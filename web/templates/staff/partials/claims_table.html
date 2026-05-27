@@ -1,0 +1,103 @@
+{# claims_table.html — refreshed by HTMX after approve/reject actions #}
+<div id="claims-table">
+  {% if claims %}
+  <div class="gilded overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Character</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Player</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Period</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Criteria</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">XP</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Submitted</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for claim in claims %}
+        <tr class="border-b border-ink-800 align-top"
+            x-data="{ rejecting: false, reason: '' }">
+          <td class="px-4 py-3">
+            <p class="font-cinzel text-xs text-bone-300">{{ claim.character_name }}</p>
+            <p class="font-cinzel text-[0.6rem] text-bone-600 mt-0.5">{{ claim.character_clan }}</p>
+          </td>
+          <td class="px-4 py-3 font-garamond text-xs text-bone-500">{{ claim.player_username }}</td>
+          <td class="px-4 py-3 font-garamond text-xs text-bone-600">{{ claim.period_label or '—' }}</td>
+          <td class="px-4 py-3">
+            {% for c in claim.claimed_criteria %}
+            <p class="font-garamond text-xs text-bone-500 leading-snug">
+              {{ c.label }}
+              <span class="text-gold-600">+{{ c.xp_value_at_submission }}</span>
+            </p>
+            {% endfor %}
+            {% if claim.rp_links %}
+            <div class="mt-1 space-y-0.5">
+              {% for link in claim.rp_links %}
+              <a href="{{ link }}" target="_blank" rel="noopener"
+                 class="block font-garamond text-[0.6rem] text-gold-700 hover:text-gold-400 truncate max-w-[16rem]">
+                {{ link | truncate(50) }}
+              </a>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if claim.helper_note %}
+            <p class="font-garamond text-xs text-mauve-500 italic mt-1">{{ claim.helper_note }}</p>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 font-cinzel text-xs text-gold-400 text-right">+{{ claim.xp_claimed }}</td>
+          <td class="px-4 py-3 font-cinzel text-[0.6rem] text-bone-600 text-right whitespace-nowrap">
+            {{ claim.submitted_at[:10] }}
+          </td>
+          <td class="px-4 py-3 text-right">
+            {# Approve / Reject buttons #}
+            <div x-show="!rejecting" class="flex gap-1.5 justify-end">
+              <button hx-post="/staff/claims/{{ claim.id }}/approve"
+                      hx-target="#claims-table"
+                      hx-swap="outerHTML"
+                      class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+                Approve
+              </button>
+              <button @click="rejecting = true"
+                      class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+                Reject
+              </button>
+            </div>
+
+            {# Inline reject form #}
+            <form x-show="rejecting" x-cloak
+                  hx-post="/staff/claims/{{ claim.id }}/reject"
+                  hx-target="#claims-table"
+                  hx-swap="outerHTML"
+                  class="flex flex-col gap-1.5 items-end min-w-[180px]">
+              <input name="reason"
+                     x-model="reason"
+                     placeholder="Reason…"
+                     required
+                     class="w-full text-xs py-1 px-2">
+              <div class="flex gap-1.5">
+                <button type="submit"
+                        class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+                  Confirm
+                </button>
+                <button type="button"
+                        @click="rejecting = false; reason = ''"
+                        class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1.5">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="gilded p-10 text-center">
+    <p class="label-gold mb-2">All Clear</p>
+    <p class="font-garamond text-bone-600 text-sm">No pending claims to review.</p>
+  </div>
+  {% endif %}
+</div>

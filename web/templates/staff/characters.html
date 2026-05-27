@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Roster — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-8">
+    <p class="label-gold mb-1">Staff</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Roster</h1>
+  </div>
+
+  {# ── Pending approvals ── #}
+  {% if pending %}
+  <div class="mb-8">
+    <p class="label-gold mb-3">
+      Awaiting Approval
+      <span class="text-blood-400 ml-2">{{ pending | length }}</span>
+    </p>
+    {% include "staff/partials/pending_chars_table.html" %}
+  </div>
+  {% endif %}
+
+  {# ── Active roster ── #}
+  <div class="mb-6">
+    <p class="label-gold mb-3">
+      Active Characters
+      <span class="text-bone-600 ml-2">{{ active | length }}</span>
+    </p>
+    {% if active %}
+    <div class="gilded overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-ink-700">
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Character</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Clan</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Player</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">XP</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Available</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Approved</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for char in active | sort(attribute='name') %}
+          <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300">{{ char.name }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">{{ char.clan | replace('-',' ') | title }}</td>
+            <td class="px-4 py-2.5 font-garamond text-xs text-bone-600">{{ char.discord_id }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-400 text-right">
+              {{ char.xp_total }} / {{ char.xp_cap }}
+            </td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-gold-500 text-right">{{ char.xp_available }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-600 text-right">
+              {{ char.approved_at[:10] if char.approved_at else '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="font-garamond text-bone-600 text-sm">No active characters.</p>
+    {% endif %}
+  </div>
+
+  {# ── Retired / Dead — collapsed ── #}
+  {% if retired or dead %}
+  <div x-data="{ show: false }">
+    <button @click="show = !show"
+            class="font-cinzel text-[0.65rem] tracking-widest text-bone-600 hover:text-bone-400 flex items-center gap-2">
+      <span x-text="show ? 'Hide' : 'Show'"></span>
+      <span>Retired & Deceased ({{ (retired | length) + (dead | length) }})</span>
+      <svg class="w-3 h-3 transition-transform" :class="show && 'rotate-180'"
+           fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="square" d="M6 9l6 6 6-6"/>
+      </svg>
+    </button>
+    <div x-show="show" x-cloak class="mt-3 gilded overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-ink-700">
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Character</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Clan</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Status</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">XP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for char in (retired + dead) | sort(attribute='name') %}
+          <tr class="border-b border-ink-800 opacity-60">
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">{{ char.name }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-600">{{ char.clan }}</td>
+            <td class="px-4 py-2.5 font-garamond text-xs
+                       {{ 'text-blood-500' if char.status == 'dead' else 'text-bone-600' }}">
+              {{ char.status | title }}
+            </td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-600 text-right">{{ char.xp_total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

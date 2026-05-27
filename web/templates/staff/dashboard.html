@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Staff Dashboard — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+
+  <div class="mb-8">
+    <p class="label-gold mb-1">Staff</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Dashboard</h1>
+  </div>
+
+  {# ── Stat cards ── #}
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+
+    <a href="/staff/claims" class="gilded p-5 block hover:border-gold-800 transition-colors">
+      <p class="label-gold mb-2 text-[0.6rem]">Pending Claims</p>
+      <p class="font-cinzel text-4xl {{ 'text-blood-400' if n_claims > 0 else 'text-bone-600' }}">
+        {{ n_claims }}
+      </p>
+    </a>
+
+    <a href="/staff/spends" class="gilded p-5 block hover:border-gold-800 transition-colors">
+      <p class="label-gold mb-2 text-[0.6rem]">Pending Spends</p>
+      <p class="font-cinzel text-4xl {{ 'text-blood-400' if n_spends > 0 else 'text-bone-600' }}">
+        {{ n_spends }}
+      </p>
+    </a>
+
+    <a href="/staff/characters" class="gilded p-5 block hover:border-gold-800 transition-colors">
+      <p class="label-gold mb-2 text-[0.6rem]">Pending Chars</p>
+      <p class="font-cinzel text-4xl {{ 'text-mauve-400' if n_chars > 0 else 'text-bone-600' }}">
+        {{ n_chars }}
+      </p>
+    </a>
+
+    <div class="gilded p-5">
+      <p class="label-gold mb-2 text-[0.6rem]">Active Characters</p>
+      <p class="font-cinzel text-4xl text-bone-400">{{ n_active }}</p>
+    </div>
+
+  </div>
+
+  {# ── Active period ── #}
+  <div class="gilded p-5 mb-8">
+    <p class="label-gold mb-2">Current XP Window</p>
+    {% if active_period %}
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="font-cinzel text-bone-200 text-lg">{{ active_period.label }}</p>
+        <p class="font-garamond text-bone-500 text-sm mt-0.5">
+          {{ active_period.opens_at[:16] | replace('T',' ') }} →
+          {{ active_period.closes_at[:16] | replace('T',' ') }} UTC
+        </p>
+      </div>
+      <span class="chip text-gold-400 border-gold-800">Open</span>
+    </div>
+    {% else %}
+    <p class="font-garamond text-bone-600 text-sm">
+      No active period.
+      <a href="/staff/periods" class="text-gold-500 hover:text-gold-300">Open a new window →</a>
+    </p>
+    {% endif %}
+  </div>
+
+  {# ── Recent pending claims ── #}
+  {% if recent_claims %}
+  <div>
+    <div class="flex items-center justify-between mb-3">
+      <p class="label-gold">Recent Pending Claims</p>
+      <a href="/staff/claims" class="font-cinzel text-[0.65rem] tracking-widest text-gold-600 hover:text-gold-400">
+        View all →
+      </a>
+    </div>
+    <div class="gilded overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-ink-700">
+            <th class="px-4 py-2.5 text-left label-gold font-normal text-xs">Character</th>
+            <th class="px-4 py-2.5 text-left label-gold font-normal text-xs">Player</th>
+            <th class="px-4 py-2.5 text-left label-gold font-normal text-xs">Period</th>
+            <th class="px-4 py-2.5 text-right label-gold font-normal text-xs">XP</th>
+            <th class="px-4 py-2.5 text-right label-gold font-normal text-xs">Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for claim in recent_claims %}
+          <tr class="border-b border-ink-800 hover:bg-ink-900 cursor-pointer"
+              data-href="/staff/claims">
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300">{{ claim.character_name }}</td>
+            <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">{{ claim.player_username }}</td>
+            <td class="px-4 py-2.5 font-garamond text-xs text-bone-600">{{ claim.period_label or '—' }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-gold-400 text-right">+{{ claim.xp_claimed }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-600 text-right">{{ claim.submitted_at[:10] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

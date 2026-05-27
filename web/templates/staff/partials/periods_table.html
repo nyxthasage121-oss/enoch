@@ -1,0 +1,59 @@
+{# periods_table.html — refreshed by HTMX after activate/close #}
+<div id="periods-table">
+  {% if periods %}
+  <div class="gilded overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Label</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Type</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Opens</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Closes</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Status</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in periods %}
+        <tr class="border-b border-ink-800">
+          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300">{{ p.label }}</td>
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-500 capitalize">{{ p.period_type }} / {{ p.phase }}</td>
+          <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-500 whitespace-nowrap">
+            {{ p.opens_at[:16] | replace('T',' ') }}
+          </td>
+          <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-500 whitespace-nowrap">
+            {{ p.closes_at[:16] | replace('T',' ') }}
+          </td>
+          <td class="px-4 py-2.5 text-center">
+            {% if p.is_active %}
+              <span class="chip text-gold-400 border-gold-800 text-[0.6rem]">Open</span>
+            {% else %}
+              <span class="chip text-bone-700 border-ink-700 text-[0.6rem]">Closed</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-right">
+            {% if p.is_active %}
+            <button hx-post="/staff/periods/{{ p.id }}/close"
+                    hx-target="#periods-table"
+                    hx-swap="outerHTML"
+                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+              Close
+            </button>
+            {% else %}
+            <button hx-post="/staff/periods/{{ p.id }}/activate"
+                    hx-target="#periods-table"
+                    hx-swap="outerHTML"
+                    class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+              Activate
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="font-garamond text-bone-600 text-sm px-1">No periods created yet.</p>
+  {% endif %}
+</div>

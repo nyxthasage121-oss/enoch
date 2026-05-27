@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Criteria — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-8">
+    <p class="label-gold mb-1">Staff</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">XP Criteria</h1>
+  </div>
+
+  {% include "staff/partials/criteria_table.html" %}
+
+  {# ── Add criterion ── #}
+  <div class="mt-8">
+    <p class="label-gold mb-4">Add Criterion</p>
+
+    {% if create_error %}
+    <div class="gilded-inset px-4 py-3 mb-4 border border-blood-900">
+      <p class="font-garamond text-blood-400 text-sm">{{ create_error }}</p>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/staff/criteria"
+          class="gilded p-5 grid grid-cols-2 gap-4 max-w-2xl">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+      <div class="col-span-2 sm:col-span-1">
+        <label class="label-gold block mb-2">Label</label>
+        <input type="text" name="label" required placeholder="e.g. Combat" class="w-full">
+      </div>
+
+      <div>
+        <label class="label-gold block mb-2">XP Value</label>
+        <input type="number" name="xp_value" value="1" min="1" max="10" class="w-full">
+      </div>
+
+      <div>
+        <label class="label-gold block mb-2">Category</label>
+        <select name="category" class="w-full">
+          <option value="base">Base</option>
+          <option value="player" selected>Player</option>
+          <option value="staff">Staff</option>
+          <option value="helper">Helper</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="label-gold block mb-2">Sort Order</label>
+        <input type="number" name="sort_order" value="0" min="0" class="w-full">
+      </div>
+
+      <div class="col-span-2">
+        <label class="label-gold block mb-2">Description
+          <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional)</span>
+        </label>
+        <input type="text" name="description" placeholder="Shown to players on the claim form" class="w-full">
+      </div>
+
+      <div class="col-span-2 flex gap-6">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="requires_rp_links" checked class="accent-[#8B1A1A]">
+          <span class="font-garamond text-bone-400 text-sm">Requires RP links</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="requires_text_note" class="accent-[#8B1A1A]">
+          <span class="font-garamond text-bone-400 text-sm">Requires text note</span>
+        </label>
+      </div>
+
+      <div class="col-span-2">
+        <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
+          Add Criterion
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

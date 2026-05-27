@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Spends Queue — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-8">
+    <p class="label-gold mb-1">Staff</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">
+      Spends Queue
+      {% if spends %}
+      <span class="font-cinzel text-xl text-blood-400 ml-3">{{ spends | length }}</span>
+      {% endif %}
+    </h1>
+  </div>
+
+  {% include "staff/partials/spends_table.html" %}
+</div>
+{% endblock %}

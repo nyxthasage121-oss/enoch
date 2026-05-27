@@ -1,0 +1,88 @@
+{# criteria_table.html — refreshed by HTMX after toggle/update #}
+<div id="criteria-table">
+  <div class="gilded overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Label</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Category</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">XP</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Links</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Note</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Sort</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Active</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in criteria %}
+        <tr class="border-b border-ink-800 align-top {{ 'opacity-40' if not c.active }}"
+            x-data="{ editing: false }">
+
+          {# View mode #}
+          <td class="px-4 py-2.5">
+            <p class="font-cinzel text-xs text-bone-300" x-show="!editing">{{ c.label }}</p>
+            <input x-show="editing" x-cloak form="edit-{{ c.id }}"
+                   name="label" value="{{ c.label }}"
+                   class="text-xs py-1 px-2 w-full">
+          </td>
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-500 capitalize">{{ c.category }}</td>
+          <td class="px-4 py-2.5 text-right">
+            <span class="font-cinzel text-xs text-gold-400" x-show="!editing">+{{ c.xp_value }}</span>
+            <input x-show="editing" x-cloak form="edit-{{ c.id }}"
+                   name="xp_value" type="number" value="{{ c.xp_value }}" min="1" max="10"
+                   class="text-xs py-1 px-2 w-14 text-right">
+          </td>
+          <td class="px-4 py-2.5 text-center">
+            {% if c.requires_rp_links %}
+              <span class="text-gold-500 text-xs">✓</span>
+            {% else %}
+              <span class="text-bone-700 text-xs">—</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-center">
+            {% if c.requires_text_note %}
+              <span class="text-gold-500 text-xs">✓</span>
+            {% else %}
+              <span class="text-bone-700 text-xs">—</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-600 text-center">{{ c.sort_order }}</td>
+          <td class="px-4 py-2.5 text-center">
+            <button hx-post="/staff/criteria/{{ c.id }}/toggle"
+                    hx-target="#criteria-table"
+                    hx-swap="outerHTML"
+                    class="font-cinzel text-[0.6rem] tracking-widest
+                           {{ 'text-gold-500 hover:text-gold-300' if c.active else 'text-bone-700 hover:text-bone-500' }}">
+              {{ 'On' if c.active else 'Off' }}
+            </button>
+          </td>
+          <td class="px-4 py-2.5 text-right">
+            <button x-show="!editing" @click="editing = true"
+                    class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1">
+              Edit
+            </button>
+            <div x-show="editing" x-cloak class="flex gap-1">
+              {# Hidden form for edit submission #}
+              <form :id="'edit-' + {{ c.id }}"
+                    hx-post="/staff/criteria/{{ c.id }}/update"
+                    hx-target="#criteria-table"
+                    hx-swap="outerHTML"
+                    @submit="editing = false">
+              </form>
+              <button type="submit" form="edit-{{ c.id }}"
+                      class="btn-send font-cinzel text-[0.6rem] px-2 py-1">
+                Save
+              </button>
+              <button type="button" @click="editing = false"
+                      class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1">
+                Cancel
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
