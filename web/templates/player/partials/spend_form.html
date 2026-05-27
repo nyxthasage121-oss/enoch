@@ -1,0 +1,232 @@
+{# spend_form.html — XP spend request form partial.
+   Rendered inline on the character page AND returned by POST /characters/{id}/spend.
+   HTMX target: #spend-form (outerHTML swap). #}
+
+<div id="spend-form"
+     x-data="spendForm({{ spend_rules_json | safe }}, {{ humanity_conditions | tojson }})">
+
+  {% if not char.is_approved %}
+  <div class="gilded p-6">
+    <p class="font-garamond text-bone-500 text-sm">
+      Your character must be approved before spending XP.
+    </p>
+  </div>
+
+  {% elif char.xp_available <= 0 and not spend_success %}
+  <div class="gilded p-6 text-center">
+    <p class="label-gold mb-2">No XP Available</p>
+    <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+      You currently have no available XP to spend.
+      Submit a claim when the next window opens to earn more.
+    </p>
+  </div>
+
+  {% else %}
+
+  {# ── Success banner ── #}
+  {% if spend_success %}
+  <div class="gilded-inset px-4 py-3 mb-5 border border-gold-800">
+    <p class="font-garamond text-gold-400 text-sm">{{ spend_success }}</p>
+  </div>
+  {% endif %}
+
+  {# ── Errors ── #}
+  {% if spend_errors %}
+  <div class="gilded-inset px-4 py-3 mb-5 border border-blood-900">
+    <ul class="space-y-1">
+      {% for e in spend_errors %}
+      <li class="font-garamond text-blood-400 text-sm">{{ e }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# ── Available XP callout ── #}
+  <div class="gilded p-4 mb-5">
+    <p class="label-gold mb-0.5">Available XP</p>
+    <p class="font-cinzel text-2xl text-bone-200">{{ char.xp_available }}</p>
+    {% if char.has_ingrained_flaw %}
+    <p class="font-garamond text-bone-600 text-xs mt-1">
+      Ingrained Flaw budget: {{ char.ingrained_xp_used }} / 15 XP used
+    </p>
+    {% endif %}
+  </div>
+
+  <form hx-post="/characters/{{ char.id }}/spend"
+        hx-target="#spend-form"
+        hx-swap="outerHTML"
+        hx-indicator="#spend-spinner"
+        class="space-y-5">
+
+    {# Category #}
+    <div>
+      <label class="label-gold block mb-2" for="spend-category">Category</label>
+      <select id="spend-category"
+              name="category"
+              x-model="category"
+              class="w-full">
+        <option value="" disabled :selected="category === ''">— Select a category —</option>
+        {% for cat in spend_categories %}
+        <option value="{{ cat }}"
+          {{ 'selected' if spend_form and spend_form.category == cat else '' }}>
+          {{ cat }}
+        </option>
+        {% endfor %}
+      </select>
+      <p x-show="category" x-cloak
+         class="font-garamond text-bone-600 text-xs mt-1 italic"
+         x-text="ruleDescription"></p>
+    </div>
+
+    {# Trait name #}
+    <div>
+      <label class="label-gold block mb-2" for="spend-trait">Trait Name</label>
+      <input id="spend-trait"
+             type="text"
+             name="trait_name"
+             placeholder="e.g. Dominate, Athletics, Presence…"
+             value="{{ spend_form.trait_name if spend_form else '' }}"
+             class="w-full">
+    </div>
+
+    {# Dots — current + new #}
+    <div class="grid grid-cols-2 gap-4" x-show="category" x-cloak>
+      <div>
+        <label class="label-gold block mb-2" for="spend-current">Current Dots</label>
+        <input id="spend-current"
+               type="number"
+               name="current_dots"
+               x-model.number="currentDots"
+               :min="isNewSkill ? 0 : minCurrentDots"
+               :max="maxDots - 1"
+               :readonly="isNewSkill"
+               :value="isNewSkill ? 0 : ({{ spend_form.current_dots if spend_form else 0 }})"
+               class="w-full"
+               min="0" max="9">
+      </div>
+      <div>
+        <label class="label-gold block mb-2" for="spend-new">New Dots</label>
+        <input id="spend-new"
+               type="number"
+               name="new_dots"
+               x-model.number="newDots"
+               :min="currentDots + 1"
+               :max="maxDots"
+               :value="{{ spend_form.new_dots if spend_form else 1 }}"
+               class="w-full"
+               min="1" max="10">
+      </div>
+    </div>
+
+    {# Cost preview #}
+    <div x-show="category && computedCost !== null" x-cloak
+         class="gilded-inset px-4 py-3 border border-gold-800 flex justify-between items-center">
+      <span class="label-gold">Calculated Cost</span>
+      <span class="font-cinzel text-xl text-gold-400" x-text="computedCost + ' XP'"></span>
+    </div>
+    <div x-show="category && computedCost === null" x-cloak
+         class="gilded-inset px-4 py-2.5 border border-blood-900">
+      <p class="font-garamond text-blood-500 text-sm">
+        Invalid dot combination for this category.
+      </p>
+    </div>
+
+    {# Humanity conditions #}
+    <div x-show="isHumanity" x-cloak class="gilded p-4 space-y-3">
+      <p class="label-gold">Humanity Requirements</p>
+      <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+        All four conditions must be met before purchasing Humanity.
+      </p>
+      {% for condition in humanity_conditions %}
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox"
+               name="hc_{{ loop.index0 }}"
+               x-model="checkedHC[{{ loop.index0 }}]"
+               class="mt-0.5 accent-[#8B1A1A]">
+        <span class="font-garamond text-bone-400 text-sm leading-snug">{{ condition }}</span>
+      </label>
+      {% endfor %}
+    </div>
+
+    {# Note #}
+    <div>
+      <label class="label-gold block mb-2" for="spend-note">
+        Note <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional)</span>
+      </label>
+      <textarea id="spend-note"
+                name="note"
+                rows="2"
+                placeholder="Additional context for the staff reviewer…"
+                class="w-full resize-none">{{ spend_form.note if spend_form and spend_form.note else '' }}</textarea>
+    </div>
+
+    {# Submit #}
+    <div class="flex items-center gap-3">
+      <button type="submit"
+              :disabled="!category || !computedCost"
+              class="btn-send font-cinzel tracking-widest text-xs disabled:opacity-40 disabled:cursor-not-allowed">
+        Submit Request
+      </button>
+      <span id="spend-spinner" class="htmx-indicator font-garamond text-bone-600 text-xs italic">
+        Submitting…
+      </span>
+    </div>
+
+  </form>
+
+  {% endif %}
+
+</div>
+
+<script>
+function spendForm(rules, humanityConditions) {
+  return {
+    category:     '{{ spend_form.category if spend_form else "" }}',
+    currentDots:  {{ spend_form.current_dots if spend_form else 0 }},
+    newDots:      {{ spend_form.new_dots if spend_form else 1 }},
+    rules:        rules,
+    humanityConditions: humanityConditions,
+    checkedHC:    humanityConditions.map(() => false),
+
+    get rule() { return this.rules[this.category] || null; },
+
+    get ruleDescription() { return this.rule ? this.rule.description : ''; },
+
+    get maxDots() { return this.rule ? (this.rule.max_dots ?? 5) : 5; },
+
+    get minCurrentDots() { return this.rule ? (this.rule.min_dots ?? 0) : 0; },
+
+    get isNewSkill()  { return this.category === 'New Skill'; },
+    get isHumanity()  { return this.category === 'Humanity'; },
+    get isIngrained() { return this.category === 'Ingrained Discipline'; },
+
+    get computedCost() {
+      const rule = this.rule;
+      if (!rule) return null;
+
+      const cur = parseInt(this.currentDots) || 0;
+      const nw  = parseInt(this.newDots)     || 0;
+
+      if (nw <= cur)                      return null;
+      if (nw  > (rule.max_dots   ?? 5))   return null;
+      if (cur < (rule.min_dots   ?? 0))   return null;
+
+      if (rule.flat_cost        !== undefined) {
+        return (cur === 0 && nw === 1) ? rule.flat_cost : null;
+      }
+      if (rule.flat_per_dot     !== undefined) {
+        return (nw - cur) * rule.flat_per_dot;
+      }
+      if (rule.level_multiplier !== undefined) {
+        return nw * rule.level_multiplier;
+      }
+      if (rule.multiplier       !== undefined) {
+        let cost = 0;
+        for (let d = cur + 1; d <= nw; d++) cost += d * rule.multiplier;
+        return cost;
+      }
+      return null;
+    }
+  };
+}
+</script>

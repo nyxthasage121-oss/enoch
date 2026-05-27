@@ -1,0 +1,157 @@
+{# claim_section.html — XP claim form partial.
+   Rendered inline on the character page AND returned by POST /characters/{id}/claim.
+   Outer wrapper carries id="claim-section" for HTMX outerHTML swap. #}
+<div id="claim-section">
+
+  {% if claim_success %}
+  {# ── Success state ── #}
+  <div class="gilded p-6 text-center">
+    <p class="label-gold mb-2">Claim Submitted</p>
+    <p class="font-garamond text-bone-400 leading-relaxed">
+      Your XP claim is pending staff review. You'll receive a notification when it's processed.
+    </p>
+  </div>
+
+  {% elif not char.is_approved %}
+  {# ── Not approved ── #}
+  <div class="gilded p-6">
+    <p class="font-garamond text-bone-500 text-sm">
+      Your character must be approved before you can submit XP claims.
+    </p>
+  </div>
+
+  {% elif not active_period %}
+  {# ── No active period ── #}
+  <div class="gilded p-6 text-center">
+    <p class="label-gold mb-2">No Active Window</p>
+    <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+      There is no XP claim window open right now. Check back when the next
+      session opens.
+    </p>
+  </div>
+
+  {% elif already_claimed %}
+  {# ── Already claimed ── #}
+  <div class="gilded p-6">
+    <p class="label-gold mb-1">Already Claimed</p>
+    <p class="font-garamond text-bone-400 text-sm leading-relaxed">
+      You have already submitted a claim for <span class="text-bone-300">{{ active_period.label }}</span>.
+      Your claim is pending staff review.
+    </p>
+  </div>
+
+  {% else %}
+  {# ── Claim form ── #}
+  {% if char.xp_total >= char.xp_cap %}
+  <div class="gilded-inset px-4 py-3 mb-4 border border-gold-800">
+    <p class="font-garamond text-gold-500 text-sm">
+      Your character has reached the XP cap. Claims will still be recorded but
+      no additional XP will be awarded.
+    </p>
+  </div>
+  {% endif %}
+
+  {# Errors #}
+  {% if claim_errors %}
+  <div class="gilded-inset px-4 py-3 mb-4 border border-blood-900">
+    <ul class="space-y-1">
+      {% for e in claim_errors %}
+      <li class="font-garamond text-blood-400 text-sm">{{ e }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form hx-post="/characters/{{ char.id }}/claim"
+        hx-target="#claim-section"
+        hx-swap="outerHTML"
+        hx-indicator="#claim-spinner"
+        class="space-y-5">
+
+    {# Period info #}
+    <div class="gilded p-4">
+      <p class="label-gold mb-0.5">Current Window</p>
+      <p class="font-cinzel text-bone-300 text-sm">{{ active_period.label }}</p>
+      <p class="font-garamond text-bone-600 text-xs mt-0.5">
+        Closes {{ active_period.closes_at[:16] | replace('T', ' ') }} UTC
+      </p>
+    </div>
+
+    {# Criteria checkboxes #}
+    {% if player_criteria %}
+    <div>
+      <p class="label-gold mb-2">What did you do?</p>
+      <div class="space-y-1.5">
+        {% for c in player_criteria %}
+        <label class="flex items-start gap-3 px-4 py-3 border border-ink-700
+                      hover:border-gold-800 cursor-pointer transition-colors
+                      {% if claim_form and c.id in claim_form.criteria_ids %}bg-ink-900{% endif %}">
+          <input type="checkbox"
+                 name="criteria_ids"
+                 value="{{ c.id }}"
+                 class="mt-0.5 accent-[#8B1A1A]"
+                 {% if claim_form and c.id in claim_form.criteria_ids %}checked{% endif %}>
+          <span class="flex-1 min-w-0">
+            <span class="font-cinzel text-bone-300 text-sm">{{ c.label }}</span>
+            <span class="font-cinzel text-gold-500 text-xs ml-2">+{{ c.xp_value }} XP</span>
+            {% if c.requires_rp_links %}
+              <span class="label-gold ml-2 text-[0.55rem]">links required</span>
+            {% endif %}
+            {% if c.description %}
+              <span class="block font-garamond text-bone-600 text-xs mt-0.5">{{ c.description }}</span>
+            {% endif %}
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# RP Links — Alpine-managed list #}
+    <div x-data="{ links: {{ (claim_form.rp_links if claim_form else ['']) | tojson }} }">
+      <p class="label-gold mb-2">RP Links <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(Discord message URLs)</span></p>
+      <div class="space-y-2">
+        <template x-for="(link, idx) in links" :key="idx">
+          <div class="flex gap-2">
+            <input type="url"
+                   name="rp_links"
+                   :value="link"
+                   @input="links[idx] = $event.target.value"
+                   placeholder="https://discord.com/channels/…"
+                   class="flex-1 min-w-0">
+            <button type="button"
+                    @click="if (links.length > 1) links.splice(idx, 1)"
+                    class="btn-ghost px-2 py-1 text-bone-600 hover:text-blood-400"
+                    :disabled="links.length === 1"
+                    title="Remove">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="square" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </template>
+      </div>
+      <button type="button"
+              @click="links.push('')"
+              class="btn-ghost mt-2 font-cinzel text-[0.65rem] tracking-widest px-3 py-1.5">
+        + Add Link
+      </button>
+    </div>
+
+    {# Path: none / staff / helper — only show if staff/helper exists in criteria #}
+    {# For now, hidden — added when staff/helper path is needed #}
+
+    {# Submit #}
+    <div class="flex items-center gap-3">
+      <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
+        Submit Claim
+      </button>
+      <span id="claim-spinner" class="htmx-indicator font-garamond text-bone-600 text-xs italic">
+        Submitting…
+      </span>
+    </div>
+
+  </form>
+  {% endif %}
+
+</div>

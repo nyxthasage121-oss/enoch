@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}{{ char.name }} — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter clan-{{ char.clan }}" x-data="{ tab: '{{ default_tab }}' }">
+
+  {# ── Back link ── #}
+  <a href="/characters" class="inline-flex items-center gap-1.5 text-bone-600 hover:text-gold-400 font-cinzel text-xs tracking-widest uppercase mb-6 transition-colors">
+    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="square" d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    All Characters
+  </a>
+
+  {# ── Hero ── #}
+  <div class="relative overflow-hidden mb-6 border border-[var(--clan,theme(colors.ink.700))]
+              bg-gradient-to-b from-ink-900 to-ink-950">
+
+    {# Clan tint overlay #}
+    <div class="absolute inset-0 opacity-[0.04] pointer-events-none"
+         style="background: radial-gradient(ellipse at 80% 50%, var(--clan, #8B6914) 0%, transparent 70%)"></div>
+
+    <div class="relative px-6 py-7 flex items-start gap-5">
+
+      {# Avatar / monogram #}
+      <div class="w-14 h-14 shrink-0 border border-[var(--clan,theme(colors.ink.700))]
+                  bg-ink-900 flex items-center justify-center">
+        {% if char.profile_image_url %}
+          <img src="{{ char.profile_image_url }}" alt="" class="w-full h-full object-cover">
+        {% else %}
+          <span class="font-cinzel text-2xl text-[var(--clan,theme(colors.gold.400))]">
+            {{ char.name[0] | upper }}
+          </span>
+        {% endif %}
+      </div>
+
+      <div class="flex-1 min-w-0">
+        <p class="label-gold mb-0.5 text-[0.6rem] tracking-[0.25em]">
+          {{ char.clan | replace('-', ' ') | title }}
+          {% if char.predator_type %}&thinsp;·&thinsp;{{ char.predator_type }}{% endif %}
+        </p>
+        <h1 class="font-cinzel text-2xl md:text-3xl text-bone-200 tracking-wide truncate">
+          {{ char.name }}
+        </h1>
+
+        <div class="flex flex-wrap gap-2 mt-2">
+          {% if not char.is_approved %}
+            <span class="chip text-mauve-400 border-mauve-700">Awaiting Approval</span>
+          {% elif char.status == 'active' %}
+            <span class="chip text-gold-400 border-gold-800">Active</span>
+          {% elif char.status == 'retired' %}
+            <span class="chip text-bone-500 border-bone-700">Retired</span>
+          {% elif char.status == 'dead' %}
+            <span class="chip text-blood-400 border-blood-800">Final Death</span>
+          {% endif %}
+          {% if char.has_ingrained_flaw %}
+            <span class="chip text-bone-600 border-ink-600">Ingrained Flaw</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# XP bar #}
+    {% set pct = [(char.xp_total / char.xp_cap * 100)|int, 100]|min %}
+    <div class="px-6 pb-5">
+      <div class="flex justify-between items-center mb-1.5">
+        <span class="font-cinzel text-[0.6rem] text-bone-600 tracking-[0.2em] uppercase">Experience</span>
+        <span class="font-cinzel text-[0.65rem] text-bone-500">
+          {{ char.xp_total }} / {{ char.xp_cap }}
+          {% if char.xp_available > 0 %}
+            <span class="text-gold-500 ml-2">{{ char.xp_available }} available</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="h-0.5 bg-ink-800 w-full overflow-hidden">
+        <div class="h-full transition-all duration-700"
+             style="width: {{ pct }}%; background: var(--clan, theme(colors.gold.400))"></div>
+      </div>
+      {% if char.xp_total >= char.xp_cap %}
+        <p class="text-right font-cinzel text-[0.6rem] text-gold-600 mt-1">
+          Cap reached — retirement window open
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Tabs ── #}
+  <div class="flex gap-0 border-b border-ink-700 mb-6 overflow-x-auto">
+    {% for t, lbl in [('overview','Overview'),('claim','Claim XP'),('spend','Spend XP'),('history','History')] %}
+    <button @click="tab='{{ t }}'"
+            :class="tab === '{{ t }}'
+              ? 'text-gold-400 border-b-2 border-[var(--clan,theme(colors.gold.400))]'
+              : 'text-bone-600 hover:text-bone-400 border-b-2 border-transparent'"
+            class="font-cinzel text-[0.65rem] tracking-[0.2em] uppercase px-4 py-2.5 -mb-px transition-colors whitespace-nowrap">
+      {{ lbl }}
+    </button>
+    {% endfor %}
+  </div>
+
+  {# ══ Overview ══ #}
+  <div x-show="tab === 'overview'" x-cloak class="space-y-4">
+    {% if char.concept or char.sire or char.covenant or char.profile_blurb %}
+    <div class="gilded p-5">
+      {% if char.profile_blurb %}
+        <p class="font-garamond text-bone-400 text-base leading-relaxed italic mb-4">
+          {{ char.profile_blurb }}
+        </p>
+        <div class="divider-gold mb-4"></div>
+      {% endif %}
+
+      <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        {% if char.concept %}
+        <div>
+          <dt class="label-gold mb-0.5">Concept</dt>
+          <dd class="font-garamond text-bone-300">{{ char.concept }}</dd>
+        </div>
+        {% endif %}
+        {% if char.sire %}
+        <div>
+          <dt class="label-gold mb-0.5">Sire</dt>
+          <dd class="font-garamond text-bone-300">{{ char.sire }}</dd>
+        </div>
+        {% endif %}
+        {% if char.predator_type %}
+        <div>
+          <dt class="label-gold mb-0.5">Predator Type</dt>
+          <dd class="font-garamond text-bone-300">{{ char.predator_type }}</dd>
+        </div>
+        {% endif %}
+        {% if char.covenant %}
+        <div>
+          <dt class="label-gold mb-0.5">Covenant</dt>
+          <dd class="font-garamond text-bone-300">{{ char.covenant }}</dd>
+        </div>
+        {% endif %}
+      </dl>
+    </div>
+    {% else %}
+    <div class="gilded p-5 text-center">
+      <p class="font-garamond text-bone-600 text-sm">No overview information on file.</p>
+    </div>
+    {% endif %}
+
+    {% if coterie %}
+    <div class="gilded p-5">
+      <p class="label-gold mb-2">Coterie</p>
+      <p class="font-cinzel text-bone-300">{{ coterie.name }}</p>
+      <dl class="flex gap-6 mt-3 text-xs">
+        {% for field, label in [('chasse','Chasse'),('lien','Lien'),('portillon','Portillon')] %}
+        <div>
+          <dt class="label-gold mb-0.5">{{ label }}</dt>
+          <dd class="font-cinzel text-bone-300">{{ coterie[field] }}</dd>
+        </div>
+        {% endfor %}
+      </dl>
+    </div>
+    {% endif %}
+
+    {% if char.has_ingrained_flaw %}
+    <div class="gilded p-5">
+      <p class="label-gold mb-1">Ingrained Discipline Flaw</p>
+      <p class="font-garamond text-bone-400 text-sm">
+        Budget used: <span class="font-cinzel text-bone-300">{{ char.ingrained_xp_used }} / 15 XP</span>
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ══ Claim XP ══ #}
+  <div x-show="tab === 'claim'" x-cloak>
+    {% include "player/partials/claim_section.html" %}
+  </div>
+
+  {# ══ Spend XP ══ #}
+  <div x-show="tab === 'spend'" x-cloak>
+    {% include "player/partials/spend_form.html" %}
+  </div>
+
+  {# ══ History ══ #}
+  <div x-show="tab === 'history'" x-cloak>
+    <div class="gilded overflow-hidden">
+      {% if ledger %}
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-ink-700">
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Date</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Type</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Note</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">XP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in ledger %}
+          <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">
+              {{ entry.created_at[:10] }}
+            </td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-400 capitalize">
+              {{ entry.entry_type }}
+            </td>
+            <td class="px-4 py-2.5 font-garamond text-bone-500 text-xs">
+              {{ entry.note or "—" }}
+            </td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-right
+                       {{ 'text-gold-400' if entry.xp_delta > 0 else 'text-blood-400' }}">
+              {{ '+' if entry.xp_delta > 0 else '' }}{{ entry.xp_delta }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="px-5 py-8 text-center font-garamond text-bone-600 text-sm">
+        No XP history yet.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}My Characters — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+
+  <div class="flex items-end justify-between mb-8">
+    <div>
+      <p class="label-gold mb-1">Dossier</p>
+      <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">My Characters</h1>
+    </div>
+    {# New character — placeholder until submission flow is built #}
+    <a href="#" class="btn-ghost font-cinzel tracking-widest text-xs opacity-50 cursor-not-allowed"
+       title="Coming soon">New Character</a>
+  </div>
+
+  {% if characters %}
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {% for char in characters %}
+    {% set pct = [(char.xp_total / char.xp_cap * 100)|int, 100]|min %}
+    <a href="/characters/{{ char.id }}"
+       class="clan-{{ char.clan }} gilded block no-underline group hover:border-[var(--clan,theme(colors.gold.dim))] transition-colors">
+
+      <div class="p-5">
+        {# Status chip #}
+        <div class="flex items-start justify-between mb-3">
+          <p class="label-gold text-[0.6rem] tracking-[0.2em]">{{ char.clan | replace('-', ' ') | title }}</p>
+          {% if not char.is_approved %}
+            <span class="chip text-mauve-400 border-mauve-700 text-[0.6rem]">Pending</span>
+          {% elif char.status == 'retired' %}
+            <span class="chip text-bone-500 border-bone-700 text-[0.6rem]">Retired</span>
+          {% elif char.status == 'dead' %}
+            <span class="chip text-blood-400 border-blood-800 text-[0.6rem]">Final Death</span>
+          {% endif %}
+        </div>
+
+        <h2 class="font-cinzel text-xl text-bone-200 tracking-wide group-hover:text-[var(--clan,theme(colors.bone.100))] transition-colors mb-4 truncate">
+          {{ char.name }}
+        </h2>
+
+        {# XP bar #}
+        <div>
+          <div class="flex justify-between items-center mb-1.5">
+            <span class="font-cinzel text-[0.65rem] text-bone-600 tracking-widest">XP</span>
+            <span class="font-cinzel text-[0.65rem] text-bone-500">{{ char.xp_total }} / {{ char.xp_cap }}</span>
+          </div>
+          <div class="h-px bg-ink-700 w-full overflow-hidden">
+            <div class="h-full bg-[var(--clan,theme(colors.gold.400))] transition-all duration-700"
+                 style="width: {{ pct }}%"></div>
+          </div>
+          {% if char.xp_available > 0 %}
+          <p class="text-right font-cinzel text-[0.6rem] text-bone-600 mt-1">
+            {{ char.xp_available }} available
+          </p>
+          {% endif %}
+        </div>
+      </div>
+
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  {# Empty state #}
+  <div class="gilded p-10 text-center max-w-md">
+    <p class="font-garamond text-bone-500 text-lg mb-6 leading-relaxed">
+      You have no characters yet. Submit one to begin your story in the city.
+    </p>
+    <a href="#" class="btn-ghost font-cinzel tracking-widest text-xs opacity-50 cursor-not-allowed"
+       title="Coming soon">Submit a Character</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

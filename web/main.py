@@ -12,6 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from .config import settings
 from .db import run_migrations
+from .deps import LoginRequired
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
@@ -67,6 +68,19 @@ def _ctx(request: Request, **extra) -> dict:
         "flash_messages": flash,
         **extra,
     }
+
+
+# ── Auth redirect handler ────────────────────────────────────────
+
+@app.exception_handler(LoginRequired)
+async def handle_login_required(request: Request, exc: LoginRequired):
+    from fastapi.responses import Response as _Resp
+    request.session["login_next"] = exc.next_url
+    # HTMX requests can't follow a 303 — send HX-Redirect instead
+    if request.headers.get("HX-Request"):
+        return _Resp(status_code=200, headers={"HX-Redirect": "/auth/login"})
+    from fastapi.responses import RedirectResponse as _Redir
+    return _Redir(url="/auth/login", status_code=303)
 
 
 # ── Error handlers ───────────────────────────────────────────────
