@@ -2,8 +2,18 @@
 
 {% block title %}Not Found — Enoch{% endblock %}
 
+{% block scripts %}
+<script>document.body.classList.add('error-page');</script>
+{% endblock %}
+
 {% block content %}
-<div class="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+<div class="fog-layer" aria-hidden="true">
+  <div class="fog-blob fog-blob-1"></div>
+  <div class="fog-blob fog-blob-2"></div>
+  <div class="fog-blob fog-blob-3"></div>
+</div>
+
+<div class="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-3rem)] text-center px-4">
 
   <div class="gilded p-10 max-w-lg w-full">
     <p class="label-gold mb-4">Error 404</p>
@@ -20,3 +30,4 @@
 
 </div>
 {% endblock %}
+

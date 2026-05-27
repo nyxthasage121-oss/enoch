@@ -522,3 +522,138 @@ tbody tr[data-href] { cursor: pointer; }
 .page-enter {
   animation: fadeUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Visual Effects Layer
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Overridable main background ────────────────────────────────── */
+.main-bg { background: #0a0708; }
+body.landing-page .main-bg,
+body.error-page   .main-bg { background: transparent; }
+
+/* ── Aurora — landing page ──────────────────────────────────────── */
+.aurora-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.aurora-layer::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background:
+    radial-gradient(ellipse 80% 55% at 18% 35%,  rgba(138,36,36,0.44) 0%, transparent 58%),
+    radial-gradient(ellipse 65% 50% at 78% 65%,  rgba(26,10,46,0.55)  0%, transparent 55%),
+    radial-gradient(ellipse 55% 42% at 58% 12%,  rgba(72,18,18,0.30)  0%, transparent 52%);
+  background-size: 300% 300%;
+  animation: aurora 14s ease-in-out infinite alternate;
+  filter: blur(55px);
+}
+
+.aurora-layer::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background:
+    radial-gradient(ellipse 70% 55% at 70% 28%,  rgba(176,48,48,0.20) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 65% at 22% 72%,  rgba(40,12,68,0.40)  0%, transparent 60%),
+    radial-gradient(ellipse 40% 45% at 88% 84%,  rgba(10,4,20,0.55)   0%, transparent 55%);
+  background-size: 280% 280%;
+  animation: aurora 20s ease-in-out infinite alternate-reverse;
+  filter: blur(75px);
+}
+
+@keyframes aurora {
+  0%   { background-position: 0%   50%, 100%  50%, 50%  0%; }
+  50%  { background-position: 100% 30%,   0%  70%, 80% 60%; }
+  100% { background-position: 30%  80%,  60%  20%,  0% 40%; }
+}
+
+/* ── Error page fog ─────────────────────────────────────────────── */
+.fog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fog-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+}
+
+.fog-blob-1 {
+  width: 75vw; height: 55vh;
+  top: -12%; left: -18%;
+  background: radial-gradient(ellipse, rgba(80,18,18,0.50) 0%, transparent 70%);
+  animation: fogDrift 20s ease-in-out infinite alternate;
+}
+
+.fog-blob-2 {
+  width: 65vw; height: 60vh;
+  bottom: -18%; right: -14%;
+  background: radial-gradient(ellipse, rgba(28,10,52,0.52) 0%, transparent 70%);
+  animation: fogDrift 26s ease-in-out infinite alternate-reverse;
+}
+
+.fog-blob-3 {
+  width: 50vw; height: 40vh;
+  top: 35%; left: 28%;
+  background: radial-gradient(ellipse, rgba(55,14,14,0.28) 0%, transparent 70%);
+  animation: fogDrift 34s ease-in-out infinite alternate;
+  animation-delay: -8s;
+}
+
+@keyframes fogDrift {
+  0%   { transform: translate(  0%,   0%) scale(1.00); }
+  33%  { transform: translate(  6%,  -4%) scale(1.06); }
+  66%  { transform: translate( -5%,   5%) scale(0.95); }
+  100% { transform: translate(  4%,  -2%) scale(1.03); }
+}
+
+/* ── Card spotlight + tilt ──────────────────────────────────────── */
+.card-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.3s ease;
+  border-radius: inherit;
+}
+
+/* ── XP fill animation ──────────────────────────────────────────── */
+.xp-fill-anim {
+  height: 100%;
+  background: var(--clan, #b08a3e);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--clan, #b08a3e) 55%, transparent);
+  width: 0;
+  animation: xpFill 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.25s forwards;
+}
+
+@keyframes xpFill {
+  to { width: var(--xp-target, 0%); }
+}
+
+/* ── Dashboard pending-pulse ────────────────────────────────────── */
+@keyframes pendingPulse {
+  0%, 100% { box-shadow:
+               inset 0 0 0 1px rgba(176,138,62,0.05),
+               inset 0 1px 0 rgba(236,228,214,0.03),
+               0 30px 60px -20px rgba(0,0,0,0.6); }
+  50%      { box-shadow:
+               inset 0 0 0 1px rgba(176,138,62,0.05),
+               inset 0 1px 0 rgba(236,228,214,0.03),
+               0 30px 60px -20px rgba(0,0,0,0.6),
+               0 0 0 1px rgba(176,48,48,0.30),
+               0 0 22px rgba(138,36,36,0.22); }
+}
+
+.pending-pulse {
+  animation: pendingPulse 2.8s ease-in-out infinite;
+}

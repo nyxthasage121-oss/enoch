@@ -2,7 +2,14 @@
 
 {% block title %}Enoch{% endblock %}
 
+{% block scripts %}
+<script>document.body.classList.add('landing-page');</script>
+{% endblock %}
+
 {% block content %}
+{# Aurora backdrop — only visible on landing page (body.landing-page) #}
+<div class="aurora-layer" aria-hidden="true"></div>
+
 <div class="page-enter">
 
   {% if current_user %}
@@ -16,7 +23,7 @@
 
   {% else %}
   {# ── Unauthenticated: landing / login gate ── #}
-  <div class="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
+  <div class="flex flex-col items-center justify-center min-h-[calc(100vh-3rem)] text-center px-4">
 
     {# Brand mark #}
     <div class="mb-10">

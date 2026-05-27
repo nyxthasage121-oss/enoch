@@ -74,8 +74,7 @@
         </span>
       </div>
       <div class="h-0.5 bg-ink-800 w-full overflow-hidden">
-        <div class="h-full transition-all duration-700"
-             style="width: {{ pct }}%; background: var(--clan, theme(colors.gold.400))"></div>
+        <div class="xp-fill-anim" style="--xp-target: {{ pct }}%"></div>
       </div>
       {% if char.xp_total >= char.xp_cap %}
         <p class="text-right font-cinzel text-[0.6rem] text-gold-600 mt-1">

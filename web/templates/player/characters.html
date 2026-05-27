@@ -20,7 +20,12 @@
     {% for char in characters %}
     {% set pct = [(char.xp_total / char.xp_cap * 100)|int, 100]|min %}
     <a href="/characters/{{ char.id }}"
-       class="clan-{{ char.clan }} gilded block no-underline group hover:border-[var(--clan,theme(colors.gold.dim))] transition-colors">
+       x-data="cardSpotlight"
+       @mousemove="onMove"
+       @mouseleave="onLeave"
+       :style="tiltStyle"
+       class="clan-{{ char.clan }} gilded relative overflow-hidden block no-underline group hover:border-[var(--clan,theme(colors.gold.dim))] transition-colors">
+      <div class="card-glare" :style="glareStyle"></div>
 
       <div class="p-5">
         {# Status chip #}
@@ -46,8 +51,7 @@
             <span class="font-cinzel text-[0.65rem] text-bone-500">{{ char.xp_total }} / {{ char.xp_cap }}</span>
           </div>
           <div class="h-px bg-ink-700 w-full overflow-hidden">
-            <div class="h-full bg-[var(--clan,theme(colors.gold.400))] transition-all duration-700"
-                 style="width: {{ pct }}%"></div>
+            <div class="xp-fill-anim" style="--xp-target: {{ pct }}%"></div>
           </div>
           {% if char.xp_available > 0 %}
           <p class="text-right font-cinzel text-[0.6rem] text-bone-600 mt-1">

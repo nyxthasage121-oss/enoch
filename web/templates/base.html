@@ -116,7 +116,7 @@
     </nav>
 
     {# ── Main content ── #}
-    <main class="flex-1 min-w-0 overflow-auto px-6 py-6" style="background:#0a0708;">
+    <main class="flex-1 min-w-0 overflow-auto px-6 py-6 main-bg">
 
       {# Flash messages (server-side redirect flow) #}
       {% if flash_messages %}
@@ -141,6 +141,7 @@
   </div>
 
   <script src="/static/vendor/htmx.min.js"></script>
+  <script src="/static/js/effects.js" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
   <script src="/static/js/codex.js" defer></script>
   {% block scripts %}{% endblock %}
