@@ -65,7 +65,7 @@ async def dashboard(request: Request, user: dict = Depends(require_staff)):
     active_chars  = [c for c in all_chars if c["status"] == "active"]
 
     return templates.TemplateResponse(
-        "staff/dashboard.html",
+        request, "staff/dashboard.html",
         _ctx(
             request,
             n_claims=len(pending_claims),
@@ -86,7 +86,7 @@ async def claims_queue(request: Request, user: dict = Depends(require_staff)):
     with get_db() as conn:
         claims = list_pending_claims(conn)
     return templates.TemplateResponse(
-        "staff/claims.html", _ctx(request, claims=claims)
+        request, "staff/claims.html", _ctx(request, claims=claims)
     )
 
 
@@ -108,7 +108,7 @@ async def do_approve_claim(
         claims = list_pending_claims(conn)
 
     resp = templates.TemplateResponse(
-        "staff/partials/claims_table.html", _ctx(request, claims=claims)
+        request, "staff/partials/claims_table.html", _ctx(request, claims=claims)
     )
     _toast(resp, err or "Claim approved.", "error" if err else "success")
     return resp
@@ -135,7 +135,7 @@ async def do_reject_claim(
         claims = list_pending_claims(conn)
 
     resp = templates.TemplateResponse(
-        "staff/partials/claims_table.html", _ctx(request, claims=claims)
+        request, "staff/partials/claims_table.html", _ctx(request, claims=claims)
     )
     _toast(resp, err or "Claim rejected.", "error" if err else "info")
     return resp
@@ -148,7 +148,7 @@ async def spends_queue(request: Request, user: dict = Depends(require_staff)):
     with get_db() as conn:
         spends = list_pending_spends(conn)
     return templates.TemplateResponse(
-        "staff/spends.html", _ctx(request, spends=spends)
+        request, "staff/spends.html", _ctx(request, spends=spends)
     )
 
 
@@ -170,7 +170,7 @@ async def do_approve_spend(
         spends = list_pending_spends(conn)
 
     resp = templates.TemplateResponse(
-        "staff/partials/spends_table.html", _ctx(request, spends=spends)
+        request, "staff/partials/spends_table.html", _ctx(request, spends=spends)
     )
     _toast(resp, err or "Spend approved.", "error" if err else "success")
     return resp
@@ -197,7 +197,7 @@ async def do_reject_spend(
         spends = list_pending_spends(conn)
 
     resp = templates.TemplateResponse(
-        "staff/partials/spends_table.html", _ctx(request, spends=spends)
+        request, "staff/partials/spends_table.html", _ctx(request, spends=spends)
     )
     _toast(resp, err or "Spend rejected.", "error" if err else "info")
     return resp
@@ -216,7 +216,7 @@ async def roster(request: Request, user: dict = Depends(require_staff)):
     dead    = [c for c in all_chars if c["status"] == "dead"]
 
     return templates.TemplateResponse(
-        "staff/characters.html",
+        request, "staff/characters.html",
         _ctx(request, pending=pending, active=active, retired=retired, dead=dead),
     )
 
@@ -240,7 +240,7 @@ async def do_approve_char(
 
     pending = [c for c in all_chars if not c["is_approved"]]
     resp = templates.TemplateResponse(
-        "staff/partials/pending_chars_table.html", _ctx(request, pending=pending)
+        request, "staff/partials/pending_chars_table.html", _ctx(request, pending=pending)
     )
     _toast(resp, err or "Character approved.", "error" if err else "success")
     return resp
@@ -268,7 +268,7 @@ async def do_reject_char(
 
     pending = [c for c in all_chars if not c["is_approved"]]
     resp = templates.TemplateResponse(
-        "staff/partials/pending_chars_table.html", _ctx(request, pending=pending)
+        request, "staff/partials/pending_chars_table.html", _ctx(request, pending=pending)
     )
     _toast(resp, err or "Character returned to player.", "error" if err else "info")
     return resp
@@ -281,7 +281,7 @@ async def criteria_admin(request: Request, user: dict = Depends(require_staff)):
     with get_db() as conn:
         criteria = list_criteria(conn, active_only=False)
     return templates.TemplateResponse(
-        "staff/criteria.html", _ctx(request, criteria=criteria)
+        request, "staff/criteria.html", _ctx(request, criteria=criteria)
     )
 
 
@@ -319,7 +319,7 @@ async def create_criterion_route(
         criteria = list_criteria(conn, active_only=False)
 
     resp = templates.TemplateResponse(
-        "staff/criteria.html", _ctx(request, criteria=criteria, create_error=err)
+        request, "staff/criteria.html", _ctx(request, criteria=criteria, create_error=err)
     )
     if not err:
         _toast(resp, f"Criterion '{label}' created.")
@@ -344,7 +344,7 @@ async def toggle_criterion(
         criteria = list_criteria(conn, active_only=False)
 
     resp = templates.TemplateResponse(
-        "staff/partials/criteria_table.html", _ctx(request, criteria=criteria)
+        request, "staff/partials/criteria_table.html", _ctx(request, criteria=criteria)
     )
     _toast(resp, f"Criterion {'deactivated' if c['active'] else 'activated'}.", "info")
     return resp
@@ -381,7 +381,7 @@ async def update_criterion_route(
             criteria = list_criteria(conn, active_only=False)
 
     resp = templates.TemplateResponse(
-        "staff/partials/criteria_table.html", _ctx(request, criteria=criteria)
+        request, "staff/partials/criteria_table.html", _ctx(request, criteria=criteria)
     )
     _toast(resp, "Criterion updated." if label else "No changes saved.", "success" if label else "info")
     return resp
@@ -395,7 +395,7 @@ async def periods_admin(request: Request, user: dict = Depends(require_staff)):
         periods       = list_periods(conn, limit=30)
         active_period = get_active_period(conn)
     return templates.TemplateResponse(
-        "staff/periods.html",
+        request, "staff/periods.html",
         _ctx(request, periods=periods, active_period=active_period),
     )
 
@@ -433,7 +433,7 @@ async def create_period_route(
         active_period = get_active_period(conn)
 
     resp = templates.TemplateResponse(
-        "staff/periods.html",
+        request, "staff/periods.html",
         _ctx(request, periods=periods, active_period=active_period, create_error=err),
     )
     if not err:
@@ -456,7 +456,7 @@ async def activate_period(
         active_period = get_active_period(conn)
 
     resp = templates.TemplateResponse(
-        "staff/partials/periods_table.html",
+        request, "staff/partials/periods_table.html",
         _ctx(request, periods=periods, active_period=active_period),
     )
     _toast(resp, "Period activated — XP window is now open.")
@@ -476,7 +476,7 @@ async def close_period_route(
         active_period = get_active_period(conn)
 
     resp = templates.TemplateResponse(
-        "staff/partials/periods_table.html",
+        request, "staff/partials/periods_table.html",
         _ctx(request, periods=periods, active_period=active_period),
     )
     _toast(resp, "Period closed.", "info")
@@ -496,7 +496,7 @@ def _coterie_ctx(conn) -> dict:
 async def coteries_admin(request: Request, user: dict = Depends(require_staff)):
     with get_db() as conn:
         ctx = _coterie_ctx(conn)
-    return templates.TemplateResponse("staff/coteries.html", _ctx(request, **ctx))
+    return templates.TemplateResponse(request, "staff/coteries.html", _ctx(request, **ctx))
 
 
 @router.post("/coteries/requests/{request_id}/approve", response_class=HTMLResponse)
@@ -515,7 +515,7 @@ async def approve_coterie_req(
     with get_db() as conn:
         ctx = _coterie_ctx(conn)
     resp = templates.TemplateResponse(
-        "staff/partials/coterie_requests_table.html", _ctx(request, **ctx)
+        request, "staff/partials/coterie_requests_table.html", _ctx(request, **ctx)
     )
     _toast(resp, err or "Coterie formed and activated.", "error" if err else "success")
     return resp
@@ -539,7 +539,7 @@ async def reject_coterie_req(
     with get_db() as conn:
         ctx = _coterie_ctx(conn)
     resp = templates.TemplateResponse(
-        "staff/partials/coterie_requests_table.html", _ctx(request, **ctx)
+        request, "staff/partials/coterie_requests_table.html", _ctx(request, **ctx)
     )
     _toast(resp, err or "Formation request rejected.", "error" if err else "info")
     return resp
@@ -561,7 +561,7 @@ async def approve_co_spend(
     with get_db() as conn:
         ctx = _coterie_ctx(conn)
     resp = templates.TemplateResponse(
-        "staff/partials/coterie_spends_table.html", _ctx(request, **ctx)
+        request, "staff/partials/coterie_spends_table.html", _ctx(request, **ctx)
     )
     _toast(resp, err or "Domain upgrade approved.", "error" if err else "success")
     return resp
@@ -585,7 +585,7 @@ async def reject_co_spend(
     with get_db() as conn:
         ctx = _coterie_ctx(conn)
     resp = templates.TemplateResponse(
-        "staff/partials/coterie_spends_table.html", _ctx(request, **ctx)
+        request, "staff/partials/coterie_spends_table.html", _ctx(request, **ctx)
     )
     _toast(resp, err or "Domain upgrade rejected.", "error" if err else "info")
     return resp
@@ -605,7 +605,7 @@ async def remove_coterie_member_route(
         members = list_coterie_members(conn, coterie_id)
         coterie = get_coterie(conn, coterie_id)
     resp = templates.TemplateResponse(
-        "staff/partials/coterie_members_table.html",
+        request, "staff/partials/coterie_members_table.html",
         _ctx(request, coterie=coterie, members=members),
     )
     _toast(resp, "Member removed.", "info")
@@ -625,7 +625,7 @@ async def coterie_manage_page(
         members = list_coterie_members(conn, coterie_id)
         spends  = list_coterie_spends(conn, coterie_id)
     return templates.TemplateResponse(
-        "staff/coterie_manage.html",
+        request, "staff/coterie_manage.html",
         _ctx(request, coterie=coterie, members=members, spends=spends),
     )
 
@@ -653,7 +653,7 @@ async def add_coterie_member_route(
         members = list_coterie_members(conn, coterie_id)
         coterie = get_coterie(conn, coterie_id)
     resp = templates.TemplateResponse(
-        "staff/partials/coterie_members_table.html",
+        request, "staff/partials/coterie_members_table.html",
         _ctx(request, coterie=coterie, members=members),
     )
     _toast(resp, err or "Member added.", "error" if err else "success")

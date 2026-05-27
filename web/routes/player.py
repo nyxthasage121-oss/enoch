@@ -68,7 +68,7 @@ async def index(request: Request):
     """Landing page — redirects to character list if logged in."""
     if request.session.get("user"):
         return RedirectResponse(url="/characters", status_code=303)
-    return templates.TemplateResponse("player/index.html", _ctx(request))
+    return templates.TemplateResponse(request, "player/index.html", _ctx(request))
 
 
 @router.get("/characters", response_class=HTMLResponse)
@@ -79,7 +79,7 @@ async def character_list(
     with get_db() as conn:
         characters = list_player_characters(conn, user["id"])
     return templates.TemplateResponse(
-        "player/characters.html",
+        request, "player/characters.html",
         _ctx(request, characters=characters),
     )
 
@@ -110,7 +110,7 @@ async def character_detail(
     )
 
     return templates.TemplateResponse(
-        "player/character.html",
+        request, "player/character.html",
         _ctx(
             request,
             char=char,
@@ -183,7 +183,7 @@ async def submit_claim(
 
         if errors:
             resp = templates.TemplateResponse(
-                "player/partials/claim_section.html",
+                request, "player/partials/claim_section.html",
                 _ctx(
                     request,
                     char=char,
@@ -223,7 +223,7 @@ async def submit_claim(
         p_criteria = list(criteria_map.values())
 
     resp = templates.TemplateResponse(
-        "player/partials/claim_section.html",
+        request, "player/partials/claim_section.html",
         _ctx(
             request,
             char=char,
@@ -294,7 +294,7 @@ async def submit_spend(
 
         if errors:
             resp = templates.TemplateResponse(
-                "player/partials/spend_form.html", _spend_ctx()
+                request, "player/partials/spend_form.html", _spend_ctx()
             )
             _toast(resp, "Please fix the errors below.", "error")
             return resp
@@ -319,7 +319,7 @@ async def submit_spend(
         char = get_character_for_player(conn, character_id, user["id"])
 
     resp = templates.TemplateResponse(
-        "player/partials/spend_form.html",
+        request, "player/partials/spend_form.html",
         _spend_ctx({"spend_success": f"Request submitted — {trait_name} ({category}, {verified_cost} XP)."}),
     )
     _toast(resp, "Spend request submitted — pending staff review.")
@@ -354,7 +354,7 @@ async def coteries_list(request: Request, user: dict = Depends(require_auth)):
         roster = [c for c in all_active if c["is_approved"]]
 
     return templates.TemplateResponse(
-        "player/coteries.html",
+        request, "player/coteries.html",
         _ctx(
             request,
             coterie=coterie,
@@ -393,7 +393,7 @@ async def submit_coterie_request(
 
     if errors:
         resp = templates.TemplateResponse(
-            "player/partials/coterie_request_form.html",
+            request, "player/partials/coterie_request_form.html",
             _ctx(request, request_errors=errors, form={"proposed_name": proposed_name, "note": note}),
         )
         _toast(resp, "Please fix the errors below.", "error")
@@ -409,7 +409,7 @@ async def submit_coterie_request(
         )
 
     resp = templates.TemplateResponse(
-        "player/partials/coterie_request_form.html",
+        request, "player/partials/coterie_request_form.html",
         _ctx(request, request_success=True),
     )
     _toast(resp, "Formation request submitted — staff will review shortly.")
@@ -450,7 +450,7 @@ async def coterie_detail(
                 upgrade_costs[trait] = {"next_dot": next_dot, "total": total, "per_member": per}
 
     return templates.TemplateResponse(
-        "player/coterie_detail.html",
+        request, "player/coterie_detail.html",
         _ctx(
             request,
             coterie=coterie,
@@ -528,7 +528,7 @@ async def submit_coterie_spend(
                     total, per = coterie_domain_cost(nd, n)
                     upgrade_costs[t] = {"next_dot": nd, "total": total, "per_member": per}
             resp = templates.TemplateResponse(
-                "player/coterie_detail.html",
+                request, "player/coterie_detail.html",
                 _ctx(request, coterie=coterie, members=members,
                      spends=spends, upgrade_costs=upgrade_costs,
                      spend_errors=errors),
@@ -548,7 +548,7 @@ async def submit_coterie_spend(
         spends = list_coterie_spends(conn, coterie_id)
 
     resp = templates.TemplateResponse(
-        "player/coterie_detail.html",
+        request, "player/coterie_detail.html",
         _ctx(
             request, coterie=coterie, members=members, spends=spends,
             upgrade_costs={},

@@ -3,9 +3,13 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv312/
 venv/
 dist/
 build/
+
+# Local dev helpers
+requirements-local.txt
 
 # Environment
 .env
@@ -19,6 +23,7 @@ build/
 
 # Node (build toolchain only — vendored output IS committed)
 node_modules/
+web/package-lock.json
 
 # OS
 .DS_Store

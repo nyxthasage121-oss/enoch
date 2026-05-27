@@ -2,6 +2,8 @@
 
 Uses libsql-experimental which mirrors the sqlite3 API for local files
 and speaks HTTP to Turso for production.
+Falls back to stdlib sqlite3 when libsql-experimental is not installed
+(no pre-built wheels for every platform/Python version).
 """
 import json
 import logging
@@ -9,7 +11,10 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-import libsql_experimental as libsql
+try:
+    import libsql_experimental as libsql
+except ModuleNotFoundError:
+    import sqlite3 as libsql  # type: ignore[no-redef]  # same API for local SQLite
 
 from .config import settings
 
@@ -103,7 +108,11 @@ def run_migrations() -> None:
             continue
         log.info("Applying migration: %s", path.name)
         sql = path.read_text(encoding="utf-8")
-        statements = [s.strip() for s in sql.split(";") if s.strip()]
+        # Strip line comments before splitting on ";" so semicolons inside
+        # comments (e.g. "-- note; more note") don't create phantom statements.
+        import re as _re
+        sql_clean = _re.sub(r"--[^\n]*", "", sql)
+        statements = [s.strip() for s in sql_clean.split(";") if s.strip()]
         with get_db() as conn:
             for stmt in statements:
                 conn.execute(stmt)

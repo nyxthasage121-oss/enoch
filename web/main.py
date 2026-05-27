@@ -88,14 +88,14 @@ async def handle_login_required(request: Request, exc: LoginRequired):
 @app.exception_handler(404)
 async def not_found(request: Request, exc):
     return templates.TemplateResponse(
-        "errors/404.html", _ctx(request), status_code=404
+        request, "errors/404.html", _ctx(request), status_code=404
     )
 
 
 @app.exception_handler(403)
 async def forbidden(request: Request, exc):
     return templates.TemplateResponse(
-        "errors/403.html", _ctx(request), status_code=403
+        request, "errors/403.html", _ctx(request), status_code=403
     )
 
 
@@ -103,7 +103,7 @@ async def forbidden(request: Request, exc):
 async def server_error(request: Request, exc):
     log.exception("Unhandled server error")
     return templates.TemplateResponse(
-        "errors/500.html", _ctx(request), status_code=500
+        request, "errors/500.html", _ctx(request), status_code=500
     )
 
 
