@@ -6,3 +6,6 @@ httpx>=0.27
 python-multipart>=0.0.12
 python-dotenv>=1.0
 libsql-experimental>=0.0.9
+
+# Discord bot
+discord.py>=2.4
