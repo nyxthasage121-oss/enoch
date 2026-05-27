@@ -20,8 +20,7 @@
       hx-target="#coterie-request-form"
       hx-swap="outerHTML"
       class="gilded p-5 space-y-4"
-      x-data="coterieRequest()"
-      @submit.prevent="submitRequest($event)">
+      x-data="coterieRequest()">
   <input type="hidden" name="_csrf" value="{{ csrf_token }}">
   <input type="hidden" name="member_ids" x-bind:value="JSON.stringify(selectedIds)">
 
@@ -85,10 +84,6 @@ function coterieRequest() {
         this.selectedIds.splice(idx, 1);
       }
     },
-    submitRequest(e) {
-      // Let HTMX handle the form submit normally (it reads the hidden input)
-      htmx.trigger(e.target, 'submit');
-    }
   };
 }
 </script>
