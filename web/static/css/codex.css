@@ -532,7 +532,15 @@ tbody tr[data-href] { cursor: pointer; }
 body.landing-page .main-bg,
 body.error-page   .main-bg { background: transparent; }
 
-/* ── Aurora — landing page ──────────────────────────────────────── */
+/* ── Landing page: full-viewport, no sidebar ────────────────────── */
+/* The nav contributes nothing for unauthenticated users; hiding it
+   lets the aurora and content occupy the full screen. */
+body.landing-page > div > nav  { display: none; }
+body.landing-page > div > main { padding: 0; }
+
+/* ── Aurora — center-origin, radiating outward ──────────────────── */
+/* Thematic: Enoch is the First City, buried beneath history.
+   Light pulses upward from the center like an ancient heartbeat.    */
 .aurora-layer {
   position: fixed;
   inset: 0;
@@ -541,36 +549,36 @@ body.error-page   .main-bg { background: transparent; }
   overflow: hidden;
 }
 
+/* Inner core — tight, bright, blood crimson */
 .aurora-layer::before {
   content: "";
   position: absolute;
-  inset: -40%;
+  inset: -25%;
   background:
-    radial-gradient(ellipse 80% 55% at 18% 35%,  rgba(138,36,36,0.44) 0%, transparent 58%),
-    radial-gradient(ellipse 65% 50% at 78% 65%,  rgba(26,10,46,0.55)  0%, transparent 55%),
-    radial-gradient(ellipse 55% 42% at 58% 12%,  rgba(72,18,18,0.30)  0%, transparent 52%);
-  background-size: 300% 300%;
-  animation: aurora 14s ease-in-out infinite alternate;
-  filter: blur(55px);
+    radial-gradient(ellipse 38% 30% at 50% 50%, rgba(138,36,36,0.70) 0%, transparent 100%),
+    radial-gradient(ellipse 68% 54% at 50% 50%, rgba(90,20,20,0.46)  0%, transparent 100%),
+    radial-gradient(ellipse 100% 80% at 50% 50%, rgba(26,10,46,0.36) 0%, transparent 100%);
+  animation: cityPulse 9s ease-in-out infinite alternate;
+  filter: blur(48px);
 }
 
+/* Outer halo — softer, bruised purple, counter-rotating drift */
 .aurora-layer::after {
   content: "";
   position: absolute;
-  inset: -40%;
+  inset: -25%;
   background:
-    radial-gradient(ellipse 70% 55% at 70% 28%,  rgba(176,48,48,0.20) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 65% at 22% 72%,  rgba(40,12,68,0.40)  0%, transparent 60%),
-    radial-gradient(ellipse 40% 45% at 88% 84%,  rgba(10,4,20,0.55)   0%, transparent 55%);
-  background-size: 280% 280%;
-  animation: aurora 20s ease-in-out infinite alternate-reverse;
-  filter: blur(75px);
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(176,48,48,0.22)  0%, transparent 100%),
+    radial-gradient(ellipse 85% 68% at 50% 50%, rgba(40,12,68,0.32)   0%, transparent 100%),
+    radial-gradient(ellipse 130% 105% at 50% 50%, rgba(8,3,14,0.50)   0%, transparent 100%);
+  animation: cityPulse 15s ease-in-out infinite alternate-reverse;
+  filter: blur(72px);
 }
 
-@keyframes aurora {
-  0%   { background-position: 0%   50%, 100%  50%, 50%  0%; }
-  50%  { background-position: 100% 30%,   0%  70%, 80% 60%; }
-  100% { background-position: 30%  80%,  60%  20%,  0% 40%; }
+@keyframes cityPulse {
+  0%   { transform: scale(0.90) rotate(-1.5deg); opacity: 0.78; }
+  50%  { transform: scale(1.08) rotate( 0.5deg); opacity: 1.00; }
+  100% { transform: scale(0.94) rotate( 1.5deg); opacity: 0.84; }
 }
 
 /* ── Error page fog ─────────────────────────────────────────────── */
@@ -656,4 +664,180 @@ body.error-page   .main-bg { background: transparent; }
 
 .pending-pulse {
   animation: pendingPulse 2.8s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Mobile — responsive navigation
+   ═══════════════════════════════════════════════════════════════ */
+
+/* On mobile, sidebar is off-screen left by default */
+@media (max-width: 767px) {
+  .nav-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    height: 100dvh !important;
+  }
+  .nav-sidebar.nav-open {
+    transform: translateX(0);
+  }
+}
+
+/* On desktop, sidebar is always visible — no transform needed */
+@media (min-width: 768px) {
+  .nav-sidebar {
+    transform: none !important;
+    position: sticky !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Visual effects — forms, tables, panels
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Enhanced input focus glow ──────────────────────────────── */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: rgba(176,138,62,0.45) !important;
+  box-shadow:
+    0 0 0 1px rgba(176,138,62,0.15),
+    0 0 12px rgba(176,138,62,0.10),
+    inset 0 0 0 1px rgba(176,138,62,0.08);
+}
+
+/* ── Table row hover — left edge reveal ─────────────────────── */
+tbody tr {
+  position: relative;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+tbody tr::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--clan, rgba(176,138,62,0.5));
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform 0.18s cubic-bezier(0.16,1,0.3,1);
+}
+tbody tr:hover::before {
+  transform: scaleY(1);
+}
+
+/* ── Gilded panel inner top-edge shimmer ────────────────────── */
+.gilded::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(180deg,
+    rgba(236,228,214,0.035) 0%,
+    transparent 18%
+  );
+  z-index: 0;
+}
+.gilded { position: relative; }
+.gilded > * { position: relative; z-index: 1; }
+
+/* ── Page shimmer scan — single pass on load ────────────────── */
+@keyframes pageScan {
+  0%   { opacity: 0; transform: translateY(-100%); }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(100vh); }
+}
+
+/* ── Stat card hover — subtle lift ──────────────────────────── */
+a.gilded, button.gilded {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+a.gilded:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px rgba(176,138,62,0.10),
+    inset 0 1px 0 rgba(236,228,214,0.05),
+    0 30px 60px -15px rgba(0,0,0,0.7),
+    0 4px 20px rgba(138,36,36,0.12);
+}
+
+/* ── Chip ────────────────────────────────────────────────────── */
+.chip {
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+/* ── Scrollbar within tables ────────────────────────────────── */
+.gilded.overflow-x-auto::-webkit-scrollbar { height: 4px; }
+.gilded.overflow-x-auto::-webkit-scrollbar-track { background: transparent; }
+.gilded.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: rgba(176,138,62,0.2);
+  border-radius: 2px;
+}
+
+/* ── Approval status glow badges ────────────────────────────── */
+@keyframes approvedPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(176,138,62,0); }
+  50%       { box-shadow: 0 0 8px 1px rgba(176,138,62,0.15); }
+}
+
+/* ── Rejection callout pulse ────────────────────────────────── */
+@keyframes rejectionGlow {
+  0%, 100% { border-color: rgba(138,36,36,0.35); }
+  50%       { border-color: rgba(138,36,36,0.70); }
+}
+.border-blood-900 {
+  animation: rejectionGlow 3s ease-in-out infinite;
+}
+
+/* ── Nav link active state shimmer ──────────────────────────── */
+.nav-link.active::before {
+  content: "";
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, rgba(176,138,62,0.6), transparent);
+}
+.nav-link { position: relative; }
+
+/* ── Staff dashboard — section label underline ──────────────── */
+.label-gold {
+  position: relative;
+}
+
+/* ── btn-send shimmer on hover ──────────────────────────────── */
+.btn-send {
+  position: relative;
+  overflow: hidden;
+}
+.btn-send::after {
+  content: "";
+  position: absolute;
+  top: 0; left: -100%; width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
+  transition: left 0.5s ease;
+}
+.btn-send:hover::after {
+  left: 140%;
+}
+
+/* ── Character hero — clan border ambient glow ──────────────── */
+@keyframes clanPulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--clan, #2a1f22), 0 0 20px rgba(138,36,36,0.05); }
+  50%       { box-shadow: 0 0 0 1px var(--clan, #2a1f22), 0 0 30px rgba(138,36,36,0.14); }
+}
+.clan-brujah,
+.clan-gangrel,
+.clan-malkavian,
+.clan-nosferatu,
+.clan-toreador,
+.clan-tremere,
+.clan-ventrue,
+.clan-lasombra,
+.clan-tzimisce,
+.clan-ravnos,
+.clan-salubri,
+.clan-thin-blood {
+  animation: clanPulse 5s ease-in-out infinite;
 }

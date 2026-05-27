@@ -21,7 +21,7 @@
             <p class="font-cinzel text-[0.6rem] text-bone-600 mt-0.5">{{ char.clan }}</p>
           </td>
           <td class="px-4 py-3 font-garamond text-xs text-bone-500">
-            {{ char.discord_id }}
+            {{ char.player_username or char.discord_id }}
           </td>
           <td class="px-4 py-3">
             {% if char.concept %}

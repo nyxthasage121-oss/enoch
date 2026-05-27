@@ -44,7 +44,9 @@
 
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
 
-    <div class="gilded p-5">
+    <div x-data="panelGlow" @mousemove="onMove" @mouseleave="onLeave"
+         class="gilded p-5 relative overflow-hidden">
+      <div class="card-glare" :style="glareStyle"></div>
       <p class="label-gold mb-2 text-[0.6rem]">Active Characters</p>
       <p class="font-cinzel text-4xl text-bone-400">{{ n_active }}</p>
     </div>
@@ -52,7 +54,9 @@
   </div>
 
   {# ── Active period ── #}
-  <div class="gilded p-5 mb-8">
+  <div x-data="panelGlow" @mousemove="onMove" @mouseleave="onLeave"
+       class="gilded p-5 mb-8 relative overflow-hidden">
+    <div class="card-glare" :style="glareStyle"></div>
     <p class="label-gold mb-2">Current XP Window</p>
     {% if active_period %}
     <div class="flex items-center justify-between">
@@ -82,7 +86,7 @@
         View all →
       </a>
     </div>
-    <div class="gilded overflow-hidden">
+    <div class="gilded overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-ink-700">

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Admin — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+
+  <div class="mb-8">
+    <p class="label-gold mb-1">Staff</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Admin</h1>
+  </div>
+
+  {# ── Manual XP Adjustment ── #}
+  <div class="gilded p-6 mb-8">
+    <p class="label-gold mb-4">Manual XP Adjustment</p>
+    <form method="post" action="/staff/admin/adjust-xp" class="space-y-4">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="label-gold mb-1 block">Character</label>
+          <select name="character_id" required
+                  class="w-full font-garamond text-bone-300 text-sm">
+            <option value="">— select —</option>
+            {% for char in all_chars | sort(attribute='name') %}
+            {% if char.is_approved %}
+            <option value="{{ char.id }}">{{ char.name }} ({{ char.clan }})</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="label-gold mb-1 block">Delta <span class="text-bone-700 normal-case font-sans text-[0.6rem]">positive = grant, negative = deduct</span></label>
+          <input type="number"
+                 name="delta"
+                 min="-350" max="350"
+                 placeholder="e.g. 3 or -2"
+                 required
+                 class="w-full">
+        </div>
+
+        <div>
+          <label class="label-gold mb-1 block">Note / Reason</label>
+          <input type="text"
+                 name="note"
+                 maxlength="120"
+                 placeholder="Staff activity, correction, etc."
+                 required
+                 class="w-full">
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
+          Apply Adjustment
+        </button>
+        <p class="font-garamond text-bone-600 text-xs">
+          This creates a permanent ledger entry and cannot be undone via the UI.
+        </p>
+      </div>
+    </form>
+  </div>
+
+  {# ── Player Roster ── #}
+  <div>
+    <div class="flex items-center justify-between mb-3">
+      <p class="label-gold">Registered Players <span class="text-bone-600 ml-2">{{ players | length }}</span></p>
+    </div>
+    <div class="gilded overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-ink-700">
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Username</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Discord ID</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Chars</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Active</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in players %}
+          <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300">{{ p.username }}</td>
+            <td class="px-4 py-2.5 font-garamond text-xs text-bone-600 font-mono">{{ p.discord_id }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500 text-right">{{ p.character_count }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-right
+                       {{ 'text-gold-400' if p.active_count > 0 else 'text-bone-700' }}">
+              {{ p.active_count or '—' }}
+            </td>
+            <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-700 text-right">
+              {{ p.created_at[:10] }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ── Staff access note ── #}
+  <div class="gilded-inset px-5 py-4 mt-6 border border-ink-700">
+    <p class="label-gold mb-1">Staff Access</p>
+    <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+      Staff permissions are granted via Discord server roles.
+      Set <span class="font-cinzel text-bone-400">STAFF_ROLE_IDS</span> in your
+      environment with the role IDs (comma-separated) that should have staff access.
+      Changes take effect at next login.
+    </p>
+  </div>
+
+</div>
+{% endblock %}

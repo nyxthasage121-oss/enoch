@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 
 from ..db import (
     add_coterie_member,
+    adjust_xp_manual,
     approve_character,
     approve_claim,
     approve_coterie_request,
@@ -16,8 +17,10 @@ from ..db import (
     create_criterion,
     create_period,
     get_active_period,
+    get_character,
     get_coterie,
     get_db,
+    list_all_players,
     list_characters,
     list_coterie_members,
     list_coterie_spends,
@@ -665,4 +668,60 @@ async def add_coterie_member_route(
         _ctx(request, coterie=coterie, members=members),
     )
     _toast(resp, err or "Member added.", "error" if err else "success")
+    return resp
+
+
+# ── Admin ─────────────────────────────────────────────────────────────────────
+
+@router.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request, user: dict = Depends(require_staff)):
+    with get_db() as conn:
+        players    = list_all_players(conn)
+        all_chars  = list_characters(conn)
+    return templates.TemplateResponse(
+        request, "staff/admin.html",
+        _ctx(request, players=players, all_chars=all_chars),
+    )
+
+
+@router.post("/admin/adjust-xp", response_class=HTMLResponse)
+async def admin_adjust_xp(
+    request: Request,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    form         = await request.form()
+    character_id = int(form.get("character_id") or 0)
+    delta        = int(form.get("delta") or 0)
+    note         = (form.get("note") or "").strip()
+
+    err  = None
+    char = None
+    if not character_id:
+        err = "Character is required."
+    elif delta == 0:
+        err = "Delta cannot be zero."
+    elif not note:
+        err = "Note is required."
+    else:
+        try:
+            with get_db() as conn:
+                char = adjust_xp_manual(conn, character_id, delta, note, user["id"])
+        except ValueError as e:
+            err = str(e)
+
+    with get_db() as conn:
+        players   = list_all_players(conn)
+        all_chars = list_characters(conn)
+
+    resp = templates.TemplateResponse(
+        request, "staff/admin.html",
+        _ctx(request, players=players, all_chars=all_chars, adjust_err=err, adjust_ok=char),
+    )
+    if err:
+        _toast(resp, err, "error")
+    else:
+        name = char["name"] if char else "Character"
+        sign = "+" if delta > 0 else ""
+        _toast(resp, f"{name}: {sign}{delta} XP — {note[:40]}", "success")
     return resp

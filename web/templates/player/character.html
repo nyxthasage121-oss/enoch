@@ -47,6 +47,9 @@
         <div class="flex flex-wrap gap-2 mt-2">
           {% if not char.is_approved %}
             <span class="chip text-mauve-400 border-mauve-700">Awaiting Approval</span>
+            {% if char.rejection_reason %}
+            <span class="chip text-blood-400 border-blood-800">Returned by Staff</span>
+            {% endif %}
           {% elif char.status == 'active' %}
             <span class="chip text-gold-400 border-gold-800">Active</span>
           {% elif char.status == 'retired' %}
@@ -99,6 +102,18 @@
 
   {# ══ Overview ══ #}
   <div x-show="tab === 'overview'" x-cloak class="space-y-4">
+
+    {# Character rejection notice #}
+    {% if not char.is_approved and char.rejection_reason %}
+    <div class="gilded border border-blood-900 p-5">
+      <p class="label-gold text-blood-400 mb-1">Returned for Revision</p>
+      <p class="font-garamond text-bone-400 text-sm leading-relaxed">{{ char.rejection_reason }}</p>
+      {% if char.rejected_at %}
+      <p class="font-cinzel text-[0.6rem] text-bone-700 mt-2">{{ char.rejected_at[:10] }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {% if char.concept or char.sire or char.covenant or char.profile_blurb %}
     <div class="gilded p-5">
       {% if char.profile_blurb %}
@@ -177,8 +192,60 @@
   </div>
 
   {# ══ History ══ #}
-  <div x-show="tab === 'history'" x-cloak>
-    <div class="gilded overflow-hidden">
+  <div x-show="tab === 'history'" x-cloak class="space-y-4">
+
+    {# Rejected claims with reasons #}
+    {% set rejected_claims = claims | selectattr('status', 'eq', 'rejected') | list %}
+    {% if rejected_claims %}
+    <div class="gilded border border-blood-900 p-5">
+      <p class="label-gold text-blood-400 mb-3">Rejected Claims</p>
+      <div class="space-y-3">
+        {% for claim in rejected_claims %}
+        <div class="border-b border-ink-800 pb-3 last:border-0 last:pb-0">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <p class="font-cinzel text-xs text-bone-400">
+                {% for c in claim.claimed_criteria %}{{ c.label }}{% if not loop.last %}, {% endif %}{% endfor %}
+              </p>
+              {% if claim.rejection_reason %}
+              <p class="font-garamond text-sm text-bone-500 mt-1 italic">{{ claim.rejection_reason }}</p>
+              {% endif %}
+            </div>
+            <p class="font-cinzel text-[0.6rem] text-bone-700 whitespace-nowrap shrink-0">{{ claim.submitted_at[:10] }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Rejected spends with reasons #}
+    {% set rejected_spends = spends | selectattr('status', 'eq', 'rejected') | list %}
+    {% if rejected_spends %}
+    <div class="gilded border border-blood-900 p-5">
+      <p class="label-gold text-blood-400 mb-3">Rejected Spends</p>
+      <div class="space-y-3">
+        {% for spend in rejected_spends %}
+        <div class="border-b border-ink-800 pb-3 last:border-0 last:pb-0">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <p class="font-cinzel text-xs text-bone-400">
+                {{ spend.trait_name }} ({{ spend.current_dots }}→{{ spend.new_dots }}) — {{ spend.verified_cost }} XP
+              </p>
+              {% if spend.rejection_reason %}
+              <p class="font-garamond text-sm text-bone-500 mt-1 italic">{{ spend.rejection_reason }}</p>
+              {% endif %}
+            </div>
+            <p class="font-cinzel text-[0.6rem] text-bone-700 whitespace-nowrap shrink-0">{{ spend.submitted_at[:10] }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Full ledger #}
+    <div class="gilded overflow-x-auto">
       {% if ledger %}
       <table class="w-full text-sm">
         <thead>
@@ -192,11 +259,16 @@
         <tbody>
           {% for entry in ledger %}
           <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
-            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500 whitespace-nowrap">
               {{ entry.created_at[:10] }}
             </td>
-            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-400 capitalize">
-              {{ entry.entry_type }}
+            <td class="px-4 py-2.5 whitespace-nowrap">
+              <span class="font-cinzel text-xs capitalize
+                {{ 'text-gold-500' if entry.entry_type == 'earn'
+                   else 'text-blood-400' if entry.entry_type == 'spend'
+                   else 'text-mauve-400' }}">
+                {{ entry.entry_type }}
+              </span>
             </td>
             <td class="px-4 py-2.5 font-garamond text-bone-500 text-xs">
               {{ entry.note or "—" }}

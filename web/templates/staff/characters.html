@@ -26,7 +26,7 @@
       <span class="text-bone-600 ml-2">{{ active | length }}</span>
     </p>
     {% if active %}
-    <div class="gilded overflow-hidden">
+    <div class="gilded overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-ink-700">
@@ -43,7 +43,7 @@
           <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300">{{ char.name }}</td>
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">{{ char.clan | replace('-',' ') | title }}</td>
-            <td class="px-4 py-2.5 font-garamond text-xs text-bone-600">{{ char.discord_id }}</td>
+            <td class="px-4 py-2.5 font-garamond text-xs text-bone-600">{{ char.player_username or char.discord_id }}</td>
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-400 text-right">
               {{ char.xp_total }} / {{ char.xp_cap }}
             </td>
@@ -73,7 +73,7 @@
         <path stroke-linecap="square" d="M6 9l6 6 6-6"/>
       </svg>
     </button>
-    <div x-show="show" x-cloak class="mt-3 gilded overflow-hidden">
+    <div x-show="show" x-cloak class="mt-3 gilded overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-ink-700">

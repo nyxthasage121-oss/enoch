@@ -141,6 +141,50 @@ def upsert_player(conn, discord_id: str, username: str, cubby_channel: str | Non
     return get_player(conn, discord_id)
 
 
+def list_all_players(conn) -> list[dict]:
+    """Staff: all player profiles with character stats."""
+    return conn.execute("""
+        SELECT
+            pp.*,
+            COUNT(c.id)                                       AS character_count,
+            SUM(CASE WHEN c.status='active' THEN 1 ELSE 0 END) AS active_count
+        FROM player_profiles pp
+        LEFT JOIN characters c ON c.discord_id = pp.discord_id
+        GROUP BY pp.discord_id
+        ORDER BY pp.username COLLATE NOCASE
+    """).fetchall()
+
+
+def adjust_xp_manual(
+    conn,
+    character_id: int,
+    delta: int,
+    note: str,
+    staff_id: str,
+) -> dict:
+    """Manual XP grant or deduction by staff.  delta > 0 = grant, < 0 = deduct."""
+    char = get_character(conn, character_id)
+    if char is None:
+        raise ValueError(f"Character {character_id} not found")
+    if not note.strip():
+        raise ValueError("A note is required for manual adjustments.")
+    now       = _now()
+    new_total = max(0, char["xp_total"] + delta)
+    conn.execute(
+        "UPDATE characters SET xp_total=?, updated_at=? WHERE id=?",
+        (new_total, now, character_id),
+    )
+    conn.execute("""
+        INSERT INTO ledger_entries
+            (character_id, entry_type, xp_delta, reference_type, note, created_by, created_at)
+        VALUES (?, 'adjustment', ?, 'manual', ?, ?, ?)
+    """, (character_id, delta, note, staff_id, now))
+    write_audit(conn, staff_id, "adjust_xp", "character", character_id,
+                before={"xp_total": char["xp_total"]},
+                after={"xp_total": new_total, "delta": delta, "note": note})
+    return get_character(conn, character_id)
+
+
 # ── Characters ────────────────────────────────────────────────────────────────
 
 def _enrich_char(row: dict | None) -> dict | None:
@@ -174,18 +218,22 @@ def list_player_characters(conn, discord_id: str) -> list[dict]:
 
 
 def list_characters(conn, status: str | None = None, clan: str | None = None) -> list[dict]:
-    """Staff: all characters, optionally filtered."""
+    """Staff: all characters with player username, optionally filtered."""
     clauses, params = [], []
     if status:
-        clauses.append("status=?")
+        clauses.append("c.status=?")
         params.append(status)
     if clan:
-        clauses.append("clan=?")
+        clauses.append("c.clan=?")
         params.append(clan)
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
-    rows = conn.execute(
-        f"SELECT * FROM characters {where} ORDER BY name", params
-    ).fetchall()
+    rows = conn.execute(f"""
+        SELECT c.*, pp.username AS player_username
+        FROM characters c
+        LEFT JOIN player_profiles pp ON pp.discord_id = c.discord_id
+        {where}
+        ORDER BY c.name
+    """, params).fetchall()
     return [_enrich_char(r) for r in rows]
 
 
@@ -253,17 +301,19 @@ def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
 
 def reject_character(conn, character_id: int, reviewer_id: str, reason: str) -> dict:
     now = _now()
-    # Reset to pending so player can resubmit
-    conn.execute(
-        "UPDATE characters SET status='pending', updated_at=? WHERE id=?", (now, character_id)
-    )
+    # Reset to pending so player can resubmit; store reason for player to see
+    conn.execute("""
+        UPDATE characters
+        SET status='pending', rejection_reason=?, rejected_at=?, updated_at=?
+        WHERE id=?
+    """, (reason, now, now, character_id))
     char = get_character(conn, character_id)
     write_audit(conn, reviewer_id, "reject_character", "character", character_id,
                 after={"status": "pending", "reason": reason})
     enqueue_bot(conn, "character_rejected", {
         "character_id": character_id,
-        "discord_id": char["discord_id"],
-        "reason": reason,
+        "discord_id":   char["discord_id"],
+        "reason":       reason,
     })
     return char
 

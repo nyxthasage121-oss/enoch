@@ -16,7 +16,18 @@
   {% block head %}{% endblock %}
 </head>
 
-<body class="h-full font-sans antialiased" x-data x-cloak>
+<body class="h-full font-sans antialiased" x-data="{ navOpen: false }" x-cloak>
+
+  {# ── Mobile nav backdrop ── #}
+  <div x-show="navOpen"
+       @click="navOpen = false"
+       x-transition:enter="transition-opacity duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition-opacity duration-150"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 z-30 bg-black/60 md:hidden"
+       style="display:none"></div>
 
   {# ── Toast ── #}
   <div x-data="{ s: $store.toast }"
@@ -41,8 +52,26 @@
   {# ── Layout ── #}
   <div class="flex min-h-full">
 
+    {# ── Mobile top bar ── #}
+    <div class="fixed top-0 left-0 right-0 z-40 md:hidden flex items-center justify-between px-4 py-3"
+         style="background:#120d0f; border-bottom:1px solid #2a1f22;">
+      <a href="/" class="font-cinzel text-base text-bone-200 tracking-widest">Enoch</a>
+      <button @click="navOpen = !navOpen"
+              class="text-bone-500 hover:text-bone-200 transition-colors p-1"
+              :aria-expanded="navOpen.toString()"
+              aria-label="Toggle navigation">
+        <svg x-show="!navOpen" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="square" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+        <svg x-show="navOpen" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="square" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
     {# ── Sidebar ── #}
-    <nav class="w-52 flex-shrink-0 flex flex-col"
+    <nav class="w-52 flex-shrink-0 flex flex-col nav-sidebar"
+         :class="navOpen ? 'nav-open' : ''"
          style="background:#120d0f; border-right:1px solid #2a1f22; position:sticky; top:0; height:100vh; overflow-y:auto;">
 
       {# Brand #}
@@ -99,6 +128,10 @@
              class="nav-link {{ 'active' if request.url.path.startswith('/staff/periods') else '' }}">
             Periods
           </a>
+          <a href="/staff/admin"
+             class="nav-link {{ 'active' if request.url.path.startswith('/staff/admin') else '' }}">
+            Admin
+          </a>
         </div>
         {% endif %}
 
@@ -116,7 +149,7 @@
     </nav>
 
     {# ── Main content ── #}
-    <main class="flex-1 min-w-0 overflow-auto px-6 py-6 main-bg">
+    <main class="flex-1 min-w-0 overflow-auto px-4 md:px-6 py-6 pt-16 md:pt-6 main-bg">
 
       {# Flash messages (server-side redirect flow) #}
       {% if flash_messages %}
