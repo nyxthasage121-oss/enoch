@@ -71,10 +71,13 @@ async def csrf_protect(request: Request) -> None:
     if not expected:
         raise HTTPException(status_code=403, detail="No CSRF token in session")
 
-    token = (
-        request.headers.get("X-CSRF-Token")
-        or request.query_params.get("_csrf", "")
-    )
+    token = request.headers.get("X-CSRF-Token") or request.query_params.get("_csrf", "")
+    if not token:
+        # Plain HTML form POST — token lives in the body
+        content_type = request.headers.get("content-type", "")
+        if "form" in content_type:
+            form = await request.form()
+            token = form.get("_csrf", "")
 
     if not secrets.compare_digest(token.encode(), expected.encode()):
         raise HTTPException(status_code=403, detail="CSRF token mismatch")

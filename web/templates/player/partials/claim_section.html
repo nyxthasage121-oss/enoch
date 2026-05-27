@@ -108,7 +108,7 @@
     {% endif %}
 
     {# RP Links — Alpine-managed list #}
-    <div x-data="{ links: {{ (claim_form.rp_links if claim_form else ['']) | tojson }} }">
+    <div x-data='{ links: {{ (claim_form.rp_links if claim_form else [""]) | tojson }} }'>
       <p class="label-gold mb-2">RP Links <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(Discord message URLs)</span></p>
       <div class="space-y-2">
         <template x-for="(link, idx) in links" :key="idx">

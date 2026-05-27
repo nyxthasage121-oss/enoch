@@ -124,6 +124,40 @@ if settings.DEV_PREVIEW:
         request.session["_csrf"]      = "dev-csrf-token"
         return RedirectResponse(url="/", status_code=307)
 
+    @app.get("/_dev/seed_data")
+    async def _dev_seed_data(request: Request):
+        """Create a test player + character directly — never ships to production."""
+        from .db import get_db, upsert_player, create_character, approve_character
+        DEV_PLAYER_ID = "111111111111111111"
+        with get_db() as conn:
+            upsert_player(conn, discord_id=DEV_PLAYER_ID, username="TestPlayer")
+            try:
+                char = create_character(
+                    conn,
+                    discord_id=DEV_PLAYER_ID,
+                    name="Valeria Morano",
+                    clan="brujah",
+                    predator_type="Siren",
+                    concept="Former NYC DA turned revolutionary",
+                    sire="Alejandro Cruz",
+                )
+                approve_character(conn, char["id"], reviewer_id=DEV_PLAYER_ID)
+            except Exception:
+                pass  # already exists — idempotent
+        return RedirectResponse(url="/staff/characters", status_code=307)
+
+    @app.get("/_dev/player")
+    async def _dev_player(request: Request):
+        """Switch session to TestPlayer (non-staff) — never ships to production."""
+        request.session["user"] = {
+            "id": "111111111111111111",
+            "username": "TestPlayer",
+            "avatar": None,
+        }
+        request.session["is_staff"]   = False
+        request.session["_csrf"]      = "dev-csrf-token"
+        return RedirectResponse(url="/characters", status_code=307)
+
     log.warning("⚠  ENOCH_DEV_PREVIEW=1 — OAuth bypass is active. Never use in production.")
 
 

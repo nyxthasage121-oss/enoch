@@ -45,8 +45,16 @@ router = APIRouter(prefix="/staff", tags=["staff"])
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 
 
+def _header_safe(s: str) -> str:
+    """HTTP headers must be latin-1; replace common Unicode punctuation."""
+    return (s.replace('—', '--').replace('–', '-')
+             .replace('‘', "'").replace('’', "'")
+             .replace('“', '"').replace('”', '"')
+             .encode('latin-1', errors='replace').decode('latin-1'))
+
+
 def _toast(response, message: str, kind: str = "success") -> None:
-    response.headers["X-Enoch-Toast"]      = message
+    response.headers["X-Enoch-Toast"]      = _header_safe(message)
     response.headers["X-Enoch-Toast-Kind"] = kind
 
 
