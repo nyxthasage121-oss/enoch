@@ -1,0 +1,96 @@
+{
+  "Attribute": {
+    "multiplier": 5,
+    "description": "New rating × 5",
+    "min_dots": 1,
+    "max_dots": 5
+  },
+  "Skill": {
+    "multiplier": 3,
+    "description": "New rating × 3 (for existing skills)",
+    "min_dots": 2,
+    "max_dots": 5
+  },
+  "New Skill": {
+    "flat_cost": 3,
+    "description": "3 XP flat (0 → 1)",
+    "min_dots": 0,
+    "max_dots": 1
+  },
+  "Specialty": {
+    "flat_cost": 3,
+    "description": "3 XP flat",
+    "min_dots": 0,
+    "max_dots": 1
+  },
+  "Clan Discipline": {
+    "multiplier": 5,
+    "description": "New rating × 5",
+    "min_dots": 0,
+    "max_dots": 5
+  },
+  "Other Discipline": {
+    "multiplier": 7,
+    "description": "New rating × 7",
+    "min_dots": 0,
+    "max_dots": 5
+  },
+  "Caitiff Discipline": {
+    "multiplier": 6,
+    "description": "New rating × 6",
+    "min_dots": 0,
+    "max_dots": 5
+  },
+  "Ingrained Discipline": {
+    "multiplier": 5,
+    "description": "New rating × 5 (Ingrained Flaw budget — max 15 XP total, uses clan discipline rate)",
+    "min_dots": 0,
+    "max_dots": 5,
+    "flaw_xp_cap": 15,
+    "requires_flaw": true
+  },
+  "Blood Sorcery Ritual": {
+    "level_multiplier": 3,
+    "description": "Ritual level × 3",
+    "min_dots": 1,
+    "max_dots": 5
+  },
+  "Thin-Blood Alchemy Formula": {
+    "level_multiplier": 3,
+    "description": "Formula level × 3",
+    "min_dots": 1,
+    "max_dots": 5
+  },
+  "Advantage": {
+    "flat_per_dot": 3,
+    "description": "3 XP per dot",
+    "min_dots": 0,
+    "max_dots": 5
+  },
+  "Loresheet": {
+    "flat_per_dot": 3,
+    "description": "3 XP per dot",
+    "min_dots": 1,
+    "max_dots": 5
+  },
+  "Blood Potency": {
+    "multiplier": 10,
+    "description": "New rating × 10",
+    "min_dots": 0,
+    "max_dots": 10
+  },
+  "Humanity": {
+    "multiplier": 2,
+    "description": "New rating × 2 (conditional — all four requirements must be met)",
+    "min_dots": 0,
+    "max_dots": 10,
+    "max_increase": 1,
+    "conditions_required": true,
+    "conditions": [
+      "No frenzy in the past 2 weeks (IRL)",
+      "No stains gained in the past 2 weeks (mitigated stains do not count)",
+      "Played a humane scene OR acted in accordance with your path",
+      "Buying only 1 dot of Humanity at a time"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Forbidden — Enoch{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+
+  <div class="gilded p-10 max-w-lg w-full">
+    <p class="label-gold mb-4">Error 403</p>
+    <h1 class="font-cinzel text-4xl text-bone-300 mb-3 tracking-widest">Access Denied</h1>
+    <div class="divider-gold my-5"></div>
+    <p class="font-garamond text-bone-400 text-lg leading-relaxed mb-8">
+      You have not been granted entry here. These halls belong to those
+      of greater standing — or perhaps you simply lack the proper invitation.
+    </p>
+    <div class="flex gap-3 justify-center">
+      <a href="/" class="btn-ghost font-cinzel tracking-widest text-xs">
+        Return to Safety
+      </a>
+      {% if not current_user %}
+      <a href="/auth/login" class="btn-send font-cinzel tracking-widest text-xs">
+        Sign In
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

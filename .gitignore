@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database (local dev only)
+*.db
+*.db-shm
+*.db-wal
+
+# Node (build toolchain only — vendored output IS committed)
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
