@@ -1,0 +1,95 @@
+{# coterie_request_form.html — HTMX-refreshed after submission #}
+{% if request_success %}
+<div class="gilded p-5 text-center">
+  <p class="font-cinzel text-gold-400 text-sm mb-1">Request Submitted</p>
+  <p class="font-garamond text-bone-400 text-sm">
+    Staff will review your formation request. You'll be notified once a decision is made.
+  </p>
+</div>
+{% else %}
+
+{% if request_errors %}
+<div class="gilded-inset px-4 py-3 mb-4 border border-blood-900">
+  {% for e in request_errors %}
+  <p class="font-garamond text-blood-400 text-sm">{{ e }}</p>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form hx-post="/coteries/request"
+      hx-target="#coterie-request-form"
+      hx-swap="outerHTML"
+      class="gilded p-5 space-y-4"
+      x-data="coterieRequest()"
+      @submit.prevent="submitRequest($event)">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <input type="hidden" name="member_ids" x-bind:value="JSON.stringify(selectedIds)">
+
+  <div>
+    <label class="label-gold block mb-2">Proposed Coterie Name</label>
+    <input type="text" name="proposed_name" required
+           placeholder="e.g. The Dusk Accord"
+           value="{{ (form or {}).get('proposed_name', '') }}"
+           class="w-full">
+  </div>
+
+  <div>
+    <label class="label-gold block mb-2">
+      Proposed Members
+      <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional — staff finalises roster)</span>
+    </label>
+    <p class="font-garamond text-bone-600 text-xs mb-2">
+      Select active characters you'd like to include. Max 6 per coterie.
+    </p>
+    <div class="space-y-1 max-h-48 overflow-y-auto">
+      {% for c in (roster or []) %}
+      <label class="flex items-center gap-2 cursor-pointer py-1">
+        <input type="checkbox" :value="{{ c.id }}"
+               @change="toggleMember({{ c.id }})"
+               class="accent-[#8B1A1A]">
+        <span class="font-cinzel text-xs text-bone-300">{{ c.name }}</span>
+        <span class="font-garamond text-bone-600 text-xs">{{ c.clan | replace('-',' ') | title }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    <p class="font-garamond text-bone-700 text-[0.65rem] mt-1"
+       x-text="selectedIds.length + ' / 6 selected'"></p>
+  </div>
+
+  <div>
+    <label class="label-gold block mb-2">
+      Note
+      <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional)</span>
+    </label>
+    <textarea name="note" rows="3"
+              placeholder="Any context for staff — IC reasons, which characters are involved, etc."
+              class="w-full">{{ (form or {}).get('note', '') }}</textarea>
+  </div>
+
+  <div>
+    <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
+      Submit Request
+    </button>
+  </div>
+</form>
+
+<script>
+function coterieRequest() {
+  return {
+    selectedIds: [],
+    toggleMember(id) {
+      const idx = this.selectedIds.indexOf(id);
+      if (idx === -1) {
+        if (this.selectedIds.length < 6) this.selectedIds.push(id);
+      } else {
+        this.selectedIds.splice(idx, 1);
+      }
+    },
+    submitRequest(e) {
+      // Let HTMX handle the form submit normally (it reads the hidden input)
+      htmx.trigger(e.target, 'submit');
+    }
+  };
+}
+</script>
+{% endif %}

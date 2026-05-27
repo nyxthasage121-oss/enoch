@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ coterie.name }} — Staff — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-6">
+    <p class="label-gold mb-1">
+      <a href="/staff/coteries" class="hover:text-gold-300">Coteries</a>
+      <span class="mx-1">›</span>Staff
+    </p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">{{ coterie.name }}</h1>
+  </div>
+
+  {# Domain values (read-only display) #}
+  <div class="gilded p-5 mb-6">
+    <p class="label-gold text-xs mb-3">Domain</p>
+    <div class="grid grid-cols-3 gap-4">
+      {% for trait, val in [('Chasse', coterie.chasse), ('Lien', coterie.lien), ('Portillon', coterie.portillon)] %}
+      <div class="gilded-inset p-3 text-center">
+        <p class="label-gold text-[0.6rem] mb-1">{{ trait }}</p>
+        <div class="flex justify-center gap-0.5 mb-1">
+          {% for i in range(5) %}
+          <span class="w-2.5 h-2.5 rounded-full border
+            {{ 'bg-gold-500 border-gold-400' if i < val else 'bg-transparent border-ink-600' }}"></span>
+          {% endfor %}
+        </div>
+        <p class="font-cinzel text-bone-400 text-xs">{{ val }}/5</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Members #}
+  <div class="mb-6">
+    <p class="label-gold text-xs mb-3">Members</p>
+    <div id="coterie-members-table">
+      {% include "staff/partials/coterie_members_table.html" %}
+    </div>
+  </div>
+
+  {# Spend history #}
+  {% if spends %}
+  <div>
+    <p class="label-gold text-xs mb-3">Domain Spend History</p>
+    <div class="gilded overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-ink-700">
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Trait</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Upgrade</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Per Member</th>
+            <th class="px-4 py-3 text-center label-gold font-normal text-xs">Status</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in spends %}
+          <tr class="border-b border-ink-800">
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300 capitalize">{{ s.trait_name }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">
+              {{ s.current_dots }} → {{ s.new_dots }}
+            </td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-gold-400 text-right">
+              {{ s.per_member_cost }} XP
+            </td>
+            <td class="px-4 py-2.5 text-center">
+              {% if s.status == 'approved' %}
+              <span class="chip text-gold-400 border-gold-800 text-[0.6rem]">Approved</span>
+              {% elif s.status == 'rejected' %}
+              <span class="chip text-blood-400 border-blood-900 text-[0.6rem]">Rejected</span>
+              {% else %}
+              <span class="chip text-bone-500 border-ink-600 text-[0.6rem]">Pending</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-600">
+              {{ s.submitted_at[:10] }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

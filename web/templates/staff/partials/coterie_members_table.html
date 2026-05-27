@@ -1,0 +1,71 @@
+{# coterie_members_table.html — refreshed by HTMX after add/remove #}
+<div id="coterie-members-table">
+  {% if members %}
+  <div class="gilded overflow-hidden mb-4">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Character</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Clan</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Player</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Role</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in members %}
+        <tr class="border-b border-ink-800">
+          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">{{ m.character_name }}</td>
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-500 capitalize">
+            {{ m.character_clan | replace('-',' ') | title }}
+          </td>
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">{{ m.player_username }}</td>
+          <td class="px-4 py-2.5 text-center">
+            {% if m.role == 'leader' %}
+            <span class="chip text-mauve-400 border-mauve-800 text-[0.55rem]">Leader</span>
+            {% else %}
+            <span class="chip text-bone-600 border-ink-700 text-[0.55rem]">Member</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-right">
+            <button hx-post="/staff/coteries/{{ coterie.id }}/members/{{ m.character_id }}/remove"
+                    hx-target="#coterie-members-table"
+                    hx-swap="outerHTML"
+                    hx-confirm="Remove {{ m.character_name }} from this coterie?"
+                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-2 py-1">
+              Remove
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="font-garamond text-bone-600 text-sm px-1 mb-4">No members yet.</p>
+  {% endif %}
+
+  {# Add member form #}
+  <form hx-post="/staff/coteries/{{ coterie.id }}/members/add"
+        hx-target="#coterie-members-table"
+        hx-swap="outerHTML"
+        class="flex gap-2 items-end">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div>
+      <label class="label-gold block mb-1.5 text-[0.6rem]">Character ID</label>
+      <input type="number" name="character_id" required
+             placeholder="e.g. 42" class="py-1.5 px-2 text-xs w-28">
+    </div>
+    <div>
+      <label class="label-gold block mb-1.5 text-[0.6rem]">Role</label>
+      <select name="role" class="py-1.5 px-2 text-xs">
+        <option value="member">Member</option>
+        <option value="leader">Leader</option>
+      </select>
+    </div>
+    <button type="submit"
+            class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+      Add
+    </button>
+  </form>
+</div>

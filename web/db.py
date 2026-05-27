@@ -881,6 +881,172 @@ def approve_coterie_request(conn, request_id: int, reviewer_id: str) -> dict:
     return get_coterie_request(conn, request_id)
 
 
+def reject_coterie_request(conn, request_id: int, reviewer_id: str, reason: str) -> dict:
+    req = get_coterie_request(conn, request_id)
+    if req is None:
+        raise ValueError(f"Coterie request {request_id} not found")
+    if req["status"] != "pending":
+        raise ValueError(f"Request {request_id} is not pending")
+    now = _now()
+    conn.execute("""
+        UPDATE coterie_requests
+        SET status='rejected', reviewed_by=?, reviewed_at=?
+        WHERE id=?
+    """, (reviewer_id, now, request_id))
+    write_audit(conn, reviewer_id, "reject_coterie_request", "coterie_request", request_id,
+                after={"status": "rejected", "reason": reason})
+    return get_coterie_request(conn, request_id)
+
+
+def update_coterie(conn, coterie_id: int, **fields) -> dict:
+    """Update whitelisted coterie fields (name, chasse, lien, portillon, status)."""
+    allowed = {"name", "chasse", "lien", "portillon", "status", "discord_role_id"}
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return get_coterie(conn, coterie_id)
+    updates["updated_at"] = _now()
+    setters = ", ".join(f"{k}=?" for k in updates)
+    conn.execute(
+        f"UPDATE coteries SET {setters} WHERE id=?",
+        (*updates.values(), coterie_id),
+    )
+    return get_coterie(conn, coterie_id)
+
+
+# ── Coterie spends ────────────────────────────────────────────────────────────
+
+# XP cost for coterie domain upgrades: new_dots × 3, split evenly across members.
+# Per-member cost always rounds up (ceiling division).
+_DOMAIN_COST_PER_DOT = 3
+
+
+def coterie_domain_cost(new_dots: int, member_count: int) -> tuple[int, int]:
+    """Return (total_cost, per_member_cost) for a domain upgrade to new_dots."""
+    if member_count <= 0:
+        raise ValueError("Coterie must have at least one member")
+    total = new_dots * _DOMAIN_COST_PER_DOT
+    per   = -(-total // member_count)  # ceiling division
+    return total, per
+
+
+def get_coterie_spend(conn, spend_id: int) -> dict | None:
+    row = conn.execute("SELECT * FROM coterie_spends WHERE id=?", (spend_id,)).fetchone()
+    return _parse(row, "contributions") if row else None
+
+
+def list_coterie_spends(conn, coterie_id: int) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM coterie_spends WHERE coterie_id=? ORDER BY submitted_at DESC",
+        (coterie_id,),
+    ).fetchall()
+    return [_parse(r, "contributions") for r in rows]
+
+
+def list_pending_coterie_spends(conn) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM coterie_spends WHERE status='pending' ORDER BY submitted_at ASC"
+    ).fetchall()
+    return [_parse(r, "contributions") for r in rows]
+
+
+def create_coterie_spend(
+    conn,
+    coterie_id: int,
+    trait_name: str,
+    current_dots: int,
+    new_dots: int,
+    contributions: dict,   # {str(character_id): xp_amount}
+) -> dict:
+    members = list_coterie_members(conn, coterie_id)
+    if not members:
+        raise ValueError("Coterie has no members")
+    total_cost, per_member = coterie_domain_cost(new_dots, len(members))
+    cur = conn.execute("""
+        INSERT INTO coterie_spends
+            (coterie_id, trait_name, current_dots, new_dots,
+             total_cost, per_member_cost, contributions, submitted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (coterie_id, trait_name, current_dots, new_dots,
+          total_cost, per_member, _j(contributions), _now()))
+    return get_coterie_spend(conn, cur.lastrowid)
+
+
+def approve_coterie_spend(conn, spend_id: int, reviewer_id: str) -> dict:
+    spend = get_coterie_spend(conn, spend_id)
+    if spend is None:
+        raise ValueError(f"Coterie spend {spend_id} not found")
+    if spend["status"] != "pending":
+        raise ValueError(f"Coterie spend {spend_id} is not pending")
+
+    coterie = get_coterie(conn, spend["coterie_id"])
+    if coterie is None:
+        raise ValueError("Coterie not found")
+
+    members  = list_coterie_members(conn, spend["coterie_id"])
+    per_cost = spend["per_member_cost"]
+
+    # Verify XP balances before any mutation
+    for m in members:
+        char = get_character(conn, m["character_id"])
+        if char is None:
+            raise ValueError(f"Character {m['character_id']} not found")
+        if char["xp_available"] < per_cost:
+            raise ValueError(
+                f"{char['name']} only has {char['xp_available']} XP available "
+                f"(need {per_cost})"
+            )
+
+    now = _now()
+    # Deduct XP from each member
+    for m in members:
+        char = get_character(conn, m["character_id"])
+        conn.execute(
+            "UPDATE characters SET xp_spent=xp_spent+?, updated_at=? WHERE id=?",
+            (per_cost, now, char["id"]),
+        )
+        conn.execute("""
+            INSERT INTO ledger_entries
+                (character_id, entry_type, xp_delta, reference_id, reference_type, note, created_by, created_at)
+            VALUES (?, 'spend', ?, ?, 'coterie_spend', ?, ?, ?)
+        """, (
+            char["id"], -per_cost, spend_id,
+            f"Coterie domain: {coterie['name']} — {spend['trait_name']} "
+            f"{spend['current_dots']}→{spend['new_dots']}",
+            reviewer_id, now,
+        ))
+
+    # Apply the upgrade to the coterie
+    update_coterie(conn, spend["coterie_id"], **{spend["trait_name"]: spend["new_dots"]})
+
+    conn.execute("""
+        UPDATE coterie_spends
+        SET status='approved', reviewed_by=?, reviewed_at=?
+        WHERE id=?
+    """, (reviewer_id, now, spend_id))
+
+    write_audit(conn, reviewer_id, "approve_coterie_spend", "coterie_spend", spend_id,
+                after={"status": "approved", "trait": spend["trait_name"],
+                       "new_dots": spend["new_dots"]})
+    return get_coterie_spend(conn, spend_id)
+
+
+def reject_coterie_spend(conn, spend_id: int, reviewer_id: str, reason: str) -> dict:
+    spend = get_coterie_spend(conn, spend_id)
+    if spend is None:
+        raise ValueError(f"Coterie spend {spend_id} not found")
+    if spend["status"] != "pending":
+        raise ValueError(f"Coterie spend {spend_id} is not pending")
+    now = _now()
+    conn.execute("""
+        UPDATE coterie_spends
+        SET status='rejected', reviewed_by=?, reviewed_at=?
+        WHERE id=?
+    """, (reviewer_id, now, spend_id))
+    write_audit(conn, reviewer_id, "reject_coterie_spend", "coterie_spend", spend_id,
+                after={"status": "rejected", "reason": reason})
+    return get_coterie_spend(conn, spend_id)
+
+
 # ── Hunting Sites ─────────────────────────────────────────────────────────────
 
 def _enrich_site(row: dict | None) -> dict | None:

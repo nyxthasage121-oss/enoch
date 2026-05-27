@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Coteries — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-8">
+    <p class="label-gold mb-1">Staff</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Coteries</h1>
+  </div>
+
+  {# ── Formation requests ── #}
+  <div class="mb-8">
+    <p class="label-gold mb-3">Pending Formation Requests
+      {% if requests %}<span class="chip text-blood-400 border-blood-900 text-[0.55rem] ml-2">{{ requests | length }}</span>{% endif %}
+    </p>
+    <div id="coterie-requests-table">
+      {% include "staff/partials/coterie_requests_table.html" %}
+    </div>
+  </div>
+
+  {# ── Domain upgrade spends ── #}
+  <div class="mb-8">
+    <p class="label-gold mb-3">Pending Domain Upgrades
+      {% if co_spends %}<span class="chip text-blood-400 border-blood-900 text-[0.55rem] ml-2">{{ co_spends | length }}</span>{% endif %}
+    </p>
+    <div id="coterie-spends-table">
+      {% include "staff/partials/coterie_spends_table.html" %}
+    </div>
+  </div>
+
+  {# ── Active coteries ── #}
+  {% if coteries %}
+  <div>
+    <p class="label-gold mb-3">Active Coteries</p>
+    <div class="gilded overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-ink-700">
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Name</th>
+            <th class="px-4 py-3 text-center label-gold font-normal text-xs">Chasse</th>
+            <th class="px-4 py-3 text-center label-gold font-normal text-xs">Lien</th>
+            <th class="px-4 py-3 text-center label-gold font-normal text-xs">Portillon</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Members</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for co in coteries %}
+          <tr class="border-b border-ink-800">
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">{{ co.name }}</td>
+            <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.chasse }}</td>
+            <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.lien }}</td>
+            <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.portillon }}</td>
+            <td class="px-4 py-2.5 text-right">
+              <a href="/staff/coteries/{{ co.id }}"
+                 class="font-cinzel text-[0.6rem] text-gold-500 hover:text-gold-300 tracking-widest">
+                Manage
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

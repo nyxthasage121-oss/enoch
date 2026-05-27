@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}{{ coterie.name }} — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-6">
+    <p class="label-gold mb-1">Coterie</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">{{ coterie.name }}</h1>
+  </div>
+
+  {# ── Domain ── #}
+  <div class="gilded p-5 mb-6">
+    <p class="label-gold text-xs mb-4">Domain</p>
+    <div class="grid grid-cols-3 gap-4">
+      {% for trait, val in [('Chasse', coterie.chasse), ('Lien', coterie.lien), ('Portillon', coterie.portillon)] %}
+      <div class="gilded-inset p-3 text-center">
+        <p class="label-gold text-[0.6rem] mb-2">{{ trait }}</p>
+        <div class="flex justify-center gap-0.5 mb-1">
+          {% for i in range(5) %}
+          <span class="w-3 h-3 rounded-full border
+            {{ 'bg-gold-500 border-gold-400' if i < val else 'bg-transparent border-ink-600' }}"></span>
+          {% endfor %}
+        </div>
+        <p class="font-cinzel text-bone-400 text-xs">{{ val }}/5</p>
+        {% if upgrade_costs.get(trait | lower) %}
+        {% set uc = upgrade_costs[trait | lower] %}
+        <p class="font-garamond text-bone-600 text-[0.6rem] mt-1">
+          Upgrade: {{ uc.per_member }} XP/member
+        </p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ── Members ── #}
+  <div class="gilded p-5 mb-6">
+    <p class="label-gold text-xs mb-3">Members</p>
+    <div class="space-y-1">
+      {% for m in members %}
+      <div class="flex items-center justify-between py-1.5 border-b border-ink-800 last:border-0">
+        <div>
+          <span class="font-cinzel text-xs text-bone-200">{{ m.character_name }}</span>
+          <span class="font-garamond text-bone-600 text-xs ml-2">
+            {{ m.character_clan | replace('-',' ') | title }}
+          </span>
+        </div>
+        {% if m.role == 'leader' %}
+        <span class="chip text-mauve-400 border-mauve-800 text-[0.55rem]">Leader</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ── Request Domain Upgrade ── #}
+  {% if upgrade_costs %}
+  <div class="gilded p-5 mb-6" x-data="{ open: false }">
+    <button @click="open = !open"
+            class="w-full flex items-center justify-between">
+      <p class="label-gold text-xs">Request Domain Upgrade</p>
+      <span class="font-cinzel text-bone-500 text-xs" x-text="open ? '▲' : '▼'"></span>
+    </button>
+
+    <div x-show="open" x-cloak class="mt-4">
+      {% if spend_errors %}
+      <div class="gilded-inset px-4 py-3 mb-3 border border-blood-900">
+        {% for e in spend_errors %}<p class="font-garamond text-blood-400 text-sm">{{ e }}</p>{% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="POST" action="/coteries/{{ coterie.id }}/spend" class="space-y-3">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <div>
+          <label class="label-gold block mb-2">Domain Trait to Upgrade</label>
+          <div class="space-y-2">
+            {% for trait_key, uc in upgrade_costs.items() %}
+            <label class="flex items-center gap-3 cursor-pointer gilded-inset px-3 py-2">
+              <input type="radio" name="trait_name" value="{{ trait_key }}" class="accent-[#8B1A1A]">
+              <div>
+                <span class="font-cinzel text-xs text-bone-200">{{ trait_key | title }}</span>
+                <span class="font-garamond text-bone-600 text-xs ml-2">
+                  → {{ uc.next_dot }} dots
+                </span>
+                <span class="font-cinzel text-gold-500 text-xs ml-2">
+                  {{ uc.per_member }} XP/member ({{ uc.total }} total)
+                </span>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
+          Submit Upgrade Request
+        </button>
+        <p class="font-garamond text-bone-600 text-xs">
+          XP will be deducted from all members upon staff approval.
+        </p>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if spend_success %}
+  <div class="gilded-inset px-4 py-3 mb-4 border border-gold-800">
+    <p class="font-garamond text-gold-400 text-sm">{{ spend_success }}</p>
+  </div>
+  {% endif %}
+
+  {# ── Spend history ── #}
+  {% if spends %}
+  <div class="gilded overflow-hidden">
+    <div class="px-4 py-3 border-b border-ink-700">
+      <p class="label-gold text-xs">Domain Upgrade History</p>
+    </div>
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-2 text-left label-gold font-normal text-xs">Trait</th>
+          <th class="px-4 py-2 text-left label-gold font-normal text-xs">Upgrade</th>
+          <th class="px-4 py-2 text-right label-gold font-normal text-xs">Cost/Member</th>
+          <th class="px-4 py-2 text-center label-gold font-normal text-xs">Status</th>
+          <th class="px-4 py-2 text-left label-gold font-normal text-xs">Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in spends %}
+        <tr class="border-b border-ink-800">
+          <td class="px-4 py-2 font-cinzel text-xs text-bone-300 capitalize">{{ s.trait_name }}</td>
+          <td class="px-4 py-2 font-cinzel text-xs text-bone-500">
+            {{ s.current_dots }} → {{ s.new_dots }}
+          </td>
+          <td class="px-4 py-2 font-cinzel text-xs text-gold-400 text-right">
+            {{ s.per_member_cost }} XP
+          </td>
+          <td class="px-4 py-2 text-center">
+            {% if s.status == 'approved' %}
+            <span class="chip text-gold-400 border-gold-800 text-[0.6rem]">Approved</span>
+            {% elif s.status == 'rejected' %}
+            <span class="chip text-blood-400 border-blood-900 text-[0.6rem]">Rejected</span>
+            {% else %}
+            <span class="chip text-bone-500 border-ink-600 text-[0.6rem]">Pending</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2 font-cinzel text-[0.6rem] text-bone-600">
+            {{ s.submitted_at[:10] }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

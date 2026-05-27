@@ -7,14 +7,23 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from ..db import (
+    add_coterie_member,
+    coterie_domain_cost,
     create_claim,
+    create_coterie_request,
+    create_coterie_spend,
     create_spend,
     get_active_period,
+    get_character,
     get_character_for_player,
+    get_coterie,
     get_coterie_for_character,
     get_db,
     get_ledger,
+    list_characters,
     list_claims_for_character,
+    list_coterie_members,
+    list_coterie_spends,
     list_criteria,
     list_player_characters,
     list_spends_for_character,
@@ -314,4 +323,237 @@ async def submit_spend(
         _spend_ctx({"spend_success": f"Request submitted — {trait_name} ({category}, {verified_cost} XP)."}),
     )
     _toast(resp, "Spend request submitted — pending staff review.")
+    return resp
+
+
+# ── Coteries ──────────────────────────────────────────────────────────────────
+
+@router.get("/coteries", response_class=HTMLResponse)
+async def coteries_list(request: Request, user: dict = Depends(require_auth)):
+    """Show the player's coterie (if any), otherwise offer formation request."""
+    with get_db() as conn:
+        chars   = list_player_characters(conn, user["id"])
+        coterie = None
+        members = []
+        spends  = []
+        # Find the first active, approved character that is in a coterie
+        for c in chars:
+            if c["status"] == "active" and c["is_approved"]:
+                coterie = get_coterie_for_character(conn, c["id"])
+                if coterie:
+                    members = list_coterie_members(conn, coterie["id"])
+                    spends  = list_coterie_spends(conn, coterie["id"])
+                    break
+
+        # Characters eligible to include in a formation request
+        eligible = [
+            c for c in chars
+            if c["status"] == "active" and c["is_approved"]
+        ]
+        all_active = list_characters(conn, status="active")
+        roster = [c for c in all_active if c["is_approved"]]
+
+    return templates.TemplateResponse(
+        "player/coteries.html",
+        _ctx(
+            request,
+            coterie=coterie,
+            members=members,
+            spends=spends,
+            eligible_chars=eligible,
+            roster=roster,
+        ),
+    )
+
+
+@router.post("/coteries/request", response_class=HTMLResponse)
+async def submit_coterie_request(
+    request: Request,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    form          = await request.form()
+    proposed_name = (form.get("proposed_name") or "").strip()
+    note          = (form.get("note") or "").strip() or None
+    # member_ids: character IDs the player wants in the coterie (JSON array from hidden input)
+    raw_ids       = (form.get("member_ids") or "").strip()
+
+    errors: list[str] = []
+
+    if not proposed_name:
+        errors.append("A coterie name is required.")
+
+    member_ids: list[int] = []
+    if raw_ids:
+        try:
+            import json as _json
+            member_ids = [int(x) for x in _json.loads(raw_ids)]
+        except Exception:
+            errors.append("Invalid member list — please try again.")
+
+    if errors:
+        resp = templates.TemplateResponse(
+            "player/partials/coterie_request_form.html",
+            _ctx(request, request_errors=errors, form={"proposed_name": proposed_name, "note": note}),
+        )
+        _toast(resp, "Please fix the errors below.", "error")
+        return resp
+
+    with get_db() as conn:
+        create_coterie_request(
+            conn,
+            requested_by=user["id"],
+            proposed_name=proposed_name,
+            member_ids=member_ids,
+            note=note,
+        )
+
+    resp = templates.TemplateResponse(
+        "player/partials/coterie_request_form.html",
+        _ctx(request, request_success=True),
+    )
+    _toast(resp, "Formation request submitted — staff will review shortly.")
+    return resp
+
+
+@router.get("/coteries/{coterie_id}", response_class=HTMLResponse)
+async def coterie_detail(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_auth),
+):
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+
+        members = list_coterie_members(conn, coterie_id)
+        spends  = list_coterie_spends(conn, coterie_id)
+
+        # Verify caller is a member
+        player_chars = list_player_characters(conn, user["id"])
+        member_char_ids = {m["character_id"] for m in members}
+        is_member = any(c["id"] in member_char_ids for c in player_chars)
+        if not is_member:
+            raise HTTPException(status_code=403, detail="Not a member of this coterie")
+
+    # Compute upgrade costs for display
+    n = len(members)
+    upgrade_costs = {}
+    if n > 0:
+        for trait, current_val in [("chasse", coterie["chasse"]),
+                                    ("lien",   coterie["lien"]),
+                                    ("portillon", coterie["portillon"])]:
+            next_dot = current_val + 1
+            if next_dot <= 5:
+                total, per = coterie_domain_cost(next_dot, n)
+                upgrade_costs[trait] = {"next_dot": next_dot, "total": total, "per_member": per}
+
+    return templates.TemplateResponse(
+        "player/coterie_detail.html",
+        _ctx(
+            request,
+            coterie=coterie,
+            members=members,
+            spends=spends,
+            upgrade_costs=upgrade_costs,
+        ),
+    )
+
+
+@router.post("/coteries/{coterie_id}/spend", response_class=HTMLResponse)
+async def submit_coterie_spend(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    form       = await request.form()
+    trait_name = (form.get("trait_name") or "").strip()
+
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+
+        members = list_coterie_members(conn, coterie_id)
+        member_char_ids = {m["character_id"] for m in members}
+        player_chars = list_player_characters(conn, user["id"])
+
+        if not any(c["id"] in member_char_ids for c in player_chars):
+            raise HTTPException(status_code=403)
+
+        errors: list[str] = []
+        if trait_name not in ("chasse", "lien", "portillon"):
+            errors.append("Invalid domain trait.")
+
+        current_val = coterie.get(trait_name, 0) if not errors else 0
+        new_dots    = current_val + 1 if not errors else 0
+
+        if not errors and new_dots > 5:
+            errors.append(f"{trait_name.title()} is already at maximum (5).")
+
+        pending_spends = list_coterie_spends(conn, coterie_id)
+        already_pending = any(
+            s["status"] == "pending" and s["trait_name"] == trait_name
+            for s in pending_spends
+        )
+        if not errors and already_pending:
+            errors.append(f"There is already a pending {trait_name} upgrade request.")
+
+        if not errors:
+            n = len(members)
+            _, per_cost = coterie_domain_cost(new_dots, n)
+            # Check all members have enough XP
+            short = []
+            for m in members:
+                char = get_character(conn, m["character_id"])
+                if char and char["xp_available"] < per_cost:
+                    short.append(f"{char['name']} ({char['xp_available']} XP available)")
+            if short:
+                errors.append(
+                    f"Insufficient XP — {per_cost} XP needed per member. "
+                    "Short: " + ", ".join(short)
+                )
+
+        if errors:
+            spends = list_coterie_spends(conn, coterie_id)
+            n = len(members)
+            upgrade_costs = {}
+            for t, cv in [("chasse", coterie["chasse"]),
+                           ("lien",   coterie["lien"]),
+                           ("portillon", coterie["portillon"])]:
+                nd = cv + 1
+                if nd <= 5:
+                    total, per = coterie_domain_cost(nd, n)
+                    upgrade_costs[t] = {"next_dot": nd, "total": total, "per_member": per}
+            resp = templates.TemplateResponse(
+                "player/coterie_detail.html",
+                _ctx(request, coterie=coterie, members=members,
+                     spends=spends, upgrade_costs=upgrade_costs,
+                     spend_errors=errors),
+            )
+            _toast(resp, "Please fix the errors below.", "error")
+            return resp
+
+        contributions = {str(m["character_id"]): per_cost for m in members}
+        create_coterie_spend(
+            conn,
+            coterie_id=coterie_id,
+            trait_name=trait_name,
+            current_dots=current_val,
+            new_dots=new_dots,
+            contributions=contributions,
+        )
+        spends = list_coterie_spends(conn, coterie_id)
+
+    resp = templates.TemplateResponse(
+        "player/coterie_detail.html",
+        _ctx(
+            request, coterie=coterie, members=members, spends=spends,
+            upgrade_costs={},
+            spend_success=f"{trait_name.title()} upgrade submitted for staff review.",
+        ),
+    )
+    _toast(resp, f"{trait_name.title()} upgrade request submitted.")
     return resp

@@ -33,6 +33,17 @@
       </p>
     </a>
 
+    <a href="/staff/coteries" class="gilded p-5 block hover:border-gold-800 transition-colors">
+      <p class="label-gold mb-2 text-[0.6rem]">Coterie Requests</p>
+      <p class="font-cinzel text-4xl {{ 'text-mauve-400' if n_coterie_reqs > 0 else 'text-bone-600' }}">
+        {{ n_coterie_reqs }}
+      </p>
+    </a>
+
+  </div>
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+
     <div class="gilded p-5">
       <p class="label-gold mb-2 text-[0.6rem]">Active Characters</p>
       <p class="font-cinzel text-4xl text-bone-400">{{ n_active }}</p>

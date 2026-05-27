@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}My Coterie — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-8">
+    <p class="label-gold mb-1">Player</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Coterie</h1>
+  </div>
+
+  {% if coterie %}
+  {# ── Member of a coterie ── #}
+  <div class="gilded p-6 mb-6">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h2 class="font-cinzel text-xl text-bone-100 tracking-wide">{{ coterie.name }}</h2>
+        <p class="font-garamond text-bone-500 text-sm mt-0.5">{{ members | length }} members</p>
+      </div>
+      <span class="chip text-gold-400 border-gold-800 text-[0.6rem]">Active</span>
+    </div>
+
+    {# Domain values #}
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      {% for trait, val in [('Chasse', coterie.chasse), ('Lien', coterie.lien), ('Portillon', coterie.portillon)] %}
+      <div class="gilded-inset p-3 text-center">
+        <p class="label-gold text-[0.6rem] mb-1">{{ trait }}</p>
+        <div class="flex justify-center gap-0.5">
+          {% for i in range(5) %}
+          <span class="w-2.5 h-2.5 rounded-full border
+            {{ 'bg-gold-500 border-gold-400' if i < val else 'bg-transparent border-ink-600' }}"></span>
+          {% endfor %}
+        </div>
+        <p class="font-cinzel text-bone-400 text-xs mt-1">{{ val }}/5</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# Members #}
+    <div class="mb-4">
+      <p class="label-gold text-xs mb-2">Members</p>
+      <div class="space-y-1">
+        {% for m in members %}
+        <div class="flex items-center justify-between py-1.5 border-b border-ink-800 last:border-0">
+          <div>
+            <span class="font-cinzel text-xs text-bone-200">{{ m.character_name }}</span>
+            <span class="font-garamond text-bone-600 text-xs ml-2">{{ m.character_clan | replace('-',' ') | title }}</span>
+          </div>
+          {% if m.role == 'leader' %}
+          <span class="chip text-mauve-400 border-mauve-800 text-[0.55rem]">Leader</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <a href="/coteries/{{ coterie.id }}"
+       class="btn-ghost font-cinzel text-xs tracking-widest">
+      View Details & Manage
+    </a>
+  </div>
+
+  {% else %}
+  {# ── No coterie ── #}
+  <div class="gilded p-6 mb-6 text-center">
+    <p class="font-cinzel text-bone-400 text-sm mb-1">No Coterie</p>
+    <p class="font-garamond text-bone-600 text-sm">
+      Your character is not part of a coterie. Request formation below.
+    </p>
+  </div>
+
+  <div class="max-w-xl">
+    <p class="label-gold mb-4">Request Coterie Formation</p>
+
+    <div id="coterie-request-form">
+      {% include "player/partials/coterie_request_form.html" %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

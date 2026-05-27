@@ -6,23 +6,36 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from ..db import (
+    add_coterie_member,
     approve_character,
     approve_claim,
+    approve_coterie_request,
+    approve_coterie_spend,
     approve_spend,
     close_period,
     create_criterion,
     create_period,
     get_active_period,
+    get_coterie,
     get_db,
     list_characters,
+    list_coterie_members,
+    list_coterie_spends,
+    list_coteries,
     list_criteria,
     list_pending_claims,
+    list_pending_coterie_requests,
+    list_pending_coterie_spends,
     list_pending_spends,
     list_periods,
     reject_character,
     reject_claim,
+    reject_coterie_request,
+    reject_coterie_spend,
     reject_spend,
+    remove_coterie_member,
     set_period_active,
+    update_coterie,
     update_criterion,
 )
 from ..deps import csrf_protect, require_staff
@@ -42,10 +55,11 @@ def _toast(response, message: str, kind: str = "success") -> None:
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, user: dict = Depends(require_staff)):
     with get_db() as conn:
-        pending_claims = list_pending_claims(conn)
-        pending_spends = list_pending_spends(conn)
-        all_chars      = list_characters(conn)
-        active_period  = get_active_period(conn)
+        pending_claims    = list_pending_claims(conn)
+        pending_spends    = list_pending_spends(conn)
+        all_chars         = list_characters(conn)
+        active_period     = get_active_period(conn)
+        coterie_requests  = list_pending_coterie_requests(conn)
 
     pending_chars = [c for c in all_chars if not c["is_approved"]]
     active_chars  = [c for c in all_chars if c["status"] == "active"]
@@ -58,6 +72,7 @@ async def dashboard(request: Request, user: dict = Depends(require_staff)):
             n_spends=len(pending_spends),
             n_chars=len(pending_chars),
             n_active=len(active_chars),
+            n_coterie_reqs=len(coterie_requests),
             active_period=active_period,
             recent_claims=pending_claims[:5],
         ),
@@ -465,4 +480,181 @@ async def close_period_route(
         _ctx(request, periods=periods, active_period=active_period),
     )
     _toast(resp, "Period closed.", "info")
+    return resp
+
+
+# ── Coteries ──────────────────────────────────────────────────────────────────
+
+def _coterie_ctx(conn) -> dict:
+    coteries  = list_coteries(conn, status="active")
+    requests  = list_pending_coterie_requests(conn)
+    co_spends = list_pending_coterie_spends(conn)
+    return {"coteries": coteries, "requests": requests, "co_spends": co_spends}
+
+
+@router.get("/coteries", response_class=HTMLResponse)
+async def coteries_admin(request: Request, user: dict = Depends(require_staff)):
+    with get_db() as conn:
+        ctx = _coterie_ctx(conn)
+    return templates.TemplateResponse("staff/coteries.html", _ctx(request, **ctx))
+
+
+@router.post("/coteries/requests/{request_id}/approve", response_class=HTMLResponse)
+async def approve_coterie_req(
+    request: Request,
+    request_id: int,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    err = None
+    try:
+        with get_db() as conn:
+            approve_coterie_request(conn, request_id, user["id"])
+    except ValueError as e:
+        err = str(e)
+    with get_db() as conn:
+        ctx = _coterie_ctx(conn)
+    resp = templates.TemplateResponse(
+        "staff/partials/coterie_requests_table.html", _ctx(request, **ctx)
+    )
+    _toast(resp, err or "Coterie formed and activated.", "error" if err else "success")
+    return resp
+
+
+@router.post("/coteries/requests/{request_id}/reject", response_class=HTMLResponse)
+async def reject_coterie_req(
+    request: Request,
+    request_id: int,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    form   = await request.form()
+    reason = (form.get("reason") or "").strip() or "No reason provided"
+    err = None
+    try:
+        with get_db() as conn:
+            reject_coterie_request(conn, request_id, user["id"], reason)
+    except ValueError as e:
+        err = str(e)
+    with get_db() as conn:
+        ctx = _coterie_ctx(conn)
+    resp = templates.TemplateResponse(
+        "staff/partials/coterie_requests_table.html", _ctx(request, **ctx)
+    )
+    _toast(resp, err or "Formation request rejected.", "error" if err else "info")
+    return resp
+
+
+@router.post("/coteries/spends/{spend_id}/approve", response_class=HTMLResponse)
+async def approve_co_spend(
+    request: Request,
+    spend_id: int,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    err = None
+    try:
+        with get_db() as conn:
+            approve_coterie_spend(conn, spend_id, user["id"])
+    except ValueError as e:
+        err = str(e)
+    with get_db() as conn:
+        ctx = _coterie_ctx(conn)
+    resp = templates.TemplateResponse(
+        "staff/partials/coterie_spends_table.html", _ctx(request, **ctx)
+    )
+    _toast(resp, err or "Domain upgrade approved.", "error" if err else "success")
+    return resp
+
+
+@router.post("/coteries/spends/{spend_id}/reject", response_class=HTMLResponse)
+async def reject_co_spend(
+    request: Request,
+    spend_id: int,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    form   = await request.form()
+    reason = (form.get("reason") or "").strip() or "No reason provided"
+    err = None
+    try:
+        with get_db() as conn:
+            reject_coterie_spend(conn, spend_id, user["id"], reason)
+    except ValueError as e:
+        err = str(e)
+    with get_db() as conn:
+        ctx = _coterie_ctx(conn)
+    resp = templates.TemplateResponse(
+        "staff/partials/coterie_spends_table.html", _ctx(request, **ctx)
+    )
+    _toast(resp, err or "Domain upgrade rejected.", "error" if err else "info")
+    return resp
+
+
+@router.post("/coteries/{coterie_id}/members/{character_id}/remove",
+             response_class=HTMLResponse)
+async def remove_coterie_member_route(
+    request: Request,
+    coterie_id: int,
+    character_id: int,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    with get_db() as conn:
+        remove_coterie_member(conn, coterie_id, character_id)
+        members = list_coterie_members(conn, coterie_id)
+        coterie = get_coterie(conn, coterie_id)
+    resp = templates.TemplateResponse(
+        "staff/partials/coterie_members_table.html",
+        _ctx(request, coterie=coterie, members=members),
+    )
+    _toast(resp, "Member removed.", "info")
+    return resp
+
+
+@router.get("/coteries/{coterie_id}", response_class=HTMLResponse)
+async def coterie_manage_page(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_staff),
+):
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+        members = list_coterie_members(conn, coterie_id)
+        spends  = list_coterie_spends(conn, coterie_id)
+    return templates.TemplateResponse(
+        "staff/coterie_manage.html",
+        _ctx(request, coterie=coterie, members=members, spends=spends),
+    )
+
+
+@router.post("/coteries/{coterie_id}/members/add", response_class=HTMLResponse)
+async def add_coterie_member_route(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    form         = await request.form()
+    character_id = int(form.get("character_id") or 0)
+    role         = form.get("role") or "member"
+    err = None
+    if not character_id:
+        err = "Character ID is required."
+    else:
+        try:
+            with get_db() as conn:
+                add_coterie_member(conn, coterie_id, character_id, role)
+        except Exception as e:
+            err = str(e)
+    with get_db() as conn:
+        members = list_coterie_members(conn, coterie_id)
+        coterie = get_coterie(conn, coterie_id)
+    resp = templates.TemplateResponse(
+        "staff/partials/coterie_members_table.html",
+        _ctx(request, coterie=coterie, members=members),
+    )
+    _toast(resp, err or "Member added.", "error" if err else "success")
     return resp
