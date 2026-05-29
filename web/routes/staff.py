@@ -684,7 +684,6 @@ async def do_delete_char(
     user: dict = Depends(require_permission("delete_character")),
     _: None = Depends(csrf_protect),
 ):
-    from fastapi.responses import RedirectResponse
     with get_db() as conn:
         char = get_character(conn, character_id)
         if not char:
@@ -1788,7 +1787,6 @@ async def admin_settings_save(
     Gated by require_settings_admin (Pattern 5) so a co_st can't flip
     XP rules without explicit grant — even if they have manage_settings
     permission. Lead STs get the grant automatically via migration 024."""
-    from fastapi.responses import RedirectResponse
     from ..db import upsert_settings
     import json as _json
 
@@ -1959,7 +1957,6 @@ async def adjust_character_xp(
     """Inline XP adjustment from the staff character detail page. Accepts
     either the new structured form (action + amount) or the legacy
     signed-delta form for back-compat."""
-    from fastapi.responses import RedirectResponse
     form  = await request.form()
     note  = (form.get("note") or "").strip()
     action = (form.get("action") or "").strip().lower()

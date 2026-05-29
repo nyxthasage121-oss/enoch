@@ -1,0 +1,10 @@
+# Normalize line endings: store LF in the repo so Windows checkouts
+# stop emitting "LF will be replaced by CRLF" churn warnings.
+* text=auto eol=lf
+
+# Treat these as binary — never normalize EOLs.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.ico  binary
+*.db   binary

@@ -39,3 +39,9 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Claude Code (machine-specific launch config — absolute paths + dev secret)
+.claude/launch.json
+
+# Stale editor backups
+*.bak
