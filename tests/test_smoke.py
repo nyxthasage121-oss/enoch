@@ -2627,6 +2627,53 @@ def test_every_predator_type_has_benefit_info():
         assert added in V5_PREDATOR_TYPES, f"{added} should be a selectable predator type"
 
 
+def test_predator_grants_are_well_formed():
+    """Every predator's structured `grants` must reference valid skill/
+    discipline keys and valid sheet lists, so the wizard pickers and the
+    sheet-application logic never hit an unknown trait. Also checks the
+    skill/discipline spread constants are internally consistent."""
+    from web.v5_traits import (
+        V5_PREDATOR_INFO, V5_SKILLS, V5_DISCIPLINES,
+        V5_SKILL_SPREADS, V5_DISCIPLINE_SPREADS,
+    )
+    skill_keys = {k for _, ts in V5_SKILLS for k, _ in ts}
+    disc_keys = {k for k, _ in V5_DISCIPLINES}
+    lists = {"merits", "backgrounds", "flaws", "advantages"}
+
+    def check(pt, g):
+        kind = g.get("kind")
+        if kind == "specialty":
+            for o in g["options"]:
+                assert o["skill"] in skill_keys, f"{pt}: bad skill {o['skill']}"
+                assert o.get("name")
+        elif kind == "discipline":
+            assert g["options"], f"{pt}: empty discipline options"
+            for d in g["options"]:
+                assert d in disc_keys, f"{pt}: bad discipline {d}"
+        elif kind == "fixed":
+            assert g["list"] in lists and g.get("name") and g.get("dots")
+        elif kind == "delta":
+            assert g["trait"] in ("humanity", "blood_potency")
+        elif kind == "choice":
+            assert g["options"]
+            for sub in g["options"]:
+                check(pt, sub)
+        elif kind == "pool":
+            assert g["list"] in lists and g.get("dots") and len(g.get("options", [])) >= 2
+        else:
+            raise AssertionError(f"{pt}: unknown grant kind {kind!r}")
+
+    for pt, info in V5_PREDATOR_INFO.items():
+        assert "grants" in info, f"{pt} has no grants"
+        for g in info["grants"]:
+            check(pt, g)
+
+    for spr in V5_SKILL_SPREADS.values():
+        assert spr["levels"] and spr.get("label")
+    for slug, spr in V5_DISCIPLINE_SPREADS.items():
+        assert sum(lvl * n for lvl, n in spr["levels"].items()) == spr["total"], f"{slug} total mismatch"
+
+
 def test_clan_color_utilities_defined_and_used():
     """Clan-color arbitrary Tailwind classes (border-[var(--clan,…)] etc.)
     don't survive the precompiled build, so clan identity must use the

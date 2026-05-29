@@ -238,59 +238,261 @@ V5_CLAN_INFO: dict[str, dict[str, str]] = {
 #
 # Restricted types (Blood Leech, Tithe Collector) are staff opt-in via
 # chronicle_restrictions — the chargen picker hides them unless unlocked.
-V5_PREDATOR_INFO: dict[str, dict[str, str]] = {
+#
+# Each entry also carries a structured `grants` list the wizard renders as
+# interactive pickers. Grant kinds:
+#   specialty  — options:[{skill,name}]            → player picks one
+#   discipline — options:[disc_*]  (the FREE dot)  → player picks one (+1 dot)
+#   fixed      — list, name, dots                  → auto-added to that list
+#   delta      — trait (humanity/blood_potency)    → auto ± to the trait
+#   choice     — prompt, options:[<grant>,…]       → player picks one sub-grant
+#   pool       — list, dots, options:[name,…]      → spend N dots across the names
+# Lists: merits / backgrounds / flaws (V5 "advantages" map onto these).
+V5_PREDATOR_INFO: dict[str, dict] = {
     "Alleycat": {
         "benefits": "+1 Celerity OR Potence. Intimidation (Stickups) OR Brawl (Grappling) specialty. Lose 1 Humanity. Gain Criminal Contacts (•••). Feeds by force or threat.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_intimidation", "name": "Stickups"},
+                {"skill": "skill_brawl", "name": "Grappling"}]},
+            {"kind": "discipline", "options": ["disc_celerity", "disc_potence"]},
+            {"kind": "delta", "trait": "humanity", "delta": -1},
+            {"kind": "fixed", "list": "backgrounds", "name": "Criminal Contacts", "dots": 3},
+        ],
     },
     "Bagger": {
         "benefits": "+1 Obfuscate (Blood Sorcery/Oblivion per clan). Larceny (Lock Picking) OR Streetwise (Black Market) specialty. Gain Iron Gullet (•••) AND an Enemy (••) flaw. Feeds on stored/preserved blood. Not for Ventrue.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_larceny", "name": "Lock Picking"},
+                {"skill": "skill_streetwise", "name": "Black Market"}]},
+            {"kind": "discipline", "options": ["disc_blood_sorcery", "disc_oblivion", "disc_obfuscate"],
+             "note": "Blood Sorcery (Tremere/Banu Haqim) · Oblivion (Hecata) · else Obfuscate"},
+            {"kind": "fixed", "list": "merits", "name": "Iron Gullet", "dots": 3},
+            {"kind": "fixed", "list": "flaws", "name": "Enemy", "dots": 2},
+        ],
     },
     "Blood Leech": {
         "benefits": "Staff opt-in. +1 Celerity OR Protean. Brawl (Kindred) OR Stealth (vs Kindred) specialty. Lose 1 Humanity, +1 Blood Potency. Diablerist OR Shunned (••), plus Prey Exclusion: Mortals (••). Feeds on vampire vitae.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_brawl", "name": "Kindred"},
+                {"skill": "skill_stealth", "name": "Against Kindred"}]},
+            {"kind": "discipline", "options": ["disc_celerity", "disc_protean"]},
+            {"kind": "delta", "trait": "humanity", "delta": -1},
+            {"kind": "delta", "trait": "blood_potency", "delta": 1},
+            {"kind": "choice", "prompt": "Dark Secret", "options": [
+                {"kind": "fixed", "list": "flaws", "name": "Dark Secret: Diablerist", "dots": 2},
+                {"kind": "fixed", "list": "flaws", "name": "Shunned", "dots": 2}]},
+            {"kind": "fixed", "list": "flaws", "name": "Prey Exclusion (Mortals)", "dots": 2},
+        ],
     },
     "Cleaver": {
         "benefits": "+1 Dominate OR Animalism. Persuasion (Gaslighting) OR Subterfuge (Coverups) specialty. Gain Herd (••), but Dark Secret: Cleaver (•). Feeds on their own family/friends.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_persuasion", "name": "Gaslighting"},
+                {"skill": "skill_subterfuge", "name": "Coverups"}]},
+            {"kind": "discipline", "options": ["disc_dominate", "disc_animalism"]},
+            {"kind": "fixed", "list": "backgrounds", "name": "Herd", "dots": 2},
+            {"kind": "fixed", "list": "flaws", "name": "Dark Secret: Cleaver", "dots": 1},
+        ],
     },
     "Consensualist": {
         "benefits": "+1 Auspex OR Fortitude. Medicine (Phlebotomy) OR Persuasion (Vessels) specialty. +1 Humanity. Masquerade Breacher (•) + Prey Exclusion: Non-consenting (•). Only feeds with consent.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_medicine", "name": "Phlebotomy"},
+                {"skill": "skill_persuasion", "name": "Vessels"}]},
+            {"kind": "discipline", "options": ["disc_auspex", "disc_fortitude"]},
+            {"kind": "delta", "trait": "humanity", "delta": 1},
+            {"kind": "fixed", "list": "flaws", "name": "Dark Secret: Masquerade Breacher", "dots": 1},
+            {"kind": "fixed", "list": "flaws", "name": "Prey Exclusion (Non-consenting)", "dots": 1},
+        ],
     },
     "Extortionist": {
         "benefits": "+1 Dominate OR Potence. Intimidation (Coercion) OR Larceny (Security) specialty. 3 dots across Contacts & Resources, but Enemy (••). Feeds in exchange for 'services'.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_intimidation", "name": "Coercion"},
+                {"skill": "skill_larceny", "name": "Security"}]},
+            {"kind": "discipline", "options": ["disc_dominate", "disc_potence"]},
+            {"kind": "pool", "list": "backgrounds", "dots": 3, "options": ["Contacts", "Resources"]},
+            {"kind": "fixed", "list": "flaws", "name": "Enemy", "dots": 2},
+        ],
     },
     "Farmer": {
         "benefits": "+1 Animalism OR Protean. Animal Ken OR Survival (Hunting) specialty. +1 Humanity. Farmer (••) feeding flaw. Feeds on animals. Not for Ventrue or Blood Potency 3+.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_animal_ken", "name": "Specific Animal"},
+                {"skill": "skill_survival", "name": "Hunting"}]},
+            {"kind": "discipline", "options": ["disc_animalism", "disc_protean"]},
+            {"kind": "delta", "trait": "humanity", "delta": 1},
+            {"kind": "fixed", "list": "flaws", "name": "Farmer", "dots": 2},
+        ],
     },
     "Graverobber": {
         "benefits": "+1 Fortitude OR Oblivion. Occult (Grave Rituals) OR Medicine (Cadavers) specialty. Iron Gullet (•••) + Haven (•), but Obvious Predator (••) herd flaw. Feeds on corpses/mourners.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_occult", "name": "Grave Rituals"},
+                {"skill": "skill_medicine", "name": "Cadavers"}]},
+            {"kind": "discipline", "options": ["disc_fortitude", "disc_oblivion"]},
+            {"kind": "fixed", "list": "merits", "name": "Iron Gullet", "dots": 3},
+            {"kind": "fixed", "list": "backgrounds", "name": "Haven", "dots": 1},
+            {"kind": "fixed", "list": "flaws", "name": "Obvious Predator", "dots": 2},
+        ],
     },
     "Grim Reaper": {
         "benefits": "+1 Auspex OR Oblivion. Awareness (Death) OR Larceny (Forgery) specialty. +1 Humanity. Allies/Influence (•) in medicine. Prey Exclusion: Healthy Mortals (•). Feeds on the dying.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_awareness", "name": "Death"},
+                {"skill": "skill_larceny", "name": "Forgery"}]},
+            {"kind": "discipline", "options": ["disc_auspex", "disc_oblivion"]},
+            {"kind": "delta", "trait": "humanity", "delta": 1},
+            {"kind": "choice", "prompt": "Medical background (•)", "options": [
+                {"kind": "fixed", "list": "backgrounds", "name": "Allies (medical)", "dots": 1},
+                {"kind": "fixed", "list": "backgrounds", "name": "Influence (medical)", "dots": 1}]},
+            {"kind": "fixed", "list": "flaws", "name": "Prey Exclusion (Healthy Mortals)", "dots": 1},
+        ],
     },
     "Montero": {
         "benefits": "+1 Dominate OR Obfuscate. Leadership (Hunting Pack) OR Stealth (Stakeout) specialty. Gain Retainers (••). Lose 1 Humanity. Retainers drive prey to the hunter.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_leadership", "name": "Hunting Pack"},
+                {"skill": "skill_stealth", "name": "Stakeout"}]},
+            {"kind": "discipline", "options": ["disc_dominate", "disc_obfuscate"]},
+            {"kind": "fixed", "list": "backgrounds", "name": "Retainers", "dots": 2},
+            {"kind": "delta", "trait": "humanity", "delta": -1},
+        ],
     },
     "Osiris": {
         "benefits": "+1 Blood Sorcery OR Presence. Occult OR Performance specialty. 3 dots across Fame & Herd; 2 dots across Enemies & Mythic flaws. Feeds on fans/followers.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_occult", "name": "Specific Tradition"},
+                {"skill": "skill_performance", "name": "Specific Field"}]},
+            {"kind": "discipline", "options": ["disc_blood_sorcery", "disc_presence"],
+             "note": "Blood Sorcery (Tremere/Banu Haqim) only; else Presence"},
+            {"kind": "pool", "list": "backgrounds", "dots": 3, "options": ["Fame", "Herd"]},
+            {"kind": "pool", "list": "flaws", "dots": 2, "options": ["Enemies", "Mythic"]},
+        ],
     },
     "Pursuer": {
         "benefits": "+1 Animalism OR Auspex. Investigation (Profiling) OR Stealth (Shadowing) specialty. Gain Bloodhound (•) merit + Contacts (•). Lose 1 Humanity. Stalks prey before striking.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_investigation", "name": "Profiling"},
+                {"skill": "skill_stealth", "name": "Shadowing"}]},
+            {"kind": "discipline", "options": ["disc_animalism", "disc_auspex"]},
+            {"kind": "fixed", "list": "merits", "name": "Bloodhound", "dots": 1},
+            {"kind": "fixed", "list": "backgrounds", "name": "Contacts", "dots": 1},
+            {"kind": "delta", "trait": "humanity", "delta": -1},
+        ],
     },
     "Roadside Killer": {
         "benefits": "+1 Fortitude OR Protean. Survival (the Road) OR Investigation (Vampire Cant) specialty. +2 dots of migrating Herd. Prey Exclusion: Locals. Always on the move.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_survival", "name": "The Road"},
+                {"skill": "skill_investigation", "name": "Vampire Cant"}]},
+            {"kind": "discipline", "options": ["disc_fortitude", "disc_protean"]},
+            {"kind": "fixed", "list": "backgrounds", "name": "Herd (migrating)", "dots": 2},
+            {"kind": "fixed", "list": "flaws", "name": "Prey Exclusion (Locals)", "dots": 1},
+        ],
     },
     "Sandman": {
         "benefits": "+1 Auspex OR Obfuscate. Medicine (Anesthetics) OR Stealth (Break-in) specialty. Gain Resources (•). Feeds on sleeping mortals.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_medicine", "name": "Anesthetics"},
+                {"skill": "skill_stealth", "name": "Break-in"}]},
+            {"kind": "discipline", "options": ["disc_auspex", "disc_obfuscate"]},
+            {"kind": "fixed", "list": "backgrounds", "name": "Resources", "dots": 1},
+        ],
     },
     "Scene Queen": {
         "benefits": "+1 Dominate OR Potence. Etiquette/Leadership/Streetwise (a scene) specialty. Fame (•) + Contacts (•). Disliked (•) OR Prey Exclusion (•). Feeds within a subculture.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_etiquette", "name": "Specific Scene"},
+                {"skill": "skill_leadership", "name": "Specific Scene"},
+                {"skill": "skill_streetwise", "name": "Specific Scene"}]},
+            {"kind": "discipline", "options": ["disc_dominate", "disc_potence"]},
+            {"kind": "fixed", "list": "backgrounds", "name": "Fame", "dots": 1},
+            {"kind": "fixed", "list": "backgrounds", "name": "Contacts", "dots": 1},
+            {"kind": "choice", "prompt": "Flaw", "options": [
+                {"kind": "fixed", "list": "flaws", "name": "Disliked (outside subculture)", "dots": 1},
+                {"kind": "fixed", "list": "flaws", "name": "Prey Exclusion (other subculture)", "dots": 1}]},
+        ],
     },
     "Siren": {
         "benefits": "+1 Fortitude OR Presence. Persuasion (Seduction) OR Subterfuge (Seduction) specialty. Beautiful (••) merit, but Enemy (•) from a spurned partner. Feeds under the guise of sex.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_persuasion", "name": "Seduction"},
+                {"skill": "skill_subterfuge", "name": "Seduction"}]},
+            {"kind": "discipline", "options": ["disc_fortitude", "disc_presence"]},
+            {"kind": "fixed", "list": "merits", "name": "Looks: Beautiful", "dots": 2},
+            {"kind": "fixed", "list": "flaws", "name": "Enemy (spurned lover)", "dots": 1},
+        ],
     },
     "Tithe Collector": {
         "benefits": "Staff opt-in. +1 Dominate OR Presence. Intimidation (Kindred) OR Leadership (Kindred) specialty. 3 dots across Domain & Status, but Adversary (••). Fed by tributes of vessels. (In Memoriam.)",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_intimidation", "name": "Kindred"},
+                {"skill": "skill_leadership", "name": "Kindred"}]},
+            {"kind": "discipline", "options": ["disc_dominate", "disc_presence"]},
+            {"kind": "pool", "list": "backgrounds", "dots": 3, "options": ["Domain", "Status"]},
+            {"kind": "fixed", "list": "flaws", "name": "Adversary", "dots": 2},
+        ],
     },
     "Trapdoor": {
         "benefits": "+1 Protean OR Obfuscate. Persuasion (Marketing) OR Stealth (Ambushes) specialty. Haven (•) + a dot of Retainers/Herd/2nd Haven, but a Creepy/Haunted (•) haven flaw. Lures prey to its lair.",
+        "grants": [
+            {"kind": "specialty", "options": [
+                {"skill": "skill_persuasion", "name": "Marketing"},
+                {"skill": "skill_stealth", "name": "Ambushes"}]},
+            {"kind": "discipline", "options": ["disc_protean", "disc_obfuscate"]},
+            {"kind": "fixed", "list": "backgrounds", "name": "Haven", "dots": 1},
+            {"kind": "choice", "prompt": "Extra background (•)", "options": [
+                {"kind": "fixed", "list": "backgrounds", "name": "Retainers", "dots": 1},
+                {"kind": "fixed", "list": "backgrounds", "name": "Herd", "dots": 1},
+                {"kind": "fixed", "list": "backgrounds", "name": "Haven (2nd dot)", "dots": 1}]},
+            {"kind": "choice", "prompt": "Haven Flaw", "options": [
+                {"kind": "fixed", "list": "flaws", "name": "Haven: Creepy", "dots": 1},
+                {"kind": "fixed", "list": "flaws", "name": "Haven: Haunted", "dots": 1}]},
+        ],
     },
 }
+
+
+# ── Chargen spreads (Standard V5) ───────────────────────────────────────────
+# Skill distributions — counts of skills at each dot level. The player picks
+# one; the wizard tracks placement against it (soft-guidance, staff verifies).
+V5_SKILL_SPREADS: dict[str, dict] = {
+    "jack":       {"label": "Jack-of-all-Trades", "levels": {3: 1, 2: 8, 1: 10},
+                   "blurb": "One 3, eight 2s, ten 1s — broad and shallow."},
+    "balanced":   {"label": "Balanced",           "levels": {3: 3, 2: 5, 1: 7},
+                   "blurb": "Three 3s, five 2s, seven 1s — a steady mix."},
+    "specialist": {"label": "Specialist",         "levels": {4: 1, 3: 3, 2: 3, 1: 3},
+                   "blurb": "One 4, three 3s, three 2s, three 1s — deep and narrow."},
+}
+
+# Discipline distributions. Non-ancilla Kindred use the standard 2+1 in-clan
+# spread; In Memoriam ancilla pick Focused / Strategic on the Memoriam step.
+# Every Kindred ALSO gets +1 free Discipline dot from their predator type, so
+# the wizard tracker target = spread total + PREDATOR_FREE_DISCIPLINE_DOTS.
+V5_DISCIPLINE_SPREADS: dict[str, dict] = {
+    "standard":  {"label": "Standard (2 + 1)",          "levels": {2: 1, 1: 1}, "total": 3,
+                  "blurb": "Two dots in one in-clan Discipline, one in another."},
+    "focused":   {"label": "Focused (3 + 1 + 1)",       "levels": {3: 1, 1: 2}, "total": 5,
+                  "blurb": "Three in one Discipline, one each in two others. (Ancilla / In Memoriam.)"},
+    "strategic": {"label": "Strategic (2 + 2 + 1 + 1)", "levels": {2: 2, 1: 2}, "total": 6,
+                  "blurb": "Two each in two Disciplines, one each in two more. (Ancilla / In Memoriam.)"},
+}
+PREDATOR_FREE_DISCIPLINE_DOTS = 1
