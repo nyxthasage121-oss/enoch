@@ -2448,6 +2448,42 @@ def test_hunting_site_chasse_reduces_dcs(_client):
             conn.commit()
 
 
+def test_chasse_reduction_only_for_owning_coterie(player):
+    """D-fix: the Chasse DC reduction applies only when the viewing character
+    is a member of the controlling coterie — outsiders hunting there see the
+    base DCs."""
+    from web.db import (get_db, create_coterie, create_hunting_site, create_character,
+                        add_coterie_member, update_hunting_site, update_character)
+    DEV = "111111111111111111"
+    with get_db() as conn:
+        a = create_character(conn, discord_id=DEV, name="OwnViewer", clan="brujah")
+        update_character(conn, a["id"], is_approved=1)
+        co = create_coterie(conn, "OwnSmoke")
+        conn.execute("UPDATE coteries SET chasse=2 WHERE id=?", (co["id"],))
+        site = create_hunting_site(conn, "OwnSite", "Manhattan", predator_dcs={"Alleycat": 3})
+        sid = site["id"]
+        update_hunting_site(conn, sid, coterie_id=co["id"])
+        conn.commit()
+    try:
+        # Viewer NOT in the owning coterie -> base DCs, no reduction note.
+        r = player.get(f"/hunting-sites/{sid}?character_id={a['id']}")
+        assert r.status_code == 200
+        assert "your Chasse" not in r.text
+        # Add them to the coterie -> reduction now applies.
+        with get_db() as conn:
+            add_coterie_member(conn, co["id"], a["id"])
+            conn.commit()
+        r2 = player.get(f"/hunting-sites/{sid}?character_id={a['id']}")
+        assert "your Chasse" in r2.text
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM hunting_sites WHERE id=?", (sid,))
+            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
+            conn.execute("DELETE FROM characters WHERE id=?", (a["id"],))
+            conn.commit()
+
+
 def test_aurora_visual_layer_wired(player):
     """The aurora CSS + JS bundles should be linked from every page
     via base.html, the SVG LUT filter should be inlined for body { filter: url(#aurora-grade) },

@@ -165,6 +165,11 @@ async def hunting_sites_directory(
                 co = get_coterie(conn, s["coterie_id"])
                 coterie_names[s["coterie_id"]] = co["name"] if co else ""
 
+        # Chasse only eases feeding at the viewing character's OWN coterie's
+        # sites — used to gate the reduced-DC display per card.
+        _vc = get_coterie_for_character(conn, selected["id"]) if selected else None
+        selected_coterie_id = _vc["id"] if _vc else None
+
     return templates.TemplateResponse(
         request, "player/hunting_sites.html",
         _ctx(request,
@@ -172,6 +177,7 @@ async def hunting_sites_directory(
              coterie_names=coterie_names,
              active_chars=active_chars,
              selected_char=selected,
+             selected_coterie_id=selected_coterie_id,
              boroughs=_BOROUGHS_PLAYER,
              filter_borough=borough,
              filter_min_quality=min_quality),
@@ -201,11 +207,18 @@ async def hunting_site_detail(
             selected = active_chars[0]
         owner = get_coterie(conn, site["coterie_id"]) if site["coterie_id"] else None
         hunts = list_hunts_for_site(conn, site_id, limit=10)
+        # Chasse only eases feeding for the OWNING coterie's own members —
+        # outsiders hunting here get the unreduced (base) DCs.
+        viewer_owns_site = False
+        if selected and site["coterie_id"]:
+            _vc = get_coterie_for_character(conn, selected["id"])
+            viewer_owns_site = bool(_vc and _vc["id"] == site["coterie_id"])
 
     return templates.TemplateResponse(
         request, "player/hunting_site_detail.html",
         _ctx(request, site=site, owner=owner, hunts=hunts,
-             active_chars=active_chars, selected_char=selected),
+             active_chars=active_chars, selected_char=selected,
+             viewer_owns_site=viewer_owns_site),
     )
 
 

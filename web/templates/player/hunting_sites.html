@@ -62,6 +62,7 @@
     {% for s in sites %}
     {% set _your_dc = s.predator_dcs.get(selected_char.predator_type) if (selected_char and selected_char.predator_type and s.predator_dcs) else None %}
     {% set _your_eff = s.effective_dcs.get(selected_char.predator_type) if (selected_char and selected_char.predator_type and s.effective_dcs) else None %}
+    {% set _owns = selected_coterie_id and selected_coterie_id == s.coterie_id %}
     <a href="/hunting-sites/{{ s.id }}{% if selected_char %}?character_id={{ selected_char.id }}{% endif %}"
        class="gilded p-5 block hover:border-gold-800 transition-colors no-underline aurora-beam">
       <div class="flex items-start justify-between gap-3 mb-2">
@@ -87,10 +88,10 @@
       {% if _your_dc is not none %}
       <div class="flex items-center justify-between pt-2 border-t border-ink-800">
         <span class="font-cinzel text-[0.6rem] tracking-[0.2em] uppercase text-bone-700">Your DC
-          {% if s.chasse_reduction and _your_eff != _your_dc %}<span class="text-gold-600 normal-case">· Chasse −{{ s.chasse_reduction }}</span>{% endif %}
+          {% if _owns and s.chasse_reduction and _your_eff != _your_dc %}<span class="text-gold-600 normal-case">· Chasse −{{ s.chasse_reduction }}</span>{% endif %}
         </span>
         <span class="font-cinzel text-lg text-gold-400">
-          {% if s.chasse_reduction and _your_eff != _your_dc %}<span class="line-through text-bone-700 text-sm mr-1">{{ _your_dc }}</span>{{ _your_eff }}{% else %}{{ _your_dc }}{% endif %}
+          {% if _owns and s.chasse_reduction and _your_eff != _your_dc %}<span class="line-through text-bone-700 text-sm mr-1">{{ _your_dc }}</span>{{ _your_eff }}{% else %}{{ _your_dc }}{% endif %}
         </span>
       </div>
       {% elif selected_char and selected_char.predator_type %}

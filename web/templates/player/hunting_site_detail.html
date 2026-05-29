@@ -35,8 +35,8 @@
   <div class="gilded p-5 mb-6">
     <div class="flex items-baseline justify-between mb-4 flex-wrap gap-2">
       <p class="label-gold">Predator-Type Difficulties
-        {% if site.chasse_reduction %}
-        <span class="text-bone-600 normal-case text-[0.6rem] ml-1">· {{ site.controlling_coterie }} Chasse −{{ site.chasse_reduction }}</span>
+        {% if site.chasse_reduction and viewer_owns_site %}
+        <span class="text-bone-600 normal-case text-[0.6rem] ml-1">· your Chasse −{{ site.chasse_reduction }}</span>
         {% endif %}
       </p>
       {% if active_chars | length > 1 %}
@@ -66,7 +66,7 @@
         </span>
         {% set _eff = site.effective_dcs.get(pt, dc) %}
         <span class="font-cinzel text-sm {{ 'text-gold-400' if _highlight else 'text-bone-500' }}">
-          {% if site.chasse_reduction and _eff != dc %}
+          {% if viewer_owns_site and site.chasse_reduction and _eff != dc %}
           <span class="line-through text-bone-700 text-xs mr-0.5">{{ dc }}</span>{{ _eff }}
           {% else %}{{ dc }}{% endif %}
         </span>
