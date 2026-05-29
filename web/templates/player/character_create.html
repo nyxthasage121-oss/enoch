@@ -340,7 +340,14 @@
         <label class="label-gold block mb-2">
           Revenant Family <span class="text-blood-500 font-sans normal-case text-xs">*</span>
         </label>
-        <select x-model="charName.revenant_family" required class="w-full">
+        {# `:required` (not a static `required`) — this select is always in
+           the DOM but hidden for non-revenants. A static required on a
+           display:none control makes the whole form invalid, so the browser
+           silently blocks Submit for every Kindred/Mortal/Ghoul. Gate it on
+           the character type so it only applies when actually shown. The
+           value posts via the hidden #revenant_family input regardless. #}
+        <select x-model="charName.revenant_family"
+                :required="charName.character_type === 'revenant'" class="w-full">
           <option value="">— Select a family —</option>
           <template x-for="fam in revenantFamilies" :key="fam.name">
             <option :value="fam.name"

@@ -2535,6 +2535,34 @@ def test_aurora_sparkle_host_stays_interactive():
     )
 
 
+def test_chargen_revenant_select_required_is_conditional():
+    """Regression guard — the Revenant-family <select> on the Nature step is
+    always in the DOM but hidden (x-show) for non-revenants. A *static*
+    `required` on a display:none control makes the whole form invalid, so the
+    browser silently blocks Submit for every Kindred/Mortal/Ghoul character.
+    The value posts via the hidden #revenant_family input, so the select must
+    gate its requirement on character type with `:required`, never a bare
+    `required`. Backend POST tests can't catch this — they bypass browser
+    constraint validation — so guard it at the template level."""
+    import re
+    from pathlib import Path
+    tpl = (Path(__file__).resolve().parents[1]
+           / "web" / "templates" / "player" / "character_create.html").read_text(encoding="utf-8")
+
+    i = tpl.index('x-model="charName.revenant_family"')
+    start = tpl.rindex("<select", 0, i)
+    end = tpl.index(">", i)
+    tag = tpl[start:end + 1]
+
+    assert ":required=" in tag, (
+        "Revenant-family <select> must use a conditional :required binding."
+    )
+    assert re.search(r"(?<!:)\brequired\b", tag) is None, (
+        "Revenant-family <select> has a bare `required` — it blocks form "
+        "submission for every non-revenant character. Use :required instead."
+    )
+
+
 def test_aurora_landing_renders_atmosphere(_client):
     """Unauthenticated landing page renders the static aurora-layer
     backdrop (CSS-only halo, no WebGL motion) so the landing remains
