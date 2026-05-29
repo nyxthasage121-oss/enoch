@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from ..forms import form_int
 from ..db import (
     coterie_effective_rating,
     create_character,
@@ -218,7 +219,7 @@ async def hunting_site_log_hunt(
     """Player logs a hunt at this site for one of their characters."""
     from ..db import get_hunting_site, create_hunt_log, HUNT_OUTCOMES
     form = await request.form()
-    char_id = int(form.get("character_id") or 0)
+    char_id = form_int(form.get("character_id"))
     outcome = (form.get("outcome") or "").strip()
     note    = (form.get("note") or "").strip()
 
@@ -444,11 +445,11 @@ async def character_create(
     pronouns       = (form.get("pronouns")     or "").strip() or None
     backstory      = (form.get("backstory")    or "").strip() or None
     try:
-        true_age = int(form.get("true_age") or 0) or None
+        true_age = form_int(form.get("true_age")) or None
     except ValueError:
         true_age = None
     try:
-        apparent_age = int(form.get("apparent_age") or 0) or None
+        apparent_age = form_int(form.get("apparent_age")) or None
     except ValueError:
         apparent_age = None
 
@@ -779,11 +780,11 @@ async def character_edit_post(
     ambition      = (form.get("ambition") or "").strip() or None
     desire        = (form.get("desire") or "").strip() or None
     try:
-        true_age      = int(form.get("true_age") or 0) or None
+        true_age      = form_int(form.get("true_age")) or None
     except ValueError:
         true_age = None
     try:
-        apparent_age  = int(form.get("apparent_age") or 0) or None
+        apparent_age  = form_int(form.get("apparent_age")) or None
     except ValueError:
         apparent_age = None
 
@@ -1281,7 +1282,7 @@ async def submit_claim(
 ):
     from ..db import update_draft_claim
     form         = await request.form()
-    criteria_ids = [int(x) for x in form.getlist("criteria_ids") if x]
+    criteria_ids = [n for x in form.getlist("criteria_ids") if (n := form_int(x)) > 0]
     rp_links     = [x.strip() for x in form.getlist("rp_links") if x.strip()]
     path         = form.get("path", "none")
     helper_note  = (form.get("helper_note") or "").strip() or None
@@ -1504,8 +1505,8 @@ async def submit_spend(
     form         = await request.form()
     category     = (form.get("category") or "").strip()
     trait_name   = (form.get("trait_name") or "").strip()
-    current_dots = int(form.get("current_dots") or 0)
-    new_dots     = int(form.get("new_dots") or 1)
+    current_dots = form_int(form.get("current_dots"))
+    new_dots     = form_int(form.get("new_dots"), 1)
     note         = (form.get("note") or "").strip() or None
     hc_checked   = [form.get(f"hc_{i}") == "on" for i in range(len(HUMANITY_CONDITIONS))]
     # Optional explicit depends_on (migration 023). If absent we'll

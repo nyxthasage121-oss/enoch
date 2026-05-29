@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from ..forms import form_int
 from ..db import (
     add_coterie_member,
     adjust_xp_manual,
@@ -973,12 +974,12 @@ async def create_criterion_route(
 ):
     form        = await request.form()
     label       = (form.get("label") or "").strip()
-    xp_value    = int(form.get("xp_value") or 1)
+    xp_value    = form_int(form.get("xp_value"), 1)
     category    = form.get("category") or "player"
     description = (form.get("description") or "").strip()
     req_links   = form.get("requires_rp_links") == "on"
     req_note    = form.get("requires_text_note") == "on"
-    sort_order  = int(form.get("sort_order") or 0)
+    sort_order  = form_int(form.get("sort_order"))
 
     err = None
     if not label:
@@ -1039,11 +1040,11 @@ async def update_criterion_route(
 ):
     form        = await request.form()
     label       = (form.get("label") or "").strip()
-    xp_value    = int(form.get("xp_value") or 1)
+    xp_value    = form_int(form.get("xp_value"), 1)
     description = (form.get("description") or "").strip()
     req_links   = form.get("requires_rp_links") == "on"
     req_note    = form.get("requires_text_note") == "on"
-    sort_order  = int(form.get("sort_order") or 0)
+    sort_order  = form_int(form.get("sort_order"))
 
     if label:
         with get_db() as conn:
@@ -1195,8 +1196,8 @@ async def create_schedule_route(
     phase         = (form.get("phase") or "full").strip()
     anchor_at     = (form.get("anchor_at") or "").strip()
     try:
-        cadence_days   = int(form.get("cadence_days") or 14)
-        duration_hours = int(form.get("duration_hours") or 48)
+        cadence_days   = form_int(form.get("cadence_days"), 14)
+        duration_hours = form_int(form.get("duration_hours"), 48)
     except ValueError:
         cadence_days, duration_hours = 0, 0
 
@@ -1241,7 +1242,7 @@ async def stamp_schedule_route(
     from ..db import stamp_periods_from_schedule
     form = await request.form()
     try:
-        count = int(form.get("count") or 1)
+        count = form_int(form.get("count"), 1)
     except ValueError:
         count = 0
 
@@ -1482,9 +1483,9 @@ async def coterie_merit_add(
     form = await request.form()
     err = None
     try:
-        character_id = int(form.get("character_id") or 0)
+        character_id = form_int(form.get("character_id"))
         merit_name   = (form.get("merit_name") or "").strip()
-        dots         = max(1, min(5, int(form.get("dots") or 1)))
+        dots         = form_int(form.get("dots"), 1, lo=1, hi=5)
         merit_type   = form.get("merit_type") or "purchased"
         if not merit_name or not character_id:
             err = "Character and merit name are required."
@@ -1538,8 +1539,8 @@ async def coterie_flaw_add(
     err = None
     try:
         flaw_name      = (form.get("flaw_name") or "").strip()
-        dots           = max(1, min(5, int(form.get("dots") or 1)))
-        creation_grant = max(0, int(form.get("creation_grant") or 0))
+        dots           = form_int(form.get("dots"), 1, lo=1, hi=5)
+        creation_grant = form_int(form.get("creation_grant"), lo=0)
         if not flaw_name:
             err = "Flaw name is required."
         if not err:
@@ -1592,9 +1593,9 @@ async def create_coterie_route(
     from ..db import create_coterie
     form     = await request.form()
     name     = (form.get("name") or "").strip()
-    chasse   = int(form.get("chasse") or 1)
-    lien     = int(form.get("lien") or 0)
-    portillon = int(form.get("portillon") or 0)
+    chasse   = form_int(form.get("chasse"), 1)
+    lien     = form_int(form.get("lien"))
+    portillon = form_int(form.get("portillon"))
     role_id  = (form.get("discord_role_id") or "").strip() or None
 
     if not name:
@@ -1630,7 +1631,7 @@ async def add_coterie_member_route(
     _: None = Depends(csrf_protect),
 ):
     form         = await request.form()
-    character_id = int(form.get("character_id") or 0)
+    character_id = form_int(form.get("character_id"))
     role         = form.get("role") or "member"
     err = None
     if not character_id:
@@ -1801,18 +1802,18 @@ async def admin_settings_save(
     payload: dict = {
         "require_sheet_on_create":   1 if form.get("require_sheet_on_create") == "on" else 0,
         "xp_cap_enabled":            1 if form.get("xp_cap_enabled") == "on" else 0,
-        "xp_cap_amount":             max(1, int(form.get("xp_cap_amount") or 350)),
+        "xp_cap_amount":             form_int(form.get("xp_cap_amount"), 350, lo=1),
         # Old binary flag stays in sync with the new selector so anything
         # still reading it doesn't break.
         "use_homebrew_rules":        1 if active_ruleset == "homebrew" else 0,
         "active_ruleset":            active_ruleset,
         # Legacy homebrew budgets — kept for back-compat with the old
         # single-budget UI; superseded by homebrew_tier_budgets below.
-        "homebrew_starting_xp":      max(0, int(form.get("homebrew_starting_xp") or 75)),
-        "homebrew_merit_budget":     max(0, int(form.get("homebrew_merit_budget") or 7)),
-        "homebrew_advantage_budget": max(0, int(form.get("homebrew_advantage_budget") or 2)),
-        "homebrew_background_budget":max(0, int(form.get("homebrew_background_budget") or 5)),
-        "homebrew_flaw_cap":         max(0, int(form.get("homebrew_flaw_cap") or 2)),
+        "homebrew_starting_xp":      form_int(form.get("homebrew_starting_xp"), 75, lo=0),
+        "homebrew_merit_budget":     form_int(form.get("homebrew_merit_budget"), 7, lo=0),
+        "homebrew_advantage_budget": form_int(form.get("homebrew_advantage_budget"), 2, lo=0),
+        "homebrew_background_budget":form_int(form.get("homebrew_background_budget"), 5, lo=0),
+        "homebrew_flaw_cap":         form_int(form.get("homebrew_flaw_cap"), 2, lo=0),
         "revenants_enabled":         1 if form.get("revenants_enabled") == "on" else 0,
     }
 
@@ -2004,8 +2005,8 @@ async def admin_adjust_xp(
     _: None = Depends(csrf_protect),
 ):
     form         = await request.form()
-    character_id = int(form.get("character_id") or 0)
-    delta        = int(form.get("delta") or 0)
+    character_id = form_int(form.get("character_id"))
+    delta        = form_int(form.get("delta"))
     note         = (form.get("note") or "").strip()
 
     err  = None
@@ -2054,7 +2055,7 @@ async def audit_log(request: Request, user: dict = Depends(require_staff)):
     target_type = request.query_params.get("type") or None
     actor_id    = request.query_params.get("actor") or None
     action      = request.query_params.get("action") or None
-    limit       = min(int(request.query_params.get("limit") or 100), 500)
+    limit       = form_int(request.query_params.get("limit"), 100, lo=1, hi=500)
 
     with get_db() as conn:
         entries = list_audit(
