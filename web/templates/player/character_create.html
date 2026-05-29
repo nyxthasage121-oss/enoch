@@ -24,6 +24,8 @@
        activeRuleset:     {{ (active_ruleset | default('standard')) | tojson | forceescape }},
        clanInfo:          {{ (clan_info | default({})) | tojson | forceescape }},
        predatorInfo:      {{ (predator_info | default({})) | tojson | forceescape }},
+       skillLabels:       {{ (skill_labels | default({})) | tojson | forceescape }},
+       discLabels:        {{ (disc_labels | default({})) | tojson | forceescape }},
      })">
 
   {# Back link #}
@@ -835,20 +837,119 @@
              x-cloak>
           <label class="label-gold block mb-2">Predator Type
             <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
-          <select name="predator_type" x-model="charName.predator_type" class="w-full">
+          <select name="predator_type" x-model="charName.predator_type"
+                  @change="onPredatorChange()" class="w-full">
             <option value="">— Select —</option>
             {% for pt in predator_types %}<option value="{{ pt }}">{{ pt }}</option>{% endfor %}
           </select>
 
-          {# Predator benefits panel — shown once a type is chosen. #}
+          {# Predator benefits + interactive grant pickers. Picks write onto
+             the sheet (specialty, free discipline dot, advantages/flaws,
+             ±Humanity/BP) and are reconciled by resolvePredatorGrants(). #}
           <template x-if="charName.predator_type && predatorInfo[charName.predator_type]">
-            <div class="gilded-inset px-4 py-3 mt-3 border border-ink-700">
-              <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Benefits</p>
-              <p class="font-garamond text-xs text-bone-400 leading-snug"
-                 x-text="predatorInfo[charName.predator_type].benefits"></p>
-              <p class="font-garamond text-[0.65rem] text-bone-700 italic mt-2">
-                Pick your option among the listed Disciplines/specialties. Staff confirms placement at approval.
+            <div class="gilded-inset px-4 py-4 mt-3 border border-ink-700 space-y-4">
+              <div>
+                <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Benefits</p>
+                <p class="font-garamond text-xs text-bone-400 leading-snug"
+                   x-text="predatorInfo[charName.predator_type].benefits"></p>
+              </div>
+
+              <template x-for="(g, gi) in (predatorInfo[charName.predator_type].grants || [])" :key="gi">
+                <div class="border-t border-ink-800 pt-3">
+
+                  <template x-if="g.kind === 'specialty'">
+                    <div>
+                      <p class="label-gold text-[0.7rem] mb-1.5">Specialty
+                        <span class="text-bone-700 normal-case">— pick one</span></p>
+                      <div class="flex flex-wrap gap-1.5">
+                        <template x-for="(o, oi) in g.options" :key="oi">
+                          <button type="button" @click="pick('s', gi, oi)"
+                                  class="px-2.5 py-1 text-xs font-garamond border transition-colors"
+                                  :class="predatorChoices['s'+gi] === oi ? 'border-gold-500 bg-ink-900/60 text-bone-200' : 'border-ink-700 text-bone-400 hover:border-gold-800'"
+                                  x-text="skillLabel(o.skill) + ' (' + o.name + ')'"></button>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="g.kind === 'discipline'">
+                    <div>
+                      <p class="label-gold text-[0.7rem] mb-1.5">Free Discipline Dot
+                        <span class="text-bone-700 normal-case">— pick one (+1 dot, stacks on your spread)</span></p>
+                      <div class="flex flex-wrap gap-1.5">
+                        <template x-for="(d, di) in g.options" :key="di">
+                          <button type="button" @click="pick('d', gi, d)"
+                                  class="px-2.5 py-1 text-xs font-garamond border transition-colors"
+                                  :class="predatorChoices['d'+gi] === d ? 'border-gold-500 bg-ink-900/60 text-bone-200' : 'border-ink-700 text-bone-400 hover:border-gold-800'"
+                                  x-text="discLabel(d)"></button>
+                        </template>
+                      </div>
+                      <p x-show="g.note" x-cloak class="font-garamond text-[0.65rem] text-bone-700 italic mt-1" x-text="g.note"></p>
+                    </div>
+                  </template>
+
+                  <template x-if="g.kind === 'choice'">
+                    <div>
+                      <p class="label-gold text-[0.7rem] mb-1.5" x-text="g.prompt + ' — pick one'"></p>
+                      <div class="flex flex-wrap gap-1.5">
+                        <template x-for="(o, oi) in g.options" :key="oi">
+                          <button type="button" @click="pick('c', gi, oi)"
+                                  class="px-2.5 py-1 text-xs font-garamond border transition-colors"
+                                  :class="predatorChoices['c'+gi] === oi ? 'border-gold-500 bg-ink-900/60 text-bone-200' : 'border-ink-700 text-bone-400 hover:border-gold-800'"
+                                  x-text="grantLabel(o)"></button>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="g.kind === 'pool'">
+                    <div>
+                      <p class="label-gold text-[0.7rem] mb-1.5">
+                        <span x-text="'Spend ' + g.dots + ' dots across ' + g.list"></span>
+                        <span class="normal-case"
+                              :class="poolRemaining(gi, g.dots) === 0 ? 'text-bone-700' : 'text-gold-500'"
+                              x-text="' — ' + poolRemaining(gi, g.dots) + ' left'"></span>
+                      </p>
+                      <div class="space-y-1">
+                        <template x-for="(name, ni) in g.options" :key="ni">
+                          <div class="flex items-center justify-between gap-2">
+                            <span class="font-garamond text-xs text-bone-300" x-text="name"></span>
+                            <div class="flex items-center gap-2">
+                              <button type="button" @click="poolDec(gi, name)"
+                                      class="w-5 h-5 leading-none border border-ink-600 text-bone-400 hover:border-gold-700">−</button>
+                              <span class="font-cinzel text-xs text-gold-400 w-3 text-center" x-text="poolDots(gi, name)"></span>
+                              <button type="button" @click="poolInc(gi, name, g.dots)"
+                                      class="w-5 h-5 leading-none border border-ink-600 text-bone-400 hover:border-gold-700">+</button>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="g.kind === 'fixed'">
+                    <p class="font-garamond text-[0.7rem] text-bone-500">
+                      <span class="text-gold-600 uppercase tracking-widest text-[0.55rem] mr-1">Auto</span>
+                      <span x-text="g.name + ' (' + '•'.repeat(g.dots) + ') → ' + g.list"></span>
+                    </p>
+                  </template>
+
+                  <template x-if="g.kind === 'delta'">
+                    <p class="font-garamond text-[0.7rem] text-bone-500">
+                      <span class="text-gold-600 uppercase tracking-widest text-[0.55rem] mr-1">Auto</span>
+                      <span x-text="(g.delta > 0 ? '+' : '') + g.delta + ' ' + (g.trait === 'humanity' ? 'Humanity' : 'Blood Potency')"></span>
+                    </p>
+                  </template>
+
+                </div>
+              </template>
+
+              <p class="font-garamond text-[0.65rem] text-bone-700 italic">
+                Your picks are added to your sheet automatically. Staff confirms placement at approval.
               </p>
+
+              {# Persist resolved picks so resume-draft restores them. #}
+              <input type="hidden" name="predator_choices" :value="JSON.stringify(predatorChoices)">
             </div>
           </template>
         </div>
@@ -1665,6 +1766,15 @@
       clanDisciplines:   opts.clanDisciplines || {},
       clanInfo:          opts.clanInfo || {},
       predatorInfo:      opts.predatorInfo || {},
+      skillLabels:       opts.skillLabels || {},
+      discLabels:        opts.discLabels || {},
+      // Predator grant picks, keyed by grant index prefixed by kind
+      // ('s'=specialty, 'd'=discipline, 'c'=choice, 'p'=pool→{name:dots}).
+      // `_predatorDisc` remembers which discipline holds the predator's free
+      // dot so re-picking reverses it cleanly.
+      predatorChoices:   (initial.predator_choices && typeof initial.predator_choices === 'object')
+                           ? Object.assign({}, initial.predator_choices) : {},
+      _predatorDisc:     null,
       revenantsEnabled:  !!opts.revenantsEnabled,
       revenantFamilies:  opts.revenantFamilies || [],
       // Default ("seed") budget — only used if tierBudgets is missing.
@@ -1838,8 +1948,12 @@
         } else if (t === 'mortal') {
           bp = 0; humanity = 7;
         }
-        this.sheet.blood_potency = bp;
-        this.sheet.humanity      = humanity;
+        // Fold in the predator type's flat Humanity / Blood Potency grants
+        // (e.g. Alleycat −1 Humanity, Blood Leech +1 BP). Recomputed from the
+        // tier base every call, so it stays correct whether the tier OR the
+        // predator changes. The player can still nudge it on the sheet.
+        this.sheet.blood_potency = Math.max(0, bp + this.predatorBpDelta);
+        this.sheet.humanity      = Math.max(0, humanity + this.predatorHumanityDelta);
         // Hunger starts at 1 for Kindred only, 0 otherwise (mortals,
         // ghouls, revenants — they're not yet vampires).
         if (t === 'kindred' && !this.sheet.hunger) {
@@ -1847,6 +1961,94 @@
         } else if (t !== 'kindred') {
           this.sheet.hunger = 0;
         }
+      },
+
+      // ── Predator grants ───────────────────────────────────────────────
+      // Flat Humanity / Blood Potency deltas the predator grants (auto).
+      get predatorHumanityDelta() { return this._predatorDelta('humanity'); },
+      get predatorBpDelta()       { return this._predatorDelta('blood_potency'); },
+      _predatorDelta(trait) {
+        const info = this.predatorInfo[this.charName.predator_type];
+        if (!info || !info.grants) return 0;
+        return info.grants
+          .filter(g => g.kind === 'delta' && g.trait === trait)
+          .reduce((a, g) => a + (g.delta || 0), 0);
+      },
+      skillLabel(key) { return this.skillLabels[key] || key; },
+      discLabel(key)  { return this.discLabels[key]  || key; },
+      grantLabel(g) {
+        if (!g) return '';
+        const dots = g.dots ? ' (' + '•'.repeat(g.dots) + ')' : '';
+        return (g.name || '') + dots;
+      },
+      // Pool allocator (spend N dots across named traits).
+      poolUsed(gi) {
+        const a = this.predatorChoices['p' + gi] || {};
+        return Object.values(a).reduce((s, n) => s + (n || 0), 0);
+      },
+      poolRemaining(gi, max) { return max - this.poolUsed(gi); },
+      poolDots(gi, name) {
+        const a = this.predatorChoices['p' + gi] || {};
+        return a[name] || 0;
+      },
+      poolInc(gi, name, max) {
+        if (this.poolUsed(gi) >= max) return;
+        const a = Object.assign({}, this.predatorChoices['p' + gi] || {});
+        a[name] = (a[name] || 0) + 1;
+        this.predatorChoices['p' + gi] = a;
+        this.resolvePredatorGrants();
+      },
+      poolDec(gi, name) {
+        const a = Object.assign({}, this.predatorChoices['p' + gi] || {});
+        a[name] = Math.max(0, (a[name] || 0) - 1);
+        this.predatorChoices['p' + gi] = a;
+        this.resolvePredatorGrants();
+      },
+      pick(prefix, gi, value) {
+        this.predatorChoices[prefix + gi] = value;
+        this.resolvePredatorGrants();
+      },
+      // Predator type itself changed — wipe stale picks, then re-derive.
+      onPredatorChange() { this.predatorChoices = {}; this.resolvePredatorGrants(); },
+      // Idempotent: strip prior predator-sourced entries, then re-apply from
+      // the current picks. Reused on every pick + on predator/tier change.
+      resolvePredatorGrants() {
+        if (this._predatorDisc) {
+          this.sheet[this._predatorDisc] = Math.max(0, (this.sheet[this._predatorDisc] || 0) - 1);
+          this._predatorDisc = null;
+        }
+        ['specialties', 'merits', 'backgrounds', 'flaws', 'advantages'].forEach(L => {
+          this[L] = (this[L] || []).filter(x => x.src !== 'predator');
+        });
+        const info = this.predatorInfo[this.charName.predator_type];
+        if (info && info.grants) info.grants.forEach((g, gi) => this._applyGrant(g, gi));
+        this.applyTierBloodDefaults();   // re-folds Humanity/BP deltas
+      },
+      _applyGrant(g, gi) {
+        if (g.kind === 'specialty') {
+          const oi = this.predatorChoices['s' + gi];
+          const o  = (oi != null) ? g.options[oi] : null;
+          if (o) this.specialties.push({ skill: o.skill, name: o.name, src: 'predator' });
+        } else if (g.kind === 'discipline') {
+          const disc = this.predatorChoices['d' + gi];
+          if (disc) { this.sheet[disc] = (this.sheet[disc] || 0) + 1; this._predatorDisc = disc; }
+        } else if (g.kind === 'fixed') {
+          this._pushGrantList(g.list, g.name, g.dots);
+        } else if (g.kind === 'choice') {
+          const ci  = this.predatorChoices['c' + gi];
+          const sub = (ci != null) ? g.options[ci] : null;
+          if (sub && sub.kind === 'fixed') this._pushGrantList(sub.list, sub.name, sub.dots);
+        } else if (g.kind === 'pool') {
+          const alloc = this.predatorChoices['p' + gi] || {};
+          g.options.forEach(name => {
+            const d = alloc[name] || 0;
+            if (d > 0) this._pushGrantList(g.list, name, d);
+          });
+        }
+      },
+      _pushGrantList(list, name, dots) {
+        const arr = this[list];
+        if (Array.isArray(arr)) arr.push({ name, dots, src: 'predator' });
       },
 
       // Step navigation
@@ -2247,7 +2449,11 @@
 
       // Live budget usage — sum dot allocations for the sidebar.
       get budgetUsed() {
-        const sum = list => list.reduce((acc, x) => acc + (x.dots || 0), 0);
+        // Predator-granted dots are free in V5 — they don't eat the player's
+        // merit/advantage/background/flaw pools, so exclude src:'predator'.
+        const sum = list => list
+          .filter(x => x.src !== 'predator')
+          .reduce((acc, x) => acc + (x.dots || 0), 0);
         return {
           merits:      sum(this.merits),
           advantages:  sum(this.advantages),

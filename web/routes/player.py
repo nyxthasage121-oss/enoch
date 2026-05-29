@@ -357,6 +357,10 @@ def _wizard_extras() -> dict:
         "revenant_families":  s.get("revenant_families") or [],
         "clan_info":          _V5_CLAN_INFO,
         "predator_info":      _V5_PREDATOR_INFO,
+        # Label lookups so the wizard's predator-grant pickers can render
+        # human names for skill_*/disc_* keys without re-deriving them in JS.
+        "skill_labels":       {k: lbl for _, traits in _V5_SKILLS for k, lbl in traits},
+        "disc_labels":        {k: lbl for k, lbl in _V5_DISCIPLINES},
         "active_ruleset":     ruleset,
         "tier_budgets":       tier_budgets,
         # Default budget shape (neonate) — Alpine swaps in tier_budgets
