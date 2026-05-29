@@ -108,6 +108,32 @@ _STAFF_ROLE_LABELS = {
 }
 
 
+# ── Asset cache-busting ──────────────────────────────────────────
+# Static assets are served at fixed paths, so browsers cache them hard.
+# `static_url` appends a short content hash as ?v= so a *changed* CSS/JS
+# file gets a fresh URL (forcing a re-fetch) while unchanged files stay
+# cacheable. The hash is memoized on (path, mtime) so a file is only
+# re-read when it actually changes on disk.
+_ASSET_HASHES: dict[tuple[str, float], str] = {}
+
+
+def static_url(rel_path: str) -> str:
+    """`/static/<rel_path>` with a content-hash cache-buster. Falls back to
+    the bare path if the file is missing."""
+    full = BASE_DIR / "static" / rel_path
+    try:
+        mtime = full.stat().st_mtime
+    except OSError:
+        return f"/static/{rel_path}"
+    key = (rel_path, mtime)
+    fp = _ASSET_HASHES.get(key)
+    if fp is None:
+        import hashlib
+        fp = hashlib.md5(full.read_bytes()).hexdigest()[:10]
+        _ASSET_HASHES[key] = fp
+    return f"/static/{rel_path}?v={fp}"
+
+
 def _ctx(request: Request, **extra) -> dict:
     """Base template context — injected into every render call."""
     user = request.session.get("user")
@@ -122,6 +148,7 @@ def _ctx(request: Request, **extra) -> dict:
         "csrf_token": request.session.get("_csrf", ""),
         "flash_messages": flash,
         "dev_preview": settings.DEV_PREVIEW,
+        "static_url": static_url,
         **extra,
     }
 

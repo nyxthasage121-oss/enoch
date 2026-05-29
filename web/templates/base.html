@@ -23,9 +23,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="/static/css/tailwind.css">
-  <link rel="stylesheet" href="/static/css/codex.css">
-  <link rel="stylesheet" href="/static/css/aurora.css">
+  <link rel="stylesheet" href="{{ static_url('css/tailwind.css') }}">
+  <link rel="stylesheet" href="{{ static_url('css/codex.css') }}">
+  <link rel="stylesheet" href="{{ static_url('css/aurora.css') }}">
   {% block head %}{% endblock %}
 </head>
 
@@ -286,11 +286,11 @@
     </main>
   </div>
 
-  <script src="/static/vendor/htmx.min.js"></script>
-  <script src="/static/js/effects.js" defer></script>
-  <script src="/static/js/aurora.js" defer></script>
-  <script src="/static/vendor/alpine.min.js" defer></script>
-  <script src="/static/js/codex.js" defer></script>
+  <script src="{{ static_url('vendor/htmx.min.js') }}"></script>
+  <script src="{{ static_url('js/effects.js') }}" defer></script>
+  <script src="{{ static_url('js/aurora.js') }}" defer></script>
+  <script src="{{ static_url('vendor/alpine.min.js') }}" defer></script>
+  <script src="{{ static_url('js/codex.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 
 </body>
