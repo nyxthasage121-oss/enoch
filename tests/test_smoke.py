@@ -2343,6 +2343,44 @@ def test_coterie_lifecycle_signoff_and_free_dot_gate(_client):
             conn.commit()
 
 
+def test_staff_coterie_traits_unified_to_contributions(staff):
+    """C3-unify: staff adding a coterie merit/flaw writes the unified
+    contributions model, so staff + players read one sheet."""
+    from web.db import (get_db, create_coterie, add_coterie_member,
+                        create_character, upsert_player, list_coterie_contributions)
+    with get_db() as conn:
+        upsert_player(conn, discord_id="u1", username="UnifyP")
+        a = create_character(conn, discord_id="u1", name="UnifyChar", clan="brujah")
+        co = create_coterie(conn, "UnifySmoke")
+        add_coterie_member(conn, co["id"], a["id"])
+    try:
+        r = staff.post(f"/staff/coteries/{co['id']}/merits/add", data={
+            "_csrf": "dev-csrf-token", "character_id": str(a["id"]),
+            "merit_name": "Shared Library", "dots": "2", "target_kind": "merit",
+        }, follow_redirects=False)
+        assert r.status_code == 200
+        with get_db() as conn:
+            contribs = list_coterie_contributions(conn, co["id"], status="active")
+        merit = [c for c in contribs if c["target_name"] == "Shared Library"]
+        assert len(merit) == 1 and merit[0]["target_kind"] == "merit" and merit[0]["dots"] == 2
+
+        rf = staff.post(f"/staff/coteries/{co['id']}/flaws/add", data={
+            "_csrf": "dev-csrf-token", "flaw_name": "Adversary", "dots": "1",
+        }, follow_redirects=False)
+        assert rf.status_code == 200
+        with get_db() as conn:
+            flaws = [c for c in list_coterie_contributions(conn, co["id"], status="active")
+                     if c["target_kind"] == "flaw"]
+        assert any(f["target_name"] == "Adversary" for f in flaws)
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM coterie_contributions WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
+            conn.execute("DELETE FROM characters WHERE id=?", (a["id"],))
+            conn.commit()
+
+
 def test_aurora_visual_layer_wired(player):
     """The aurora CSS + JS bundles should be linked from every page
     via base.html, the SVG LUT filter should be inlined for body { filter: url(#aurora-grade) },
@@ -3240,7 +3278,7 @@ def test_coterie_manage_page_renders_merits_flaws_panels(staff):
         assert "Merits" in r.text
         assert "Flaws"  in r.text
         # Empty-state copy
-        assert "No merits recorded" in r.text
+        assert "No merits or backgrounds recorded" in r.text
         assert "No flaws recorded"  in r.text
     finally:
         with get_db() as conn:

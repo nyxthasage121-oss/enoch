@@ -1,14 +1,15 @@
-{# coterie_merits_table.html — list + add form for coterie merits.
-   Merits are per-member: each is contributed by a specific character. #}
+{# coterie_merits_table.html — coterie merits + backgrounds from the unified
+   contributions model. Each is contributed by a specific member character. #}
 <div id="coterie-merits-table">
   {% if merits %}
   <div class="gilded overflow-hidden mb-3">
     <table class="w-full text-sm">
       <thead>
         <tr class="border-b border-ink-700">
-          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Merit</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Trait</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Kind</th>
           <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Contributor</th>
-          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Type</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Source</th>
           <th class="px-4 py-3 text-center label-gold font-normal text-xs">Dots</th>
           <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
         </tr>
@@ -16,9 +17,10 @@
       <tbody>
         {% for m in merits %}
         <tr class="border-b border-ink-800">
-          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">{{ m.merit_name }}</td>
-          <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">{{ m.character_name }}</td>
-          <td class="px-4 py-2.5 font-garamond text-[0.7rem] text-bone-600 capitalize">{{ m.merit_type }}</td>
+          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">{{ m.target_name }}</td>
+          <td class="px-4 py-2.5 font-garamond text-[0.7rem] text-bone-600 capitalize">{{ m.target_kind }}</td>
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">{{ m.character_name or '—' }}</td>
+          <td class="px-4 py-2.5 font-garamond text-[0.7rem] text-bone-600">{{ m.contribution_type | replace('_', ' ') }}</td>
           <td class="px-4 py-2.5 text-center">
             <div class="flex justify-center gap-0.5">
               {% for i in range(5) %}
@@ -31,7 +33,7 @@
             <button hx-post="/staff/coteries/{{ coterie.id }}/merits/{{ m.id }}/remove"
                     hx-target="#coterie-merits-table"
                     hx-swap="outerHTML"
-                    hx-confirm="Remove {{ m.merit_name }} from this coterie?"
+                    hx-confirm="Remove {{ m.target_name }} from this coterie?"
                     class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-2 py-1">
               Remove
             </button>
@@ -42,10 +44,10 @@
     </table>
   </div>
   {% else %}
-  <p class="font-garamond text-bone-600 text-sm px-1 mb-3">No merits recorded.</p>
+  <p class="font-garamond text-bone-600 text-sm px-1 mb-3">No merits or backgrounds recorded.</p>
   {% endif %}
 
-  {# Add merit form #}
+  {# Add merit / background form #}
   {% if members %}
   <form hx-post="/staff/coteries/{{ coterie.id }}/merits/add"
         hx-target="#coterie-merits-table"
@@ -61,22 +63,21 @@
       </select>
     </div>
     <div>
-      <label class="label-gold block mb-1.5 text-[0.75rem]">Merit</label>
+      <label class="label-gold block mb-1.5 text-[0.75rem]">Trait</label>
       <input type="text" name="merit_name" required maxlength="80"
              placeholder="e.g. Haven" class="py-1.5 px-2 text-xs w-44">
     </div>
     <div>
-      <label class="label-gold block mb-1.5 text-[0.75rem]">Dots</label>
-      <input type="number" name="dots" min="1" max="5" value="1" required
-             class="py-1.5 px-2 text-xs w-16 text-center">
+      <label class="label-gold block mb-1.5 text-[0.75rem]">Kind</label>
+      <select name="target_kind" class="py-1.5 px-2 text-xs">
+        <option value="merit">Merit</option>
+        <option value="background">Background</option>
+      </select>
     </div>
     <div>
-      <label class="label-gold block mb-1.5 text-[0.75rem]">Source</label>
-      <select name="merit_type" class="py-1.5 px-2 text-xs">
-        <option value="purchased">Purchased</option>
-        <option value="creation">Creation</option>
-        <option value="donated">Donated</option>
-      </select>
+      <label class="label-gold block mb-1.5 text-[0.75rem]">Dots</label>
+      <input type="number" name="dots" min="1" max="3" value="1" required
+             class="py-1.5 px-2 text-xs w-16 text-center">
     </div>
     <button type="submit"
             class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
@@ -84,6 +85,6 @@
     </button>
   </form>
   {% else %}
-  <p class="font-garamond text-[0.7rem] text-bone-700 italic">Add a member before adding merits.</p>
+  <p class="font-garamond text-[0.7rem] text-bone-700 italic">Add a member before adding traits.</p>
   {% endif %}
 </div>

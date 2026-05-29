@@ -11,8 +11,6 @@ from ..db import (
     adjust_xp_manual,
     approve_character,
     approve_claim,
-    add_coterie_flaw,
-    add_coterie_merit,
     approve_coterie_request,
     start_character_review,
     approve_coterie_spend,
@@ -41,8 +39,6 @@ from ..db import (
     list_pending_coterie_spends,
     list_pending_spends,
     list_claims_history,
-    list_coterie_flaws,
-    list_coterie_merits,
     list_periods,
     list_recent_closed_periods,
     list_spends_for_character,
@@ -53,8 +49,6 @@ from ..db import (
     reject_character,
     reject_claim,
     reject_coterie_request,
-    remove_coterie_flaw,
-    remove_coterie_merit,
     reject_coterie_spend,
     reject_spend,
     remove_coterie_member,
@@ -1503,6 +1497,16 @@ async def search_chars_for_coterie(
     )
 
 
+def _coterie_trait_lists(conn, coterie_id: int):
+    """Active coterie merits/backgrounds + flaws from the unified
+    contributions model (the single source of truth for the sheet)."""
+    from ..db import list_coterie_contributions
+    contribs = list_coterie_contributions(conn, coterie_id, status="active")
+    merits = [c for c in contribs if c["target_kind"] in ("merit", "background")]
+    flaws  = [c for c in contribs if c["target_kind"] == "flaw"]
+    return merits, flaws
+
+
 @router.get("/coteries/{coterie_id}", response_class=HTMLResponse)
 async def coterie_manage_page(
     request: Request,
@@ -1515,8 +1519,7 @@ async def coterie_manage_page(
             raise HTTPException(status_code=404)
         members = list_coterie_members(conn, coterie_id)
         spends  = list_coterie_spends(conn, coterie_id)
-        merits  = list_coterie_merits(conn, coterie_id)
-        flaws   = list_coterie_flaws(conn, coterie_id)
+        merits, flaws = _coterie_trait_lists(conn, coterie_id)
     return templates.TemplateResponse(
         request, "staff/coterie_manage.html",
         _ctx(request, coterie=coterie, members=members, spends=spends,
@@ -1533,30 +1536,35 @@ async def coterie_merit_add(
     user: dict = Depends(require_permission("manage_coterie")),
     _: None = Depends(csrf_protect),
 ):
+    from ..db import add_coterie_contribution
     form = await request.form()
     err = None
     try:
         character_id = form_int(form.get("character_id"))
-        merit_name   = (form.get("merit_name") or "").strip()
-        dots         = form_int(form.get("dots"), 1, lo=1, hi=5)
-        merit_type   = form.get("merit_type") or "purchased"
-        if not merit_name or not character_id:
-            err = "Character and merit name are required."
+        name = (form.get("merit_name") or "").strip()
+        dots = form_int(form.get("dots"), 1, lo=1, hi=3)
+        kind = (form.get("target_kind") or "merit").strip().lower()
+        if kind not in ("merit", "background"):
+            kind = "merit"
+        if not name or not character_id:
+            err = "Character and name are required."
         if not err:
             with get_db() as conn:
-                add_coterie_merit(conn, coterie_id, character_id, merit_name,
-                                  dots, merit_type, actor_id=user["id"])
+                add_coterie_contribution(
+                    conn, coterie_id=coterie_id, contribution_type="staff_grant",
+                    target_kind=kind, target_name=name, dots=dots,
+                    character_id=character_id, note="Staff-added")
     except ValueError as e:
         err = str(e)
 
     with get_db() as conn:
-        merits  = list_coterie_merits(conn, coterie_id)
+        merits, _flaws = _coterie_trait_lists(conn, coterie_id)
         members = list_coterie_members(conn, coterie_id)
     resp = templates.TemplateResponse(
         request, "staff/partials/coterie_merits_table.html",
         _ctx(request, coterie={"id": coterie_id}, merits=merits, members=members),
     )
-    _toast(resp, err or "Merit added.", "error" if err else "success")
+    _toast(resp, err or "Trait added.", "error" if err else "success")
     return resp
 
 
@@ -1569,15 +1577,16 @@ async def coterie_merit_remove(
     user: dict = Depends(require_permission("manage_coterie")),
     _: None = Depends(csrf_protect),
 ):
+    from ..db import set_contribution_status
     with get_db() as conn:
-        remove_coterie_merit(conn, merit_id, actor_id=user["id"])
-        merits  = list_coterie_merits(conn, coterie_id)
+        set_contribution_status(conn, merit_id, "removed", actor_id=user["id"])
+        merits, _flaws = _coterie_trait_lists(conn, coterie_id)
         members = list_coterie_members(conn, coterie_id)
     resp = templates.TemplateResponse(
         request, "staff/partials/coterie_merits_table.html",
         _ctx(request, coterie={"id": coterie_id}, merits=merits, members=members),
     )
-    _toast(resp, "Merit removed.")
+    _toast(resp, "Trait removed.")
     return resp
 
 
@@ -1588,23 +1597,25 @@ async def coterie_flaw_add(
     user: dict = Depends(require_permission("manage_coterie")),
     _: None = Depends(csrf_protect),
 ):
+    from ..db import add_coterie_contribution
     form = await request.form()
     err = None
     try:
-        flaw_name      = (form.get("flaw_name") or "").strip()
-        dots           = form_int(form.get("dots"), 1, lo=1, hi=5)
-        creation_grant = form_int(form.get("creation_grant"), lo=0)
+        flaw_name = (form.get("flaw_name") or "").strip()
+        dots      = form_int(form.get("dots"), 1, lo=1, hi=5)
         if not flaw_name:
             err = "Flaw name is required."
         if not err:
             with get_db() as conn:
-                add_coterie_flaw(conn, coterie_id, flaw_name, dots,
-                                 creation_grant, actor_id=user["id"])
+                add_coterie_contribution(
+                    conn, coterie_id=coterie_id, contribution_type="flaw_bonus",
+                    target_kind="flaw", target_name=flaw_name, dots=dots,
+                    character_id=None, note="Staff-added")
     except ValueError as e:
         err = str(e)
 
     with get_db() as conn:
-        flaws = list_coterie_flaws(conn, coterie_id)
+        _merits, flaws = _coterie_trait_lists(conn, coterie_id)
     resp = templates.TemplateResponse(
         request, "staff/partials/coterie_flaws_table.html",
         _ctx(request, coterie={"id": coterie_id}, flaws=flaws),
@@ -1622,9 +1633,10 @@ async def coterie_flaw_remove(
     user: dict = Depends(require_permission("manage_coterie")),
     _: None = Depends(csrf_protect),
 ):
+    from ..db import set_contribution_status
     with get_db() as conn:
-        remove_coterie_flaw(conn, flaw_id, actor_id=user["id"])
-        flaws = list_coterie_flaws(conn, coterie_id)
+        set_contribution_status(conn, flaw_id, "removed", actor_id=user["id"])
+        _merits, flaws = _coterie_trait_lists(conn, coterie_id)
     resp = templates.TemplateResponse(
         request, "staff/partials/coterie_flaws_table.html",
         _ctx(request, coterie={"id": coterie_id}, flaws=flaws),
