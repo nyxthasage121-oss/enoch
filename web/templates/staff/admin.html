@@ -371,7 +371,11 @@
       </form>
     </div>
 
-    {# Data export #}
+    {# Data export — settings-admins only. This dumps the entire chronicle
+       (characters, claims, spends, ledger, audit log, player IDs), so it's
+       gated like other chronicle-wide sensitive ops; the route enforces the
+       same require_settings_admin. #}
+    {% if viewer_is_settings_admin %}
     <div class="gilded p-5">
       <div class="flex items-start justify-between gap-4 flex-wrap">
         <div class="flex-1 min-w-0">
@@ -391,6 +395,7 @@
         </a>
       </div>
     </div>
+    {% endif %}
 
     {# Staff access note #}
     <div class="gilded-inset px-5 py-4 border border-ink-700">

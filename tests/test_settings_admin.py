@@ -147,3 +147,25 @@ def test_admin_html_renders_settings_admin_column(staff):
     assert "Settings Admin" in r.text
     # The grant form action must be present.
     assert "/staff/admin/settings-admin/" in r.text
+
+
+def test_export_requires_settings_admin(staff, monkeypatch):
+    """The full chronicle export (characters/claims/spends/ledger/audit log)
+    is settings-admin only — a staff_role without the flag is blocked, since
+    a read-only Helper shouldn't be able to dump the whole database."""
+    monkeypatch.delenv("ENOCH_SETTINGS_ADMIN_IDS", raising=False)
+    from web.db import get_db, set_settings_admin
+    with get_db() as conn:
+        set_settings_admin(conn, "999999999999999999", False, actor_id="0")
+        conn.commit()
+    try:
+        r = staff.get("/staff/admin/export.json", follow_redirects=False)
+        assert r.status_code == 403
+    finally:
+        with get_db() as conn:
+            set_settings_admin(conn, "999999999999999999", True, actor_id="0")
+            conn.commit()
+    # With the flag restored, a settings-admin can export.
+    ok = staff.get("/staff/admin/export.json")
+    assert ok.status_code == 200
+    assert "tables" in ok.json()

@@ -152,7 +152,7 @@ _EXPORT_TABLES = (
 @router.get("/admin/export.json")
 async def export_snapshot(
     request: Request,
-    user: dict = Depends(require_staff),
+    user: dict = Depends(require_settings_admin),
 ):
     """Stream a full JSON snapshot of all chronicle data — characters,
     claims, spends, periods, coteries, ledger, audit log. Bot outbox
@@ -1739,9 +1739,12 @@ async def admin_page(request: Request, user: dict = Depends(require_staff)):
     """Admin home — tabbed view consolidating chronicle settings, the
     player roster, and the XP criteria editor under one URL. The tab
     can be deep-linked via the URL fragment (#criteria etc.)."""
+    from ..deps import is_settings_admin
     return templates.TemplateResponse(
         request, "staff/admin.html",
-        _ctx(request, **_admin_ctx_extras()),
+        _ctx(request,
+             viewer_is_settings_admin=is_settings_admin(request, user),
+             **_admin_ctx_extras()),
     )
 
 
