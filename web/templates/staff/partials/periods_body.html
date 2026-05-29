@@ -4,12 +4,43 @@
 
 {% include "staff/partials/periods_table.html" %}
 
-{# Schedule Templates section was removed 2026-05 per Steward direction —
-   they want reliable batch period generation but the current cadence-
-   stamping UI wasn't it. The underlying tables, routes, and helpers
-   (period_schedules, /staff/periods/schedules*, list_period_schedules,
-   stamp_periods_from_schedule) are kept around in case we lift MCbN's
-   pattern in a future iteration; they're just unreachable from the UI. #}
+{# Reliable period generation now lives in the Automatic Generation
+   toggle below (migration 025), which infers cadence from recent periods
+   instead of a stored template. The older period_schedules tables/helpers
+   (/staff/periods/schedules*, stamp_periods_from_schedule) remain in the
+   codebase but unreachable from the UI — kept only as a possible
+   explicit-schedule fallback. #}
+
+{# ── Automatic generation (migration 025) ──
+   The checkbox posts to /staff/periods/auto-create-toggle, which flips
+   chronicle_settings.auto_create_periods_enabled. Inline accent-color
+   (not a Tailwind arbitrary class) so the gold tick renders without a CSS
+   rebuild — same approach as the Settings Admin checkbox. #}
+{% set _auto_on = (chronicle_settings or {}).get('auto_create_periods_enabled') %}
+<div class="mt-8 max-w-2xl gilded p-5">
+  <p class="label-gold mb-1">Automatic Generation</p>
+  <p class="font-garamond text-bone-500 text-sm leading-relaxed mb-3">
+    When on, Enoch learns your rhythm from recent periods — the gap between
+    the last two and how long they stay open — and stamps the next
+    <em>Night</em> a couple of days before it's due. It keeps exactly one
+    period on deck and never auto-opens it; you still press Activate.
+    Needs at least two existing periods to learn from.
+  </p>
+  <form method="POST" action="/staff/periods/auto-create-toggle">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input type="checkbox" name="enabled"
+             {{ 'checked' if _auto_on else '' }}
+             onchange="this.form.submit()"
+             style="accent-color:#c29b48;width:16px;height:16px">
+      <span class="font-cinzel text-xs tracking-widest uppercase
+                   {{ 'text-gold-300' if _auto_on else 'text-bone-600' }}">
+        {{ 'On — next period stamps automatically' if _auto_on else 'Off' }}
+      </span>
+    </label>
+    <noscript><button type="submit" class="btn-ghost text-xs mt-2">Save</button></noscript>
+  </form>
+</div>
 
 {# ── Create period ── #}
 <div class="mt-8 max-w-2xl">

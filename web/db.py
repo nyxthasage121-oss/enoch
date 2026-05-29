@@ -624,6 +624,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "active_ruleset", "homebrew_tier_budgets",
         # Predator-type opt-in list (migration 021)
         "unlocked_predator_types",
+        # Auto period-generation toggle (migration 025)
+        "auto_create_periods_enabled",
     }
     # Validate ruleset before persisting — guard against typo'd POSTs.
     if "active_ruleset" in kwargs and kwargs["active_ruleset"] not in RULESETS:
@@ -972,6 +974,118 @@ def set_period_active(conn, period_id: int) -> dict:
 
 def close_period(conn, period_id: int) -> None:
     conn.execute("UPDATE play_periods SET is_active=0 WHERE id=?", (period_id,))
+
+
+def _next_period_label(prev_label: str) -> str:
+    """Derive the next period's label by bumping the first integer in the
+    previous one: 'Night 42 — Dusk to Midnight' -> 'Night 43 — Dusk to
+    Midnight'. If there's no number to increment, fall back to a suffix so
+    we never silently reuse the exact same label."""
+    import re
+    m = re.search(r"\d+", prev_label or "")
+    if not m:
+        return f"{(prev_label or 'Night').strip()} (cont.)"
+    return f"{prev_label[:m.start()]}{int(m.group()) + 1}{prev_label[m.end():]}"
+
+
+def auto_create_next_period_if_due(
+    conn,
+    *,
+    lead_days: int = 2,
+    now: str | None = None,
+    actor_id: str = "system",
+) -> dict | None:
+    """Stamp the next play period when one is due, inferring the schedule
+    from recent history instead of a stored template (migration 025).
+
+    Gated by chronicle_settings.auto_create_periods_enabled. No-op unless:
+      * the toggle is on,
+      * there are >= 2 prior periods to infer a rhythm from,
+      * we're within `lead_days` of the next period's computed opening.
+
+    Cadence  = gap between the two most recent periods' opens_at.
+    Duration = the latest period's own window (closes_at - opens_at).
+    The new period inherits period_type + phase from the latest one and is
+    created inactive — staff still press Activate to actually open it.
+
+    Idempotent by construction: the "latest" period is always the furthest
+    in the future, so once the next one is stamped the following call sees
+    it as the anchor and won't fire again until that one's successor is due.
+    This also means it never collides with periods staff scheduled by hand.
+
+    `now` (ISO-8601 string) is injectable for testing; defaults to the wall
+    clock. Returns the created period row, or None when nothing was due.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    settings = get_settings(conn)
+    if not settings or not settings.get("auto_create_periods_enabled"):
+        return None
+
+    recent = conn.execute(
+        "SELECT * FROM play_periods ORDER BY opens_at DESC LIMIT 2"
+    ).fetchall()
+    if len(recent) < 2:
+        return None  # not enough history to infer a cadence
+
+    def _parse(s: str) -> datetime:
+        dt = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+    latest, prev = recent[0], recent[1]
+    try:
+        opens0, opens1 = _parse(latest["opens_at"]), _parse(prev["opens_at"])
+        closes0 = _parse(latest["closes_at"])
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+    cadence  = opens0 - opens1
+    duration = closes0 - opens0
+    if cadence <= timedelta(0) or duration <= timedelta(0):
+        return None  # out-of-order or zero-length history — don't guess
+
+    now_dt = _parse(now) if now else datetime.now(timezone.utc)
+
+    # Next slot is one cadence past the latest opening. If the chronicle
+    # went dormant (the slot is already fully in the past), roll forward by
+    # whole cadences so we never stamp an already-closed period. The cap is
+    # a runaway guard for absurd data, not an expected path.
+    next_opens = opens0 + cadence
+    guard = 0
+    while next_opens + duration <= now_dt and guard < 520:
+        next_opens += cadence
+        guard += 1
+
+    if now_dt < next_opens - timedelta(days=lead_days):
+        return None  # not yet within the lead window
+
+    def _iso(dt: datetime) -> str:
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    opens_iso, closes_iso = _iso(next_opens), _iso(next_opens + duration)
+
+    # Belt-and-suspenders: never double-stamp the same opening.
+    if conn.execute(
+        "SELECT 1 FROM play_periods WHERE opens_at=? LIMIT 1", (opens_iso,)
+    ).fetchone():
+        return None
+
+    label = _next_period_label(latest["label"])
+    row = create_period(
+        conn,
+        label=label,
+        period_type=latest["period_type"],
+        phase=latest["phase"],
+        opens_at=opens_iso,
+        closes_at=closes_iso,
+        created_by=actor_id,
+    )
+    write_audit(
+        conn, actor_id, "auto_create_period", "play_period", row["id"],
+        after={"label": label, "opens_at": opens_iso, "closes_at": closes_iso,
+               "inferred_cadence_days": round(cadence.total_seconds() / 86400, 2)},
+    )
+    return row
 
 
 def sweep_period_closing_soon(conn, hours_threshold: int = 24) -> list[dict]:

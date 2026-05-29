@@ -11,7 +11,10 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from .config import settings
-from .db import get_db, run_migrations, sweep_retirements, sweep_period_closing_soon
+from .db import (
+    get_db, run_migrations, sweep_retirements,
+    sweep_period_closing_soon, auto_create_next_period_if_due,
+)
 from .deps import LoginRequired
 
 log = logging.getLogger(__name__)
@@ -46,8 +49,12 @@ async def _hourly_period_closing_sweep() -> None:
         try:
             with get_db() as conn:
                 notified = sweep_period_closing_soon(conn)
+                created  = auto_create_next_period_if_due(conn)
             if notified:
                 log.info("Enqueued period_closing_soon for %d period(s)", len(notified))
+            if created:
+                log.info("Auto-created next period %r (id=%s)",
+                         created["label"], created["id"])
         except Exception:
             log.exception("Period-closing sweep failed")
         await asyncio.sleep(60 * 60)  # 1h

@@ -16,6 +16,7 @@ from ..db import (
     start_character_review,
     approve_coterie_spend,
     approve_spend,
+    auto_create_next_period_if_due,
     close_period,
     create_criterion,
     create_hunting_site,
@@ -91,6 +92,7 @@ async def dashboard(request: Request, user: dict = Depends(require_staff)):
     with get_db() as conn:
         sweep_retirements(conn)
         sweep_period_closing_soon(conn)
+        auto_create_next_period_if_due(conn)
         pending_claims    = list_pending_claims(conn)
         pending_spends    = list_pending_spends(conn)
         all_chars         = list_characters(conn)
@@ -1150,6 +1152,31 @@ async def close_period_route(
     )
     _toast(resp, "Period closed.", "info")
     return resp
+
+
+@router.post("/periods/auto-create-toggle", response_class=HTMLResponse)
+async def toggle_auto_create_periods(
+    request: Request,
+    user: dict = Depends(require_permission("manage_period")),
+    _: None = Depends(csrf_protect),
+):
+    """Flip the chronicle-wide automatic period-generation toggle. When on,
+    the system infers cadence from recent periods and keeps exactly one
+    period on deck (see db.auto_create_next_period_if_due). Enabling it also
+    attempts an immediate stamp so staff get instant feedback if one's due."""
+    from ..db import upsert_settings
+    form = await request.form()
+    enabled = 1 if form.get("enabled") == "on" else 0
+    with get_db() as conn:
+        upsert_settings(conn, actor_id=user["id"],
+                        auto_create_periods_enabled=enabled)
+        created = auto_create_next_period_if_due(conn) if enabled else None
+    msg = ("Automatic period generation enabled." if enabled
+           else "Automatic period generation disabled.")
+    if created:
+        msg += f" Stamped \"{created['label']}\"."
+    request.session["flash"] = [{"kind": "success", "message": msg}]
+    return RedirectResponse(url="/staff/admin#periods", status_code=303)
 
 
 @router.post("/periods/schedules", response_class=HTMLResponse)
