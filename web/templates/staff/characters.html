@@ -20,28 +20,133 @@
   {% endif %}
 
   {# ── Active roster ── #}
-  <div class="mb-6">
-    <p class="label-gold mb-3">
-      Active Characters
-      <span class="text-bone-600 ml-2">{{ active | length }}</span>
-    </p>
+  <div class="mb-6" x-data="{
+         search: '',
+         clanFilter: '',
+         sortBy: 'name',
+         sortDir: 'asc',
+         matches(name, clan, player) {
+           const q = this.search.trim().toLowerCase();
+           const nameOk   = !q || name.toLowerCase().includes(q) || (player || '').toLowerCase().includes(q);
+           const clanOk   = !this.clanFilter || clan === this.clanFilter;
+           return nameOk && clanOk;
+         },
+         get visible() {
+           return Array.from(document.querySelectorAll('#active-roster-body tr'))
+             .filter(tr => tr.style.display !== 'none').length;
+         },
+         toggleSort(key) {
+           if (this.sortBy === key) {
+             this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+           } else {
+             this.sortBy = key;
+             this.sortDir = 'asc';
+           }
+           this.sortRows();
+         },
+         sortArrow(key) {
+           if (this.sortBy !== key) return '';
+           return this.sortDir === 'asc' ? ' ▲' : ' ▼';
+         },
+         sortRows() {
+           const tbody = document.getElementById('active-roster-body');
+           if (!tbody) return;
+           const rows = Array.from(tbody.children);
+           const numericKeys = new Set(['xp', 'available']);
+           const key = this.sortBy, dir = this.sortDir;
+           rows.sort((a, b) => {
+             let av = a.dataset['sort' + key.charAt(0).toUpperCase() + key.slice(1)] || '';
+             let bv = b.dataset['sort' + key.charAt(0).toUpperCase() + key.slice(1)] || '';
+             if (numericKeys.has(key)) { av = parseFloat(av) || 0; bv = parseFloat(bv) || 0; }
+             else                       { av = av.toLowerCase();   bv = bv.toLowerCase();   }
+             if (av < bv) return dir === 'asc' ? -1 : 1;
+             if (av > bv) return dir === 'asc' ?  1 : -1;
+             return 0;
+           });
+           rows.forEach(r => tbody.appendChild(r));
+         },
+       }"
+       x-init="$nextTick(() => sortRows())">
+    {# Filter strip — matches the items-end / mb-6 / gap-4 layout used
+       on Claims, Spends, and Hunting Sites for visual consistency. #}
+    <div class="flex items-end justify-between mb-6 flex-wrap gap-4">
+      <p class="label-gold mb-0">
+        Active Characters
+        <span class="text-bone-600 ml-2" x-text="search || clanFilter ? (visible + ' of ' + {{ active | length }}) : '{{ active | length }}'"></span>
+      </p>
+      {% if active %}
+      <div class="flex flex-wrap gap-2 items-end">
+        <div>
+          <label class="label-gold block mb-1 text-[0.75rem]">Search</label>
+          <input type="search" x-model="search"
+                 placeholder="Name or player…"
+                 class="text-xs py-1.5 px-2">
+        </div>
+        <div>
+          <label class="label-gold block mb-1 text-[0.75rem]">Clan</label>
+          <select x-model="clanFilter" class="text-xs py-1.5 px-2">
+            <option value="">All</option>
+            {% set unique_clans = active | map(attribute='clan') | unique | sort %}
+            {% for c in unique_clans %}
+            <option value="{{ c }}">{{ c | replace('-',' ') | title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="button"
+                @click="search = ''; clanFilter = ''"
+                x-show="search || clanFilter"
+                x-cloak
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+          Clear
+        </button>
+      </div>
+      {% endif %}
+    </div>
     {% if active %}
     <div class="gilded overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-ink-700">
-            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Character</th>
-            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Clan</th>
-            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Player</th>
-            <th class="px-4 py-3 text-right label-gold font-normal text-xs">XP</th>
-            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Available</th>
-            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Approved</th>
+            {% for key, label, align in [
+              ('name',     'Character', 'left'),
+              ('clan',     'Clan',      'left'),
+              ('player',   'Player',    'left'),
+              ('xp',       'XP',        'right'),
+              ('available','Available', 'right'),
+              ('approved', 'Approved',  'right'),
+            ] %}
+            <th class="px-4 py-3 text-{{ align }} label-gold font-normal text-xs cursor-pointer select-none hover:text-bone-300 transition-colors"
+                @click="toggleSort('{{ key }}')">
+              {{ label }}<span x-text="sortArrow('{{ key }}')" class="text-gold-500"></span>
+            </th>
+            {% endfor %}
           </tr>
         </thead>
-        <tbody>
+        <tbody id="active-roster-body">
           {% for char in active | sort(attribute='name') %}
-          <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
-            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300">{{ char.name }}</td>
+          <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors cursor-pointer"
+              data-sort-name="{{ char.name }}"
+              data-sort-clan="{{ char.clan }}"
+              data-sort-player="{{ char.player_username or char.discord_id or '' }}"
+              data-sort-xp="{{ char.xp_total }}"
+              data-sort-available="{{ char.xp_available }}"
+              data-sort-approved="{{ char.approved_at or '' }}"
+              x-show="matches({{ char.name | tojson | forceescape }}, '{{ char.clan }}', {{ (char.player_username or char.discord_id or '') | tojson | forceescape }})"
+              onclick="window.location.href='/staff/characters/{{ char.id }}'">
+            <td class="px-4 py-2.5">
+              <div class="flex items-center gap-2">
+                <a href="/staff/characters/{{ char.id }}"
+                   class="font-cinzel text-xs text-bone-300 hover:text-gold-400 transition-colors">
+                  {{ char.name }}
+                </a>
+                {% if char.is_inactive %}
+                <span class="chip text-mauve-400 border-mauve-800 text-[0.5rem]"
+                      title="No XP activity in {{ char.inactive_days }} day{{ 's' if char.inactive_days != 1 else '' }}">
+                  Silent {{ (char.inactive_days // 7) }}w
+                </span>
+                {% endif %}
+              </div>
+            </td>
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">{{ char.clan | replace('-',' ') | title }}</td>
             <td class="px-4 py-2.5 font-garamond text-xs text-bone-600">{{ char.player_username or char.discord_id }}</td>
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-400 text-right">
@@ -55,6 +160,10 @@
           {% endfor %}
         </tbody>
       </table>
+      <div x-show="visible === 0 && (search || clanFilter)" x-cloak
+           class="px-4 py-6 text-center font-garamond text-bone-700 text-sm italic">
+        No matching characters.
+      </div>
     </div>
     {% else %}
     <p class="font-garamond text-bone-600 text-sm">No active characters.</p>
@@ -85,8 +194,14 @@
         </thead>
         <tbody>
           {% for char in (retired + dead) | sort(attribute='name') %}
-          <tr class="border-b border-ink-800 opacity-60">
-            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">{{ char.name }}</td>
+          <tr class="border-b border-ink-800 opacity-60 hover:opacity-100 hover:bg-ink-900 transition-all cursor-pointer"
+              onclick="window.location.href='/staff/characters/{{ char.id }}'">
+            <td class="px-4 py-2.5">
+              <a href="/staff/characters/{{ char.id }}"
+                 class="font-cinzel text-xs text-bone-500 hover:text-bone-300 transition-colors">
+                {{ char.name }}
+              </a>
+            </td>
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-600">{{ char.clan }}</td>
             <td class="px-4 py-2.5 font-garamond text-xs
                        {{ 'text-blood-500' if char.status == 'dead' else 'text-bone-600' }}">

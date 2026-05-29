@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import clan_icon %}
 
 {% block title %}{{ char.name }} — Enoch{% endblock %}
 
@@ -13,9 +14,15 @@
     All Characters
   </a>
 
-  {# ── Hero ── #}
+  {# ── Hero — ember drift on desktop, clan-portrait frame, beam sweep ── #}
   <div class="relative overflow-hidden mb-6 border border-[var(--clan,theme(colors.ink.700))]
-              bg-gradient-to-b from-ink-900 to-ink-950">
+              bg-gradient-to-b from-ink-900 to-ink-950 aurora-beam aurora-sparkle-host"
+       x-data="{}"
+       x-init="
+         if (window.Aurora && !window.Aurora.MOBILE && !window.Aurora.REDUCED) {
+           window.Aurora.embers($el, { rateMs: 1100, max: 6 });
+         }
+       ">
 
     {# Clan tint overlay #}
     <div class="absolute inset-0 opacity-[0.04] pointer-events-none"
@@ -23,26 +30,44 @@
 
     <div class="relative px-6 py-7 flex items-start gap-5">
 
-      {# Avatar / monogram #}
-      <div class="w-14 h-14 shrink-0 border border-[var(--clan,theme(colors.ink.700))]
-                  bg-ink-900 flex items-center justify-center">
-        {% if char.profile_image_url %}
-          <img src="{{ char.profile_image_url }}" alt="" class="w-full h-full object-cover">
-        {% else %}
-          <span class="font-cinzel text-2xl text-[var(--clan,theme(colors.gold.400))]">
-            {{ char.name[0] | upper }}
-          </span>
-        {% endif %}
+      {# Avatar / monogram — aurora-portrait wraps the inner frame for
+         the slow clan-colored rotating border. #}
+      <div class="aurora-portrait w-14 h-14 shrink-0">
+        <div class="w-full h-full border border-[var(--clan,theme(colors.ink.700))]
+                    bg-ink-900 flex items-center justify-center">
+          {% if char.profile_image_url %}
+            <img src="{{ char.profile_image_url }}" alt=""
+                 class="w-full h-full object-cover"
+                 style="filter: url(#aurora-portrait-warm);">
+          {% else %}
+            <span class="font-cinzel text-2xl text-[var(--clan,theme(colors.gold.400))]">
+              {{ char.name[0] | upper }}
+            </span>
+          {% endif %}
+        </div>
       </div>
 
       <div class="flex-1 min-w-0">
-        <p class="label-gold mb-0.5 text-[0.6rem] tracking-[0.25em]">
-          {{ char.clan | replace('-', ' ') | title }}
-          {% if char.predator_type %}&thinsp;·&thinsp;{{ char.predator_type }}{% endif %}
-        </p>
-        <h1 class="font-cinzel text-2xl md:text-3xl text-bone-200 tracking-wide truncate">
-          {{ char.name }}
-        </h1>
+        <div class="flex items-center gap-2 mb-0.5">
+          {{ clan_icon(char.clan, size='w-5 h-5', font_size=11) }}
+          <p class="label-gold text-[0.75rem] tracking-[0.25em]">
+            {{ char.clan | replace('-', ' ') | title }}
+            {% if char.predator_type %}&thinsp;·&thinsp;{{ char.predator_type }}{% endif %}
+          </p>
+        </div>
+        <div class="flex items-start justify-between gap-3">
+          <h1 class="font-cinzel text-2xl md:text-3xl text-bone-200 tracking-wide truncate">
+            {{ char.name }}
+          </h1>
+          <a href="/characters/{{ char.id }}/edit"
+             class="shrink-0 btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 flex items-center gap-1.5 mt-0.5">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="square" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+              <path stroke-linecap="square" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Edit
+          </a>
+        </div>
 
         <div class="flex flex-wrap gap-2 mt-2">
           {% if not char.is_approved %}
@@ -70,13 +95,15 @@
       <div class="flex justify-between items-center mb-1.5">
         <span class="font-cinzel text-[0.6rem] text-bone-600 tracking-[0.2em] uppercase">Experience</span>
         <span class="font-cinzel text-[0.65rem] text-bone-500">
-          {{ char.xp_total }} / {{ char.xp_cap }}
+          <span x-data="counter(0, {{ char.xp_total }})" x-text="value"></span> / {{ char.xp_cap }}
           {% if char.xp_available > 0 %}
-            <span class="text-gold-500 ml-2">{{ char.xp_available }} available</span>
+            <span class="text-gold-500 ml-2">
+              <span x-data="counter(0, {{ char.xp_available }}, 700)" x-text="value"></span> available
+            </span>
           {% endif %}
         </span>
       </div>
-      <div class="h-0.5 bg-ink-800 w-full overflow-hidden">
+      <div class="h-0.5 bg-ink-800 w-full overflow-hidden aurora-beam">
         <div class="xp-fill-anim" style="--xp-target: {{ pct }}%"></div>
       </div>
       {% if char.xp_total >= char.xp_cap %}
@@ -89,7 +116,8 @@
 
   {# ── Tabs ── #}
   <div class="flex gap-0 border-b border-ink-700 mb-6 overflow-x-auto">
-    {% for t, lbl in [('overview','Overview'),('claim','Claim XP'),('spend','Spend XP'),('history','History')] %}
+    {% set xp_tabs = [('claim','Claim XP'),('spend','Spend XP'),('wishlist','Wishlist')] if char.is_approved else [] %}
+    {% for t, lbl in [('overview','Overview'),('sheet','Sheet')] + xp_tabs + [('history','History')] %}
     <button @click="tab='{{ t }}'"
             :class="tab === '{{ t }}'
               ? 'text-gold-400 border-b-2 border-[var(--clan,theme(colors.gold.400))]'
@@ -179,6 +207,716 @@
       </p>
     </div>
     {% endif %}
+
+    {# Submit for Review — short-form chargen stages the character as a
+       draft so the player can finish their sheet here before staff sees
+       it. This button is the explicit "I'm done" signal. #}
+    {% if char.is_draft %}
+    <div class="gilded border border-gold-800 p-5">
+      <p class="label-gold mb-1 text-gold-400">Submit for Review</p>
+      <p class="font-garamond text-bone-400 text-sm mb-3 leading-relaxed">
+        Fill in your sheet above, then send it to staff when you're ready.
+        Until you do, this character stays in your drafts and isn't visible
+        to staff.
+      </p>
+      <form method="post" action="/characters/{{ char.id }}/submit-for-review">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <button type="submit"
+                class="btn-send font-cinzel text-[0.65rem] tracking-widest px-4 py-2">
+          Submit for Review
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if not char.is_approved %}
+    <div class="gilded border border-ink-700 p-5" x-data="{ confirming: false }">
+      <p class="label-gold mb-1 text-bone-600">
+        {{ 'Discard Draft' if char.is_draft else 'Withdraw Submission' }}
+      </p>
+      <p class="font-garamond text-bone-600 text-sm mb-3 leading-relaxed">
+        {% if char.is_draft %}
+        Delete this draft without submitting. This cannot be undone.
+        {% else %}
+        Remove this character from the approval queue. This cannot be undone.
+        {% endif %}
+      </p>
+      <div x-show="!confirming">
+        <button @click="confirming = true"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+          {{ 'Discard Draft' if char.is_draft else 'Withdraw Character' }}
+        </button>
+      </div>
+      <div x-show="confirming" x-cloak class="flex items-center gap-3">
+        <form method="post" action="/characters/{{ char.id }}/withdraw">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <button type="submit"
+                  class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+            {{ 'Yes, Discard' if char.is_draft else 'Yes, Withdraw' }}
+          </button>
+        </form>
+        <button @click="confirming = false"
+                class="btn-ghost font-cinzel text-[0.6rem] px-3 py-1.5">
+          Cancel
+        </button>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ══ Sheet ══ #}
+  <div x-show="tab === 'sheet'" x-cloak
+       x-data="{
+         sheet: {{ char.sheet_json | tojson | forceescape }},
+         merits:      ({{ char.sheet_json | tojson | forceescape }}.merits      || []),
+         flaws:       ({{ char.sheet_json | tojson | forceescape }}.flaws       || []),
+         rituals:     ({{ char.sheet_json | tojson | forceescape }}.rituals     || []),
+         ceremonies:  ({{ char.sheet_json | tojson | forceescape }}.ceremonies  || []),
+         formulae:    ({{ char.sheet_json | tojson | forceescape }}.formulae    || []),
+         specialties: ({{ char.sheet_json | tojson | forceescape }}.specialties || []),
+         skillLabels: { {% for cat, traits in v5_skills %}{% for key, label in traits %}'{{ key }}': '{{ label }}',{% endfor %}{% endfor %} },
+         newMerit: '', newFlaw: '',
+         newRitual: '', newCeremony: '', newFormula: '',
+         addingFor: '', addBuffer: '',
+         // ── Edit mode ────────────────────────────────────────────────
+         // Approved characters open read-only by default — clicking Edit
+         // snapshots the current sheet so Cancel can roll back, and
+         // unlocks all the interactive controls. Save submits the form
+         // (the redirect reloads the page, so editMode resets to false).
+         editMode: false,
+         _snapshot: null,
+         enterEdit() {
+           this._snapshot = JSON.stringify({
+             sheet:       this.sheet,
+             merits:      this.merits,
+             flaws:       this.flaws,
+             rituals:     this.rituals,
+             ceremonies:  this.ceremonies,
+             formulae:    this.formulae,
+             specialties: this.specialties,
+           });
+           this.editMode = true;
+         },
+         cancelEdit() {
+           if (this._snapshot) {
+             const snap       = JSON.parse(this._snapshot);
+             this.sheet       = snap.sheet;
+             this.merits      = snap.merits;
+             this.flaws       = snap.flaws;
+             this.rituals     = snap.rituals;
+             this.ceremonies  = snap.ceremonies;
+             this.formulae    = snap.formulae;
+             this.specialties = snap.specialties;
+           }
+           this.editMode = false;
+         },
+         toggleDot(key, n) {
+           const cur = this.sheet[key] || 0;
+           this.sheet[key] = cur === n ? n - 1 : n;
+         },
+         get(key) { return this.sheet[key] || 0; },
+         addMerit() {
+           const name = this.newMerit.trim();
+           if (!name) return;
+           this.merits.push({ name: name.slice(0, 80), dots: 1 });
+           this.newMerit = '';
+         },
+         addFlaw() {
+           const name = this.newFlaw.trim();
+           if (!name) return;
+           this.flaws.push({ name: name.slice(0, 80), dots: 1 });
+           this.newFlaw = '';
+         },
+         addRitual() {
+           const name = this.newRitual.trim();
+           if (!name) return;
+           this.rituals.push({ name: name.slice(0, 80), level: 1 });
+           this.newRitual = '';
+         },
+         addCeremony() {
+           const name = this.newCeremony.trim();
+           if (!name) return;
+           this.ceremonies.push({ name: name.slice(0, 80), level: 1 });
+           this.newCeremony = '';
+         },
+         addFormula() {
+           const name = this.newFormula.trim();
+           if (!name) return;
+           this.formulae.push({ name: name.slice(0, 80), level: 1 });
+           this.newFormula = '';
+         },
+         skillLabel(key) { return this.skillLabels[key] || key; },
+         specialtiesFor(key) { return this.specialties.filter(s => s.skill === key); },
+         startAdding(key) {
+           this.addingFor = key;
+           this.addBuffer = '';
+           this.$nextTick(() => {
+             const el = document.getElementById('add-input-' + key);
+             if (el) el.focus();
+           });
+         },
+         cancelAdding() { this.addingFor = ''; this.addBuffer = ''; },
+         saveSpecialty() {
+           const name = this.addBuffer.trim();
+           if (!name || !this.addingFor) { this.cancelAdding(); return; }
+           this.specialties.push({ skill: this.addingFor, name: name.slice(0, 80) });
+           this.cancelAdding();
+         },
+         removeSpecialty(skillKey, name) {
+           const idx = this.specialties.findIndex(s => s.skill === skillKey && s.name === name);
+           if (idx >= 0) this.specialties.splice(idx, 1);
+         },
+         /* Damage tracks. Each click cycles a box: empty → superficial → aggravated → empty.
+            Layout convention: aggravated boxes are rendered first (worst on left),
+            then superficial, then empty. */
+         dmgState(track, position) {
+           const agg = this.sheet['damage_' + track + '_agg'] || 0;
+           const sup = this.sheet['damage_' + track + '_sup'] || 0;
+           if (position <= agg) return 'agg';
+           if (position <= agg + sup) return 'sup';
+           return 'empty';
+         },
+         cycleDamage(track, position) {
+           const state = this.dmgState(track, position);
+           const aggKey = 'damage_' + track + '_agg';
+           const supKey = 'damage_' + track + '_sup';
+           const agg = this.sheet[aggKey] || 0;
+           const sup = this.sheet[supKey] || 0;
+           if (state === 'empty')      { this.sheet[supKey] = sup + 1; }
+           else if (state === 'sup')   { this.sheet[supKey] = sup - 1; this.sheet[aggKey] = agg + 1; }
+           else /* agg */              { this.sheet[aggKey] = agg - 1; }
+         },
+       }">
+
+    {% if not char.is_approved and char.review_started_at %}
+    {# Locked banner: staff is reviewing — the player can't save edits
+       until they finish. Edits still display visually so the player can
+       see what they wrote, but the form action no-ops on the server. #}
+    <div class="gilded-inset px-5 py-4 mb-5 border-l-2 border-mauve-700">
+      <p class="label-gold mb-1 text-mauve-400">Under Review</p>
+      <p class="font-garamond text-bone-400 text-sm leading-relaxed">
+        Staff has opened the review on this character — your sheet is read-only
+        until they approve or return it. Any edits you make below won't save.
+      </p>
+    </div>
+    {% endif %}
+
+    {# Edit / Save / Cancel button group. Lives outside the form's
+       pointer-events scope so it always responds. Save uses the form=
+       attribute to submit the sheet form below. #}
+    {% set _can_edit = (char.is_approved or (not char.review_started_at)) %}
+    {% if _can_edit %}
+    <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+      <div class="flex items-center gap-2">
+        <p class="label-gold mb-0">
+          <span x-show="!editMode">Sheet</span>
+          <span x-show="editMode" x-cloak class="text-gold-400">Editing</span>
+        </p>
+        <span x-show="!editMode"
+              class="font-garamond text-bone-700 text-[0.7rem] italic">
+          Read-only — click Edit to make changes.
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" x-show="!editMode"
+                @click="enterEdit()"
+                class="btn-ghost font-cinzel tracking-widest text-[0.65rem] px-4 py-1.5">
+          Edit Sheet
+        </button>
+        <button type="button" x-show="editMode" x-cloak
+                @click="cancelEdit()"
+                class="btn-ghost font-cinzel tracking-widest text-[0.65rem] px-4 py-1.5">
+          Cancel
+        </button>
+        <button type="submit" form="char-sheet-form" x-show="editMode" x-cloak
+                class="btn-send font-cinzel tracking-widest text-[0.65rem] px-4 py-1.5">
+          Save Sheet
+        </button>
+      </div>
+    </div>
+    {% endif %}
+
+    <form id="char-sheet-form" method="post" action="/characters/{{ char.id }}/sheet"
+          class="space-y-5"
+          {% if _can_edit %}
+          :class="!editMode ? 'pointer-events-none opacity-95' : ''"
+          {% endif %}>
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+      {# Hidden inputs mirror Alpine state so every trait posts a value #}
+      {% for cat, traits in v5_attributes %}
+        {% for key, label in traits %}
+        <input type="hidden" name="{{ key }}" :value="get('{{ key }}')">
+        {% endfor %}
+      {% endfor %}
+      {% for cat, traits in v5_skills %}
+        {% for key, label in traits %}
+        <input type="hidden" name="{{ key }}" :value="get('{{ key }}')">
+        {% endfor %}
+      {% endfor %}
+      <input type="hidden" name="humanity"      :value="get('humanity')">
+      <input type="hidden" name="blood_potency" :value="get('blood_potency')">
+      <input type="hidden" name="hunger"        :value="get('hunger')">
+
+      {# ── Attributes ── #}
+      <div class="gilded p-5">
+        <p class="label-gold mb-4">Attributes</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+          {% for cat, traits in v5_attributes %}
+          <div>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] text-bone-700 uppercase mb-2">{{ cat }}</p>
+            {% for key, label in traits %}
+            <div class="flex items-center justify-between py-1.5 border-b border-ink-800 last:border-0">
+              <span class="font-garamond text-sm text-bone-300">{{ label }}</span>
+              <div class="flex gap-1">
+                {% for n in range(1, 6) %}
+                <button type="button" @click="toggleDot('{{ key }}', {{ n }})"
+                        class="w-3 h-3 rounded-full border transition-colors"
+                        :class="get('{{ key }}') >= {{ n }}
+                          ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
+                          : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                </button>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ── Skills ── #}
+      <div class="gilded p-5">
+        <div class="flex items-baseline justify-between mb-4">
+          <p class="label-gold">Skills</p>
+          <p class="font-garamond text-bone-700 text-xs italic">
+            Hover a skill to add a specialty.
+          </p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+          {% for cat, traits in v5_skills %}
+          <div>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] text-bone-700 uppercase mb-2">{{ cat }}</p>
+            {% for key, label in traits %}
+            <div class="border-b border-ink-800 last:border-0 group/skill">
+              <div class="flex items-center justify-between py-1.5">
+                <span class="font-garamond text-sm text-bone-300">{{ label }}</span>
+                <div class="flex items-center gap-1">
+                  {% for n in range(1, 6) %}
+                  <button type="button" @click="toggleDot('{{ key }}', {{ n }})"
+                          class="w-3 h-3 rounded-full border transition-colors"
+                          :class="get('{{ key }}') >= {{ n }}
+                            ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
+                            : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                  </button>
+                  {% endfor %}
+                  <button type="button" @click="startAdding('{{ key }}')"
+                          class="ml-1 w-4 h-4 rounded-full border border-bone-700 text-bone-700 hover:text-gold-400 hover:border-gold-700 text-[0.6rem] leading-none flex items-center justify-center opacity-0 group-hover/skill:opacity-100 focus:opacity-100 transition-opacity"
+                          :class="addingFor === '{{ key }}' ? 'opacity-100' : ''"
+                          title="Add specialty">
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {# Inline add input for this skill #}
+              <div x-show="addingFor === '{{ key }}'" x-cloak class="flex items-center gap-1 pb-1.5 pl-2">
+                <span class="font-garamond text-[0.65rem] text-bone-700 italic">·</span>
+                <input type="text" id="add-input-{{ key }}"
+                       x-model="addBuffer"
+                       @keydown.enter.prevent="saveSpecialty()"
+                       @keydown.escape="cancelAdding()"
+                       placeholder="Specialty name…"
+                       class="flex-1 text-xs py-0.5 px-1.5">
+                <button type="button" @click="saveSpecialty()"
+                        class="font-cinzel text-[0.6rem] text-gold-500 hover:text-gold-300 px-1">
+                  Save
+                </button>
+                <button type="button" @click="cancelAdding()"
+                        class="font-cinzel text-[0.6rem] text-bone-700 hover:text-blood-400 px-1">
+                  ×
+                </button>
+              </div>
+
+              {# Existing specialties for this skill #}
+              <template x-for="s in specialtiesFor('{{ key }}')" :key="'{{ key }}'+s.name">
+                <div class="flex items-center justify-between pb-1 pl-2 group/spec">
+                  <span class="font-garamond text-[0.7rem] italic text-bone-500" x-text="'· ' + s.name"></span>
+                  <button type="button" @click="removeSpecialty('{{ key }}', s.name)"
+                          class="font-cinzel text-[0.6rem] text-bone-700 hover:text-blood-400 opacity-0 group-hover/spec:opacity-100 transition-opacity">
+                    ×
+                  </button>
+                </div>
+              </template>
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Hidden input for specialties (managed inline in the Skills section) #}
+      <input type="hidden" name="specialties" :value="JSON.stringify(specialties)">
+
+      {# Hidden inputs for disciplines #}
+      {% for key, label in v5_disciplines %}
+      <input type="hidden" name="{{ key }}" :value="get('{{ key }}')">
+      {% endfor %}
+
+      {# ── Disciplines ── #}
+      <div class="gilded p-5">
+        <div class="flex items-baseline justify-between mb-4">
+          <p class="label-gold">Disciplines</p>
+          {% if clan_disciplines %}
+          <p class="font-garamond text-bone-700 text-xs italic">
+            {{ char.clan | replace('-',' ') | title }} in-clan disciplines marked
+            <span class="text-gold-500 font-cinzel tracking-widest text-[0.55rem] uppercase ml-1">Clan</span>
+          </p>
+          {% elif char.clan in ['caitiff','thin-blood'] %}
+          <p class="font-garamond text-bone-700 text-xs italic">
+            No in-clan disciplines — all picks are equal cost.
+          </p>
+          {% endif %}
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+          {% for key, label in v5_disciplines %}
+          {% set is_clan = key in clan_disciplines %}
+          <div class="flex items-center justify-between py-1.5 border-b border-ink-800 last:border-0">
+            <div class="flex items-center gap-2">
+              <span class="font-garamond text-sm {{ 'text-bone-200' if is_clan else 'text-bone-400' }}">
+                {{ label }}
+              </span>
+              {% if is_clan %}
+              <span class="font-cinzel text-[0.5rem] tracking-[0.2em] text-gold-500 uppercase">Clan</span>
+              {% endif %}
+            </div>
+            <div class="flex gap-1">
+              {% for n in range(1, 6) %}
+              <button type="button" @click="toggleDot('{{ key }}', {{ n }})"
+                      class="w-3 h-3 rounded-full border transition-colors"
+                      :class="get('{{ key }}') >= {{ n }}
+                        ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
+                        : 'bg-transparent border-bone-700 hover:border-bone-500'">
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ── Merits & Flaws ── #}
+      <input type="hidden" name="merits" :value="JSON.stringify(merits)">
+      <input type="hidden" name="flaws"  :value="JSON.stringify(flaws)">
+
+      <div class="gilded p-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+
+          {# Merits #}
+          <div>
+            <p class="label-gold mb-3">Merits</p>
+            <template x-for="(m, idx) in merits" :key="'m'+idx">
+              <div class="flex items-center justify-between py-1.5 border-b border-ink-800">
+                <span class="font-garamond text-sm text-bone-300 truncate flex-1 pr-2" x-text="m.name"></span>
+                <div class="flex gap-1 shrink-0">
+                  <template x-for="n in 5" :key="n">
+                    <button type="button" @click="m.dots = m.dots === n ? n - 1 : n"
+                            class="w-3 h-3 rounded-full border transition-colors"
+                            :class="m.dots >= n
+                              ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
+                              : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                    </button>
+                  </template>
+                </div>
+                <button type="button" @click="merits.splice(idx, 1)"
+                        class="ml-3 font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-blood-400">
+                  ×
+                </button>
+              </div>
+            </template>
+            <template x-if="merits.length === 0">
+              <p class="font-garamond text-bone-700 text-xs italic py-1">No merits added.</p>
+            </template>
+            <div class="flex items-end gap-2 mt-3">
+              <div class="flex-1">
+                <label class="label-gold block mb-1 text-[0.7rem]">Add Merit</label>
+                <input type="text" x-model="newMerit"
+                       @keydown.enter.prevent="addMerit()"
+                       placeholder="e.g. Resources, Allies, Linguistics…"
+                       class="w-full text-xs">
+              </div>
+              <button type="button" @click="addMerit()"
+                      class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
+                Add
+              </button>
+            </div>
+          </div>
+
+          {# Flaws #}
+          <div>
+            <p class="label-gold mb-3">Flaws</p>
+            <template x-for="(f, idx) in flaws" :key="'f'+idx">
+              <div class="flex items-center justify-between py-1.5 border-b border-ink-800">
+                <span class="font-garamond text-sm text-bone-300 truncate flex-1 pr-2" x-text="f.name"></span>
+                <div class="flex gap-1 shrink-0">
+                  <template x-for="n in 5" :key="n">
+                    <button type="button" @click="f.dots = f.dots === n ? n - 1 : n"
+                            class="w-3 h-3 rounded-full border transition-colors"
+                            :class="f.dots >= n
+                              ? 'bg-blood-bright border-blood-bright'
+                              : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                    </button>
+                  </template>
+                </div>
+                <button type="button" @click="flaws.splice(idx, 1)"
+                        class="ml-3 font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-blood-400">
+                  ×
+                </button>
+              </div>
+            </template>
+            <template x-if="flaws.length === 0">
+              <p class="font-garamond text-bone-700 text-xs italic py-1">No flaws added.</p>
+            </template>
+            <div class="flex items-end gap-2 mt-3">
+              <div class="flex-1">
+                <label class="label-gold block mb-1 text-[0.7rem]">Add Flaw</label>
+                <input type="text" x-model="newFlaw"
+                       @keydown.enter.prevent="addFlaw()"
+                       placeholder="e.g. Stake Bait, Folkloric Bane…"
+                       class="w-full text-xs">
+              </div>
+              <button type="button" @click="addFlaw()"
+                      class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Hidden inputs for level-rated lists #}
+      <input type="hidden" name="rituals"    :value="JSON.stringify(rituals)">
+      <input type="hidden" name="ceremonies" :value="JSON.stringify(ceremonies)">
+      <input type="hidden" name="formulae"   :value="JSON.stringify(formulae)">
+
+      {# ── Blood Sorcery Rituals ── #}
+      <div class="gilded p-5"
+           x-show="(sheet.disc_blood_sorcery || 0) > 0"
+           x-cloak>
+        <div class="flex items-baseline justify-between mb-3">
+          <p class="label-gold">Blood Sorcery Rituals</p>
+          <p class="font-garamond text-bone-700 text-xs italic">
+            Each ritual is gated by your Blood Sorcery rating.
+          </p>
+        </div>
+        <template x-for="(r, idx) in rituals" :key="'r'+idx">
+          <div class="flex items-center justify-between py-1.5 border-b border-ink-800">
+            <span class="font-garamond text-sm text-bone-300 truncate flex-1 pr-2" x-text="r.name"></span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="font-cinzel text-[0.55rem] tracking-widest text-bone-700 uppercase">Level</span>
+              <template x-for="n in 5" :key="n">
+                <button type="button" @click="r.level = r.level === n ? n - 1 : n"
+                        class="w-3 h-3 rounded-full border transition-colors"
+                        :class="r.level >= n
+                          ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
+                          : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                </button>
+              </template>
+              <button type="button" @click="rituals.splice(idx, 1)"
+                      class="ml-3 font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-blood-400">
+                ×
+              </button>
+            </div>
+          </div>
+        </template>
+        <template x-if="rituals.length === 0">
+          <p class="font-garamond text-bone-700 text-xs italic py-1">No rituals added.</p>
+        </template>
+        <div class="flex items-end gap-2 mt-3">
+          <div class="flex-1">
+            <label class="label-gold block mb-1 text-[0.7rem]">Add Ritual</label>
+            <input type="text" x-model="newRitual"
+                   @keydown.enter.prevent="addRitual()"
+                   placeholder="e.g. Defense of the Sacred Haven…"
+                   class="w-full text-xs">
+          </div>
+          <button type="button" @click="addRitual()"
+                  class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
+            Add
+          </button>
+        </div>
+      </div>
+
+      {# ── Oblivion Ceremonies ── #}
+      <div class="gilded p-5"
+           x-show="(sheet.disc_oblivion || 0) > 0"
+           x-cloak>
+        <div class="flex items-baseline justify-between mb-3">
+          <p class="label-gold">Oblivion Ceremonies</p>
+          <p class="font-garamond text-bone-700 text-xs italic">
+            Each ceremony is gated by your Oblivion rating.
+          </p>
+        </div>
+        <template x-for="(c, idx) in ceremonies" :key="'c'+idx">
+          <div class="flex items-center justify-between py-1.5 border-b border-ink-800">
+            <span class="font-garamond text-sm text-bone-300 truncate flex-1 pr-2" x-text="c.name"></span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="font-cinzel text-[0.55rem] tracking-widest text-bone-700 uppercase">Level</span>
+              <template x-for="n in 5" :key="n">
+                <button type="button" @click="c.level = c.level === n ? n - 1 : n"
+                        class="w-3 h-3 rounded-full border transition-colors"
+                        :class="c.level >= n
+                          ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
+                          : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                </button>
+              </template>
+              <button type="button" @click="ceremonies.splice(idx, 1)"
+                      class="ml-3 font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-blood-400">
+                ×
+              </button>
+            </div>
+          </div>
+        </template>
+        <template x-if="ceremonies.length === 0">
+          <p class="font-garamond text-bone-700 text-xs italic py-1">No ceremonies added.</p>
+        </template>
+        <div class="flex items-end gap-2 mt-3">
+          <div class="flex-1">
+            <label class="label-gold block mb-1 text-[0.7rem]">Add Ceremony</label>
+            <input type="text" x-model="newCeremony"
+                   @keydown.enter.prevent="addCeremony()"
+                   placeholder="e.g. Knowing Stone, Compel the Slumbering Dead…"
+                   class="w-full text-xs">
+          </div>
+          <button type="button" @click="addCeremony()"
+                  class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
+            Add
+          </button>
+        </div>
+      </div>
+
+      {# ── Thin-Blood Formulae ── #}
+      <div class="gilded p-5"
+           x-show="(sheet.disc_thin_blood_alchemy || 0) > 0"
+           x-cloak>
+        <div class="flex items-baseline justify-between mb-3">
+          <p class="label-gold">Thin-Blood Formulae</p>
+          <p class="font-garamond text-bone-700 text-xs italic">
+            Each formula is gated by your Thin-Blood Alchemy rating.
+          </p>
+        </div>
+        <template x-for="(f, idx) in formulae" :key="'f'+idx">
+          <div class="flex items-center justify-between py-1.5 border-b border-ink-800">
+            <span class="font-garamond text-sm text-bone-300 truncate flex-1 pr-2" x-text="f.name"></span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="font-cinzel text-[0.55rem] tracking-widest text-bone-700 uppercase">Level</span>
+              <template x-for="n in 5" :key="n">
+                <button type="button" @click="f.level = f.level === n ? n - 1 : n"
+                        class="w-3 h-3 rounded-full border transition-colors"
+                        :class="f.level >= n
+                          ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
+                          : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                </button>
+              </template>
+              <button type="button" @click="formulae.splice(idx, 1)"
+                      class="ml-3 font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-blood-400">
+                ×
+              </button>
+            </div>
+          </div>
+        </template>
+        <template x-if="formulae.length === 0">
+          <p class="font-garamond text-bone-700 text-xs italic py-1">No formulae added.</p>
+        </template>
+        <div class="flex items-end gap-2 mt-3">
+          <div class="flex-1">
+            <label class="label-gold block mb-1 text-[0.7rem]">Add Formula</label>
+            <input type="text" x-model="newFormula"
+                   @keydown.enter.prevent="addFormula()"
+                   placeholder="e.g. Far Reach, Counterfeit, Discreet Phantasm…"
+                   class="w-full text-xs">
+          </div>
+          <button type="button" @click="addFormula()"
+                  class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
+            Add
+          </button>
+        </div>
+      </div>
+
+      {# ── Core traits ── #}
+      <div class="gilded p-5">
+        <p class="label-gold mb-4">Core Traits</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-3">
+          {% for key, label, max_dots in [('humanity','Humanity',10),('blood_potency','Blood Potency',5),('hunger','Hunger',5)] %}
+          <div class="flex items-center justify-between py-1">
+            <span class="font-garamond text-sm text-bone-300">{{ label }}</span>
+            <div class="flex gap-1 flex-wrap">
+              {% for n in range(1, max_dots + 1) %}
+              <button type="button" @click="toggleDot('{{ key }}', {{ n }})"
+                      class="w-3 h-3 rounded-full border transition-colors"
+                      :class="get('{{ key }}') >= {{ n }}
+                        ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
+                        : 'bg-transparent border-bone-700 hover:border-bone-500'">
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Hidden inputs persist damage tracks on save #}
+      <input type="hidden" name="damage_health_sup"    :value="sheet.damage_health_sup    || 0">
+      <input type="hidden" name="damage_health_agg"    :value="sheet.damage_health_agg    || 0">
+      <input type="hidden" name="damage_willpower_sup" :value="sheet.damage_willpower_sup || 0">
+      <input type="hidden" name="damage_willpower_agg" :value="sheet.damage_willpower_agg || 0">
+
+      {# ── Damage tracks ── #}
+      <div class="gilded p-5">
+        <div class="flex items-baseline justify-between mb-3">
+          <p class="label-gold">Damage Tracks</p>
+          <p class="font-garamond text-bone-700 text-xs italic">
+            Click a box: empty → superficial → aggravated → empty.
+          </p>
+        </div>
+        <div class="space-y-3">
+          {% for track, label in [('health','Health'), ('willpower','Willpower')] %}
+          {% set max_attr = ('attr_stamina',) if track == 'health' else ('attr_composure','attr_resolve') %}
+          {% if track == 'health' %}
+            {% set total_expr = "(sheet.attr_stamina || 0) + 3" %}
+          {% else %}
+            {% set total_expr = "(sheet.attr_composure || 0) + (sheet.attr_resolve || 0)" %}
+          {% endif %}
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-baseline gap-3 min-w-[8rem]">
+              <span class="font-garamond text-sm text-bone-300">{{ label }}</span>
+              <span class="font-cinzel text-[0.6rem] text-bone-700 tracking-widest">
+                <span x-text="(sheet.damage_{{ track }}_agg || 0) + (sheet.damage_{{ track }}_sup || 0)"></span>
+                <span class="text-bone-800">/</span>
+                <span x-text="{{ total_expr }}"></span>
+              </span>
+            </div>
+            <div class="flex gap-1 flex-wrap" x-data="{ track: '{{ track }}' }">
+              <template x-for="pos in Math.max(1, {{ total_expr }})" :key="pos">
+                <button type="button" @click="cycleDamage('{{ track }}', pos)"
+                        class="dbox cursor-pointer"
+                        :class="dmgState('{{ track }}', pos) === 'agg' ? 'agg'
+                              : dmgState('{{ track }}', pos) === 'sup' ? 'sup'
+                              : ''"
+                        style="width:18px;height:18px;font-size:0;">
+                </button>
+              </template>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <p class="font-garamond text-bone-700 text-xs italic">
+        Rituals, ceremonies, and formulae appear when their disciplines are set.
+        Sheet is read-only until you press Edit Sheet at the top.
+      </p>
+    </form>
   </div>
 
   {# ══ Claim XP ══ #}
@@ -189,6 +927,152 @@
   {# ══ Spend XP ══ #}
   <div x-show="tab === 'spend'" x-cloak>
     {% include "player/partials/spend_form.html" %}
+  </div>
+
+  {# ══ Wishlist ══ #}
+  <div x-show="tab === 'wishlist'" x-cloak
+       x-data="wishlistPlanner({{ char.id }}, {{ char.xp_available }}, '{{ csrf_token }}')">
+
+    <div class="gilded p-5 mb-4">
+      <div class="flex items-baseline justify-between mb-1">
+        <p class="label-gold">XP Wishlist</p>
+        <p class="font-garamond text-bone-700 text-xs italic">
+          Saved in your browser. Visible only to you.
+        </p>
+      </div>
+      <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+        Plan what you'd like to buy next. Costs use V5 rules ({{ '{' }}new × multiplier{{ '}' }} summed across steps).
+        Click <span class="font-cinzel text-blood-400 text-xs tracking-widest">Send</span> on any item
+        to submit it as a spend request — staff will review.
+      </p>
+    </div>
+
+    {# Status banner #}
+    <div x-show="statusMsg" x-cloak
+         :class="statusKind === 'error' ? 'border-blood-900 text-blood-400' : 'border-gold-800 text-gold-400'"
+         class="gilded-inset px-4 py-3 mb-4 border-l-2 font-garamond text-sm"
+         x-text="statusMsg"></div>
+
+    {# Add row #}
+    <div class="gilded-inset px-5 py-4 mb-4">
+      <p class="label-gold mb-3">Add an Item</p>
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+        <div class="md:col-span-4">
+          <label class="label-gold block mb-1 text-[0.7rem]">Category</label>
+          <select x-model="newItem.category" class="w-full text-xs">
+            <option value="attribute">Attribute</option>
+            <option value="skill">Skill</option>
+            <option value="clan_discipline">Clan Discipline</option>
+            <option value="other_discipline">Other Discipline</option>
+            <option value="blood_potency">Blood Potency</option>
+            <option value="specialty">Specialty (flat 3 XP)</option>
+            <option value="advantage">Advantage (3 XP/dot)</option>
+          </select>
+        </div>
+        <div class="md:col-span-4">
+          <label class="label-gold block mb-1 text-[0.7rem]">Trait Name</label>
+          <input type="text" x-model="newItem.trait" placeholder="e.g. Dominate, Athletics…" class="w-full text-xs">
+        </div>
+        <div class="md:col-span-1">
+          <label class="label-gold block mb-1 text-[0.7rem]">From</label>
+          <input type="number" min="0" max="5" x-model.number="newItem.current" class="w-full text-xs">
+        </div>
+        <div class="md:col-span-1">
+          <label class="label-gold block mb-1 text-[0.7rem]">To</label>
+          <input type="number" min="1" max="10" x-model.number="newItem.target" class="w-full text-xs">
+        </div>
+        <div class="md:col-span-2">
+          <button type="button" @click="add()"
+                  class="btn-send font-cinzel tracking-widest text-[0.65rem] w-full py-2"
+                  :disabled="!canAdd()"
+                  :class="canAdd() ? '' : 'opacity-50 cursor-not-allowed'">
+            Add
+          </button>
+        </div>
+      </div>
+      <p x-show="addError" x-text="addError" x-cloak
+         class="font-garamond text-blood-400 text-xs mt-2"></p>
+    </div>
+
+    {# List of items #}
+    <template x-if="items.length === 0">
+      <div class="gilded p-6 text-center">
+        <p class="font-garamond text-bone-600 text-sm italic">
+          Nothing on your wishlist yet. Add an item above to plan your next purchase.
+        </p>
+      </div>
+    </template>
+
+    <template x-if="items.length > 0">
+      <div class="gilded overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-ink-700">
+              <th class="px-4 py-3 text-left label-gold font-normal text-xs">Category</th>
+              <th class="px-4 py-3 text-left label-gold font-normal text-xs">Trait</th>
+              <th class="px-4 py-3 text-right label-gold font-normal text-xs">From → To</th>
+              <th class="px-4 py-3 text-right label-gold font-normal text-xs">Cost</th>
+              <th class="px-4 py-3 text-right label-gold font-normal text-xs"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(item, idx) in items" :key="idx">
+              <tr class="border-b border-ink-800">
+                <td class="px-4 py-2.5 font-garamond text-xs text-bone-500" x-text="categoryLabel(item.category)"></td>
+                <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200" x-text="item.trait"></td>
+                <td class="px-4 py-2.5 font-cinzel text-xs text-bone-400 text-right whitespace-nowrap">
+                  <span x-text="item.current"></span>
+                  <span class="text-bone-700 mx-1">→</span>
+                  <span x-text="item.target"></span>
+                </td>
+                <td class="px-4 py-2.5 font-cinzel text-xs text-blood-400 text-right whitespace-nowrap"
+                    x-text="costOf(item) + ' XP'"></td>
+                <td class="px-4 py-2.5 text-right whitespace-nowrap">
+                  <button type="button" @click="submit(idx)"
+                          :disabled="!canSubmit(item) || sendingIdx === idx"
+                          :class="canSubmit(item) && sendingIdx !== idx
+                            ? 'btn-send'
+                            : 'btn-ghost opacity-50 cursor-not-allowed'"
+                          class="font-cinzel text-[0.6rem] tracking-widest px-2 py-1 mr-2">
+                    <span x-show="sendingIdx !== idx">Send</span>
+                    <span x-show="sendingIdx === idx" x-cloak>Sending…</span>
+                  </button>
+                  <button type="button" @click="remove(idx)"
+                          class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-2 py-1 text-bone-600 hover:text-blood-400">
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+          <tfoot>
+            <tr class="bg-ink-900">
+              <td colspan="3" class="px-4 py-3 font-cinzel text-[0.65rem] tracking-widest uppercase text-bone-500 text-right">
+                Total
+              </td>
+              <td class="px-4 py-3 font-cinzel text-sm text-gold-400 text-right whitespace-nowrap"
+                  x-text="totalCost() + ' XP'"></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td colspan="3" class="px-4 py-2 font-cinzel text-[0.6rem] tracking-widest uppercase text-bone-700 text-right">
+                Available
+              </td>
+              <td class="px-4 py-2 font-cinzel text-xs text-right whitespace-nowrap"
+                  :class="totalCost() <= availableXp ? 'text-bone-500' : 'text-blood-400'">
+                <span x-text="availableXp + ' XP'"></span>
+              </td>
+              <td></td>
+            </tr>
+            <tr x-show="totalCost() > availableXp" x-cloak>
+              <td colspan="5" class="px-4 py-2 font-garamond text-blood-400 text-xs italic text-right"
+                  x-text="'Short by ' + (totalCost() - availableXp) + ' XP'"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </template>
+
   </div>
 
   {# ══ History ══ #}
@@ -290,4 +1174,172 @@
   </div>
 
 </div>
+
+<script>
+function wishlistPlanner(characterId, availableXp, csrfToken) {
+  const storageKey = 'enoch:wishlist:' + characterId;
+  const MULTIPLIER = {
+    attribute:        5,
+    skill:            3,
+    clan_discipline:  5,
+    other_discipline: 7,
+    blood_potency:   10,
+  };
+  const LABELS = {
+    attribute:        'Attribute',
+    skill:            'Skill',
+    clan_discipline:  'Clan Discipline',
+    other_discipline: 'Other Discipline',
+    blood_potency:    'Blood Potency',
+    specialty:        'Specialty',
+    advantage:        'Advantage',
+  };
+  // Map wishlist category keys -> server-side category strings (xp_rules.SPEND_CATEGORIES)
+  const SERVER_CATEGORY = {
+    attribute:        'Attribute',
+    skill:            'Skill',
+    clan_discipline:  'Clan Discipline',
+    other_discipline: 'Other Discipline',
+    blood_potency:    'Blood Potency',
+    specialty:        'Specialty',
+    advantage:        'Advantage',
+  };
+
+  function loadItems() {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  return {
+    items: loadItems(),
+    availableXp: availableXp,
+    addError: '',
+    newItem: { category: 'skill', trait: '', current: 0, target: 1 },
+    sendingIdx: null,
+    statusMsg: '',
+    statusKind: '',
+
+    save() {
+      try { localStorage.setItem(storageKey, JSON.stringify(this.items)); } catch (e) {}
+    },
+
+    flash(msg, kind) {
+      this.statusMsg = msg;
+      this.statusKind = kind || 'success';
+      clearTimeout(this._flashTimer);
+      this._flashTimer = setTimeout(() => { this.statusMsg = ''; }, 5000);
+    },
+
+    categoryLabel(cat) { return LABELS[cat] || cat; },
+
+    canAdd() {
+      return this.newItem.trait.trim().length > 0
+          && Number.isInteger(this.newItem.current)
+          && Number.isInteger(this.newItem.target)
+          && this.newItem.target > this.newItem.current;
+    },
+
+    add() {
+      this.addError = '';
+      const c = this.newItem;
+      if (!c.trait.trim()) {
+        this.addError = 'Please enter a trait name.';
+        return;
+      }
+      if (c.target <= c.current) {
+        this.addError = 'Target dots must be greater than current.';
+        return;
+      }
+      this.items.push({
+        category: c.category,
+        trait: c.trait.trim(),
+        current: c.current,
+        target: c.target,
+      });
+      this.save();
+      this.newItem = { category: c.category, trait: '', current: 0, target: 1 };
+    },
+
+    remove(idx) {
+      this.items.splice(idx, 1);
+      this.save();
+    },
+
+    costOf(item) {
+      if (item.category === 'specialty') return 3;
+      if (item.category === 'advantage') return 3 * (item.target - item.current);
+      const mult = MULTIPLIER[item.category];
+      if (!mult) return 0;
+      let cost = 0;
+      for (let d = item.current + 1; d <= item.target; d++) cost += d * mult;
+      return cost;
+    },
+
+    totalCost() {
+      return this.items.reduce((sum, it) => sum + this.costOf(it), 0);
+    },
+
+    canSubmit(item) {
+      return SERVER_CATEGORY[item.category] !== undefined
+          && this.costOf(item) <= this.availableXp
+          && this.sendingIdx === null;
+    },
+
+    async submit(idx) {
+      if (this.sendingIdx !== null) return;
+      const item = this.items[idx];
+      const category = SERVER_CATEGORY[item.category];
+      if (!category) {
+        this.flash('This category cannot be auto-submitted.', 'error');
+        return;
+      }
+      const cost = this.costOf(item);
+      if (cost > this.availableXp) {
+        this.flash('Not enough XP for this item.', 'error');
+        return;
+      }
+
+      this.sendingIdx = idx;
+      try {
+        const fd = new FormData();
+        fd.append('_csrf', csrfToken);
+        fd.append('category', category);
+        fd.append('trait_name', item.trait);
+        fd.append('current_dots', String(item.current));
+        fd.append('new_dots', String(item.target));
+        fd.append('note', 'Submitted from wishlist');
+        const resp = await fetch('/characters/' + characterId + '/spend', {
+          method: 'POST',
+          body: fd,
+        });
+        if (!resp.ok) {
+          this.flash('Server rejected the request (status ' + resp.status + ').', 'error');
+          return;
+        }
+        // Pull the toast header if present for a more specific message
+        const toast = resp.headers.get('X-Enoch-Toast');
+        const kind  = resp.headers.get('X-Enoch-Toast-Kind') || 'success';
+        if (kind === 'error') {
+          this.flash(toast || 'Could not submit.', 'error');
+          return;
+        }
+        // Success — remove from wishlist, decrement local available XP, flash
+        const trait = item.trait;
+        this.items.splice(idx, 1);
+        this.save();
+        this.availableXp -= cost;
+        this.flash('Submitted "' + trait + '" — staff will review. (-' + cost + ' XP pending)', 'success');
+      } catch (e) {
+        this.flash('Network error: ' + (e.message || e), 'error');
+      } finally {
+        this.sendingIdx = null;
+      }
+    },
+  };
+}
+</script>
 {% endblock %}

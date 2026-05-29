@@ -45,27 +45,63 @@
   <p class="font-garamond text-bone-600 text-sm px-1 mb-4">No members yet.</p>
   {% endif %}
 
-  {# Add member form #}
-  <form hx-post="/staff/coteries/{{ coterie.id }}/members/add"
-        hx-target="#coterie-members-table"
-        hx-swap="outerHTML"
-        class="flex gap-2 items-end">
-    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-    <div>
-      <label class="label-gold block mb-1.5 text-[0.6rem]">Character ID</label>
-      <input type="number" name="character_id" required
-             placeholder="e.g. 42" class="py-1.5 px-2 text-xs w-28">
+  {# Add member form — searches by character name OR player username
+     and shows a click-to-pick dropdown. Replaces the old "type a
+     character ID" UX which required staff to know an internal id. #}
+  <div x-data="{ searching: false, selectedCharId: 0, selectedCharName: '', selectedPlayer: '' }"
+       class="gilded-inset p-3">
+    <p class="label-gold mb-2 text-[0.75rem]">Add a Member</p>
+
+    {# Search input — HTMX-debounced live results into #char-picker-results #}
+    <div class="relative">
+      <input type="search"
+             placeholder="Search by character name or player username…"
+             autocomplete="off"
+             hx-get="/staff/coteries/search-chars"
+             hx-trigger="keyup changed delay:250ms"
+             hx-target="#char-picker-results-{{ coterie.id }}"
+             hx-swap="innerHTML"
+             @focus="searching = true"
+             @keydown.escape="searching = false"
+             class="w-full text-xs py-1.5 px-2">
+      <div id="char-picker-results-{{ coterie.id }}"
+           x-show="searching"
+           class="absolute left-0 right-0 top-full mt-1 z-20"></div>
     </div>
-    <div>
-      <label class="label-gold block mb-1.5 text-[0.6rem]">Role</label>
-      <select name="role" class="py-1.5 px-2 text-xs">
-        <option value="member">Member</option>
-        <option value="leader">Leader</option>
-      </select>
+
+    {# Selected preview + commit form. Hidden until a search-result is
+       clicked, at which point the Alpine state in the search partial
+       fills these fields. #}
+    <div x-show="selectedCharId > 0" x-cloak class="mt-3">
+      <p class="font-garamond text-xs text-bone-400 mb-2">
+        Selected: <span class="text-bone-200 font-cinzel" x-text="selectedCharName"></span>
+        <span class="text-bone-600">·</span>
+        <span class="text-bone-500" x-text="selectedPlayer"></span>
+      </p>
+      <form hx-post="/staff/coteries/{{ coterie.id }}/members/add"
+            hx-target="#coterie-members-table"
+            hx-swap="outerHTML"
+            @htmx:after-on-load="selectedCharId = 0; selectedCharName = ''; selectedPlayer = '';"
+            class="flex gap-2 items-end">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <input type="hidden" name="character_id" :value="selectedCharId">
+        <div>
+          <label class="label-gold block mb-1.5 text-[0.75rem]">Role</label>
+          <select name="role" class="py-1.5 px-2 text-xs">
+            <option value="member">Member</option>
+            <option value="leader">Leader</option>
+          </select>
+        </div>
+        <button type="submit"
+                class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+          Add to Coterie
+        </button>
+        <button type="button"
+                @click="selectedCharId = 0; selectedCharName = '';"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+          Cancel
+        </button>
+      </form>
     </div>
-    <button type="submit"
-            class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
-      Add
-    </button>
-  </form>
+  </div>
 </div>

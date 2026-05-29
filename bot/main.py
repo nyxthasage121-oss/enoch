@@ -21,6 +21,7 @@ _COGS = [
     "bot.cogs.outbox",
     "bot.cogs.xp",
     "bot.cogs.characters",
+    "bot.cogs.coteries",
 ]
 
 

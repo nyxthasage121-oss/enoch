@@ -1,16 +1,54 @@
 {% extends "base.html" %}
-{% block title %}Spends Queue — Enoch{% endblock %}
+{% block title %}Spends — Enoch{% endblock %}
 
 {% block content %}
 <div class="page-enter">
-  <div class="mb-8">
-    <p class="label-gold mb-1">Staff</p>
-    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">
-      Spends Queue
-      {% if spends %}
-      <span class="font-cinzel text-xl text-blood-400 ml-3">{{ spends | length }}</span>
+  <div class="flex items-end justify-between mb-6 flex-wrap gap-4">
+    <div>
+      <p class="label-gold mb-1">Staff</p>
+      <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">
+        {% if filter_status == 'pending' %}Spends Queue{% else %}Spends History{% endif %}
+        {% if spends %}
+        <span class="font-cinzel text-xl
+                     {{ 'text-blood-400' if filter_status == 'pending'
+                        else 'text-bone-600' }} ml-3">{{ spends | length }}</span>
+        {% endif %}
+      </h1>
+    </div>
+
+    <form method="GET" action="/staff/spends" class="flex flex-wrap gap-2 items-end">
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Status</label>
+        <select name="status" onchange="this.form.submit()" class="text-xs py-1.5 px-2">
+          {% for opt_val, opt_label in [
+            ('pending',  'Pending'),
+            ('approved', 'Approved'),
+            ('rejected', 'Rejected'),
+            ('all',      'All Statuses'),
+          ] %}
+          <option value="{{ opt_val }}"
+                  {{ 'selected' if (filter_status or 'pending') == opt_val or
+                     (opt_val == 'all' and not filter_status) }}>
+            {{ opt_label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Category</label>
+        <input type="text" name="category" value="{{ filter_category or '' }}"
+               placeholder="e.g. discipline"
+               class="text-xs py-1.5 px-2 w-40">
+      </div>
+      <button type="submit" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+        Filter
+      </button>
+      {% if (filter_status and filter_status != 'pending') or filter_category %}
+      <a href="/staff/spends" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+        Reset
+      </a>
       {% endif %}
-    </h1>
+    </form>
   </div>
 
   {% include "staff/partials/spends_table.html" %}

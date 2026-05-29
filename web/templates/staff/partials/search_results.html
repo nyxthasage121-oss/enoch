@@ -1,0 +1,43 @@
+{# search_results.html — fragment for the sidebar search dropdown. #}
+{% if q and matches %}
+<div class="absolute left-0 right-0 top-full mt-1 z-50 gilded p-1 max-h-80 overflow-y-auto"
+     style="background:#120d0f;">
+  <ul class="space-y-px">
+    {% for c in matches %}
+    <li>
+      <a href="/staff/characters/{{ c.id }}"
+         class="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-ink-800 transition-colors group">
+        <div class="min-w-0 flex-1">
+          <p class="font-cinzel text-xs text-bone-300 truncate group-hover:text-gold-400">
+            {{ c.name }}
+          </p>
+          <p class="font-garamond text-[0.65rem] text-bone-600 truncate">
+            {{ c.clan | replace('-',' ') | title }}
+            {% if c.player_username %}
+            &middot; {{ c.player_username }}
+            {% endif %}
+          </p>
+        </div>
+        <span class="chip text-[0.5rem] shrink-0
+          {% if not c.is_approved %}text-mauve-400 border-mauve-800
+          {% elif c.status == 'active' %}text-gold-500 border-gold-800
+          {% elif c.status == 'retired' %}text-bone-600 border-bone-700
+          {% elif c.status == 'dead' %}text-blood-400 border-blood-800
+          {% endif %}">
+          {% if not c.is_approved %}Pending
+          {% elif c.status == 'active' %}Active
+          {% elif c.status == 'retired' %}Retired
+          {% elif c.status == 'dead' %}Final Death
+          {% endif %}
+        </span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% elif q and not matches %}
+<div class="absolute left-0 right-0 top-full mt-1 z-50 gilded p-3 text-center"
+     style="background:#120d0f;">
+  <p class="font-garamond text-[0.7rem] text-bone-700 italic">No characters found.</p>
+</div>
+{% endif %}

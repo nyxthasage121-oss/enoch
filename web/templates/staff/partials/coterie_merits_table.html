@@ -1,0 +1,89 @@
+{# coterie_merits_table.html — list + add form for coterie merits.
+   Merits are per-member: each is contributed by a specific character. #}
+<div id="coterie-merits-table">
+  {% if merits %}
+  <div class="gilded overflow-hidden mb-3">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Merit</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Contributor</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Type</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Dots</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in merits %}
+        <tr class="border-b border-ink-800">
+          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">{{ m.merit_name }}</td>
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">{{ m.character_name }}</td>
+          <td class="px-4 py-2.5 font-garamond text-[0.7rem] text-bone-600 capitalize">{{ m.merit_type }}</td>
+          <td class="px-4 py-2.5 text-center">
+            <div class="flex justify-center gap-0.5">
+              {% for i in range(5) %}
+              <span class="w-2 h-2 rounded-full
+                {{ 'bg-gold-500' if i < m.dots else 'border border-bone-700' }}"></span>
+              {% endfor %}
+            </div>
+          </td>
+          <td class="px-4 py-2.5 text-right">
+            <button hx-post="/staff/coteries/{{ coterie.id }}/merits/{{ m.id }}/remove"
+                    hx-target="#coterie-merits-table"
+                    hx-swap="outerHTML"
+                    hx-confirm="Remove {{ m.merit_name }} from this coterie?"
+                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-2 py-1">
+              Remove
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="font-garamond text-bone-600 text-sm px-1 mb-3">No merits recorded.</p>
+  {% endif %}
+
+  {# Add merit form #}
+  {% if members %}
+  <form hx-post="/staff/coteries/{{ coterie.id }}/merits/add"
+        hx-target="#coterie-merits-table"
+        hx-swap="outerHTML"
+        class="flex flex-wrap gap-2 items-end">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div>
+      <label class="label-gold block mb-1.5 text-[0.75rem]">Contributor</label>
+      <select name="character_id" required class="py-1.5 px-2 text-xs">
+        {% for m in members %}
+        <option value="{{ m.character_id }}">{{ m.character_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="label-gold block mb-1.5 text-[0.75rem]">Merit</label>
+      <input type="text" name="merit_name" required maxlength="80"
+             placeholder="e.g. Haven" class="py-1.5 px-2 text-xs w-44">
+    </div>
+    <div>
+      <label class="label-gold block mb-1.5 text-[0.75rem]">Dots</label>
+      <input type="number" name="dots" min="1" max="5" value="1" required
+             class="py-1.5 px-2 text-xs w-16 text-center">
+    </div>
+    <div>
+      <label class="label-gold block mb-1.5 text-[0.75rem]">Source</label>
+      <select name="merit_type" class="py-1.5 px-2 text-xs">
+        <option value="purchased">Purchased</option>
+        <option value="creation">Creation</option>
+        <option value="donated">Donated</option>
+      </select>
+    </div>
+    <button type="submit"
+            class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+      Add
+    </button>
+  </form>
+  {% else %}
+  <p class="font-garamond text-[0.7rem] text-bone-700 italic">Add a member before adding merits.</p>
+  {% endif %}
+</div>

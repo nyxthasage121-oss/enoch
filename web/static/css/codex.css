@@ -7,6 +7,81 @@
 /* Loaded in base.html via Google Fonts:
    Cinzel · Cormorant Garamond · EB Garamond · Inter              */
 
+/* ═══════════════════════════════════════════════════════════════
+   Color utility classes
+   Tailwind's compiled CSS only scanned a small subset of colors.
+   These fill in every text-*, border-*, bg-* variant used in templates.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── bone ───────────────────────────────────────────────────────── */
+/* One-tier lift on every working shade (300-600) so body + label text
+   reads cleanly against the deep-ink backgrounds. bone-100/200 (already
+   near-white) and bone-700 (the dimmest accent) stay put as anchors. */
+.text-bone-100 { color: #f8f1e6; }   /* was #f5ede0 — slight lift */
+.text-bone-200 { color: #f1e9d9; }   /* was #ece4d6 — body brights */
+.text-bone-300 { color: #e8debc; }   /* was #e0d6c5 — primary text */
+.text-bone-400 { color: #d8c9a8; }   /* was #ccc0af — secondary text */
+.text-bone-500 { color: #b3a48a; }   /* was #a39988 — labels / meta */
+.text-bone-600 { color: #8a8170; }   /* was #7a7268 — muted captions */
+.text-bone-700 { color: #4a443d; }   /* was #3a3533 — placeholders */
+
+/* ── gold ───────────────────────────────────────────────────────── */
+.text-gold-300 { color: #f0d278; }   /* was #e8c96a — top tier brighter */
+.text-gold-400 { color: #e0b454; }   /* was #d4a94d — primary gold lifted */
+.text-gold-500 { color: #c29b48; }   /* was #b08a3e — secondary gold */
+.text-gold-600 { color: #a67a35; }   /* was #8a6a2a — labels / borders */
+.text-gold-700 { color: #9d7233; }   /* was #7a5e29 — small breadcrumb labels */
+.text-gold-dim  { color: #9d7233; }   /* mirrors gold-700 */
+
+/* ── blood ──────────────────────────────────────────────────────── */
+.text-blood-300  { color: #e04545; }
+.text-blood-400  { color: #c94040; }
+.text-blood-500  { color: #8a2424; }
+.text-blood-bright { color: #b03030; }
+
+/* ── mauve ──────────────────────────────────────────────────────── */
+.text-mauve-400 { color: #b08aa0; }
+.text-mauve-500 { color: #8a6878; }
+
+/* ── borders ────────────────────────────────────────────────────── */
+.border-gold-400  { border-color: #d4a94d; }
+.border-gold-600  { border-color: #8a6a2a; }
+.border-gold-800  { border-color: #3a2d14; }
+.border-gold-900  { border-color: #1a1509; }
+.border-gold-dim  { border-color: #7a5e29; }
+.border-blood-700 { border-color: #5a1818; }
+.border-blood-800 { border-color: #3a1010; }
+.border-blood-900 { border-color: #200808; }
+.border-blood-bright { border-color: #b03030; }
+.border-mauve-500 { border-color: #7a5e70; }
+.border-mauve-700 { border-color: #4a2d3a; }
+.border-mauve-800 { border-color: #2a1820; }
+.border-bone-700  { border-color: #3a3533; }
+.border-ink-600   { border-color: #352b2e; }
+
+/* ── backgrounds ────────────────────────────────────────────────── */
+.bg-ink-950  { background-color: #0a0708; }
+.bg-blood-900 { background-color: #200808; }
+
+/* ── hover: text ────────────────────────────────────────────────── */
+.hover\:text-bone-200:hover { color: #ece4d6; }
+.hover\:text-bone-400:hover { color: #b8ac9c; }
+.hover\:text-gold-300:hover { color: #e8c96a; }
+.hover\:text-gold-400:hover { color: #d4a94d; }
+.hover\:text-gold-500:hover { color: #b08a3e; }
+.hover\:text-gold-600:hover { color: #8a6a2a; }
+.hover\:text-gold-dim:hover { color: #7a5e29; }
+.hover\:text-blood-400:hover { color: #c94040; }
+.hover\:text-blood-300:hover { color: #e04545; }
+
+/* ── hover: border ──────────────────────────────────────────────── */
+.hover\:border-gold-400:hover  { border-color: #d4a94d; }
+.hover\:border-gold-800:hover  { border-color: #3a2d14; }
+.hover\:border-gold-900:hover  { border-color: #1a1509; }
+
+/* ── hover: background ──────────────────────────────────────────── */
+.hover\:bg-ink-900:hover { background-color: #120d0f; }
+
 /* ── Custom scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar              { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track        { background: #0a0708; }
@@ -55,6 +130,18 @@ body::after {
     inset 0 0 0 1px rgba(176,138,62,0.05),
     inset 0 1px 0 rgba(236,228,214,0.03),
     0 30px 60px -20px rgba(0,0,0,0.6);
+  position: relative;
+  transition: border-color 0.5s ease, box-shadow 0.5s ease;
+}
+
+/* Animated gold sweep on hover — picks up a faint shifting border tint */
+.gilded:hover {
+  border-color: rgba(176,138,62,0.28);
+  box-shadow:
+    inset 0 0 0 1px rgba(176,138,62,0.10),
+    inset 0 1px 0 rgba(236,228,214,0.05),
+    0 30px 60px -20px rgba(0,0,0,0.7),
+    0 0 28px -8px rgba(176,138,62,0.18);
 }
 
 /* Inset / sunken — for inputs, textareas, selects */
@@ -66,13 +153,89 @@ body::after {
   box-shadow: inset 0 1px 6px rgba(0,0,0,0.6);
 }
 
-/* Double-line frame — hero banner, primary editor only */
+/* Sidebar brand watermark — the logo SVG sits behind the wordmark
+   as a faded background so the mark is present as atmosphere without
+   competing for attention. */
+.sidebar-brand-watermark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("/static/images/EnochLogo.svg") no-repeat center / 78% auto;
+  opacity: 0.08;
+  pointer-events: none;
+  /* Slight warm tint via blend mode so it picks up the gold accents */
+  filter: drop-shadow(0 0 8px rgba(212,169,77,0.20));
+}
+
+/* ── NYC atmosphere — the chronicle's setting ───────────────────── */
+/* Landing-page backdrop: NYC_Golden SVG (vector — sharp at any
+   viewport size). Lightly tinted to keep foreground content readable
+   while the gold-toned skyline reads clearly behind the aurora. */
+body.landing-page::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;                     /* behind .aurora-layer (-1) */
+  background:
+    linear-gradient(180deg, rgba(10,7,8,0.20) 0%, rgba(10,7,8,0.55) 100%),
+    url("/static/images/NYC_Golden.svg") center / cover no-repeat;
+  filter: contrast(1.08);
+  pointer-events: none;
+}
+
+/* Horizon band — NYC Moon banner pinned to the bottom of every
+   authenticated page. The Moon SVG has a 2.4:1 aspect ratio and the
+   moon + skyline sit roughly centered, so `center` positioning shows
+   both elements rather than cropping to water like a portrait-oriented
+   source would. The mask gradient fades the top edge into the body. */
+.nyc-horizon {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 220px;
+  pointer-events: none;
+  z-index: 0;                      /* above main bg, below content */
+  background: url("/static/images/NYC_Moon.svg") center center / cover no-repeat;
+  filter: contrast(1.10) brightness(0.95);
+  opacity: 0.80;
+  mask-image: linear-gradient(0deg, #000 0%, #000 65%, transparent 100%);
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, #000 65%, transparent 100%);
+}
+/* Landing and error pages skip the horizon — they use the full backdrop */
+body.landing-page .nyc-horizon,
+body.error-page   .nyc-horizon { display: none; }
+
+/* Error pages — NYC_Lost SVG sunk back behind the gilded error
+   card. Heavier overlay + dimmed brightness so the image is felt
+   as atmosphere rather than seen as a foreground photograph. */
+body.error-page::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(180deg, rgba(10,7,8,0.70) 0%, rgba(10,7,8,0.90) 100%),
+    url("/static/images/NYC_Lost.svg") center / cover no-repeat;
+  filter: contrast(1.0) brightness(0.70) saturate(0.85);
+  pointer-events: none;
+}
+
+/* Double-line frame — manuscript-page treatment for hero banners
+   and landing-card framings. Now a true double-line (outer + inner)
+   so the framing reads clearly at a glance without feeling heavy. */
 .frame-gold { position: relative; }
 .frame-gold::before {
   content: "";
   position: absolute;
-  inset: 6px;
-  border: 1px solid rgba(176,138,62,0.25);
+  inset: 4px;
+  border: 1px solid rgba(176,138,62,0.55);
+  pointer-events: none;
+  z-index: 1;
+}
+.frame-gold::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 1px solid rgba(176,138,62,0.22);
   pointer-events: none;
   z-index: 1;
 }
@@ -103,8 +266,9 @@ body::after {
 .label-gold {
   font-variant: all-small-caps;
   letter-spacing: 0.16em;
-  font-size: 0.65rem;
-  color: #b08a3e;
+  font-size: 0.82rem;       /* was 0.65rem — bigger so section labels read clearly */
+  font-weight: 500;          /* small weight bump for legibility */
+  color: #d4a94d;            /* was #b08a3e — lifted to the brighter gold-400 tier */
 }
 
 /* ── Buttons ────────────────────────────────────────────────────── */
@@ -142,6 +306,39 @@ body::after {
   cursor: not-allowed;
 }
 
+/* Gold primary — non-destructive primary action (e.g. landing Sign In).
+   btn-send is reserved for blood-red destructive/critical actions. */
+.btn-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1.1rem;
+  font-family: 'Cinzel', serif;
+  font-variant: all-small-caps;
+  letter-spacing: 0.1em;
+  font-size: 0.8rem;
+  background: linear-gradient(180deg, #d4a94d 0%, #8a6a2a 100%);
+  color: #1a1004;
+  border: 1px solid #b08a3e;
+  box-shadow:
+    inset 0 1px 0 rgba(255,235,180,0.40),
+    inset 0 -1px 0 rgba(0,0,0,0.35),
+    0 6px 16px -6px rgba(176,138,62,0.55);
+  cursor: pointer;
+  transition: opacity 0.15s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.btn-gold:hover {
+  opacity: 0.92;
+  box-shadow:
+    inset 0 1px 0 rgba(255,235,180,0.45),
+    inset 0 -1px 0 rgba(0,0,0,0.40),
+    0 10px 28px -6px rgba(212,169,77,0.70);
+}
+.btn-gold:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Ghost / secondary action */
 .btn-ghost {
   display: inline-flex;
@@ -152,18 +349,23 @@ body::after {
   font-variant: all-small-caps;
   letter-spacing: 0.1em;
   font-size: 0.8rem;
-  border: 1px solid #2a1f22;
-  color: #c9bfb0;
-  background: rgba(18,13,15,0.5);
+  /* Brighter border + text — the previous bone tone was too muted for
+     hierarchy against the parchment cards, and the player kept missing
+     the Next / Cancel / Save Draft buttons. */
+  border: 1px solid #6b5a3a;
+  color: #ece4d6;
+  background: rgba(18,13,15,0.55);
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease,
+              background-color 0.15s ease;
 }
 .btn-ghost:hover {
-  border-color: #b08a3e;
-  color: #ece4d6;
+  border-color: #d4a017;
+  color: #fff7e6;
+  background: rgba(28,21,23,0.7);
 }
 .btn-ghost:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -195,6 +397,11 @@ input[type="url"],
 input[type="email"],
 input[type="password"],
 input[type="search"],
+input[type="tel"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input:not([type]),
 select,
 textarea {
   width: 100%;
@@ -202,6 +409,11 @@ textarea {
   font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
   color: #ece4d6;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0) 40%),
+    #120d0f;
+  border: 1px solid #2a1f22;
+  box-shadow: inset 0 1px 6px rgba(0,0,0,0.6);
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -212,10 +424,17 @@ input[type="url"]:focus,
 input[type="email"]:focus,
 input[type="password"]:focus,
 input[type="search"]:focus,
+input[type="tel"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime-local"]:focus,
+input:not([type]):focus,
 select:focus,
 textarea:focus {
   border-color: rgba(176,138,62,0.55) !important;
-  box-shadow: 0 0 0 2px rgba(176,138,62,0.14) !important;
+  box-shadow:
+    inset 0 1px 6px rgba(0,0,0,0.6),
+    0 0 0 2px rgba(176,138,62,0.14) !important;
 }
 
 input::placeholder,
@@ -324,32 +543,32 @@ label.field-label {
   align-items: center;
   gap: 0.6rem;
   padding: 0.45rem 0.75rem;
-  font-size: 0.82rem;
+  font-size: 0.88rem;          /* was 0.82rem — slight bump for clarity */
   font-family: 'Inter', sans-serif;
-  color: #8b8275;
+  color: #b8ac98;              /* was #8b8275 — meaningfully brighter idle state */
   border-left: 2px solid transparent;
   transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
 }
 .nav-link:hover {
-  color: #c9bfb0;
-  background: rgba(255,255,255,0.03);
-  border-left-color: rgba(176,138,62,0.3);
+  color: #ece4d6;              /* was #c9bfb0 — hover now reads as primary text */
+  background: rgba(255,255,255,0.04);
+  border-left-color: rgba(176,138,62,0.4);
 }
 .nav-link.active {
-  color: #ece4d6;
-  background: linear-gradient(to right, rgba(138,36,36,0.16), rgba(138,36,36,0.04));
-  border-left-color: #b03030;
+  color: #f5ede0;              /* was #ece4d6 — active state is now bone-100 bright */
+  background: linear-gradient(to right, rgba(138,36,36,0.20), rgba(138,36,36,0.05));
+  border-left-color: #c0383a;
 }
 .nav-link svg,
 .nav-link i {
   width: 14px;
-  opacity: 0.6;
+  opacity: 0.75;               /* was 0.6 — icons more visible */
   flex-shrink: 0;
 }
 .nav-link.active svg,
 .nav-link.active i {
   opacity: 1;
-  color: #d4a94d;
+  color: #e8c96a;              /* was #d4a94d — active icon is now gold-300 brighter */
 }
 
 /* ── Section headings within content ───────────────────────────── */
@@ -462,21 +681,29 @@ label.field-label {
   transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Clan colors ────────────────────────────────────────────────── */
+/* ── Clan colors ──────────────────────────────────────────────────
+   Per chronicle Steward direction (2026-05):
+     Hecata     → dark green
+     Ravnos     → royal purple
+     Ministry   → golden yellow  (display name "The Ministry")
+     Tremere    → dark red
+     Nosferatu  → dark blue
+     Gangrel    → green
+*/
 .clan-brujah      { --clan: #e53935; }
-.clan-gangrel     { --clan: #8d6e63; }
-.clan-hecata      { --clan: #ab47bc; }
+.clan-gangrel     { --clan: #2e7d32; }  /* green (was muddy brown) */
+.clan-hecata      { --clan: #1b5e20; }  /* dark green (was lavender) */
 .clan-lasombra    { --clan: #5c6bc0; }
 .clan-malkavian   { --clan: #00acc1; }
-.clan-nosferatu   { --clan: #66bb6a; }
-.clan-ravnos      { --clan: #ef6c00; }
+.clan-nosferatu   { --clan: #0d47a1; }  /* dark blue (was apple green) */
+.clan-ravnos      { --clan: #6a1b9a; }  /* royal purple (was orange) */
 .clan-salubri     { --clan: #1e88e5; }
 .clan-toreador    { --clan: #e91e8c; }
-.clan-tremere     { --clan: #c62828; }
+.clan-tremere     { --clan: #8b0000; }  /* dark red (was brighter red) */
 .clan-tzimisce    { --clan: #795548; }
 .clan-ventrue     { --clan: #3949ab; }
 .clan-banu-haqim  { --clan: #f9a825; }
-.clan-the-ministry { --clan: #8e24aa; }
+.clan-ministry    { --clan: #d4a017; }  /* golden yellow (was purple) */
 .clan-thin-blood  { --clan: #78909c; }
 .clan-caitiff     { --clan: #757575; }
 
@@ -549,30 +776,33 @@ body.landing-page > div > main { padding: 0; }
   overflow: hidden;
 }
 
-/* Inner core — tight, bright, blood crimson */
+/* Inner core — warm candle-gold, matching the gilded panel palette.
+   Soft enough that text remains readable; dark enough to keep the
+   nocturnal feel. The logo's gold eye sits in front of a subtle halo. */
 .aurora-layer::before {
   content: "";
   position: absolute;
   inset: -25%;
   background:
-    radial-gradient(ellipse 38% 30% at 50% 50%, rgba(138,36,36,0.70) 0%, transparent 100%),
-    radial-gradient(ellipse 68% 54% at 50% 50%, rgba(90,20,20,0.46)  0%, transparent 100%),
-    radial-gradient(ellipse 100% 80% at 50% 50%, rgba(26,10,46,0.36) 0%, transparent 100%);
+    radial-gradient(ellipse 38% 30% at 50% 50%, rgba(176,138, 62,0.30) 0%, transparent 100%),
+    radial-gradient(ellipse 68% 54% at 50% 50%, rgba( 90, 64, 22,0.30) 0%, transparent 100%),
+    radial-gradient(ellipse 100% 80% at 50% 50%, rgba( 18, 12, 14,0.45) 0%, transparent 100%);
   animation: cityPulse 9s ease-in-out infinite alternate;
-  filter: blur(48px);
+  filter: blur(28px);              /* was 48px — softened so the NYC
+                                     backdrop stays in focus through it */
 }
 
-/* Outer halo — softer, bruised purple, counter-rotating drift */
+/* Outer halo — softer warm umber, counter-rotating drift */
 .aurora-layer::after {
   content: "";
   position: absolute;
   inset: -25%;
   background:
-    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(176,48,48,0.22)  0%, transparent 100%),
-    radial-gradient(ellipse 85% 68% at 50% 50%, rgba(40,12,68,0.32)   0%, transparent 100%),
-    radial-gradient(ellipse 130% 105% at 50% 50%, rgba(8,3,14,0.50)   0%, transparent 100%);
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(212,169, 77,0.14) 0%, transparent 100%),
+    radial-gradient(ellipse 85% 68% at 50% 50%, rgba( 58, 38, 14,0.30) 0%, transparent 100%),
+    radial-gradient(ellipse 130% 105% at 50% 50%, rgba( 10,  7,  8,0.55) 0%, transparent 100%);
   animation: cityPulse 15s ease-in-out infinite alternate-reverse;
-  filter: blur(72px);
+  filter: blur(42px);              /* was 72px */
 }
 
 @keyframes cityPulse {
@@ -708,11 +938,16 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* ── Table row hover — left edge reveal ─────────────────────── */
+/* NOTE: position:relative on <tr> + border-collapse:separate causes
+   column-width miscalculation in Chromium (cells shift right of
+   their headers). The accent is anchored to the first cell instead. */
 tbody tr {
-  position: relative;
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
-tbody tr::before {
+tbody tr > td:first-child {
+  position: relative;
+}
+tbody tr > td:first-child::before {
   content: "";
   position: absolute;
   left: 0; top: 0; bottom: 0;
@@ -721,8 +956,9 @@ tbody tr::before {
   transform: scaleY(0);
   transform-origin: center;
   transition: transform 0.18s cubic-bezier(0.16,1,0.3,1);
+  pointer-events: none;
 }
-tbody tr:hover::before {
+tbody tr:hover > td:first-child::before {
   transform: scaleY(1);
 }
 
@@ -740,7 +976,11 @@ tbody tr:hover::before {
   z-index: 0;
 }
 .gilded { position: relative; }
-.gilded > * { position: relative; z-index: 1; }
+/* Stack children above the .gilded::before sheen overlay. Tables are
+   excluded — position:relative on a <table> in some browsers shifts
+   its column widths against the <thead> grid. The table sits above the
+   sheen anyway because the sheen is a 0.035-opacity wash. */
+.gilded > *:not(table) { position: relative; z-index: 1; }
 
 /* ── Page shimmer scan — single pass on load ────────────────── */
 @keyframes pageScan {
@@ -750,17 +990,20 @@ tbody tr:hover::before {
   100% { opacity: 0; transform: translateY(100vh); }
 }
 
-/* ── Stat card hover — subtle lift ──────────────────────────── */
+/* ── Stat card hover — clan glow lift ───────────────────────── */
 a.gilded, button.gilded {
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
 }
 a.gilded:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--clan, #b08a3e) 50%, #2a1f22);
   box-shadow:
-    inset 0 0 0 1px rgba(176,138,62,0.10),
-    inset 0 1px 0 rgba(236,228,214,0.05),
-    0 30px 60px -15px rgba(0,0,0,0.7),
-    0 4px 20px rgba(138,36,36,0.12);
+    inset 0 0 0 1px rgba(176,138,62,0.12),
+    inset 0 1px 0 rgba(236,228,214,0.06),
+    0 20px 40px -12px rgba(0,0,0,0.8),
+    0 0 0 1px color-mix(in srgb, var(--clan, #b08a3e) 35%, transparent),
+    0 0 28px color-mix(in srgb, var(--clan, #8a2424) 40%, transparent),
+    0 0 60px color-mix(in srgb, var(--clan, #8a2424) 18%, transparent);
 }
 
 /* ── Chip ────────────────────────────────────────────────────── */
@@ -827,17 +1070,195 @@ a.gilded:hover {
   0%, 100% { box-shadow: 0 0 0 1px var(--clan, #2a1f22), 0 0 20px rgba(138,36,36,0.05); }
   50%       { box-shadow: 0 0 0 1px var(--clan, #2a1f22), 0 0 30px rgba(138,36,36,0.14); }
 }
+.clan-banu-haqim,
 .clan-brujah,
+.clan-caitiff,
 .clan-gangrel,
-.clan-malkavian,
-.clan-nosferatu,
-.clan-toreador,
-.clan-tremere,
-.clan-ventrue,
+.clan-hecata,
 .clan-lasombra,
-.clan-tzimisce,
+.clan-malkavian,
+.clan-ministry,
+.clan-nosferatu,
 .clan-ravnos,
 .clan-salubri,
-.clan-thin-blood {
+.clan-thin-blood,
+.clan-toreador,
+.clan-tremere,
+.clan-tzimisce,
+.clan-ventrue {
   animation: clanPulse 5s ease-in-out infinite;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   Wizard 3-column shell — character_create.html
+
+   These rules exist because the compiled tailwind.css does NOT include
+   arbitrary grid values like `lg:grid-cols-[260px_minmax(0,1fr)_260px]`
+   nor the responsive utilities `lg:block` / `lg:hidden`. The wizard
+   layout therefore renders correctly only when these explicit rules
+   load. If you ever rebuild tailwind with the wizard markup in the
+   content sweep, these can be replaced with native Tailwind classes
+   again. Until then, keep them.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.wizard-shell { display: block; }
+@media (min-width: 1024px) {
+  .wizard-shell {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr) 260px;
+    gap: 1.5rem;
+    align-items: start;
+  }
+}
+@media (min-width: 1440px) {
+  .wizard-shell {
+    grid-template-columns: 300px minmax(0, 960px) 260px;
+  }
+}
+
+/* Left preview aside — sticky on desktop, hidden below lg */
+.wizard-left { display: none; }
+@media (min-width: 1024px) {
+  .wizard-left {
+    display: block;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    align-self: start;
+  }
+}
+
+/* Right step-nav aside — desktop column, mobile drawer */
+.wizard-right {
+  position: fixed;
+  z-index: 40;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 280px;
+  overflow-y: auto;
+  background: #0a0709;
+  padding: 1rem;
+  border-left: 1px solid #2a1f22;
+  transform: translateX(100%);
+  transition: transform 200ms;
+}
+.wizard-right.is-open { transform: translateX(0); }
+@media (min-width: 1024px) {
+  .wizard-right {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    background: transparent;
+    padding: 0;
+    border-left: 0;
+    transform: translateX(0);
+    align-self: start;
+  }
+  /* Hide the mobile-only close button on desktop */
+  .wizard-right .wizard-right-close { display: none; }
+}
+
+/* Mobile FAB — only visible below lg */
+.wizard-fab { display: inline-flex; }
+@media (min-width: 1024px) {
+  .wizard-fab { display: none; }
+}
+
+/* Mobile drawer backdrop */
+.wizard-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0,0,0,0.7);
+}
+@media (min-width: 1024px) {
+  .wizard-backdrop { display: none !important; }
+}
+
+
+/* ── Wizard step tracker — top horizontal bubble + label strip ──
+   Drops the vertical right-side step nav in favor of a clean inline
+   strip across the top of the wizard. Bubble = numbered circle;
+   label = step name. Three visual states via class hooks:
+     .is-current — active step (blood pulse + gold ring)
+     .is-done    — completed step (gold solid)
+     .is-future  — not yet reached (muted)
+*/
+.wizard-tracker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.85rem;
+  padding: 0.5rem 0;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(176,138,62,0.18);
+}
+.wizard-tracker-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.wizard-tracker-step:hover {
+  background: rgba(176,138,62,0.06);
+}
+.wizard-tracker-bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 999px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border: 1px solid #2a1f22;
+  background: #120d0f;
+  color: #4a443d;
+  transition: all 180ms ease;
+}
+.wizard-tracker-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8170;
+  transition: color 150ms ease;
+}
+.wizard-tracker-step.is-current .wizard-tracker-bubble {
+  background: #8a2424;
+  border-color: #b03030;
+  color: #f8f1e6;
+  box-shadow: 0 0 10px -2px rgba(176,48,48,0.65);
+}
+.wizard-tracker-step.is-current .wizard-tracker-label {
+  color: #f1e9d9;
+}
+.wizard-tracker-step.is-done .wizard-tracker-bubble {
+  background: rgba(212,169,77,0.18);
+  border-color: #8a6a2a;
+  color: #e0b454;
+}
+.wizard-tracker-step.is-done .wizard-tracker-label {
+  color: #c29b48;
+}
+
+/* Switch the shell to 2-column now that the right step nav is gone */
+@media (min-width: 1024px) {
+  .wizard-shell {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+}
+@media (min-width: 1440px) {
+  .wizard-shell {
+    grid-template-columns: 300px minmax(0, 1100px);
+  }
 }

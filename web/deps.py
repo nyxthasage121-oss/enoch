@@ -57,6 +57,80 @@ def require_staff(request: Request, user: dict = Depends(require_auth)) -> dict:
     return user
 
 
+def _current_staff_role(request: Request) -> str | None:
+    """Read the viewer's assigned staff role from the session, or fall
+    back to a DB lookup on miss. Returns None if no role assigned."""
+    cached = request.session.get("staff_role")
+    if cached is not None:
+        return cached or None
+    user = request.session.get("user") or {}
+    discord_id = user.get("id")
+    if not discord_id:
+        return None
+    # Lazy lookup — populated on next request after assignment via the
+    # admin UI. We import here to dodge a circular import at module load.
+    from .db import get_db, get_staff_role
+    with get_db() as conn:
+        role = get_staff_role(conn, str(discord_id))
+    request.session["staff_role"] = role or ""
+    return role
+
+
+def require_permission(permission: str):
+    """Dependency factory: 403 unless the viewer's staff role grants
+    the named permission. Implies require_staff. Use it on routes that
+    should be gated beyond the basic Discord-role staff check —
+    e.g. role management and chronicle settings."""
+    def _checker(request: Request, user: dict = Depends(require_staff)) -> dict:
+        from .db import staff_role_has_permission
+        role = _current_staff_role(request)
+        if not staff_role_has_permission(role, permission):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Your staff role does not grant '{permission}' permission.",
+            )
+        return user
+    return _checker
+
+
+def is_settings_admin(request: Request, user: dict) -> bool:
+    """Three-tier resolver for the settings-admin gate (migration 024):
+        1. ENOCH_SETTINGS_ADMIN_IDS env var (comma-separated discord ids)
+           — emergency / bootstrap override.
+        2. player_profiles.settings_admin = 1.
+        3. Otherwise: False."""
+    import os
+    env_ids = (os.environ.get("ENOCH_SETTINGS_ADMIN_IDS") or "")
+    if str(user.get("id", "")) in {i.strip() for i in env_ids.split(",") if i.strip()}:
+        return True
+    cached = request.session.get("settings_admin")
+    if cached is not None:
+        return bool(cached)
+    from .db import get_db, get_player
+    with get_db() as conn:
+        prof = get_player(conn, str(user["id"]))
+    flag = bool(prof.get("settings_admin")) if prof else False
+    request.session["settings_admin"] = flag
+    return flag
+
+
+def require_settings_admin(
+    request: Request,
+    user: dict = Depends(require_staff),
+) -> dict:
+    """Gate beyond require_staff for chronicle-wide configuration
+    (XP rules, tier budgets, ruleset selection). Modeled on MCbN's
+    SETTINGS_ADMIN_DISCORD_IDS pattern — even a lead_st must hold
+    settings_admin to flip rule constants. Default-true for any
+    pre-existing lead_st via migration 024's backfill."""
+    if not is_settings_admin(request, user):
+        raise HTTPException(
+            status_code=403,
+            detail="Settings admin access required. Ask a lead ST to grant the role.",
+        )
+    return user
+
+
 # ── CSRF protection ───────────────────────────────────────────────────────────
 
 async def csrf_protect(request: Request) -> None:

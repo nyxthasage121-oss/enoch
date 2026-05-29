@@ -28,6 +28,54 @@
     </div>
   </div>
 
+  {# ── Create coterie (staff direct) ──
+       Bypasses the player formation request flow — useful when a
+       group of players has decided IC but hasn't filed paperwork,
+       or when staff needs to seed a coterie for an NPC bloc. #}
+  <div class="mb-8" x-data="{ open: false }">
+    <button @click="open = !open"
+            class="btn-ghost font-cinzel text-xs tracking-widest px-4 py-2 inline-flex items-center gap-2">
+      <span x-text="open ? '−' : '+'"></span>
+      Create Coterie (staff)
+    </button>
+    <form x-show="open" x-cloak method="post" action="/staff/coteries"
+          class="gilded p-5 mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div class="sm:col-span-2">
+        <label class="label-gold block mb-1 text-[0.75rem]">Name</label>
+        <input type="text" name="name" required maxlength="80"
+               placeholder="e.g. Iron Crown" class="w-full text-xs">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Chasse</label>
+        <input type="number" name="chasse" value="1" min="1" max="5" class="w-full text-xs text-center">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Lien</label>
+        <input type="number" name="lien" value="0" min="0" max="5" class="w-full text-xs text-center">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Portillon</label>
+        <input type="number" name="portillon" value="0" min="0" max="5" class="w-full text-xs text-center">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Discord Role ID
+          <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional)</span>
+        </label>
+        <input type="text" name="discord_role_id" maxlength="32"
+               placeholder="role snowflake" class="w-full text-xs font-mono">
+      </div>
+      <div class="sm:col-span-2">
+        <button type="submit" class="btn-send font-cinzel tracking-widest text-[0.7rem] w-full py-2">
+          Create Coterie
+        </button>
+        <p class="font-garamond text-bone-600 text-[0.65rem] mt-2 italic">
+          Members can be added from the coterie's detail page after creation.
+        </p>
+      </div>
+    </form>
+  </div>
+
   {# ── Active coteries ── #}
   {% if coteries %}
   <div>
@@ -40,16 +88,19 @@
             <th class="px-4 py-3 text-center label-gold font-normal text-xs">Chasse</th>
             <th class="px-4 py-3 text-center label-gold font-normal text-xs">Lien</th>
             <th class="px-4 py-3 text-center label-gold font-normal text-xs">Portillon</th>
-            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Members</th>
+            <th class="px-4 py-3 text-center label-gold font-normal text-xs">Members</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs"></th>
           </tr>
         </thead>
         <tbody>
           {% for co in coteries %}
-          <tr class="border-b border-ink-800">
+          <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors cursor-pointer"
+              onclick="window.location.href='/staff/coteries/{{ co.id }}'">
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">{{ co.name }}</td>
             <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.chasse }}</td>
             <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.lien }}</td>
             <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.portillon }}</td>
+            <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.member_count }}</td>
             <td class="px-4 py-2.5 text-right">
               <a href="/staff/coteries/{{ co.id }}"
                  class="font-cinzel text-[0.6rem] text-gold-500 hover:text-gold-300 tracking-widest">

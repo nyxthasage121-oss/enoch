@@ -1,0 +1,738 @@
+{% extends "base.html" %}
+{% block title %}Map — Staff — Enoch{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+  <style>
+    #map-canvas { height: calc(100vh - 4.5rem); min-height: 480px; }
+    .leaflet-popup-content-wrapper {
+      background: #1c1814; color: #d9cdb8;
+      border: 1px solid rgba(212, 169, 92, 0.25);
+      border-radius: 0;
+    }
+    .leaflet-popup-content {
+      margin: 0.75rem 1rem;
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 0.875rem;
+    }
+    .leaflet-popup-tip { background: #1c1814; }
+    .leaflet-control-attribution {
+      background: rgba(28, 24, 20, 0.75);
+      color: #6e6253;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.65rem;
+    }
+    .leaflet-control-attribution a { color: #b89352; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-0"
+     x-data="{ mapSidebarOpen: false }">
+
+  <div id="map-canvas" class="border border-ink-700 bg-ink-900"></div>
+
+  {# Mobile FAB — opens the sidebar drawer. Visible only below lg. #}
+  <button type="button"
+          x-show="!mapSidebarOpen"
+          @click="mapSidebarOpen = true"
+          class="lg:hidden fixed bottom-4 right-4 z-30 gilded px-3 py-2 font-cinzel text-[0.6rem] tracking-widest text-bone-300 shadow-lg border border-gold-700">
+    Layers
+  </button>
+
+  {# Mobile backdrop #}
+  <div x-show="mapSidebarOpen" x-cloak
+       @click="mapSidebarOpen = false"
+       class="lg:hidden fixed inset-0 z-30 bg-black/70"></div>
+
+  <aside class="fixed z-40 inset-y-0 right-0 w-[320px] bg-ink-900 border-l border-ink-700 p-4 overflow-y-auto space-y-5
+                transform transition-transform duration-200
+                lg:static lg:translate-x-0"
+         :class="mapSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'"
+         style="max-height: 100vh;"
+         x-cloak
+         x-data="staffMapSidebar({
+           initialLayers: {{ layers | tojson | forceescape }}
+         })">
+
+    {# Mobile close button — invisible on desktop #}
+    <button type="button"
+            @click="mapSidebarOpen = false"
+            class="lg:hidden ml-auto block text-bone-600 hover:text-blood-400 text-2xl leading-none">
+      ×
+    </button>
+
+
+    <div>
+      <p class="label-gold mb-1">
+        <a href="/staff" class="hover:text-gold-300">Staff</a>
+        <span class="mx-1">›</span>Map
+      </p>
+      <h1 class="font-cinzel text-xl text-bone-200 tracking-wide mb-1">Chronicle Map</h1>
+      <p class="font-garamond text-bone-600 text-xs leading-relaxed">
+        Import GeoJSON or Google Maps KML to populate a layer.
+        Use layers to organize territories, landmarks, hunting grounds, or anything else.
+      </p>
+    </div>
+
+    {# ── Empty state — surfaces the import CTA when no layers exist yet ── #}
+    <div x-show="!layers.length" x-cloak
+         class="gilded p-5 border border-gold-800 text-center space-y-3">
+      <p class="label-gold text-xs">No Map Data Yet</p>
+      <p class="font-garamond text-bone-500 text-xs leading-relaxed">
+        Upload your chronicle's territories, neighborhoods, or landmarks.
+        Works with <code class="text-bone-300">.geojson</code> files or KML exports
+        from Google Maps' <strong>My Maps</strong>.
+      </p>
+      <button type="button" @click="openQuickImport()"
+              class="btn-send font-cinzel text-[0.65rem] tracking-widest w-full py-3 aurora-pulse aurora-beam">
+        Import Your First Layer
+      </button>
+      <p class="font-garamond text-bone-700 text-[0.65rem] italic">
+        Or create an empty layer below and add features later.
+      </p>
+    </div>
+
+    {# ── Create layer (always available, collapsed by default) ── #}
+    <details class="gilded-inset p-3" :open="!layers.length">
+      <summary class="label-gold text-[0.78rem] cursor-pointer">New Empty Layer</summary>
+      <form method="POST" action="/staff/map/layers" class="space-y-2 mt-3">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <input type="text" name="name" placeholder="Layer name" required maxlength="80"
+               class="w-full text-xs px-2 py-1.5">
+        <input type="text" name="description" placeholder="Description (optional)" maxlength="200"
+               class="w-full text-xs px-2 py-1.5">
+        <div class="flex items-center gap-2">
+          <input type="color" name="color" value="#8B1A1A"
+                 class="w-12 h-8 border border-ink-700 bg-ink-900 cursor-pointer">
+          <select name="visibility" class="flex-1 text-xs px-2 py-1.5">
+            <option value="public">Public — visible to all players</option>
+            <option value="staff">Staff-only — hidden from players</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest w-full py-2">
+          Create Empty Layer
+        </button>
+      </form>
+    </details>
+
+    {# Always show the quick-import CTA at the top of the list too, so
+       staff can add a new layer-from-file even when they already have
+       some layers. #}
+    <button type="button" @click="openQuickImport()"
+            x-show="layers.length" x-cloak
+            class="btn-send font-cinzel text-[0.65rem] tracking-widest w-full py-2">
+      + Import a New Map
+    </button>
+
+    {# Drop-pin tool — toggle to enter map-click mode. The next click
+       on the canvas opens a dialog with the picked layer + coordinates. #}
+    <div x-show="layers.length" x-cloak class="gilded-inset p-3">
+      <label class="flex items-center justify-between gap-2 cursor-pointer">
+        <span class="font-cinzel text-[0.65rem] tracking-widest text-bone-400">Drop Pin Tool</span>
+        <input type="checkbox" x-model="pinMode"
+               @change="setPinMode(pinMode)"
+               class="accent-mauve-500">
+      </label>
+      <p class="font-garamond text-bone-700 text-[0.65rem] italic mt-1.5">
+        When on, click anywhere on the map to add a single Point feature.
+      </p>
+      <div x-show="pinMode" x-cloak class="mt-2 pt-2 border-t border-ink-800">
+        <label class="label-gold block mb-1 text-[0.7rem]">Add to layer</label>
+        <select x-model="pinLayerId" class="w-full text-xs py-1 px-2">
+          <template x-for="layer in layers" :key="layer.id">
+            <option :value="layer.id" x-text="layer.name"></option>
+          </template>
+        </select>
+      </div>
+    </div>
+
+    {# ── Layer list ── #}
+    <div>
+      <p class="label-gold text-[0.78rem] mb-2">Layers
+        <span class="text-bone-700 ml-2 normal-case" x-text="layers.length"></span>
+      </p>
+
+      <ul class="space-y-3">
+        <template x-for="layer in layers" :key="layer.id">
+          <li class="gilded-inset p-3 aurora-beam relative overflow-hidden"
+              :style="'border-left: 3px solid ' + (layer.color || '#8B1A1A')">
+            <div class="flex items-baseline justify-between gap-2 mb-1">
+              <label class="flex items-center gap-2 cursor-pointer min-w-0">
+                <input type="checkbox" :checked="layer.visible"
+                       @change="toggleLayer(layer)"
+                       class="accent-gold-500 shrink-0">
+                <span class="font-cinzel text-xs text-bone-300 truncate" x-text="layer.name"></span>
+              </label>
+              <span class="font-cinzel text-[0.55rem] text-bone-700 shrink-0"
+                    x-text="layer.feature_count + ' feat'"></span>
+            </div>
+
+            <div class="flex flex-wrap gap-1.5 mt-2 text-[0.55rem]">
+              <span class="chip border-ink-700 text-bone-600"
+                    :class="layer.visibility === 'staff' ? 'text-mauve-400 border-mauve-800' : ''"
+                    x-text="layer.visibility === 'staff' ? 'STAFF' : 'PUBLIC'"></span>
+              <span x-show="!layer.active" x-cloak
+                    class="chip text-blood-400 border-blood-900">DISABLED</span>
+            </div>
+
+            {# Import + edit actions #}
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              <button type="button" @click="openImport(layer)"
+                      class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2 py-1">
+                Import
+              </button>
+              <button type="button" @click="openEdit(layer)"
+                      class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2 py-1">
+                Edit
+              </button>
+              <form method="POST" :action="'/staff/map/layers/' + layer.id + '/delete'"
+                    onsubmit="return confirm('Delete this layer and all its features? This cannot be undone.');"
+                    class="inline">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <button type="submit"
+                        class="font-cinzel text-[0.55rem] tracking-widest text-blood-500 hover:text-blood-400 px-2 py-1">
+                  Delete
+                </button>
+              </form>
+            </div>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </aside>
+</div>
+
+{# ── Quick-import dialog — creates a new layer AND imports in one shot.
+   Used by the empty-state CTA and the "+ Import a New Map" button. #}
+<div x-data="{ open: false }"
+     @open-quick-import.window="open = true"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+     @click.self="open = false">
+  <div class="gilded p-6 max-w-xl w-full mx-4 max-h-[85vh] overflow-y-auto">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="font-cinzel text-lg text-bone-200">Import a Map</h2>
+      <button @click="open = false" class="text-bone-600 hover:text-blood-400 text-2xl leading-none">×</button>
+    </div>
+    <p class="font-garamond text-bone-500 text-xs mb-4 leading-relaxed">
+      Creates a new layer and populates it with features from your file in one step.
+      Drop in a <code class="text-bone-300">.geojson</code> file or a
+      <code class="text-bone-300">.kml</code> export from Google Maps' My Maps. Max 5 MB.
+    </p>
+
+    <form method="POST" action="/staff/map/quick-import"
+          enctype="multipart/form-data" class="space-y-3">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Layer Name</label>
+        <input type="text" name="name" required maxlength="80"
+               placeholder="e.g. Boroughs, Elder Domains, Hunting Grounds"
+               class="w-full text-xs px-2 py-1.5">
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input type="color" name="color" value="#8B1A1A"
+               class="w-12 h-8 border border-ink-700 bg-ink-900 cursor-pointer"
+               title="Layer color">
+        <select name="visibility" class="flex-1 text-xs px-2 py-1.5">
+          <option value="public">Public — visible to all players</option>
+          <option value="staff">Staff-only — hidden from players</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Description <span class="text-bone-700 normal-case ml-1">(optional)</span></label>
+        <input type="text" name="description" maxlength="200"
+               class="w-full text-xs px-2 py-1.5">
+      </div>
+
+      <div class="pt-2 border-t border-ink-800">
+        <label class="label-gold block mb-1 text-[0.75rem]">File</label>
+        <input type="file" name="file"
+               accept=".geojson,.json,.kml,application/geo+json,application/vnd.google-earth.kml+xml"
+               class="w-full text-xs">
+      </div>
+
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Or paste raw text</label>
+        <textarea name="payload" rows="5"
+                  placeholder='{"type":"FeatureCollection","features":[…]} or KML XML'
+                  class="w-full text-xs font-mono"></textarea>
+      </div>
+
+      <details class="text-xs">
+        <summary class="font-cinzel text-[0.6rem] text-bone-600 cursor-pointer">GeoJSON property mapping (optional)</summary>
+        <div class="mt-2 space-y-2">
+          <p class="font-garamond text-bone-700 text-[0.7rem] italic">
+            Pull these GeoJSON property names into the matching feature columns.
+            Defaults handle <code>name</code>/<code>title</code>/<code>description</code> automatically.
+          </p>
+          <input type="text" name="label_field" placeholder="Label field name (e.g. NAME)"
+                 class="w-full text-xs px-2 py-1.5">
+          <input type="text" name="tag_field" placeholder="Tag field name (e.g. category)"
+                 class="w-full text-xs px-2 py-1.5">
+          <input type="text" name="description_field" placeholder="Description field name"
+                 class="w-full text-xs px-2 py-1.5">
+        </div>
+      </details>
+
+      <div class="flex gap-2 justify-end pt-2 border-t border-ink-800">
+        <button type="button" @click="open = false"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Cancel
+        </button>
+        <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Create + Import
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Import dialog ── #}
+<div x-data="{ open: false, layerId: null, layerName: '' }"
+     @open-import.window="open = true; layerId = $event.detail.id; layerName = $event.detail.name"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+     @click.self="open = false">
+  <div class="gilded p-6 max-w-xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="font-cinzel text-lg text-bone-200">
+        Import to <span x-text="layerName" class="text-gold-400"></span>
+      </h2>
+      <button @click="open = false" class="text-bone-600 hover:text-blood-400 text-2xl leading-none">×</button>
+    </div>
+    <p class="font-garamond text-bone-500 text-xs mb-4 leading-relaxed">
+      Upload a <code class="text-bone-300">.geojson</code> file (FeatureCollection) or
+      a <code class="text-bone-300">.kml</code> export from Google Maps' My Maps.
+      Max 5 MB.
+    </p>
+
+    <form method="POST" :action="'/staff/map/layers/' + layerId + '/import'"
+          enctype="multipart/form-data" class="space-y-3">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">File</label>
+        <input type="file" name="file"
+               accept=".geojson,.json,.kml,application/geo+json,application/vnd.google-earth.kml+xml"
+               class="w-full text-xs">
+      </div>
+
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Or paste raw text</label>
+        <textarea name="payload" rows="6"
+                  placeholder='{"type":"FeatureCollection","features":[…]} or KML XML'
+                  class="w-full text-xs font-mono"></textarea>
+      </div>
+
+      <details class="text-xs">
+        <summary class="font-cinzel text-[0.6rem] text-bone-600 cursor-pointer">GeoJSON property mapping (optional)</summary>
+        <div class="mt-2 space-y-2">
+          <p class="font-garamond text-bone-700 text-[0.7rem] italic">
+            When importing GeoJSON, pull these property names into the matching feature columns.
+            Defaults handle <code>name</code>/<code>title</code>/<code>description</code> automatically.
+          </p>
+          <input type="text" name="label_field" placeholder="Label field name (e.g. NAME)"
+                 class="w-full text-xs px-2 py-1.5">
+          <input type="text" name="tag_field" placeholder="Tag field name (e.g. category)"
+                 class="w-full text-xs px-2 py-1.5">
+          <input type="text" name="description_field" placeholder="Description field name"
+                 class="w-full text-xs px-2 py-1.5">
+        </div>
+      </details>
+
+      <div class="flex gap-2 justify-end pt-2 border-t border-ink-800">
+        <button type="button" @click="open = false"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Cancel
+        </button>
+        <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Import
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Drop Pin dialog — opened by clicking the map while pinMode is on. #}
+<div x-data="{ open: false, lat: 0, lng: 0, layerId: null }"
+     @open-drop-pin.window="
+       open = true;
+       lat = $event.detail.lat;
+       lng = $event.detail.lng;
+       layerId = $event.detail.layerId;
+     "
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+     @click.self="open = false">
+  <div class="gilded p-6 max-w-md w-full mx-4">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="font-cinzel text-lg text-bone-200">Drop Pin</h2>
+      <button @click="open = false" class="text-bone-600 hover:text-blood-400 text-2xl leading-none">×</button>
+    </div>
+    <p class="font-garamond text-bone-600 text-xs mb-3">
+      Coordinates: <span class="font-mono text-bone-300" x-text="lat.toFixed(5) + ', ' + lng.toFixed(5)"></span>
+    </p>
+    <form method="POST" action="/staff/map/features" class="space-y-3">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="layer_id" :value="layerId">
+      <input type="hidden" name="lat" :value="lat">
+      <input type="hidden" name="lng" :value="lng">
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Label</label>
+        <input type="text" name="label" required maxlength="120"
+               placeholder="e.g. Elysium, Haven, Anarch Rave"
+               class="w-full text-xs px-2 py-1.5">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Tag <span class="text-bone-700 normal-case ml-1">(optional)</span></label>
+        <input type="text" name="tag" maxlength="60"
+               placeholder="e.g. elysium, haven, rival-domain"
+               class="w-full text-xs px-2 py-1.5">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Description</label>
+        <textarea name="description" rows="2"
+                  class="w-full text-xs px-2 py-1.5"></textarea>
+      </div>
+      <label class="flex items-center gap-2 text-xs font-garamond text-bone-400 cursor-pointer">
+        <input type="checkbox" name="is_hidden" value="1" class="accent-mauve-500">
+        Hidden from players (staff-only)
+      </label>
+      <div class="flex gap-2 justify-end pt-2 border-t border-ink-800">
+        <button type="button" @click="open = false"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Cancel
+        </button>
+        <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Drop Pin
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Edit Feature dialog — opens from the Leaflet popup's "Edit" button.
+   Lets staff bind a feature to a hunting site or coterie. #}
+<div x-data="{ open: false, feature: null }"
+     @open-feature-edit.window="open = true; feature = JSON.parse(JSON.stringify($event.detail))"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+     @click.self="open = false">
+  <div x-show="open && feature" class="gilded p-6 max-w-md w-full mx-4 max-h-[85vh] overflow-y-auto">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="font-cinzel text-lg text-bone-200">Edit Feature</h2>
+      <button @click="open = false" class="text-bone-600 hover:text-blood-400 text-2xl leading-none">×</button>
+    </div>
+    <form x-show="feature" method="POST"
+          :action="'/staff/map/features/' + (feature ? feature.id : '') + '/edit'"
+          class="space-y-3">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Label</label>
+        <input type="text" name="label" :value="feature ? feature.label : ''"
+               maxlength="120" class="w-full text-xs px-2 py-1.5">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Tag</label>
+        <input type="text" name="tag" :value="feature ? (feature.tag || '') : ''"
+               maxlength="60" class="w-full text-xs px-2 py-1.5">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Description</label>
+        <textarea name="description" rows="2"
+                  class="w-full text-xs px-2 py-1.5"
+                  x-text="feature ? (feature.description || '') : ''"></textarea>
+      </div>
+
+      {# Cross-refs — link to a hunting site or coterie. Use :value on
+         the <select> itself so Alpine sets the dropdown to the
+         feature's stored ID when the dialog opens (Alpine's :selected
+         binding on <option> is unreliable across browsers). #}
+      <div class="grid grid-cols-2 gap-3 pt-2 border-t border-ink-800">
+        <div>
+          <label class="label-gold block mb-1 text-[0.75rem]">Hunting Site</label>
+          <select name="site_id"
+                  :value="feature ? (feature.site_id || '') : ''"
+                  class="w-full text-xs py-1.5 px-2">
+            <option value="">— None —</option>
+            {% for s in sites %}
+            <option value="{{ s.id }}">{{ s.name }} ({{ s.borough }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="label-gold block mb-1 text-[0.75rem]">Coterie</label>
+          <select name="coterie_id"
+                  :value="feature ? (feature.coterie_id || '') : ''"
+                  class="w-full text-xs py-1.5 px-2">
+            <option value="">— None —</option>
+            {% for co in coteries %}
+            <option value="{{ co.id }}">{{ co.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <label class="flex items-center gap-2 text-xs font-garamond text-bone-400 cursor-pointer">
+        <input type="checkbox" name="is_hidden" value="1"
+               :checked="feature && feature.is_hidden"
+               class="accent-mauve-500">
+        Hidden from players (staff-only)
+      </label>
+
+      <div class="flex gap-2 justify-end pt-2 border-t border-ink-800">
+        <button type="button" @click="open = false"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Cancel
+        </button>
+        <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Save
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Edit Layer dialog ── #}
+<div x-data="{ open: false, layer: null }"
+     @open-edit.window="open = true; layer = JSON.parse(JSON.stringify($event.detail))"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+     @click.self="open = false">
+  <div x-show="open && layer" class="gilded p-6 max-w-md w-full mx-4">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="font-cinzel text-lg text-bone-200">Edit Layer</h2>
+      <button @click="open = false" class="text-bone-600 hover:text-blood-400 text-2xl leading-none">×</button>
+    </div>
+
+    <form x-show="layer" method="POST" :action="'/staff/map/layers/' + (layer ? layer.id : '') + '/edit'"
+          class="space-y-3">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Name</label>
+        <input type="text" name="name" :value="layer ? layer.name : ''" required maxlength="80"
+               class="w-full text-xs px-2 py-1.5">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Description</label>
+        <input type="text" name="description" :value="layer ? (layer.description || '') : ''" maxlength="200"
+               class="w-full text-xs px-2 py-1.5">
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="color" name="color" :value="layer ? layer.color : '#8B1A1A'"
+               class="w-12 h-8 border border-ink-700 bg-ink-900 cursor-pointer">
+        <select name="visibility"
+                :value="layer ? layer.visibility : 'public'"
+                class="flex-1 text-xs px-2 py-1.5">
+          <option value="public">Public</option>
+          <option value="staff">Staff-only</option>
+        </select>
+      </div>
+      <label class="flex items-center gap-2 text-xs font-garamond text-bone-400 cursor-pointer">
+        <input type="checkbox" name="active" value="1" :checked="layer && layer.active"
+               class="accent-gold-500">
+        Active (uncheck to hide without deleting)
+      </label>
+      <div class="flex gap-2 justify-end pt-2 border-t border-ink-800">
+        <button type="button" @click="open = false"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Cancel
+        </button>
+        <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-2">
+          Save
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const _OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const _OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+  const _DEFAULT_CENTER = [40.7128, -74.0060];
+  const _DEFAULT_ZOOM = 11;
+
+  function staffMapSidebar(opts) {
+    return {
+      // Server-rendered layer list, decorated with runtime fields:
+      //   visible (toggle state), _leafletGroup (Leaflet handle), features (geometries)
+      layers: (opts.initialLayers || []).map(l => ({
+        id:           l.id,
+        name:         l.name,
+        description:  l.description,
+        color:        l.color,
+        visibility:   l.visibility,
+        active:       Boolean(l.active),
+        feature_count: l.feature_count || 0,
+        features:     [],
+        visible:      true,
+        _leafletGroup: null,
+      })),
+      _map: null,
+      _allBounds: null,
+      pinMode: false,
+      pinLayerId: null,
+      _clickHandler: null,
+
+      async init() {
+        this._map = L.map('map-canvas', { zoomControl: true });
+        this._map.setView(_DEFAULT_CENTER, _DEFAULT_ZOOM);
+        L.tileLayer(_OSM_URL, { attribution: _OSM_ATTR, maxZoom: 19 }).addTo(this._map);
+
+        // Default pin-mode target = first layer in the list.
+        if (this.layers.length) this.pinLayerId = this.layers[0].id;
+
+        // Pull the staff-only data feed (includes hidden features).
+        try {
+          const resp = await fetch('/staff/map/data.json', { credentials: 'same-origin' });
+          if (!resp.ok) throw new Error(resp.statusText);
+          const data = await resp.json();
+          for (const layerData of (data.layers || [])) {
+            this._attachLayer(layerData);
+          }
+          if (this._allBounds && this._allBounds.isValid()) {
+            this._map.fitBounds(this._allBounds, { padding: [40, 40] });
+          }
+        } catch (e) {
+          console.error('Failed to load staff map data:', e);
+        }
+      },
+
+      _attachLayer(layerData) {
+        const local = this.layers.find(l => l.id === layerData.id);
+        if (!local) return;
+        local.features = layerData.features || [];
+        const group = L.featureGroup();
+        const color = layerData.color || '#8B1A1A';
+        for (const feat of local.features) {
+          const lf = this._featureToLeaflet(feat, color);
+          if (lf) {
+            lf.bindPopup(this._popupHtml(feat, layerData));
+            lf.addTo(group);
+          }
+        }
+        local._leafletGroup = group;
+        if (local.active) group.addTo(this._map);
+        if (group.getBounds && group.getBounds().isValid()) {
+          if (!this._allBounds) this._allBounds = L.latLngBounds([]);
+          this._allBounds.extend(group.getBounds());
+        }
+      },
+
+      _featureToLeaflet(feat, color) {
+        const geom = feat.geometry;
+        if (!geom || !geom.type) return null;
+        if (geom.type === 'Point') {
+          const [lng, lat] = geom.coordinates;
+          return L.circleMarker([lat, lng], {
+            radius: 8, color: color, fillColor: color, fillOpacity: 0.7, weight: 2,
+          });
+        }
+        if (geom.type === 'MultiPoint') {
+          const group = L.featureGroup();
+          for (const [lng, lat] of geom.coordinates) {
+            L.circleMarker([lat, lng], {
+              radius: 8, color: color, fillColor: color, fillOpacity: 0.7, weight: 2,
+            }).addTo(group);
+          }
+          return group;
+        }
+        if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
+          return L.geoJSON(geom, { style: { color: color, weight: 3, opacity: 0.8 } });
+        }
+        if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
+          return L.geoJSON(geom, {
+            style: { color: color, weight: 2, fillColor: color,
+                     fillOpacity: 0.25, opacity: 0.8 },
+          });
+        }
+        return null;
+      },
+
+      _popupHtml(feat, layer) {
+        const esc = s => String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const parts = [];
+        if (feat.label) parts.push(`<p style="font-family: Cinzel, serif; letter-spacing: 0.08em; font-size: 0.85rem; color: #d9cdb8;">${esc(feat.label)}</p>`);
+        if (feat.tag)   parts.push(`<p style="font-family: Cinzel, serif; text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.6rem; color: ${esc(layer.color)};">${esc(feat.tag)}</p>`);
+        if (feat.is_hidden) parts.push(`<p style="font-family: Cinzel, serif; text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.55rem; color: #aa5252;">Hidden from players</p>`);
+        if (feat.description) parts.push(`<p style="margin-top: 0.4rem; color: #aa9c84;">${esc(feat.description)}</p>`);
+        // Cross-ref indicators — show which site/coterie the feature
+        // is linked to, if any.
+        if (feat.site_id) parts.push(`<p style="margin-top: 0.4rem; font-family: Cinzel, serif; font-size: 0.55rem; letter-spacing: 0.2em; color: #b89352;">↪ SITE #${feat.site_id}</p>`);
+        if (feat.coterie_id) parts.push(`<p style="font-family: Cinzel, serif; font-size: 0.55rem; letter-spacing: 0.2em; color: #b89352;">↪ COTERIE #${feat.coterie_id}</p>`);
+        // Staff actions in the popup
+        const csrf = document.querySelector('meta[name="csrf-token"]').content;
+        const featJson = esc(JSON.stringify(feat));
+        parts.push(`<div style="margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px solid #2a241e; display: flex; gap: 0.5rem;">
+          <button type="button"
+                  onclick="window.dispatchEvent(new CustomEvent('open-feature-edit', { detail: ${featJson} }))"
+                  style="font-family: Cinzel, serif; font-size: 0.55rem; letter-spacing: 0.2em; color: #b89352; background: transparent; border: none; cursor: pointer;">EDIT</button>
+          <form method="POST" action="/staff/map/features/${feat.id}/delete" style="margin: 0;" onsubmit="return confirm('Delete this feature?');">
+            <input type="hidden" name="_csrf" value="${esc(csrf)}">
+            <button type="submit" style="font-family: Cinzel, serif; font-size: 0.55rem; letter-spacing: 0.2em; color: #aa5252; background: transparent; border: none; cursor: pointer;">DELETE</button>
+          </form>
+        </div>`);
+        return parts.join('');
+      },
+
+      toggleLayer(layer) {
+        layer.visible = !layer.visible;
+        if (!layer._leafletGroup) return;
+        if (layer.visible) layer._leafletGroup.addTo(this._map);
+        else this._map.removeLayer(layer._leafletGroup);
+      },
+
+      openImport(layer) {
+        window.dispatchEvent(new CustomEvent('open-import',
+          { detail: { id: layer.id, name: layer.name } }));
+      },
+
+      openEdit(layer) {
+        window.dispatchEvent(new CustomEvent('open-edit',
+          { detail: { ...layer } }));
+      },
+
+      openQuickImport() {
+        window.dispatchEvent(new CustomEvent('open-quick-import'));
+      },
+
+      // Toggle map-click pin mode. While on, a click on the canvas
+      // opens the drop-pin dialog pre-filled with the clicked coords.
+      setPinMode(on) {
+        const canvas = document.getElementById('map-canvas');
+        if (on) {
+          canvas.style.cursor = 'crosshair';
+          this._clickHandler = (e) => {
+            if (!this.pinLayerId) return;
+            window.dispatchEvent(new CustomEvent('open-drop-pin', {
+              detail: {
+                lat: e.latlng.lat,
+                lng: e.latlng.lng,
+                layerId: this.pinLayerId,
+              },
+            }));
+          };
+          this._map.on('click', this._clickHandler);
+        } else {
+          canvas.style.cursor = '';
+          if (this._clickHandler) {
+            this._map.off('click', this._clickHandler);
+            this._clickHandler = null;
+          }
+        }
+      },
+    };
+  }
+</script>
+{% endblock %}

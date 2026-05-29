@@ -2,76 +2,417 @@
 {% block title %}Admin — Enoch{% endblock %}
 
 {% block content %}
-<div class="page-enter">
+{# Tabbed admin control panel — Alpine handles client-side switching,
+   URL hash keeps deep-links working (e.g. /staff/admin#periods). #}
+<div class="page-enter"
+     x-data="{ tab: (location.hash || '#settings').replace('#', '') }"
+     x-init="
+       const valid = ['settings','staff','periods','sites','criteria'];
+       if (!valid.includes(tab)) tab = 'settings';
+       $watch('tab', v => { history.replaceState(null, '', '#' + v); });
+     ">
 
-  <div class="mb-8">
+  <div class="mb-6">
     <p class="label-gold mb-1">Staff</p>
     <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Admin</h1>
   </div>
 
-  {# ── Manual XP Adjustment ── #}
-  <div class="gilded p-6 mb-8">
-    <p class="label-gold mb-4">Manual XP Adjustment</p>
-    <form method="post" action="/staff/admin/adjust-xp" class="space-y-4">
-      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label class="label-gold mb-1 block">Character</label>
-          <select name="character_id" required
-                  class="w-full font-garamond text-bone-300 text-sm">
-            <option value="">— select —</option>
-            {% for char in all_chars | sort(attribute='name') %}
-            {% if char.is_approved %}
-            <option value="{{ char.id }}">{{ char.name }} ({{ char.clan }})</option>
-            {% endif %}
-            {% endfor %}
-          </select>
-        </div>
-
-        <div>
-          <label class="label-gold mb-1 block">Delta <span class="text-bone-700 normal-case font-sans text-[0.6rem]">positive = grant, negative = deduct</span></label>
-          <input type="number"
-                 name="delta"
-                 min="-350" max="350"
-                 placeholder="e.g. 3 or -2"
-                 required
-                 class="w-full">
-        </div>
-
-        <div>
-          <label class="label-gold mb-1 block">Note / Reason</label>
-          <input type="text"
-                 name="note"
-                 maxlength="120"
-                 placeholder="Staff activity, correction, etc."
-                 required
-                 class="w-full">
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
-          Apply Adjustment
-        </button>
-        <p class="font-garamond text-bone-600 text-xs">
-          This creates a permanent ledger entry and cannot be undone via the UI.
-        </p>
-      </div>
-    </form>
+  {# ── Tab strip ── #}
+  <div class="flex gap-1 border-b border-ink-700 mb-6 overflow-x-auto">
+    {% for key, label in [
+      ('settings', 'Settings'),
+      ('staff',    'Staff'),
+      ('periods',  'Periods'),
+      ('sites',    'Hunting Sites'),
+      ('criteria', 'Criteria'),
+    ] %}
+    <button type="button"
+            @click="tab = '{{ key }}'"
+            :class="tab === '{{ key }}'
+              ? 'border-gold-500 text-gold-300'
+              : 'border-transparent text-bone-600 hover:text-bone-400'"
+            class="px-4 py-2 font-cinzel text-xs tracking-widest uppercase border-b-2 -mb-px transition-colors whitespace-nowrap">
+      {{ label }}
+    </button>
+    {% endfor %}
   </div>
 
-  {# ── Player Roster ── #}
-  <div>
+  {# ─────────────────────────── Settings tab ─────────────────────────── #}
+  {# Per-character Adjust XP lives on each character's detail-page Tools
+     tab (the workflow most staff already use). The redundant admin-level
+     form was removed 2026-05 per Steward direction. #}
+  <div x-show="tab === 'settings'" x-cloak class="space-y-6">
+
+    {# Chronicle settings — every chronicle_settings access is guarded with
+       `| default({})` so that re-renders from POST handlers that forget to
+       pass the dict don't 500. #}
+    {% set _cs = chronicle_settings | default({}) %}
+    {% set _families = _cs.get('revenant_families') or [] %}
+    {% set _ruleset  = _cs.get('active_ruleset') or 'standard' %}
+    {# Defensive coerce — if homebrew_tier_budgets was stored as a JSON
+       string blob (older rows can be that way), treat it as empty here
+       rather than crash with 'str object has no attribute get'. The
+       proper fix is in db.py::get_settings which now decodes JSON. #}
+    {% set _tb_raw = _cs.get('homebrew_tier_budgets') %}
+    {% set _tier_budgets = _tb_raw if (_tb_raw is mapping) else {} %}
+    {# Per-tier V5 RAW defaults — used when ruleset is standard or a tier
+       hasn't been overridden under homebrew. Keep in sync with
+       web/db.py::_TIER_DEFAULTS. Numbers reflect V5 Corebook Sea of Time
+       allocations: 7 Advantage points + 2 Flaw points baseline, Ancilla
+       adds +2/+2 on top. #}
+    {% set _tier_defaults = {
+      'mortal':    {'xp': 50,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
+      'ghoul':     {'xp': 60,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
+      'revenant':  {'xp': 75,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
+      'fledgling': {'xp': 60,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
+      'thinblood': {'xp': 60,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
+      'neonate':   {'xp': 75,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
+      'ancilla':   {'xp': 110, 'merits': 3, 'advantages': 3, 'backgrounds': 3, 'flaw_cap': 4},
+    } %}
+    <div class="gilded p-5" x-data="{
+           ruleset: '{{ _ruleset }}',
+           revenants: {{ 'true' if _cs.get('revenants_enabled') else 'false' }},
+         }">
+      <p class="label-gold mb-3">Chronicle Settings</p>
+      <form method="post" action="/staff/admin/settings" class="space-y-5">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <div class="pt-0.5">
+            <input type="checkbox" name="require_sheet_on_create"
+                   {{ 'checked' if _cs.get('require_sheet_on_create', 1) else '' }}
+                   class="accent-[#8B1A1A]">
+          </div>
+          <div>
+            <p class="font-cinzel text-xs text-bone-300 tracking-wide group-hover:text-bone-200 transition-colors">
+              Require full sheet during character creation
+            </p>
+            <p class="font-garamond text-bone-500 text-sm mt-0.5 leading-relaxed">
+              When checked, the wizard walks the player through every sheet section.
+              When unchecked, the wizard stops after the basics — players fill in
+              the sheet later via the Sheet tab.
+            </p>
+          </div>
+        </label>
+
+        <div class="divider-gold"></div>
+
+        {# Ruleset selector — two-way Standard vs Homebrew. The In
+           Memoriam path is now a SEPARATE checkbox below since it only
+           affects Ancilla characters and is orthogonal to whether
+           neonate/mortal/etc. use RAW or chronicle-tuned budgets.
+           Combinations:
+             Standard alone        → V5 RAW everywhere, +35 XP Ancilla
+             Standard + IM         → V5 RAW for non-Ancilla, Era Builder for Ancilla
+             Homebrew alone        → custom budgets, +35 XP Ancilla
+             Homebrew + IM         → custom budgets + Era Builder for Ancilla
+           The route writes active_ruleset='in_memoriam' when IM is on,
+           regardless of which base ruleset was picked, so the rest of
+           the codebase still treats IM as a discrete mode. The hidden
+           field below carries the combined value to the server. #}
+        <div x-data="{ baseRuleset: ruleset === 'in_memoriam' ? 'standard' : ruleset,
+                       imEnabled: ruleset === 'in_memoriam' }"
+             x-init="$watch('baseRuleset', v => { ruleset = imEnabled ? 'in_memoriam' : v; });
+                     $watch('imEnabled', v => { ruleset = v ? 'in_memoriam' : baseRuleset; });">
+          <p class="font-cinzel text-xs text-bone-300 tracking-wide mb-2">Active Ruleset</p>
+          <p class="font-garamond text-bone-500 text-sm mb-3 leading-relaxed">
+            <strong class="text-bone-400">Standard</strong> uses V5 RAW.
+            <strong class="text-bone-400">Homebrew</strong> exposes the per-tier
+            budgets below so the chronicle can tune each archetype.
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+            {% for val, label, desc in [
+              ('standard',  'Standard',  'V5 RAW defaults'),
+              ('homebrew',  'Homebrew',  'Chronicle-tuned budgets'),
+            ] %}
+            <label class="flex items-start gap-2 gilded-inset px-3 py-2 cursor-pointer hover:border-gold-700 transition-colors"
+                   :class="baseRuleset === '{{ val }}' ? 'border-gold-700' : ''">
+              <input type="radio" value="{{ val }}"
+                     x-model="baseRuleset"
+                     class="accent-gold-500 mt-0.5">
+              <div>
+                <p class="font-cinzel text-xs text-bone-200">{{ label }}</p>
+                <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">{{ desc }}</p>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+
+          {# In Memoriam toggle — orthogonal, Ancilla-only #}
+          <label class="flex items-start gap-3 gilded-inset px-3 py-2 cursor-pointer hover:border-mauve-700 transition-colors"
+                 :class="imEnabled ? 'border-mauve-700' : ''">
+            <input type="checkbox" x-model="imEnabled" class="accent-[#8B1A1A] mt-0.5">
+            <div>
+              <p class="font-cinzel text-xs text-bone-200">In Memoriam (Ancilla)</p>
+              <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">
+                Ancilla characters build their history era-by-era through the
+                Era Builder instead of taking the +35 XP boost. Layers on top
+                of either Standard or Homebrew above.
+              </p>
+            </div>
+          </label>
+
+          {# Hidden field carries the combined value to the route. #}
+          <input type="hidden" name="active_ruleset" :value="ruleset">
+        </div>
+
+        {# Per-tier budgets — visible under homebrew + IM (both honor
+           the overrides). Hidden under standard ruleset where V5 RAW is
+           the law.
+           Per Steward direction (2026-05): collapse the three Merits /
+           Advantages / Backgrounds columns into a single combined pool
+           input. The save handler splits the value into all three legacy
+           fields so the rest of the wizard sidebar / cost validator code
+           keeps working — staff just see one box per tier. #}
+        <div x-show="ruleset !== 'standard'" x-cloak class="space-y-3">
+          <p class="label-gold text-[0.78rem]">Per-Tier Budgets</p>
+          <p class="font-garamond text-bone-600 text-xs italic">
+            Override the V5 RAW starting allotments per archetype. Blank fields fall back to defaults.
+            <span x-show="ruleset === 'in_memoriam'" class="text-mauve-500 ml-1">
+              Ancilla still defaults to In Memoriam flow regardless of XP override.
+            </span>
+          </p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="border-b border-ink-700">
+                  <th class="px-2 py-2 text-left label-gold font-normal text-[0.75rem]">Tier</th>
+                  <th class="px-2 py-2 text-right label-gold font-normal text-[0.75rem]">Starting XP</th>
+                  <th class="px-2 py-2 text-right label-gold font-normal text-[0.75rem]">
+                    Merit/Adv/BG Dots
+                    <span class="block text-bone-700 text-[0.6rem] normal-case font-normal mt-0.5 italic">combined pool</span>
+                  </th>
+                  <th class="px-2 py-2 text-right label-gold font-normal text-[0.75rem]">Flaw Cap</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for tier_key, tier_label in [
+                  ('mortal',    'Mortal'),
+                  ('ghoul',     'Ghoul'),
+                  ('revenant',  'Revenant'),
+                  ('fledgling', 'Fledgling'),
+                  ('thinblood', 'Thin-Blood'),
+                  ('neonate',   'Neonate'),
+                  ('ancilla',   'Ancilla'),
+                ] %}
+                {% set defaults = _tier_defaults[tier_key] %}
+                {% set overrides = _tier_budgets.get(tier_key) or {} %}
+                {# Combined-pool placeholder is the sum of the three RAW
+                   defaults so staff can see what V5 RAW would yield. #}
+                {% set _combined_default = defaults['merits'] + defaults['advantages'] + defaults['backgrounds'] %}
+                {% set _combined_override = overrides.get('merits_advantages_backgrounds') or
+                                            (overrides.get('merits') + overrides.get('advantages', 0) + overrides.get('backgrounds', 0)
+                                             if overrides.get('merits') is not none else '') %}
+                <tr class="border-b border-ink-800">
+                  <td class="px-2 py-2 font-cinzel text-xs text-bone-300">{{ tier_label }}</td>
+                  <td class="px-2 py-2 text-right">
+                    <input type="number" name="tier_{{ tier_key }}_xp"
+                           value="{{ overrides.get('xp', '') }}"
+                           placeholder="{{ defaults['xp'] }}"
+                           min="0" max="350"
+                           class="text-xs w-14 py-0.5 px-1 text-center">
+                  </td>
+                  <td class="px-2 py-2 text-right">
+                    <input type="number" name="tier_{{ tier_key }}_mab"
+                           value="{{ _combined_override }}"
+                           placeholder="{{ _combined_default }}"
+                           min="0" max="60"
+                           class="text-xs w-16 py-0.5 px-1 text-center"
+                           title="Combined Merits + Advantages + Backgrounds dot pool">
+                  </td>
+                  <td class="px-2 py-2 text-right">
+                    <input type="number" name="tier_{{ tier_key }}_flaw_cap"
+                           value="{{ overrides.get('flaw_cap', '') }}"
+                           placeholder="{{ defaults['flaw_cap'] }}"
+                           min="0" max="10"
+                           class="text-xs w-14 py-0.5 px-1 text-center">
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {# Legacy single-budget fields — kept hidden so the form still
+           posts values, but no longer rendered. Per-tier table above
+           supersedes these for new chronicles. #}
+        <input type="hidden" name="homebrew_starting_xp"      value="{{ _cs.get('homebrew_starting_xp', 75) }}">
+        <input type="hidden" name="homebrew_merit_budget"     value="{{ _cs.get('homebrew_merit_budget', 7) }}">
+        <input type="hidden" name="homebrew_advantage_budget" value="{{ _cs.get('homebrew_advantage_budget', 2) }}">
+        <input type="hidden" name="homebrew_background_budget" value="{{ _cs.get('homebrew_background_budget', 5) }}">
+        <input type="hidden" name="homebrew_flaw_cap"         value="{{ _cs.get('homebrew_flaw_cap', 2) }}">
+
+        <div class="divider-gold"></div>
+
+        {# Revenants #}
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <div class="pt-0.5">
+            <input type="checkbox" name="revenants_enabled" x-model="revenants"
+                   class="accent-[#8B1A1A]">
+          </div>
+          <div>
+            <p class="font-cinzel text-xs text-bone-300 tracking-wide group-hover:text-bone-200 transition-colors">
+              Allow Revenant characters
+            </p>
+            <p class="font-garamond text-bone-500 text-sm mt-0.5 leading-relaxed">
+              When enabled, the wizard surfaces <em>Revenant</em> as a character
+              type and shows a family dropdown driven by the list below.
+            </p>
+          </div>
+        </label>
+
+        {# Family list is seeded in migration 008 and intentionally not
+           editable here. Per Steward direction the checkbox is the only
+           knob — staff don't need to tweak the canonical V5 list at
+           runtime, and accidentally clearing it broke chargen. #}
+        <div x-show="revenants" x-cloak class="pl-7">
+          <p class="font-garamond text-[0.72rem] text-bone-600 italic leading-relaxed">
+            {{ _families | length }} canonical family/families available in the
+            chargen wizard. Edit the seed list in <code class="font-mono text-bone-500">migrations/008_seed_revenant_families.sql</code>
+            if you need to add or rename one.
+          </p>
+        </div>
+        {# Keep the hidden field empty so the route's family loader
+           preserves the existing seed (it merges by name; an empty
+           textarea would wipe the list). #}
+        <input type="hidden" name="revenant_families" value="">
+        <script>
+          // Roll the value back to the existing seed JSON so an admin
+          // submit while Revenants are enabled doesn't blank the list.
+          (function(){
+            const el = document.querySelector('input[name="revenant_families"]');
+            if (!el) return;
+            const seeded = {{ _families | tojson }};
+            // Encode as the legacy "Name | Parent" lines so the route
+            // happy-path that splits on "|" still merges by name.
+            el.value = (seeded || []).map(f =>
+              f.parent_clan ? `${f.name} | ${f.parent_clan}` : f.name
+            ).join("\n");
+          })();
+        </script>
+
+        <div class="divider-gold"></div>
+
+        {# ── Restricted predator types — per-chronicle opt-in ──
+             Blood Leech and Tithe Collector are off by default per
+             Steward direction. Check a box to unlock that type in the
+             player chargen wizard. Backed by the chronicle_restrictions
+             table (migration 022). The list of default-restricted names
+             lives in web/v5_traits.py::V5_RESTRICTED_PREDATOR_TYPES. #}
+        {% set _restricted = ['Blood Leech', 'Tithe Collector'] %}
+        <div>
+          <p class="font-cinzel text-xs text-bone-300 tracking-wide mb-2">
+            Restricted Predator Types
+          </p>
+          <p class="font-garamond text-bone-500 text-sm mb-3 leading-relaxed">
+            Predator types that are hidden from the chargen picker by
+            default. Tick a box to allow players to select it in this
+            chronicle. Most chronicles leave both unchecked.
+          </p>
+          <div class="space-y-2 pl-1">
+            {% for name in _restricted %}
+            <label class="flex items-start gap-3 cursor-pointer group">
+              <div class="pt-0.5">
+                <input type="checkbox" name="unlock_predator_{{ name }}"
+                       {{ 'checked' if name in unlocked_predator_ids else '' }}
+                       class="accent-[#8B1A1A]">
+              </div>
+              <div>
+                <p class="font-cinzel text-xs text-bone-300 tracking-wide group-hover:text-bone-200 transition-colors">
+                  Allow {{ name }}
+                </p>
+                <p class="font-garamond text-bone-500 text-[0.75rem] mt-0.5 leading-relaxed">
+                  {% if name == 'Blood Leech' %}
+                  Core Rulebook. Feeds only on other vampires. Heavily politically charged — chronicles that allow it usually require ST approval per character.
+                  {% elif name == 'Tithe Collector' %}
+                  In Memoriam (V5 Sea of Time supplement). Feeds via tithes from devoted faithful. Bends the Hunger economy; typically only enabled in cult-heavy chronicles.
+                  {% else %}
+                  Restricted predator type.
+                  {% endif %}
+                </p>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <button type="submit" class="btn-ghost font-cinzel tracking-widest text-xs">
+          Save Settings
+        </button>
+      </form>
+    </div>
+
+    {# Data export #}
+    <div class="gilded p-5">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div class="flex-1 min-w-0">
+          <p class="label-gold mb-1">Chronicle Snapshot</p>
+          <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+            Download a full JSON export of every chronicle row — characters, claims,
+            spends, periods, coteries, ledger, audit log. Keep one offsite as a backup
+            before risky operations (mass deletes, migration tests).
+          </p>
+        </div>
+        <a href="/staff/admin/export.json"
+           class="btn-ghost font-cinzel tracking-widest text-xs shrink-0 flex items-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="square" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/>
+          </svg>
+          Download
+        </a>
+      </div>
+    </div>
+
+    {# Staff access note #}
+    <div class="gilded-inset px-5 py-4 border border-ink-700">
+      <p class="label-gold mb-1">Staff Access</p>
+      <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+        Staff permissions are granted via Discord server roles.
+        Set <span class="font-cinzel text-bone-400">STAFF_ROLE_IDS</span> in your
+        environment with the role IDs (comma-separated) that should have staff access.
+        Changes take effect at next login.
+      </p>
+    </div>
+  </div>
+
+  {# ─────────────────────────── Staff tab ─────────────────────────── #}
+  {# Was "Players" — renamed 2026-05 per Steward direction. The tab
+     manages staff role assignments and the Settings Admin flag; it does
+     not (and never did) manage player-side things like character
+     creation. The Discord-role gate still controls who shows up here. #}
+  <div x-show="tab === 'staff'" x-cloak>
     <div class="flex items-center justify-between mb-3">
       <p class="label-gold">Registered Players <span class="text-bone-600 ml-2">{{ players | length }}</span></p>
     </div>
+
+    <div class="gilded-inset px-4 py-3 mb-4 border border-gold-900/40 space-y-2">
+      <p class="font-garamond text-bone-500 text-xs leading-relaxed">
+        <strong class="text-bone-400">Staff roles</strong> gate what each ST can do
+        once the Discord role grants them dashboard access.
+        <strong class="text-mauve-400">Lead ST</strong>: every permission, including role management.
+        <strong class="text-mauve-400">Co-ST</strong>: all chronicle work except role management.
+        <strong class="text-mauve-400">Reviewer</strong>: approve/reject claims + spends only.
+        <strong class="text-mauve-400">Helper</strong>: read-only dashboard access.
+      </p>
+      <p class="font-garamond text-bone-500 text-xs leading-relaxed">
+        <strong class="text-gold-400">Settings Admin</strong> is a separate, stricter
+        gate on chronicle-wide configuration (ruleset, tier budgets, restrictions,
+        XP rules). Even a Lead ST without this flag can't flip rule constants — the
+        grant ships pre-set for existing Lead STs but must be granted explicitly to
+        anyone new.
+      </p>
+    </div>
+
     <div class="gilded overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-ink-700">
             <th class="px-4 py-3 text-left label-gold font-normal text-xs">Username</th>
             <th class="px-4 py-3 text-left label-gold font-normal text-xs">Discord ID</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Staff Role</th>
+            <th class="px-4 py-3 text-center label-gold font-normal text-xs"
+                title="Required for editing chronicle settings + XP rules">Settings Admin</th>
             <th class="px-4 py-3 text-right label-gold font-normal text-xs">Chars</th>
             <th class="px-4 py-3 text-right label-gold font-normal text-xs">Active</th>
             <th class="px-4 py-3 text-right label-gold font-normal text-xs">Joined</th>
@@ -79,16 +420,54 @@
         </thead>
         <tbody>
           {% for p in players %}
-          <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
+          <tr class="border-b border-ink-800">
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300">{{ p.username }}</td>
-            <td class="px-4 py-2.5 font-garamond text-xs text-bone-600 font-mono">{{ p.discord_id }}</td>
-            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500 text-right">{{ p.character_count }}</td>
-            <td class="px-4 py-2.5 font-cinzel text-xs text-right
-                       {{ 'text-gold-400' if p.active_count > 0 else 'text-bone-700' }}">
-              {{ p.active_count or '—' }}
+            <td class="px-4 py-2.5 font-cinzel text-[0.65rem] text-bone-600 font-mono">{{ p.discord_id }}</td>
+            <td class="px-4 py-2.5">
+              <form method="POST" action="/staff/admin/roles/{{ p.discord_id }}/set"
+                    class="flex items-center gap-1.5">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <select name="role" onchange="this.form.submit()"
+                        class="text-[0.65rem] py-1 px-1.5"
+                        title="Set this player's staff role">
+                  <option value="" {{ 'selected' if not p.staff_role else '' }}>— none —</option>
+                  {% for role_key, role_label in [
+                    ('lead_st',  'Lead ST'),
+                    ('co_st',    'Co-ST'),
+                    ('reviewer', 'Reviewer'),
+                    ('helper',   'Helper'),
+                  ] %}
+                  <option value="{{ role_key }}"
+                          {{ 'selected' if p.staff_role == role_key else '' }}>
+                    {{ role_label }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <noscript><button type="submit" class="text-[0.6rem] btn-ghost px-2 py-0.5">Set</button></noscript>
+              </form>
             </td>
-            <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-700 text-right">
-              {{ p.created_at[:10] }}
+            <td class="px-4 py-2.5 text-center">
+              <form method="POST" action="/staff/admin/settings-admin/{{ p.discord_id }}/set"
+                    class="inline-flex items-center justify-center">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <input type="checkbox" name="enabled"
+                       {{ 'checked' if p.settings_admin else '' }}
+                       onchange="this.form.submit()"
+                       title="Allow this player to edit chronicle settings + XP rules"
+                       style="accent-color:#c29b48;width:14px;height:14px">
+                <noscript><button type="submit" class="text-[0.6rem] btn-ghost px-1.5 py-0.5 ml-1">Set</button></noscript>
+              </form>
+            </td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500 text-right">{{ p.character_count or 0 }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-gold-500 text-right">{{ p.active_count or 0 }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-600 text-right">
+              {{ p.created_at[:10] if p.created_at else '—' }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="px-4 py-8 text-center font-garamond text-bone-700 italic">
+              No players registered yet.
             </td>
           </tr>
           {% endfor %}
@@ -97,15 +476,24 @@
     </div>
   </div>
 
-  {# ── Staff access note ── #}
-  <div class="gilded-inset px-5 py-4 mt-6 border border-ink-700">
-    <p class="label-gold mb-1">Staff Access</p>
-    <p class="font-garamond text-bone-500 text-sm leading-relaxed">
-      Staff permissions are granted via Discord server roles.
-      Set <span class="font-cinzel text-bone-400">STAFF_ROLE_IDS</span> in your
-      environment with the role IDs (comma-separated) that should have staff access.
-      Changes take effect at next login.
-    </p>
+  {# ─────────────────────────── Periods tab ─────────────────────────── #}
+  {# Folded in from /staff/periods 2026-05 per Steward direction — periods
+     are setup, not ongoing chronicle work. Body extracted to a partial
+     so the standalone page (if anyone deep-links it) still renders. #}
+  <div x-show="tab === 'periods'" x-cloak>
+    {% include "staff/partials/periods_body.html" %}
+  </div>
+
+  {# ─────────────────────────── Hunting Sites tab ────────────────────── #}
+  {# Folded in from /staff/sites 2026-05 — sites are chronicle-setup, not
+     daily ops. Same partial pattern as Periods. #}
+  <div x-show="tab === 'sites'" x-cloak>
+    {% include "staff/partials/sites_body.html" %}
+  </div>
+
+  {# ─────────────────────────── Criteria tab ─────────────────────────── #}
+  <div x-show="tab === 'criteria'" x-cloak>
+    {% include "staff/partials/criteria_section.html" %}
   </div>
 
 </div>

@@ -1,0 +1,899 @@
+{% extends "base.html" %}
+{% from "_macros.html" import clan_icon, themed_confirm %}
+
+{% block title %}{{ char.name }} — Staff — Enoch{% endblock %}
+
+{% block content %}
+{# Tabbed staff character detail. Tabs switch client-side via Alpine;
+   the URL fragment (#sheet, #claims, etc.) deep-links into a tab. #}
+<div class="page-enter clan-{{ char.clan }}"
+     x-data="{ tab: (location.hash || '#overview').replace('#', '') }"
+     x-init="
+       const valid = ['overview','sheet','claims','spends','tools'];
+       if (!valid.includes(tab)) tab = 'overview';
+       $watch('tab', v => { history.replaceState(null, '', '#' + v); });
+     ">
+
+  {# ── Back ── #}
+  <a href="/staff/characters"
+     class="inline-flex items-center gap-1.5 text-bone-600 hover:text-gold-400 font-cinzel text-xs tracking-widest uppercase mb-6 transition-colors">
+    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="square" d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    Roster
+  </a>
+
+  {# ── Hero — clan-portrait frame + beam sweep ── #}
+  <div class="relative overflow-hidden mb-6 border border-[var(--clan,theme(colors.ink.700))]
+              bg-gradient-to-b from-ink-900 to-ink-950 aurora-beam">
+    <div class="absolute inset-0 opacity-[0.04] pointer-events-none"
+         style="background:radial-gradient(ellipse at 80% 50%, var(--clan,#8B6914) 0%, transparent 70%)"></div>
+
+    <div class="relative px-6 py-6 flex items-start gap-5">
+      <div class="aurora-portrait w-14 h-14 shrink-0">
+       <div class="w-full h-full border border-[var(--clan,theme(colors.ink.700))]
+                   bg-ink-900 flex items-center justify-center overflow-hidden">
+        {% if char.profile_image_url %}
+          <img src="{{ char.profile_image_url }}" alt=""
+               class="w-full h-full object-cover"
+               style="filter: url(#aurora-portrait-warm);">
+        {% else %}
+          <span class="font-cinzel text-2xl text-[var(--clan,theme(colors.gold.400))]">
+            {{ char.name[0] | upper }}
+          </span>
+        {% endif %}
+       </div>
+      </div>
+
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-0.5">
+          {{ clan_icon(char.clan, size='w-5 h-5', font_size=11) }}
+          <p class="label-gold text-[0.75rem] tracking-[0.25em]">
+            {{ char.clan | replace('-',' ') | title }}
+            {% if char.predator_type %}&thinsp;·&thinsp;{{ char.predator_type }}{% endif %}
+            &thinsp;·&thinsp; <span class="text-bone-600">{{ char.player_username or char.discord_id }}</span>
+          </p>
+        </div>
+        <h1 class="font-cinzel text-2xl md:text-3xl text-bone-200 tracking-wide truncate">{{ char.name }}</h1>
+
+        <div class="flex flex-wrap gap-2 mt-2">
+          {% if not char.is_approved %}
+            <span class="chip text-mauve-400 border-mauve-700">Pending Approval</span>
+            {% if char.rejection_reason %}
+            <span class="chip text-blood-400 border-blood-800">Returned</span>
+            {% endif %}
+          {% elif char.status == 'active' %}
+            <span class="chip text-gold-400 border-gold-800">Active</span>
+          {% elif char.status == 'retired' %}
+            <span class="chip text-bone-500 border-bone-700">Retired</span>
+          {% elif char.status == 'dead' %}
+            <span class="chip text-blood-400 border-blood-800">Final Death</span>
+          {% endif %}
+          {% if char.has_ingrained_flaw %}
+            <span class="chip text-mauve-400 border-mauve-800">Ingrained Flaw</span>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Quick approve/return — only for pending. Plain form posts so the
+         server can redirect us back to the (now-approved) detail page.
+         The roster table uses HTMX swaps; this view doesn't, because
+         #pending-chars-table doesn't exist on this page. #}
+      {% if not char.is_approved %}
+      <div x-data="{ rejecting: false, reason: '' }" class="shrink-0">
+        <div x-show="!rejecting" class="flex gap-2">
+          <form method="post" action="/staff/characters/{{ char.id }}/approve">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button type="submit"
+                    class="btn-send font-cinzel text-[0.65rem] tracking-widest px-4 py-2">
+              Approve
+            </button>
+          </form>
+          <button @click="rejecting = true"
+                  class="btn-ghost font-cinzel text-[0.65rem] tracking-widest px-4 py-2">
+            Return
+          </button>
+        </div>
+        <form x-show="rejecting" x-cloak
+              method="post" action="/staff/characters/{{ char.id }}/reject"
+              class="flex flex-col gap-1.5 items-end min-w-[200px]">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <textarea name="reason"
+                    x-model="reason"
+                    rows="2"
+                    placeholder="Feedback for player…"
+                    required
+                    class="w-full text-xs resize-none"></textarea>
+          <div class="flex gap-1.5">
+            <button type="submit"
+                    class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+              Send
+            </button>
+            <button type="button" @click="rejecting = false; reason = ''"
+                    class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1.5">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+
+    {# XP bar #}
+    {% set pct = [(char.xp_total / char.xp_cap * 100)|int, 100]|min %}
+    <div class="px-6 pb-5">
+      <div class="flex justify-between items-center mb-1.5">
+        <span class="font-cinzel text-[0.6rem] text-bone-600 tracking-[0.2em] uppercase">XP</span>
+        <span class="font-cinzel text-[0.65rem] text-bone-500">
+          <span x-data="counter(0, {{ char.xp_total }})" x-text="value"></span> / {{ char.xp_cap }}
+          <span class="text-gold-500 ml-2">
+            <span x-data="counter(0, {{ char.xp_available }}, 700)" x-text="value"></span> available
+          </span>
+        </span>
+      </div>
+      <div class="h-0.5 bg-ink-800 w-full overflow-hidden">
+        <div class="xp-fill-anim" style="--xp-target: {{ pct }}%"></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Tab strip ─────────────────────────────────────────────────────── #}
+  <div class="flex gap-1 border-b border-ink-700 mb-6 overflow-x-auto">
+    {% for key, label in [
+      ('overview', 'Overview'),
+      ('sheet',    'Sheet'),
+      ('claims',   'Claims'),
+      ('spends',   'Spends'),
+      ('tools',    'Tools'),
+    ] %}
+    <button type="button"
+            @click="tab = '{{ key }}'"
+            :class="tab === '{{ key }}'
+              ? 'border-gold-500 text-gold-300'
+              : 'border-transparent text-bone-600 hover:text-bone-400'"
+            class="px-4 py-2 font-cinzel text-xs tracking-widest uppercase border-b-2 -mb-px transition-colors whitespace-nowrap">
+      {{ label }}
+      {% if key == 'claims' and claims %}<span class="text-bone-700 ml-1">({{ claims | length }})</span>{% endif %}
+      {% if key == 'spends' and spends %}<span class="text-bone-700 ml-1">({{ spends | length }})</span>{% endif %}
+    </button>
+    {% endfor %}
+  </div>
+
+  {# ─────────────────────────── Sheet tab ─────────────────────────── #}
+  {% set sheet = char.sheet_json or {} %}
+  <div x-show="tab === 'sheet'" x-cloak class="gilded p-5 mb-6">
+    <p class="label-gold mb-4">Character Sheet</p>
+
+    <div class="space-y-5">
+
+      {# Attributes #}
+      <div>
+        <p class="label-gold mb-3 text-[0.75rem]">Attributes</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+          {% for cat, traits in v5_attributes %}
+          <div>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] text-bone-700 uppercase mb-1.5">{{ cat }}</p>
+            {% for key, label in traits %}
+            {% set rating = sheet.get(key, 0) %}
+            <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
+              <span class="font-garamond text-xs {{ 'text-bone-200' if rating > 0 else 'text-bone-700' }}">{{ label }}</span>
+              <div class="flex gap-1">
+                {% for n in range(1, 6) %}
+                <span class="w-2 h-2 rounded-full {{ 'bg-[var(--clan,theme(colors.gold.500))]' if rating >= n else 'border border-bone-700' }}"></span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Skills (specialties inline beside the skill name, not below) #}
+      {% set _specs_by_skill = {} %}
+      {% for s in (sheet.get('specialties') or []) %}
+        {% set _ = _specs_by_skill.setdefault(s.skill, []).append(s.name) %}
+      {% endfor %}
+      <div>
+        <p class="label-gold mb-3 text-[0.75rem]">Skills</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+          {% for cat, traits in v5_skills %}
+          <div>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] text-bone-700 uppercase mb-1.5">{{ cat }}</p>
+            {% for key, label in traits %}
+            {% set rating = sheet.get(key, 0) %}
+            {% set specs  = _specs_by_skill.get(key, []) %}
+            <div class="border-b border-ink-800 last:border-0 flex items-center justify-between gap-2 py-1">
+              <div class="min-w-0 flex-1 flex items-baseline gap-1.5 flex-wrap">
+                <span class="font-garamond text-xs {{ 'text-bone-300' if rating > 0 else 'text-bone-700' }}">{{ label }}</span>
+                {% if specs %}
+                <span class="font-garamond text-[0.65rem] italic text-bone-500 truncate"
+                      title="{{ specs | join(' · ') }}">· {{ specs | join(', ') }}</span>
+                {% endif %}
+              </div>
+              <div class="flex gap-1 shrink-0">
+                {% for n in range(1, 6) %}
+                <span class="w-2 h-2 rounded-full {{ 'bg-[var(--clan,theme(colors.gold.500))]' if rating >= n else 'border border-bone-700' }}"></span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Disciplines — only show those with rating > 0 #}
+      {% set learned_disciplines = v5_disciplines | selectattr('0', 'in', sheet) | list %}
+      {% set nonzero_disciplines = [] %}
+      {% for key, label in v5_disciplines %}
+        {% if sheet.get(key, 0) > 0 %}
+          {% set _ = nonzero_disciplines.append((key, label)) %}
+        {% endif %}
+      {% endfor %}
+      {% if nonzero_disciplines %}
+      <div>
+        <p class="label-gold mb-3 text-[0.75rem]">Disciplines</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+          {% for key, label in nonzero_disciplines %}
+          {% set rating = sheet.get(key, 0) %}
+          {% set is_clan = key in clan_disciplines %}
+          <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
+            <div class="flex items-center gap-2">
+              <span class="font-garamond text-xs text-bone-200">{{ label }}</span>
+              {% if is_clan %}
+              <span class="font-cinzel text-[0.5rem] tracking-[0.2em] text-gold-500 uppercase">Clan</span>
+              {% endif %}
+            </div>
+            <div class="flex gap-1">
+              {% for n in range(1, 6) %}
+              <span class="w-2 h-2 rounded-full {{ 'bg-[var(--clan,theme(colors.gold.500))]' if rating >= n else 'border border-bone-700' }}"></span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# Merits / Advantages / Backgrounds / Flaws — only show panels that
+         have entries. Donations from a member to a coterie land in
+         whichever list the trait originally lived in, so all four need
+         the "Shared with coterie" chip render. #}
+      {% set _has_rated = sheet.get('merits') or sheet.get('advantages') or sheet.get('backgrounds') or sheet.get('flaws') %}
+      {% if _has_rated %}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+        {% for list_key, label, dotcolor in [
+              ('merits',      'Merits',      'gold'),
+              ('advantages',  'Advantages',  'gold'),
+              ('backgrounds', 'Backgrounds', 'gold'),
+              ('flaws',       'Flaws',       'blood'),
+        ] %}
+        {% if sheet.get(list_key) %}
+        <div>
+          <p class="label-gold mb-2 text-[0.75rem]">{{ label }}</p>
+          {% for m in sheet[list_key] %}
+          <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
+            <span class="font-garamond text-xs text-bone-300 truncate pr-2">
+              {{ m.name }}
+              {% if m.get('shared_with_coteries') %}
+              <span class="chip text-mauve-400 border-mauve-800 text-[0.5rem] ml-1"
+                    title="Shared with coterie ID(s) {{ m.shared_with_coteries | join(', ') }}">
+                Shared
+              </span>
+              {% endif %}
+            </span>
+            <div class="flex gap-1 shrink-0">
+              {% for n in range(1, 6) %}
+              <span class="w-2 h-2 rounded-full {{ ('bg-blood-bright' if dotcolor == 'blood' else 'bg-[var(--clan,theme(colors.gold.500))]') if m.dots >= n else 'border border-bone-700' }}"></span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# Rituals / Ceremonies / Formulae #}
+      {% for list_key, panel_label in [('rituals', 'Blood Sorcery Rituals'), ('ceremonies', 'Oblivion Ceremonies'), ('formulae', 'Thin-Blood Formulae')] %}
+      {% if sheet.get(list_key) %}
+      <div>
+        <p class="label-gold mb-2 text-[0.75rem]">{{ panel_label }}</p>
+        {% for item in sheet[list_key] %}
+        <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
+          <span class="font-garamond text-xs text-bone-300 truncate pr-2">{{ item.name }}</span>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="font-cinzel text-[0.55rem] tracking-widest text-bone-700 uppercase">Level</span>
+            <div class="flex gap-1">
+              {% for n in range(1, 6) %}
+              <span class="w-2 h-2 rounded-full {{ 'bg-[var(--clan,theme(colors.gold.500))]' if item.level >= n else 'border border-bone-700' }}"></span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endfor %}
+
+      {# Core traits #}
+      <div>
+        <p class="label-gold mb-2 text-[0.75rem]">Core Traits</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-2">
+          {% for key, label, max_dots in [('humanity','Humanity',10),('blood_potency','Blood Potency',5),('hunger','Hunger',5)] %}
+          {% set rating = sheet.get(key, 0) %}
+          <div class="flex items-center justify-between py-1">
+            <span class="font-garamond text-xs {{ 'text-bone-200' if rating > 0 else 'text-bone-700' }}">{{ label }}</span>
+            <div class="flex gap-1 flex-wrap">
+              {% for n in range(1, max_dots + 1) %}
+              <span class="w-2 h-2 rounded-full {{ 'bg-[var(--clan,theme(colors.gold.500))]' if rating >= n else 'border border-bone-700' }}"></span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Touchstones — V5 RAW chargen requires 2–3. The wizard stores them
+         in sheet_json.touchstones as [{name, conviction}] objects. #}
+      {% set _touchstones = sheet.get('touchstones') or [] %}
+      {% if _touchstones %}
+      <div>
+        <p class="label-gold mb-2 text-[0.75rem]">Touchstones &amp; Convictions</p>
+        <ul class="space-y-1.5">
+          {% for t in _touchstones %}
+          {% if t is mapping %}
+          <li class="border-b border-ink-800 last:border-0 py-1">
+            <p class="font-garamond text-xs text-bone-200">{{ t.name or '—' }}</p>
+            {% if t.conviction %}
+            <p class="font-garamond text-[0.65rem] text-bone-500 italic mt-0.5">{{ t.conviction }}</p>
+            {% endif %}
+          </li>
+          {% elif t %}
+          <li class="border-b border-ink-800 last:border-0 py-1">
+            <p class="font-garamond text-xs text-bone-200">{{ t }}</p>
+          </li>
+          {% endif %}
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+  {# ─────────────────────────── Overview tab ─────────────────────────── #}
+  <div x-show="tab === 'overview'" x-cloak class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+      {# Profile info #}
+      <div class="gilded p-5 lg:col-span-2">
+        <p class="label-gold mb-3">Profile</p>
+        {% if char.profile_blurb %}
+        <p class="font-garamond text-bone-400 text-sm italic leading-relaxed mb-4">
+          {{ char.profile_blurb }}
+        </p>
+        <div class="divider-gold mb-4"></div>
+        {% endif %}
+        <dl class="space-y-2.5 text-sm">
+          {# Type + Tier — shown for every character so staff can see at a
+             glance what budget the wizard enforced and whether the build
+             came through the In Memoriam (Ancilla era-builder) path. #}
+          <div>
+            <dt class="label-gold mb-0.5">Type / Tier</dt>
+            <dd class="font-garamond text-bone-300">
+              {{ (char.character_type or 'kindred') | title }}
+              {% if char.character_type == 'kindred' and char.character_tier %}
+                · {{ char.character_tier | title }}
+                {% if char.character_tier == 'ancilla' and char.ancilla_mode == 'in_memoriam' %}
+                  <span class="chip text-mauve-400 border-mauve-800 text-[0.55rem] ml-1">In Memoriam</span>
+                {% endif %}
+              {% endif %}
+              {% if char.revenant_family %}
+                · {{ char.revenant_family }}
+              {% endif %}
+            </dd>
+          </div>
+          {% for label, value in [
+            ('Concept',       char.concept),
+            ('Ambition',      char.ambition),
+            ('Desire',        char.desire),
+            ('Profession',    char.profession),
+            ('Pronouns',      char.pronouns),
+            ('True Age',      char.true_age),
+            ('Apparent Age',  char.apparent_age),
+            ('Sire',          char.sire),
+            ('Regnant',       char.ghoul_regnant),
+            ('Covenant',      char.covenant),
+            ('Predator Type', char.predator_type),
+          ] %}
+          {% if value %}
+          <div>
+            <dt class="label-gold mb-0.5">{{ label }}</dt>
+            <dd class="font-garamond text-bone-300">{{ value }}</dd>
+          </div>
+          {% endif %}
+          {% endfor %}
+          {% if char.has_ingrained_flaw %}
+          <div>
+            <dt class="label-gold mb-0.5 text-mauve-400">Ingrained Discipline Flaw</dt>
+            <dd class="font-garamond text-bone-300">
+              {{ char.ingrained_discipline | title if char.ingrained_discipline else 'Discipline TBD by staff' }}
+              <span class="text-bone-600 text-[0.7rem] ml-1">
+                ({{ char.ingrained_xp_used or 0 }} / 15 XP used)
+              </span>
+            </dd>
+          </div>
+          {% endif %}
+          {# In Memoriam — the era-builder ledger. Shown when the player
+             chose the Ancilla → In Memoriam path. Stores generation,
+             discipline spread, embrace-age band, and a list of eras. #}
+          {% if char.ancilla_mode == 'in_memoriam' and char.in_memoriam %}
+          {% set _im = char.in_memoriam %}
+          {% if _im.generation %}
+          <div>
+            <dt class="label-gold mb-0.5">Generation</dt>
+            <dd class="font-garamond text-bone-300">{{ _im.generation }}</dd>
+          </div>
+          {% endif %}
+          {% if _im.embrace_age %}
+          <div>
+            <dt class="label-gold mb-0.5">Embrace Age Band</dt>
+            <dd class="font-garamond text-bone-300">{{ _im.embrace_age | replace('_', ' ') }}</dd>
+          </div>
+          {% endif %}
+          {% if _im.discipline_spread %}
+          <div>
+            <dt class="label-gold mb-0.5">Discipline Spread</dt>
+            <dd class="font-garamond text-bone-300">{{ _im.discipline_spread }}</dd>
+          </div>
+          {% endif %}
+          {% if _im.eras %}
+          <div>
+            <dt class="label-gold mb-0.5">Lived Eras
+              <span class="text-bone-700 text-[0.6rem] normal-case ml-1">({{ _im.eras | length }})</span>
+            </dt>
+            <dd>
+              <ol class="space-y-1 mt-1">
+                {% for era in _im.eras %}
+                <li class="font-garamond text-bone-400 text-xs border-l border-mauve-800 pl-2">
+                  {{ loop.index }}. {{ (era.type or 'untyped') | title }}
+                  {% if era.gambit_taken %}
+                  <span class="text-mauve-400 text-[0.65rem]">· Gambit taken{% if era.gambit_roll %} (roll {{ era.gambit_roll }}){% endif %}</span>
+                  {% endif %}
+                  {% if era.humanity_loss %}
+                  <span class="text-blood-400 text-[0.65rem]">· −{{ era.humanity_loss }} Humanity</span>
+                  {% endif %}
+                </li>
+                {% endfor %}
+              </ol>
+            </dd>
+          </div>
+          {% endif %}
+          {% endif %}
+          <div>
+            <dt class="label-gold mb-0.5">Submitted</dt>
+            <dd class="font-cinzel text-bone-500 text-xs">{{ char.created_at[:10] }}</dd>
+          </div>
+          {% if char.approved_at %}
+          <div>
+            <dt class="label-gold mb-0.5">Approved</dt>
+            <dd class="font-cinzel text-bone-500 text-xs">{{ char.approved_at[:10] }}</dd>
+          </div>
+          {% endif %}
+          {% if char.discord_id %}
+          <div>
+            <dt class="label-gold mb-0.5">Discord ID</dt>
+            <dd class="font-cinzel text-bone-600 text-xs font-mono">{{ char.discord_id }}</dd>
+          </div>
+          {% endif %}
+        </dl>
+      </div>
+
+      {# Submission notes — what the player wrote for staff at submit. #}
+      {% if char.submission_notes %}
+      <div class="gilded p-5 border border-mauve-800">
+        <p class="label-gold text-mauve-400 mb-2">Notes from Player</p>
+        <p class="font-garamond text-bone-300 text-sm leading-relaxed whitespace-pre-line">{{ char.submission_notes }}</p>
+      </div>
+      {% endif %}
+
+      {# Backstory — staff-only long-form, never shown to other players. #}
+      {% if char.backstory %}
+      <div class="gilded p-5">
+        <p class="label-gold mb-2">Backstory <span class="text-bone-700 text-[0.55rem] normal-case tracking-widest ml-1">staff-private</span></p>
+        <p class="font-garamond text-bone-400 text-sm leading-relaxed whitespace-pre-line">{{ char.backstory }}</p>
+      </div>
+      {% endif %}
+
+      {# ST notes — staff working notes on this character. Never shown to
+         the owning player or other players. Auto-saves on blur via HTMX. #}
+      <div class="gilded p-5 border border-gold-900/40">
+        <form method="post" action="/staff/characters/{{ char.id }}/st-notes" class="space-y-2">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <div class="flex items-baseline justify-between gap-3">
+            <p class="label-gold">ST Notes
+              <span class="text-bone-700 text-[0.55rem] normal-case tracking-widest ml-1">staff-only</span>
+            </p>
+            <button type="submit" class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1">
+              Save
+            </button>
+          </div>
+          <textarea name="st_notes" rows="4" maxlength="2000"
+                    placeholder="Working notes for staff — concept follow-ups, RP reminders, period flags, anything you want to remember about this character."
+                    class="w-full text-sm resize-y font-garamond">{{ char.st_notes or '' }}</textarea>
+        </form>
+      </div>
+
+      {# Rejection reason if any #}
+      {% if char.rejection_reason %}
+      <div class="gilded border border-blood-900 p-5 lg:col-span-2">
+        <p class="label-gold text-blood-400 mb-2">Returned — Reason on File</p>
+        <p class="font-garamond text-bone-400 text-sm leading-relaxed">{{ char.rejection_reason }}</p>
+        {% if char.rejected_at %}
+        <p class="font-cinzel text-[0.6rem] text-bone-700 mt-2">{{ char.rejected_at[:10] }}</p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+  </div>
+  {# end Overview tab #}
+
+  {# ─────────────────────────── Tools tab ───────────────────────────
+       Two-column layout (collapses to one on mobile). Per Steward UX
+       feedback: the redundant "Edit Character Fields" block is gone
+       — players now self-edit via their profile page. Bio fields that
+       still need staff override live in the per-field hooks in the
+       character sheet save flow. #}
+  <div x-show="tab === 'tools'" x-cloak
+       class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+
+      {# Left column — Adjust XP (primary tool, used often) #}
+      <div class="gilded p-5">
+        <p class="label-gold mb-3">Adjust XP</p>
+
+        <form method="post" action="/staff/characters/{{ char.id }}/adjust-xp"
+              class="space-y-3">
+
+          <div>
+            <label class="label-gold block mb-1 text-[0.75rem]">Action</label>
+            <select name="action" required class="w-full text-xs">
+              <option value="grant_xp">Grant XP — give bonus from staff activity, errata, etc.</option>
+              <option value="remove_xp">Remove XP — claw back a mis-awarded amount</option>
+              <option value="refund_spend">Refund Spend — return XP from a reversed purchase</option>
+              <option value="add_spend">Add Spend — record an off-system purchase</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="label-gold block mb-1 text-[0.75rem]">Amount</label>
+            <input type="number" name="amount" required min="1" max="350"
+                   placeholder="positive integer"
+                   class="w-full text-xs">
+            <p class="font-garamond text-bone-700 text-[0.6rem] mt-1 italic">
+              Sign comes from the action — enter a positive number.
+            </p>
+          </div>
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+          <div>
+            <label class="label-gold block mb-1 text-[0.75rem]">Reason</label>
+            <textarea name="note" required rows="2"
+                      placeholder="Staff activity, correction, reversal of claim #42…"
+                      class="w-full text-xs resize-none"></textarea>
+            <p class="font-garamond text-bone-700 text-[0.6rem] mt-1 italic">
+              Each action writes a permanent ledger entry with a matching prefix.
+            </p>
+          </div>
+
+          <button type="submit"
+                  class="btn-send font-cinzel text-[0.6rem] tracking-widest w-full py-2">
+            Apply Adjustment
+          </button>
+        </form>
+      </div>
+
+      {# Lifecycle actions — manual retire / un-retire, profile lock,
+         ingrained discipline grant. All write audit. #}
+      <div class="gilded p-5 space-y-4">
+        <p class="label-gold mb-2">Lifecycle</p>
+
+        {# Status chip — always show so staff sees what's currently set #}
+        <div class="mb-3">
+          {% set _status_color = {
+            'active':   'text-gold-400 border-gold-800',
+            'inactive': 'text-bone-500 border-bone-700',
+            'retired':  'text-mauve-400 border-mauve-800',
+            'dead':     'text-blood-400 border-blood-800',
+            'pending':  'text-bone-400 border-bone-700',
+          }.get(char.status, 'text-bone-500 border-bone-700') %}
+          <span class="chip {{ _status_color }} text-[0.65rem]">
+            Status · {{ char.status | upper }}
+          </span>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          {% if char.status == 'active' %}
+          {# Inactive — soft hide from rosters but fully reversible.
+             Distinct from Retire, which carries an in-game finality. #}
+          <form method="post" action="/staff/characters/{{ char.id }}/set-status"
+                class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="hidden" name="status" value="inactive">
+            <button type="submit"
+                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5"
+                    title="Soft-hide from rosters. Reversible.">
+              Mark Inactive
+            </button>
+          </form>
+
+          {{ themed_confirm(
+               form_url='/staff/characters/' ~ char.id ~ '/retire',
+               trigger_label='Retire Now',
+               title='Retire ' ~ char.name ~ '?',
+               body='They\'ll move to the Retired list. Reversible via Un-Retire, but the IC framing assumes finality — use only when the player intends to step away.',
+               confirm_label='Retire',
+               confirm_class='btn-send',
+               trigger_class='btn-ghost px-3 py-1.5 text-blood-400 border-blood-900',
+               csrf_token=csrf_token) }}
+
+          {% elif char.status == 'inactive' %}
+          <form method="post" action="/staff/characters/{{ char.id }}/set-status"
+                class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="hidden" name="status" value="active">
+            <button type="submit"
+                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 text-gold-500 border-gold-800">
+              Mark Active
+            </button>
+          </form>
+          {{ themed_confirm(
+               form_url='/staff/characters/' ~ char.id ~ '/retire',
+               trigger_label='Retire Now',
+               title='Retire ' ~ char.name ~ '?',
+               body='Final step — moves the character to the Retired list. Reversible via Un-Retire, but treat this as the IC end of their story.',
+               confirm_label='Retire',
+               confirm_class='btn-send',
+               trigger_class='btn-ghost px-3 py-1.5 text-blood-400 border-blood-900',
+               csrf_token=csrf_token) }}
+
+          {% elif char.status in ('retired', 'dead') %}
+          {{ themed_confirm(
+               form_url='/staff/characters/' ~ char.id ~ '/unretire',
+               trigger_label='Un-Retire',
+               title='Un-Retire ' ~ char.name ~ '?',
+               body='Brings them back to the active roster. The retirement-eligibility marker is cleared so the next inactivity sweep doesn\'t re-fire.',
+               confirm_label='Un-Retire',
+               confirm_class='btn-send',
+               trigger_class='btn-ghost px-3 py-1.5 text-gold-500 border-gold-800',
+               csrf_token=csrf_token) }}
+          {% endif %}
+
+          <form method="post" action="/staff/characters/{{ char.id }}/toggle-lock"
+                class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button type="submit"
+                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+              {{ 'Unlock Profile' if char.profile_locked else 'Lock Profile' }}
+            </button>
+          </form>
+        </div>
+
+        {# Ingrained Discipline Flaw — staff grant/clear after approval #}
+        <details class="gilded-inset p-3">
+          <summary class="label-gold text-[0.78rem] cursor-pointer">
+            Ingrained Discipline Flaw
+            {% if char.has_ingrained_flaw and char.ingrained_discipline %}
+            <span class="text-mauve-400 ml-2 normal-case">· {{ char.ingrained_discipline }}</span>
+            {% elif char.has_ingrained_flaw %}
+            <span class="text-mauve-400 ml-2 normal-case">· flag set, no discipline recorded</span>
+            {% endif %}
+          </summary>
+          <form method="post" action="/staff/characters/{{ char.id }}/set-ingrained"
+                class="mt-3 flex items-end gap-2">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <div class="flex-1">
+              <label class="label-gold block mb-1 text-[0.75rem]">Discipline</label>
+              <input type="text" name="discipline" maxlength="60"
+                     value="{{ char.ingrained_discipline or '' }}"
+                     placeholder="e.g. Auspex (blank to clear)"
+                     class="w-full text-xs">
+            </div>
+            <button type="submit"
+                    class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+              Save
+            </button>
+          </form>
+          <p class="font-garamond text-bone-600 text-[0.65rem] italic mt-2 leading-relaxed">
+            Up to 15 XP of extra powers; doesn't consume a sheet slot.
+            Submit blank to remove.
+          </p>
+        </details>
+      </div>
+
+      {# Danger zone #}
+      <div class="gilded border border-ink-700 p-5" x-data="{ confirming: false }">
+        <p class="label-gold mb-1 text-bone-600">Danger Zone</p>
+        <p class="font-garamond text-bone-600 text-sm mb-3 leading-relaxed">
+          Permanently delete this character and all associated records.
+          This cannot be undone.
+        </p>
+        <div x-show="!confirming">
+          <button @click="confirming = true"
+                  class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 border-blood-900 text-blood-500 hover:text-blood-400">
+            Delete Character
+          </button>
+        </div>
+        <div x-show="confirming" x-cloak class="flex items-center gap-3">
+          <form method="post" action="/staff/characters/{{ char.id }}/delete">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button type="submit"
+                    class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+              Confirm Delete
+            </button>
+          </form>
+          <button @click="confirming = false"
+                  class="btn-ghost font-cinzel text-[0.6rem] px-3 py-1.5">
+            Cancel
+          </button>
+        </div>
+      </div>
+  </div>
+  {# end Tools tab #}
+
+  {# ─────────────────────────── Claims tab ─────────────────────────── #}
+  <div x-show="tab === 'claims'" x-cloak>
+
+      {# Claims #}
+      <div>
+        <p class="label-gold mb-3">
+          XP Claims
+          <span class="text-bone-600 ml-2">{{ claims | length }}</span>
+        </p>
+        {% if claims %}
+        <div class="gilded overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-ink-700">
+                <th class="px-4 py-3 text-left label-gold font-normal text-xs">Date</th>
+                <th class="px-4 py-3 text-left label-gold font-normal text-xs">Criteria</th>
+                <th class="px-4 py-3 text-right label-gold font-normal text-xs">XP</th>
+                <th class="px-4 py-3 text-right label-gold font-normal text-xs">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in claims %}
+              <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
+                <td class="px-4 py-2.5 font-cinzel text-xs text-bone-600 whitespace-nowrap">
+                  {{ c.submitted_at[:10] }}
+                </td>
+                <td class="px-4 py-2.5 font-garamond text-xs text-bone-400 max-w-[240px]">
+                  {% for cr in c.claimed_criteria %}
+                    {{ cr.label }}{% if not loop.last %}, {% endif %}
+                  {% endfor %}
+                </td>
+                <td class="px-4 py-2.5 font-cinzel text-xs text-gold-500 text-right">
+                  {{ c.claimed_criteria | sum(attribute='xp_value_at_submission') }}
+                </td>
+                <td class="px-4 py-2.5 text-right">
+                  <span class="font-cinzel text-[0.6rem] tracking-wider
+                    {{ 'text-gold-400' if c.status == 'approved'
+                       else 'text-blood-400' if c.status == 'rejected'
+                       else 'text-mauve-400' }}">
+                    {{ c.status | title }}
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="font-garamond text-bone-600 text-sm">No claims on record.</p>
+        {% endif %}
+      </div>
+  </div>
+  {# end Claims tab #}
+
+  {# ─────────────────────────── Spends tab (spends + ledger) ─────────────── #}
+  <div x-show="tab === 'spends'" x-cloak class="space-y-5">
+
+      {# Spends #}
+      <div>
+        <p class="label-gold mb-3">
+          XP Spends
+          <span class="text-bone-600 ml-2">{{ spends | length }}</span>
+        </p>
+        {% if spends %}
+        <div class="gilded overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-ink-700">
+                <th class="px-4 py-3 text-left label-gold font-normal text-xs">Date</th>
+                <th class="px-4 py-3 text-left label-gold font-normal text-xs">Trait</th>
+                <th class="px-4 py-3 text-left label-gold font-normal text-xs">Category</th>
+                <th class="px-4 py-3 text-right label-gold font-normal text-xs">Cost</th>
+                <th class="px-4 py-3 text-right label-gold font-normal text-xs">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in spends %}
+              <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
+                <td class="px-4 py-2.5 font-cinzel text-xs text-bone-600 whitespace-nowrap">
+                  {{ s.submitted_at[:10] }}
+                </td>
+                <td class="px-4 py-2.5 font-garamond text-xs text-bone-300">
+                  {{ s.trait_name }}
+                  <span class="text-bone-600"> {{ s.current_dots }}→{{ s.new_dots }}</span>
+                </td>
+                <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">{{ s.category }}</td>
+                <td class="px-4 py-2.5 font-cinzel text-xs text-blood-400 text-right">
+                  {{ s.verified_cost }} XP
+                </td>
+                <td class="px-4 py-2.5 text-right">
+                  <span class="font-cinzel text-[0.6rem] tracking-wider
+                    {{ 'text-gold-400' if s.status == 'approved'
+                       else 'text-blood-400' if s.status == 'rejected'
+                       else 'text-mauve-400' }}">
+                    {{ s.status | title }}
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="font-garamond text-bone-600 text-sm">No spends on record.</p>
+        {% endif %}
+      </div>
+
+      {# XP Ledger #}
+      {% if ledger %}
+      <div>
+        <p class="label-gold mb-3">XP Ledger</p>
+        <div class="gilded overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-ink-700">
+                <th class="px-4 py-3 text-left label-gold font-normal text-xs">Date</th>
+                <th class="px-4 py-3 text-left label-gold font-normal text-xs">Type</th>
+                <th class="px-4 py-3 text-left label-gold font-normal text-xs">Note</th>
+                <th class="px-4 py-3 text-right label-gold font-normal text-xs">Delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in ledger %}
+              <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors">
+                <td class="px-4 py-2.5 font-cinzel text-xs text-bone-600 whitespace-nowrap">
+                  {{ entry.created_at[:10] }}
+                </td>
+                <td class="px-4 py-2.5">
+                  <span class="font-cinzel text-xs capitalize
+                    {{ 'text-gold-500' if entry.entry_type == 'earn'
+                       else 'text-blood-400' if entry.entry_type == 'spend'
+                       else 'text-mauve-400' }}">
+                    {{ entry.entry_type }}
+                  </span>
+                </td>
+                <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">
+                  {{ entry.note or '—' }}
+                </td>
+                <td class="px-4 py-2.5 font-cinzel text-xs text-right
+                           {{ 'text-gold-400' if entry.xp_delta > 0 else 'text-blood-400' }}">
+                  {{ '+' if entry.xp_delta > 0 else '' }}{{ entry.xp_delta }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+  </div>
+  {# end Spends tab #}
+
+</div>
+{% endblock %}

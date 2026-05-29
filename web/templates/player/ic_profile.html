@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% from "_macros.html" import clan_icon %}
+{% block title %}{{ char.name }} — Enoch{% endblock %}
+
+{% block content %}
+{# Tabbed IC profile. URL fragment (#about etc.) deep-links. #}
+<div class="page-enter clan-{{ char.clan }} max-w-3xl mx-auto"
+     x-data="{ tab: (location.hash || '#identity').replace('#', '') }"
+     x-init="
+       const valid = ['identity','about','coterie'];
+       if (!valid.includes(tab)) tab = 'identity';
+       $watch('tab', v => { history.replaceState(null, '', '#' + v); });
+     ">
+
+  {# ── Back link ── #}
+  <a href="{{ '/characters' if is_owner else '/characters' }}"
+     class="inline-flex items-center gap-1.5 text-bone-600 hover:text-gold-400 font-cinzel text-xs tracking-widest uppercase mb-6 transition-colors">
+    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="square" d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    Return
+  </a>
+
+  {# ── Hero ── #}
+  <div class="relative overflow-hidden mb-6 border border-[var(--clan,theme(colors.ink.700))]
+              bg-gradient-to-b from-ink-900 to-ink-950 aurora-beam aurora-sparkle-host"
+       x-data="{ embers: null }"
+       x-init="
+         /* Drift soft embers across the hero on desktop */
+         if (window.Aurora && !window.Aurora.MOBILE && !window.Aurora.REDUCED) {
+           embers = window.Aurora.embers($el, { rateMs: 900, max: 8 });
+         }
+       ">
+    <div class="absolute inset-0 opacity-[0.05] pointer-events-none"
+         style="background:radial-gradient(ellipse at 80% 50%, var(--clan,#8B6914) 0%, transparent 70%)"></div>
+
+    <div class="relative px-6 py-7 flex items-start gap-5">
+
+      {# Avatar / monogram — wrapped with aurora-portrait for the slow
+         clan-colored rotating border. Image gets a warm portrait LUT
+         filter so even default uploads feel cinematic. #}
+      <div class="aurora-portrait w-20 h-20 shrink-0">
+        <div class="w-full h-full border border-[var(--clan,theme(colors.ink.700))]
+                    bg-ink-900 flex items-center justify-center overflow-hidden">
+          {% if char.profile_image_url %}
+            <img src="{{ char.profile_image_url }}" alt=""
+                 class="w-full h-full object-cover"
+                 style="filter: url(#aurora-portrait-warm);">
+          {% else %}
+            <span class="font-cinzel text-4xl text-[var(--clan,theme(colors.gold.400))]">
+              {{ char.name[0] | upper }}
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-0.5">
+          {{ clan_icon(char.clan, size='w-6 h-6', font_size=12) }}
+          <p class="label-gold text-[0.75rem] tracking-[0.25em]">
+            {{ char.clan | replace('-',' ') | title }}
+            {% if char.predator_type %}&thinsp;·&thinsp;{{ char.predator_type }}{% endif %}
+          </p>
+        </div>
+        <h1 class="font-cinzel text-3xl md:text-4xl text-bone-200 tracking-wide truncate">
+          {{ char.name }}
+        </h1>
+
+        <div class="flex flex-wrap gap-2 mt-3">
+          {% if char.status == 'active' %}
+            <span class="chip text-gold-400 border-gold-800">Active</span>
+          {% elif char.status == 'retired' %}
+            <span class="chip text-bone-500 border-bone-700">Retired</span>
+          {% elif char.status == 'dead' %}
+            <span class="chip text-blood-400 border-blood-800">Final Death</span>
+          {% endif %}
+          {% if coterie %}
+          <a href="/coteries/{{ coterie.id }}"
+             class="chip text-mauve-400 border-mauve-800 hover:text-bone-200 transition-colors">
+            {{ coterie.name }}
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if is_owner %}
+      <a href="/characters/{{ char.id }}/edit"
+         class="btn-ghost font-cinzel text-[0.65rem] tracking-widest px-3 py-1.5 shrink-0">
+        Edit
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Tab strip ── #}
+  <div class="flex gap-1 border-b border-ink-700 mb-6 overflow-x-auto">
+    {% for key, label in [
+      ('identity', 'Identity'),
+      ('about',    'About'),
+      ('coterie',  'Coterie'),
+    ] %}
+    <button type="button"
+            @click="tab = '{{ key }}'"
+            :class="tab === '{{ key }}'
+              ? 'border-gold-500 text-gold-300'
+              : 'border-transparent text-bone-600 hover:text-bone-400'"
+            class="px-4 py-2 font-cinzel text-xs tracking-widest uppercase border-b-2 -mb-px transition-colors whitespace-nowrap">
+      {{ label }}
+    </button>
+    {% endfor %}
+  </div>
+
+  {# ─────────────────────────── Identity tab ─────────────────────────── #}
+  <div x-show="tab === 'identity'" x-cloak>
+    <div class="gilded p-6">
+      <p class="label-gold mb-4">Particulars</p>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+        {% for label, value in [
+          ('Concept',        char.concept),
+          ('Sire',           char.sire),
+          ('Covenant',       char.covenant),
+          ('Predator Type',  char.predator_type),
+          ('Pronouns',       char.pronouns),
+          ('Profession',     char.profession),
+        ] %}
+        {% if value %}
+        <div>
+          <dt class="label-gold mb-0.5">{{ label }}</dt>
+          <dd class="font-garamond text-bone-300">{{ value }}</dd>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% if char.true_age or char.apparent_age %}
+        <div>
+          <dt class="label-gold mb-0.5">Age</dt>
+          <dd class="font-garamond text-bone-300">
+            {% if char.apparent_age %}<span title="Apparent age">~{{ char.apparent_age }}</span>{% endif %}
+            {% if char.true_age %}
+              {% if char.apparent_age %} <span class="text-bone-700">·</span> {% endif %}
+              <span class="text-bone-500" title="True age">true {{ char.true_age }}</span>
+            {% endif %}
+          </dd>
+        </div>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+
+  {# ─────────────────────────── About tab ─────────────────────────── #}
+  <div x-show="tab === 'about'" x-cloak class="space-y-5">
+
+    {# Of This Kindred — the IC blurb #}
+    {% if char.profile_blurb %}
+    <div class="gilded p-6">
+      <p class="label-gold mb-3">Of This Kindred</p>
+      <p class="font-garamond text-bone-300 text-base italic leading-relaxed whitespace-pre-line">
+        {{ char.profile_blurb }}
+      </p>
+    </div>
+    {% endif %}
+
+    {# Drives — ambition + desire if either is set #}
+    {% if char.ambition or char.desire %}
+    <div class="gilded p-6">
+      <p class="label-gold mb-4">Drives</p>
+      <dl class="space-y-4 text-sm">
+        {% if char.ambition %}
+        <div>
+          <dt class="label-gold mb-0.5">Ambition</dt>
+          <dd class="font-garamond text-bone-300 italic leading-relaxed">{{ char.ambition }}</dd>
+        </div>
+        {% endif %}
+        {% if char.desire %}
+        <div>
+          <dt class="label-gold mb-0.5">Desire</dt>
+          <dd class="font-garamond text-bone-300 italic leading-relaxed">{{ char.desire }}</dd>
+        </div>
+        {% endif %}
+      </dl>
+    </div>
+    {% endif %}
+
+    {% if not char.profile_blurb and not char.ambition and not char.desire %}
+    <p class="font-garamond text-bone-700 text-sm italic">
+      Nothing further has been shared about this one.
+    </p>
+    {% endif %}
+  </div>
+
+  {# ─────────────────────────── Coterie tab ─────────────────────────── #}
+  <div x-show="tab === 'coterie'" x-cloak>
+    {% if coterie %}
+    <div class="gilded p-6">
+      <p class="label-gold mb-2">Coterie</p>
+      <a href="/coteries/{{ coterie.id }}"
+         class="font-cinzel text-xl text-bone-200 hover:text-gold-400 transition-colors">
+        {{ coterie.name }}
+      </a>
+      {% if coterie.description %}
+      <p class="font-garamond text-bone-500 text-sm mt-2 italic leading-relaxed">
+        {{ coterie.description }}
+      </p>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="font-garamond text-bone-700 text-sm italic">
+      Unaffiliated. {{ char.name }} keeps their own counsel.
+    </p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

@@ -111,6 +111,133 @@ async def _on_spend_rejected(bot: commands.Bot, p: dict) -> None:
     await _dm(bot, p["discord_id"], e)
 
 
+@_handler("character_retired")
+async def _on_character_retired(bot: commands.Bot, p: dict) -> None:
+    name = p.get("name") or "Your character"
+    e = discord.Embed(
+        title="🪦 Character Retired",
+        description=(
+            f"**{name}** has reached the end of the 6-month retirement window "
+            "after hitting the XP cap and is now marked as **retired**.\n\n"
+            "Please reach out to staff about epilogue or starting a new character."
+        ),
+        color=0x8B1A1A,
+    )
+    await _dm(bot, p["discord_id"], e)
+
+
+# ── Coterie events ────────────────────────────────────────────────────────────
+
+@_handler("coterie_request_approved")
+async def _on_coterie_request_approved(bot: commands.Bot, p: dict) -> None:
+    name = p.get("coterie_name") or "Your coterie"
+    e = discord.Embed(
+        title="🩸 Coterie Formed",
+        description=(
+            f"**{name}** has been approved by staff and is now active.\n\n"
+            "Use `/coterie status` to view the domain dots, members, and roles."
+        ),
+        color=0xC8A85B,
+    )
+    await _dm(bot, p["discord_id"], e)
+
+
+@_handler("coterie_request_rejected")
+async def _on_coterie_request_rejected(bot: commands.Bot, p: dict) -> None:
+    proposed = p.get("proposed_name") or "Your coterie request"
+    reason   = p.get("reason") or "No reason provided."
+    e = discord.Embed(
+        title="❌ Coterie Request Rejected",
+        description=(
+            f"Your request to form **{proposed}** was rejected by staff.\n\n"
+            f"**Reason:** {reason}"
+        ),
+        color=0x8B1A1A,
+    )
+    await _dm(bot, p["discord_id"], e)
+
+
+@_handler("coterie_spend_approved")
+async def _on_coterie_spend_approved(bot: commands.Bot, p: dict) -> None:
+    coterie = p.get("coterie_name") or "your coterie"
+    trait   = (p.get("trait_name") or "domain").title()
+    cur     = p.get("current_dots", 0)
+    new     = p.get("new_dots", 0)
+    cost    = p.get("per_member_cost", 0)
+    e = discord.Embed(
+        title="✅ Coterie Domain Upgraded",
+        description=(
+            f"**{coterie}** has upgraded **{trait}** from {cur} → {new}.\n\n"
+            f"**{cost} XP** has been deducted from your character."
+        ),
+        color=0xC8A85B,
+    )
+    await _dm(bot, p["discord_id"], e)
+
+
+@_handler("coterie_spend_rejected")
+async def _on_coterie_spend_rejected(bot: commands.Bot, p: dict) -> None:
+    coterie = p.get("coterie_name") or "your coterie"
+    trait   = (p.get("trait_name") or "domain").title()
+    reason  = p.get("reason") or "No reason provided."
+    e = discord.Embed(
+        title="❌ Coterie Spend Rejected",
+        description=(
+            f"**{coterie}**'s domain upgrade for **{trait}** was rejected by staff.\n\n"
+            f"**Reason:** {reason}\n\n"
+            "No XP was deducted."
+        ),
+        color=0x8B1A1A,
+    )
+    await _dm(bot, p["discord_id"], e)
+
+
+# ── Period events ─────────────────────────────────────────────────────────────
+
+@_handler("period_closing_soon")
+async def _on_period_closing_soon(bot: commands.Bot, p: dict) -> None:
+    """Post a closing-soon announcement to the chronicle channel.
+    Silent no-op if CHRONICLE_CHANNEL_ID isn't configured."""
+    channel_id = settings.CHRONICLE_CHANNEL_ID
+    if not channel_id:
+        log.info("period_closing_soon: CHRONICLE_CHANNEL_ID unset — skipping announcement")
+        return
+
+    try:
+        channel = bot.get_channel(channel_id) or await bot.fetch_channel(channel_id)
+    except discord.NotFound:
+        log.warning("Chronicle channel %s not found", channel_id)
+        return
+    except discord.Forbidden:
+        log.warning("Bot lacks access to chronicle channel %s", channel_id)
+        return
+
+    label  = p.get("label") or "the current XP window"
+    closes = p.get("closes_at") or ""
+    ptype  = (p.get("period_type") or "").title()
+    phase  = (p.get("phase") or "").title()
+
+    e = discord.Embed(
+        title="⏳ XP Window Closing Soon",
+        description=(
+            f"**{label}** closes in less than 24 hours.\n\n"
+            "Submit any pending XP claims before the window shuts. "
+            "Use `/xp submit` or visit the web roster to file."
+        ),
+        color=0xC8A85B,
+    )
+    if ptype or phase:
+        e.add_field(name="Period", value=f"{ptype} · {phase}".strip(" ·"), inline=True)
+    if closes:
+        # Chop trailing 'Z' off ISO for cleaner display
+        pretty = closes[:16].replace("T", " ")
+        e.add_field(name="Closes (UTC)", value=pretty, inline=True)
+    try:
+        await channel.send(embed=e)
+    except Exception as exc:
+        log.error("Failed to post period_closing_soon: %s", exc)
+
+
 # ── Cog ───────────────────────────────────────────────────────────────────────
 
 class OutboxCog(commands.Cog):

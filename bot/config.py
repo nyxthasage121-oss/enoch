@@ -9,7 +9,7 @@ class BotSettings:
     # ── Discord ───────────────────────────────────────────────────
     DISCORD_BOT_TOKEN: str      = os.getenv("DISCORD_BOT_TOKEN", "")
     DISCORD_GUILD_ID: int | None = (
-        int(os.getenv("DISCORD_GUILD_ID", 0)) or None
+        int(os.getenv("DISCORD_GUILD_ID") or 0) or None
     )
 
     # ── Web API ───────────────────────────────────────────────────
@@ -18,7 +18,7 @@ class BotSettings:
 
     # ── Tuning ────────────────────────────────────────────────────
     # How often (seconds) to poll the web API outbox
-    OUTBOX_POLL_INTERVAL: int = int(os.getenv("OUTBOX_POLL_INTERVAL", "10"))
+    OUTBOX_POLL_INTERVAL: int = int(os.getenv("OUTBOX_POLL_INTERVAL") or "10")
 
 
 settings = BotSettings()

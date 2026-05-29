@@ -51,6 +51,31 @@
   </div>
   {% endif %}
 
+  {# Resumed-draft banner #}
+  {% if draft_claim %}
+  <div class="gilded-inset px-4 py-3 mb-4 border border-mauve-800 flex items-center justify-between gap-3">
+    <p class="font-garamond text-mauve-300 text-sm">
+      {% if draft_saved %}
+      <span class="font-cinzel tracking-widest text-[0.6rem] text-mauve-400 mr-2">DRAFT SAVED</span>
+      {% else %}
+      <span class="font-cinzel tracking-widest text-[0.6rem] text-mauve-400 mr-2">RESUMING DRAFT</span>
+      {% endif %}
+      Last edit
+      {{ draft_claim.submitted_at[:16] | replace('T', ' ') }} UTC.
+    </p>
+    <form hx-post="/characters/{{ char.id }}/claim/{{ draft_claim.id }}/discard"
+          hx-target="#claim-section"
+          hx-swap="outerHTML"
+          hx-confirm="Discard this draft? Any saved selections will be lost."
+          class="inline">
+      <button type="submit"
+              class="font-cinzel text-[0.6rem] tracking-widest text-blood-500 hover:text-blood-400">
+        Discard Draft
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
   {# Errors #}
   {% if claim_errors %}
   <div class="gilded-inset px-4 py-3 mb-4 border border-blood-900">
@@ -62,11 +87,23 @@
   </div>
   {% endif %}
 
-  <form hx-post="/characters/{{ char.id }}/claim"
+  {# Compute the "active" set of selections — error replay > draft pre-fill > empty. #}
+  {% set selected_ids = claim_form.criteria_ids if claim_form else (draft_claim.claimed_criteria | map(attribute='criteria_id') | list if draft_claim else []) %}
+  {% set initial_links = claim_form.rp_links if claim_form else (draft_claim.rp_links if draft_claim else ['']) %}
+  {% set initial_path = (claim_form.path if claim_form else (draft_claim.path if draft_claim else 'none')) %}
+
+  <form x-data="{ asDraft: false }"
+        hx-post="/characters/{{ char.id }}/claim"
         hx-target="#claim-section"
         hx-swap="outerHTML"
         hx-indicator="#claim-spinner"
         class="space-y-5">
+
+    {# Hidden draft tracking — set by Save Draft handler, read by route #}
+    <input type="hidden" name="as_draft" :value="asDraft ? '1' : ''">
+    {% if draft_claim %}
+    <input type="hidden" name="draft_id" value="{{ draft_claim.id }}">
+    {% endif %}
 
     {# Period info #}
     <div class="gilded p-4">
@@ -85,17 +122,17 @@
         {% for c in player_criteria %}
         <label class="flex items-start gap-3 px-4 py-3 border border-ink-700
                       hover:border-gold-800 cursor-pointer transition-colors
-                      {% if claim_form and c.id in claim_form.criteria_ids %}bg-ink-900{% endif %}">
+                      {% if c.id in selected_ids %}bg-ink-900{% endif %}">
           <input type="checkbox"
                  name="criteria_ids"
                  value="{{ c.id }}"
                  class="mt-0.5 accent-[#8B1A1A]"
-                 {% if claim_form and c.id in claim_form.criteria_ids %}checked{% endif %}>
+                 {% if c.id in selected_ids %}checked{% endif %}>
           <span class="flex-1 min-w-0">
             <span class="font-cinzel text-bone-300 text-sm">{{ c.label }}</span>
             <span class="font-cinzel text-gold-500 text-xs ml-2">+{{ c.xp_value }} XP</span>
             {% if c.requires_rp_links %}
-              <span class="label-gold ml-2 text-[0.55rem]">links required</span>
+              <span class="label-gold ml-2 text-[0.7rem]">links required</span>
             {% endif %}
             {% if c.description %}
               <span class="block font-garamond text-bone-600 text-xs mt-0.5">{{ c.description }}</span>
@@ -108,7 +145,7 @@
     {% endif %}
 
     {# RP Links — Alpine-managed list #}
-    <div x-data='{ links: {{ (claim_form.rp_links if claim_form else [""]) | tojson }} }'>
+    <div x-data='{ links: {{ initial_links | tojson }} }'>
       <p class="label-gold mb-2">RP Links <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(Discord message URLs)</span></p>
       <div class="space-y-2">
         <template x-for="(link, idx) in links" :key="idx">
@@ -138,16 +175,21 @@
       </button>
     </div>
 
-    {# Path: none / staff / helper — only show if staff/helper exists in criteria #}
-    {# For now, hidden — added when staff/helper path is needed #}
-
-    {# Submit #}
-    <div class="flex items-center gap-3">
-      <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
-        Submit Claim
+    {# Submit / Save Draft #}
+    <div class="flex items-center gap-3 aurora-sparkle-host">
+      <button type="submit"
+              @click="asDraft = false; if(window.Aurora) window.Aurora.sparkles($el.parentElement, 12)"
+              class="btn-send font-cinzel tracking-widest text-xs aurora-beam aurora-pulse">
+        {% if draft_claim %}Submit Draft{% else %}Submit Claim{% endif %}
+      </button>
+      <button type="submit"
+              @click="asDraft = true"
+              title="Save what you have so far — come back later to finish."
+              class="btn-ghost font-cinzel tracking-widest text-xs">
+        Save Draft
       </button>
       <span id="claim-spinner" class="htmx-indicator font-garamond text-bone-600 text-xs italic">
-        Submitting…
+        Saving…
       </span>
     </div>
 

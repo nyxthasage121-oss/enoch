@@ -1,10 +1,42 @@
-{# pending_chars_table.html — pending character approvals #}
-<div id="pending-chars-table">
+{# pending_chars_table.html — pending character approvals with bulk actions #}
+<div id="pending-chars-table" x-data="pendingQueue()">
   {% if pending %}
-  <div class="gilded overflow-hidden">
+  <div class="gilded">
+
+    {# Bulk action toolbar — appears when one or more rows are selected #}
+    <div class="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-ink-700">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox"
+               @change="toggleAll($event)"
+               :checked="allSelected"
+               :indeterminate.camel="selected.length > 0 && !allSelected"
+               class="accent-mauve-400">
+        <span class="font-cinzel text-[0.6rem] tracking-widest text-bone-500">
+          <span x-show="selected.length === 0">Select all</span>
+          <span x-show="selected.length > 0" x-cloak>
+            <span x-text="selected.length"></span> selected
+          </span>
+        </span>
+      </label>
+      <div x-show="selected.length > 0" x-cloak class="flex gap-1.5">
+        <button @click="bulkAction('start-review', $event)"
+                title="Start review on every selected character (locks player sheets)"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+          Start Review
+        </button>
+        <button @click="bulkAction('approve', $event)"
+                hx-confirm="Approve all selected characters?"
+                class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+          Approve
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b border-ink-700">
+        <tr class="border-b border-ink-800">
+          <th class="px-3 py-3 w-8"></th>
           <th class="px-4 py-3 text-left label-gold font-normal text-xs">Character</th>
           <th class="px-4 py-3 text-left label-gold font-normal text-xs">Player</th>
           <th class="px-4 py-3 text-left label-gold font-normal text-xs">Details</th>
@@ -16,14 +48,28 @@
         {% for char in pending %}
         <tr class="border-b border-ink-800 align-top"
             x-data="{ rejecting: false, reason: '' }">
+          <td class="px-3 py-3">
+            <input type="checkbox"
+                   :value="{{ char.id }}"
+                   x-model.number="selected"
+                   class="accent-mauve-400">
+          </td>
           <td class="px-4 py-3">
-            <p class="font-cinzel text-xs text-bone-300">{{ char.name }}</p>
-            <p class="font-cinzel text-[0.6rem] text-bone-600 mt-0.5">{{ char.clan }}</p>
+            <a href="/staff/characters/{{ char.id }}"
+               class="font-cinzel text-xs text-bone-300 hover:text-gold-400 transition-colors">
+              {{ char.name }}
+            </a>
+            <p class="font-cinzel text-[0.6rem] text-bone-600 mt-0.5">
+              {{ char.clan or (char.character_type | title) }}
+              {% if char.character_tier and char.character_tier != 'neonate' %}
+                · <span class="text-mauve-500">{{ char.character_tier | title }}</span>
+              {% endif %}
+            </p>
           </td>
           <td class="px-4 py-3 font-garamond text-xs text-bone-500">
             {{ char.player_username or char.discord_id }}
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-3 max-w-xs">
             {% if char.concept %}
             <p class="font-garamond text-xs text-bone-500">{{ char.concept }}</p>
             {% endif %}
@@ -33,12 +79,37 @@
             {% if char.has_ingrained_flaw %}
             <span class="chip text-mauve-400 border-mauve-800 text-[0.55rem] mt-1">Ingrained Flaw</span>
             {% endif %}
+            {% if char.submission_notes %}
+            <details class="mt-1.5">
+              <summary class="font-cinzel text-[0.55rem] tracking-widest text-mauve-500 cursor-pointer hover:text-mauve-400">
+                Player Note
+              </summary>
+              <p class="font-garamond text-[0.7rem] text-bone-400 italic mt-1 leading-relaxed whitespace-pre-line border-l border-mauve-900 pl-2">
+                {{ char.submission_notes }}
+              </p>
+            </details>
+            {% endif %}
           </td>
           <td class="px-4 py-3 font-cinzel text-[0.6rem] text-bone-600 text-right whitespace-nowrap">
             {{ char.created_at[:10] }}
           </td>
           <td class="px-4 py-3 text-right">
-            <div x-show="!rejecting" class="flex gap-1.5 justify-end">
+            <div x-show="!rejecting" class="flex gap-1.5 justify-end flex-wrap">
+              {% if not char.review_started_at %}
+              <button hx-post="/staff/characters/{{ char.id }}/start-review"
+                      hx-target="#pending-chars-table"
+                      hx-swap="outerHTML"
+                      hx-confirm="Start review? The player's sheet will lock until you approve or return."
+                      title="Locks the player out of editing while you review"
+                      class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+                Start Review
+              </button>
+              {% else %}
+              <span class="chip text-mauve-400 border-mauve-700 text-[0.55rem] mr-1"
+                    title="Sheet locked since {{ char.review_started_at[:16] | replace('T', ' ') }} UTC">
+                Under Review
+              </span>
+              {% endif %}
               <button hx-post="/staff/characters/{{ char.id }}/approve"
                       hx-target="#pending-chars-table"
                       hx-swap="outerHTML"
@@ -78,8 +149,52 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   {% else %}
   <p class="font-garamond text-bone-600 text-sm px-1">No characters pending approval.</p>
   {% endif %}
 </div>
+
+<script>
+  // Re-defined on every HTMX swap. Alpine binds new instances cleanly.
+  function pendingQueue() {
+    return {
+      selected: [],
+      allIds: {{ (pending or []) | map(attribute='id') | list | tojson }},
+      get allSelected() {
+        return this.allIds.length > 0 && this.selected.length === this.allIds.length;
+      },
+      toggleAll(ev) {
+        this.selected = ev.target.checked ? [...this.allIds] : [];
+      },
+      bulkAction(verb, ev) {
+        if (this.selected.length === 0) return;
+        if (verb === 'approve' && !confirm(`Approve all ${this.selected.length} selected characters?`)) return;
+        if (verb === 'start-review' && !confirm(`Start review on all ${this.selected.length} selected characters? Their sheets will lock.`)) return;
+
+        // Build a hidden form on the fly and submit it. htmx would also
+        // work, but a real form keeps CSRF handling identical to the
+        // other endpoints and forces a full reload of the table.
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/staff/queue/bulk-${verb}`;
+        form.style.display = 'none';
+
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta) {
+          const tok = document.createElement('input');
+          tok.type = 'hidden'; tok.name = '_csrf'; tok.value = csrfMeta.content;
+          form.appendChild(tok);
+        }
+        for (const id of this.selected) {
+          const inp = document.createElement('input');
+          inp.type = 'hidden'; inp.name = 'character_ids'; inp.value = id;
+          form.appendChild(inp);
+        }
+        document.body.appendChild(form);
+        form.submit();
+      },
+    };
+  }
+</script>

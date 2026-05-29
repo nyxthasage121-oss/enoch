@@ -3,7 +3,7 @@
    HTMX target: #spend-form (outerHTML swap). #}
 
 <div id="spend-form"
-     x-data="spendForm({{ spend_rules_json | safe }}, {{ humanity_conditions | tojson }})">
+     x-data="spendForm({{ spend_rules_json | safe | forceescape }}, {{ humanity_conditions | tojson | forceescape }})">
 
   {% if not char.is_approved %}
   <div class="gilded p-6">
@@ -161,10 +161,11 @@
     </div>
 
     {# Submit #}
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 aurora-sparkle-host">
       <button type="submit"
               :disabled="!category || !computedCost"
-              class="btn-send font-cinzel tracking-widest text-xs disabled:opacity-40 disabled:cursor-not-allowed">
+              @click="if(category && computedCost && window.Aurora) window.Aurora.sparkles($el.parentElement, 12)"
+              class="btn-send font-cinzel tracking-widest text-xs disabled:opacity-40 disabled:cursor-not-allowed aurora-beam aurora-pulse">
         Submit Request
       </button>
       <span id="spend-spinner" class="htmx-indicator font-garamond text-bone-600 text-xs italic">

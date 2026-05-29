@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Audit Log — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-6 flex items-start justify-between flex-wrap gap-4">
+    <div>
+      <p class="label-gold mb-1">Staff</p>
+      <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Audit Log</h1>
+    </div>
+
+    {# Filter bar #}
+    <form method="GET" action="/staff/audit"
+          class="flex flex-wrap gap-2 items-end">
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Type</label>
+        <select name="type" class="text-xs py-1.5 px-2">
+          <option value="">All</option>
+          {% for t in ['character','claim','spend','coterie_request','coterie_spend'] %}
+          <option value="{{ t }}" {{ 'selected' if filter_type == t }}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Action</label>
+        <select name="action" class="text-xs py-1.5 px-2">
+          <option value="">All</option>
+          {% for a in known_actions %}
+          <option value="{{ a }}" {{ 'selected' if filter_action == a }}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Actor ID</label>
+        <input type="text" name="actor" value="{{ filter_actor or '' }}"
+               placeholder="Discord ID" class="text-xs py-1.5 px-2 w-36">
+      </div>
+      <button type="submit" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+        Filter
+      </button>
+      {% if filter_type or filter_actor or filter_action %}
+      <a href="/staff/audit" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+        Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="gilded overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">When</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Actor</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Action</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Target</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Before → After</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr class="border-b border-ink-800">
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-600 whitespace-nowrap">
+            {{ e.created_at[:16].replace('T', ' ') }}
+          </td>
+          <td class="px-4 py-2.5 text-xs">
+            {# Actor cell — always surfaces *someone*:
+                 1) "system" / "dev-seed" / "smoke" → labelled chip
+                 2) Recognised player → username + optional staff-role chip
+                 3) Unknown discord id → fallback ID in mono, so investigations
+                    can still trace the actor through the ledger. #}
+            {% set _sys_actors = ('system', 'dev-seed', 'smoke', 'bot') %}
+            {% if e.actor_id in _sys_actors %}
+              <span class="font-cinzel text-gold-500 tracking-wider uppercase text-[0.6rem]">
+                {{ e.actor_id | title }}
+              </span>
+            {% elif e.actor_username %}
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-cinzel text-bone-200">{{ e.actor_username }}</span>
+                {% if e.actor_staff_role %}
+                <span class="chip text-gold-400 border-gold-800 text-[0.55rem]">
+                  {{ e.actor_staff_role | replace('_', ' ') | upper }}
+                </span>
+                {% endif %}
+              </div>
+            {% else %}
+              <span class="font-mono text-[0.65rem] text-bone-600" title="Unknown actor — likely deactivated player">
+                ? {{ e.actor_id[:12] }}…
+              </span>
+            {% endif %}
+          </td>
+          {# Color-code the action chip by verb so a glance distinguishes
+             approvals (gold), rejections/deletes (blood), edits (mauve). #}
+          {% set _action_color = (
+            'text-gold-400 border-gold-800'  if e.action.startswith(('approve_', 'create_')) else
+            'text-blood-400 border-blood-800' if e.action.startswith(('reject_', 'delete_', 'discard_')) else
+            'text-mauve-400 border-mauve-800' if e.action.startswith(('update_', 'set_', 'upsert_', 'commit_', 'toggle_')) else
+            'text-bone-400 border-bone-700'
+          ) %}
+          <td class="px-4 py-2.5 whitespace-nowrap">
+            <span class="chip {{ _action_color }} text-[0.6rem]">{{ e.action }}</span>
+          </td>
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-400">
+            {{ e.target_type }}
+            {% if e.target_id %}
+              <span class="text-bone-700">#{{ e.target_id }}</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 font-mono text-[0.6rem] text-bone-600 max-w-sm">
+            {% if e.before_json %}
+              <span class="text-blood-400">{{ e.before_json[:80] }}</span>
+            {% endif %}
+            {% if e.before_json and e.after_json %}
+              <span class="text-bone-700 mx-1">→</span>
+            {% endif %}
+            {% if e.after_json %}
+              <span class="text-gold-600">{{ e.after_json[:80] }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="px-4 py-8 text-center font-garamond text-bone-700 italic">
+            No audit entries found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if entries | length >= 100 %}
+  <p class="mt-3 font-garamond text-xs text-bone-700 italic text-right">
+    Showing up to 100 entries — use filters to narrow results.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

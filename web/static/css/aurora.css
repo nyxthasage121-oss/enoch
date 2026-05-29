@@ -1,0 +1,316 @@
+/* aurora.css — Aceternity-flavored visual layer for Enoch.
+ * Built on top of codex.css. Adds: animated glow utilities, sparkle
+ * markup styling, beam-sweep, pulse-glow, drifting embers, global
+ * cinematic LUT applied via SVG feColorMatrix.
+ *
+ * Performance philosophy:
+ *   - Desktop: full effects, including animated gradients + filters
+ *   - Mobile: heavy filters drop, animations simplify to fades
+ *   - prefers-reduced-motion: everything goes static
+ */
+
+/* ─────────────────────────────────────────────────────────────
+ * Cinematic LUT — applied to <body> as a subtle global grade.
+ * Hue-shifts highlights toward gold and shadows toward deep mauve,
+ * gives the whole UI a unified film-cut feel. Lighter than a true
+ * 3D LUT but cheap enough to keep on every page.
+ * ───────────────────────────────────────────────────────────── */
+body {
+  /* Inline SVG filter — keeps the asset path simple. */
+  filter: url(#aurora-grade);
+}
+
+/* Disable the LUT on mobile (filters are expensive on weak GPUs) and
+   on iframes/leaflet (it would tint the basemap). */
+@media (max-width: 1024px) {
+  body { filter: none; }
+}
+.leaflet-container,
+.leaflet-container * { filter: none !important; }
+
+/* Some users disable color filters entirely (high-contrast modes). */
+@media (prefers-contrast: more) {
+  body { filter: none; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Animation keyframes — reused across the app
+ * ───────────────────────────────────────────────────────────── */
+
+/* Slow rotating conic gradient — used for animated borders */
+@keyframes aurora-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Diagonal sweep — beam effect crossing a panel or button */
+@keyframes aurora-sweep {
+  0%   { transform: translateX(-100%) skewX(-20deg); opacity: 0; }
+  15%  { opacity: 0.6; }
+  85%  { opacity: 0.6; }
+  100% { transform: translateX(220%) skewX(-20deg); opacity: 0; }
+}
+
+/* Slow breathing glow — pulses outward */
+@keyframes aurora-pulse {
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(212, 169, 77, 0.20); }
+  50%      { box-shadow: 0 0 18px 4px rgba(212, 169, 77, 0.55); }
+}
+
+/* Blood-tinted variant for danger / active claims */
+@keyframes aurora-pulse-blood {
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(192, 64, 64, 0.25); }
+  50%      { box-shadow: 0 0 16px 4px rgba(192, 64, 64, 0.60); }
+}
+
+/* Ember drift — used by particle sparkles on hero areas */
+@keyframes aurora-ember {
+  0%   { transform: translateY(0)    translateX(0) scale(1);   opacity: 0; }
+  10%  { opacity: 0.9; }
+  100% { transform: translateY(-120px) translateX(var(--dx, 8px)) scale(0.4); opacity: 0; }
+}
+
+/* Sparkle burst — short-lived twinkle */
+@keyframes aurora-sparkle {
+  0%   { transform: scale(0)   rotate(0deg);   opacity: 0; }
+  20%  { transform: scale(1.2) rotate(45deg);  opacity: 1; }
+  100% { transform: scale(0.6) rotate(180deg); opacity: 0; }
+}
+
+/* Slow color hue shift — backdrop gradients */
+@keyframes aurora-hue {
+  0%, 100% { filter: hue-rotate(0deg); }
+  50%      { filter: hue-rotate(15deg); }
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Utility classes
+ * ───────────────────────────────────────────────────────────── */
+
+/* Aceternity-style animated gradient border. Wrap an element in this
+   for a slow-rotating conic gold/blood gradient border. */
+.aurora-border {
+  position: relative;
+  isolation: isolate;
+}
+.aurora-border::before {
+  content: "";
+  position: absolute; inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from 0deg,
+    rgba(212, 169, 77, 0.0) 0%,
+    rgba(212, 169, 77, 0.7) 25%,
+    rgba(176, 48, 48, 0.5) 50%,
+    rgba(176, 138, 160, 0.4) 75%,
+    rgba(212, 169, 77, 0.0) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: aurora-spin 8s linear infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Clan-aware variant — picks up the --clan custom prop set by clan-X */
+.aurora-border-clan::before {
+  background: conic-gradient(
+    from 0deg,
+    rgba(0,0,0,0) 0%,
+    var(--clan, #d4a94d) 35%,
+    rgba(176, 48, 48, 0.4) 60%,
+    rgba(0,0,0,0) 100%
+  );
+}
+
+/* Slow breathing border — for "active" / "pending" items */
+.aurora-pulse        { animation: aurora-pulse 3.2s ease-in-out infinite; }
+.aurora-pulse-blood  { animation: aurora-pulse-blood 2.6s ease-in-out infinite; }
+
+/* Diagonal beam sweep across an element on hover. The wrapper needs
+   position: relative + overflow: hidden. */
+.aurora-beam {
+  position: relative;
+  overflow: hidden;
+}
+.aurora-beam::after {
+  content: "";
+  position: absolute; top: 0; bottom: 0;
+  left: 0; width: 30%;
+  background: linear-gradient(110deg,
+    transparent 0%,
+    rgba(212, 169, 77, 0.18) 40%,
+    rgba(255, 235, 200, 0.35) 50%,
+    rgba(212, 169, 77, 0.18) 60%,
+    transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-100%) skewX(-20deg);
+}
+.aurora-beam:hover::after,
+.aurora-beam.aurora-beam-auto::after {
+  animation: aurora-sweep 1.6s ease-out;
+}
+
+/* Auto-sweep — fires repeatedly without hover. Use sparingly. */
+.aurora-beam.aurora-beam-auto::after {
+  animation: aurora-sweep 6s ease-out infinite;
+}
+
+/* Pulsing count badge — for pending counts that demand attention */
+.aurora-badge-pulse {
+  position: relative;
+}
+.aurora-badge-pulse::before {
+  content: "";
+  position: absolute; inset: -6px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(176, 48, 48, 0.45) 0%, transparent 70%);
+  animation: aurora-pulse-blood 2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Subtle hero vignette — for landing + character portraits */
+.aurora-vignette {
+  position: relative;
+}
+.aurora-vignette::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.65) 100%);
+  pointer-events: none;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Sparkle particles
+ * Set `.aurora-sparkle-host` on a positioned container, then JS
+ * (aurora.js) injects child spans on demand.
+ * ───────────────────────────────────────────────────────────── */
+.aurora-sparkle-host {
+  position: relative;
+  pointer-events: none;
+}
+.aurora-spark {
+  position: absolute;
+  width: 8px; height: 8px;
+  background: radial-gradient(circle, rgba(255, 235, 180, 1) 0%,
+                                       rgba(212, 169, 77, 0.6) 40%,
+                                       transparent 70%);
+  border-radius: 50%;
+  animation: aurora-sparkle 1.2s ease-out forwards;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+/* Ember particles — slower, ride upward */
+.aurora-ember {
+  position: absolute;
+  width: 3px; height: 3px;
+  background: radial-gradient(circle, rgba(255, 180, 80, 1) 0%,
+                                       rgba(192, 80, 30, 0.6) 50%,
+                                       transparent 80%);
+  border-radius: 50%;
+  animation: aurora-ember 4s ease-out forwards;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Hero shader canvas wrapper — placed behind content on landing
+ * ───────────────────────────────────────────────────────────── */
+.aurora-hero-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* Static CSS fallback when WebGL is unavailable or on mobile */
+.aurora-hero-fallback {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(176, 48, 48, 0.18) 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 30%, rgba(176, 138, 160, 0.15) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 90%, rgba(212, 169, 77, 0.12) 0%, transparent 50%),
+    linear-gradient(180deg, #0f0b0d 0%, #1a1218 60%, #0a0608 100%);
+  background-size: 200% 200%;
+  animation: aurora-hue 18s ease-in-out infinite;
+  z-index: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Portrait frame — clan-aware animated border on character images
+ * ───────────────────────────────────────────────────────────── */
+.aurora-portrait {
+  position: relative;
+  isolation: isolate;
+}
+.aurora-portrait::before {
+  content: "";
+  position: absolute; inset: -3px;
+  background: conic-gradient(
+    from 180deg,
+    transparent 0%,
+    var(--clan, #d4a94d) 30%,
+    rgba(255, 235, 200, 0.8) 50%,
+    var(--clan, #d4a94d) 70%,
+    transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  padding: 3px;
+  animation: aurora-spin 14s linear infinite;
+  pointer-events: none;
+  opacity: 0.7;
+  z-index: -1;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * HTMX loading polish — turn `.htmx-indicator` spans into a
+ * subtle pulsing gold dot when the htmx-request class fires.
+ * Lighter than a spinner, matches the codex aesthetic.
+ * ───────────────────────────────────────────────────────────── */
+.htmx-indicator {
+  display: none;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.htmx-request .htmx-indicator::before,
+.htmx-request.htmx-indicator::before {
+  content: "";
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 235, 180, 1) 0%,
+                                       rgba(212, 169, 77, 0.6) 60%,
+                                       transparent 80%);
+  animation: aurora-pulse 0.9s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Honor reduced motion across the board
+ * ───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-border::before,
+  .aurora-portrait::before     { animation: none; }
+  .aurora-pulse,
+  .aurora-pulse-blood          { animation: none; }
+  .aurora-beam::after          { display: none; }
+  .aurora-badge-pulse::before  { animation: none; opacity: 0.5; }
+  .aurora-hero-fallback        { animation: none; }
+  .aurora-spark, .aurora-ember { animation-duration: 0.001s; }
+  body                          { filter: none; }
+}

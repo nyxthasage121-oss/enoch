@@ -37,7 +37,16 @@ document.addEventListener('htmx:afterRequest', (e) => {
     const msg = e.detail.xhr.getResponseHeader('X-Enoch-Toast');
     if (!msg) return;
     const kind = e.detail.xhr.getResponseHeader('X-Enoch-Toast-Kind') || 'info';
-    Alpine.store('toast').show(msg, kind);
+    // Defensive: if Alpine hasn't initialised yet (rare race on first POST
+    // before alpine:init fires), don't let a thrown ReferenceError abort
+    // the HTMX swap pipeline — the swap is what the user cares about.
+    try {
+        if (typeof Alpine !== 'undefined' && Alpine.store('toast')) {
+            Alpine.store('toast').show(msg, kind);
+        }
+    } catch (err) {
+        console.warn('toast store unavailable:', err);
+    }
 });
 
 // Attach CSRF token to every HTMX request

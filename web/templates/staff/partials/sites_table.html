@@ -1,0 +1,147 @@
+{# sites_table.html — full CRUD with inline edit. View shows name +
+   area + control coterie + sect. Edit reveals all fields including the
+   per-predator-type DC grid. #}
+<div id="sites-table">
+  <div class="gilded overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Name</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Area</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Sect</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Control</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Description</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Active</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sites %}
+        <tr class="border-b border-ink-800 align-top {{ 'opacity-40' if not s.active }}"
+            x-data="{ editing: false }">
+
+          {# Name #}
+          <td class="px-4 py-2.5">
+            <p class="font-cinzel text-xs text-bone-300" x-show="!editing">{{ s.name }}</p>
+            <input x-show="editing" x-cloak form="site-edit-{{ s.id }}"
+                   name="name" value="{{ s.name }}" class="text-xs py-1 px-2 w-full">
+          </td>
+
+          {# Area (column renamed from Borough — DB column stays) #}
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">
+            <span x-show="!editing">{{ s.borough }}</span>
+            <select x-show="editing" x-cloak form="site-edit-{{ s.id }}"
+                    name="borough" class="text-xs py-1 px-2">
+              {% for b in boroughs %}
+              <option value="{{ b }}" {{ 'selected' if s.borough == b }}>{{ b }}</option>
+              {% endfor %}
+            </select>
+          </td>
+
+          {# Sect Control #}
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-400">
+            <span x-show="!editing">{{ s.sect_control or '—' }}</span>
+            <input x-show="editing" x-cloak form="site-edit-{{ s.id }}"
+                   name="sect_control" maxlength="80"
+                   value="{{ s.sect_control or '' }}"
+                   placeholder="faction" class="text-xs py-1 px-2 w-full">
+          </td>
+
+          {# Control: coterie #}
+          <td class="px-4 py-2.5">
+            <div x-show="!editing">
+              {% if s.coterie_id %}
+                {% set _owner = coteries | selectattr('id','equalto', s.coterie_id) | list | first %}
+                <span class="chip text-gold-400 border-gold-800 text-[0.55rem]">
+                  {{ _owner.name if _owner else 'Coterie #' ~ s.coterie_id }}
+                </span>
+              {% else %}
+              <span class="font-garamond text-[0.7rem] text-bone-700 italic">No claim</span>
+              {% endif %}
+            </div>
+            <select x-show="editing" x-cloak form="site-edit-{{ s.id }}"
+                    name="coterie_id" class="text-xs py-1 px-2 w-full">
+              <option value="">— None —</option>
+              {% for co in coteries %}
+              <option value="{{ co.id }}" {{ 'selected' if s.coterie_id == co.id }}>{{ co.name }}</option>
+              {% endfor %}
+            </select>
+          </td>
+
+          {# Description #}
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-600 max-w-xs">
+            <span x-show="!editing">{{ s.description or '—' }}</span>
+            <textarea x-show="editing" x-cloak form="site-edit-{{ s.id }}"
+                      name="description" rows="2"
+                      class="text-xs py-1 px-2 w-full resize-none">{{ s.description or '' }}</textarea>
+          </td>
+
+          {# Active toggle #}
+          <td class="px-4 py-2.5 text-center">
+            <button hx-post="/staff/sites/{{ s.id }}/toggle"
+                    hx-target="#sites-table"
+                    hx-swap="outerHTML"
+                    class="font-cinzel text-[0.6rem] tracking-widest
+                           {{ 'text-gold-500 hover:text-gold-300' if s.active else 'text-bone-700 hover:text-bone-500' }}">
+              {{ 'On' if s.active else 'Off' }}
+            </button>
+          </td>
+
+          {# Actions #}
+          <td class="px-4 py-2.5 text-right">
+            <button x-show="!editing" @click="editing = true"
+                    class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1">
+              Edit
+            </button>
+            <div x-show="editing" x-cloak class="flex flex-col gap-1 items-end">
+              <form :id="'site-edit-' + {{ s.id }}"
+                    hx-post="/staff/sites/{{ s.id }}/edit"
+                    hx-target="#sites-table"
+                    hx-swap="outerHTML"
+                    @submit="editing = false">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+              </form>
+              <div class="flex gap-1">
+                <button type="submit" form="site-edit-{{ s.id }}"
+                        class="btn-send font-cinzel text-[0.6rem] px-2 py-1">
+                  Save
+                </button>
+                <button type="button" @click="editing = false"
+                        class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+
+        {# Predator DC sub-row — only visible while editing #}
+        <tr x-show="editing" x-cloak class="bg-ink-900/40">
+          <td colspan="7" class="px-4 py-3">
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-2">
+              Predator-Type Difficulties <span class="text-bone-800">(blank = no entry)</span>
+            </p>
+            <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-1.5">
+              {% for pt in predator_types %}
+              <div class="flex items-center justify-between gap-1">
+                <span class="font-garamond text-[0.7rem] text-bone-500">{{ pt }}</span>
+                <input type="number" form="site-edit-{{ s.id }}" name="dc_{{ pt }}"
+                       min="1" max="5" placeholder="—"
+                       value="{{ s.predator_dcs.get(pt, '') if s.predator_dcs else '' }}"
+                       class="text-xs py-0.5 px-1.5 w-10 text-center">
+              </div>
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="px-4 py-8 text-center font-garamond text-bone-700 italic">
+            No hunting sites yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

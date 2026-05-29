@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Chronicle Map — Enoch{% endblock %}
+
+{% block head %}
+  {# Leaflet — open-source map library, no API key required. CDN-pinned
+     to a known good version so the page loads predictably. #}
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+  <style>
+    /* Full-bleed map area — base has its own header/nav above this. */
+    #map-canvas { height: calc(100vh - 4.5rem); min-height: 480px; }
+    .leaflet-popup-content-wrapper {
+      background: #1c1814; color: #d9cdb8;
+      border: 1px solid rgba(212, 169, 92, 0.25);
+      border-radius: 0;
+    }
+    .leaflet-popup-content {
+      margin: 0.75rem 1rem;
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 0.875rem;
+      line-height: 1.4;
+    }
+    .leaflet-popup-tip { background: #1c1814; }
+    .leaflet-control-attribution {
+      background: rgba(28, 24, 20, 0.75);
+      color: #6e6253;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.65rem;
+    }
+    .leaflet-control-attribution a { color: #b89352; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-0">
+
+  <div id="map-canvas" class="border border-ink-700 bg-ink-900"></div>
+
+  <aside class="bg-ink-900 border-l border-ink-700 p-4 overflow-y-auto"
+         style="max-height: calc(100vh - 4.5rem);"
+         x-data="mapSidebar()">
+    <div class="mb-4">
+      <p class="label-gold mb-1">Chronicle Map</p>
+      <p class="font-garamond text-bone-600 text-xs leading-relaxed">
+        Click a feature for details. Toggle layers below to hide them.
+      </p>
+    </div>
+
+    <div x-show="!layers.length" x-cloak
+         class="font-garamond text-bone-700 text-xs italic">
+      No map layers yet. Staff can import a map from the admin page.
+    </div>
+
+    <ul class="space-y-2">
+      <template x-for="layer in layers" :key="layer.id">
+        <li class="border-l-2 pl-3 py-1.5 aurora-beam relative overflow-hidden"
+            :style="'border-color: ' + layer.color">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" :checked="layer.visible"
+                   @change="toggleLayer(layer)"
+                   class="accent-gold-500">
+            <span class="font-cinzel text-xs text-bone-300" x-text="layer.name"></span>
+            <span class="font-cinzel text-[0.55rem] text-bone-700 ml-auto"
+                  x-text="layer.features.length"></span>
+          </label>
+          <p x-show="layer.description" x-cloak
+             class="font-garamond text-bone-600 text-[0.7rem] italic mt-0.5"
+             x-text="layer.description"></p>
+        </li>
+      </template>
+    </ul>
+  </aside>
+</div>
+
+<script>
+  // OpenStreetMap base tiles — no key needed. If a chronicle wants a
+  // different basemap they can swap this URL.
+  const _OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const _OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+  // World-wide neutral center until a feature is added.
+  const _DEFAULT_CENTER = [40.7128, -74.0060];   // NYC as a sensible default
+  const _DEFAULT_ZOOM = 11;
+
+  function mapSidebar() {
+    return {
+      layers: [],          // [{id, name, color, description, features, visible, _leafletGroup}]
+      _map: null,
+      _allBounds: null,
+
+      async init() {
+        this._map = L.map('map-canvas', { zoomControl: true });
+        this._map.setView(_DEFAULT_CENTER, _DEFAULT_ZOOM);
+        L.tileLayer(_OSM_URL, { attribution: _OSM_ATTR, maxZoom: 19 }).addTo(this._map);
+
+        try {
+          const resp = await fetch('/map/data.json', { credentials: 'same-origin' });
+          if (!resp.ok) throw new Error(resp.statusText);
+          const data = await resp.json();
+          for (const layer of (data.layers || [])) {
+            this._addLayer(layer);
+          }
+          // Fit to imported content if we have any.
+          if (this._allBounds && this._allBounds.isValid()) {
+            this._map.fitBounds(this._allBounds, { padding: [40, 40] });
+          }
+        } catch (e) {
+          console.error('Failed to load map data:', e);
+        }
+      },
+
+      _addLayer(layer) {
+        const group = L.featureGroup();
+        const color = layer.color || '#8B1A1A';
+        for (const feat of (layer.features || [])) {
+          const lf = this._featureToLeaflet(feat, color);
+          if (lf) {
+            lf.bindPopup(this._popupHtml(feat, layer));
+            lf.addTo(group);
+          }
+        }
+        group.addTo(this._map);
+        // Track combined bounds for the initial fitBounds.
+        if (group.getBounds && group.getBounds().isValid()) {
+          if (!this._allBounds) this._allBounds = L.latLngBounds([]);
+          this._allBounds.extend(group.getBounds());
+        }
+        this.layers.push({
+          id:          layer.id,
+          name:        layer.name,
+          color:       color,
+          description: layer.description,
+          features:    layer.features || [],
+          visible:     true,
+          _leafletGroup: group,
+        });
+      },
+
+      _featureToLeaflet(feat, color) {
+        const geom = feat.geometry;
+        if (!geom || !geom.type) return null;
+        if (geom.type === 'Point') {
+          // [lng, lat] in GeoJSON → [lat, lng] for Leaflet
+          const [lng, lat] = geom.coordinates;
+          return L.circleMarker([lat, lng], {
+            radius: 8, color: color, fillColor: color, fillOpacity: 0.7, weight: 2,
+          });
+        }
+        if (geom.type === 'MultiPoint') {
+          const group = L.featureGroup();
+          for (const [lng, lat] of geom.coordinates) {
+            L.circleMarker([lat, lng], {
+              radius: 8, color: color, fillColor: color, fillOpacity: 0.7, weight: 2,
+            }).addTo(group);
+          }
+          return group;
+        }
+        if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
+          // Leaflet accepts a GeoJSON Feature object directly.
+          return L.geoJSON(geom, {
+            style: { color: color, weight: 3, opacity: 0.8 },
+          });
+        }
+        if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
+          return L.geoJSON(geom, {
+            style: { color: color, weight: 2, fillColor: color,
+                     fillOpacity: 0.25, opacity: 0.8 },
+          });
+        }
+        return null;
+      },
+
+      _popupHtml(feat, layer) {
+        const esc = s => String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const parts = [];
+        if (feat.label) parts.push(`<p style="font-family: Cinzel, serif; letter-spacing: 0.08em; font-size: 0.85rem; color: #d9cdb8;">${esc(feat.label)}</p>`);
+        if (feat.tag)   parts.push(`<p style="font-family: Cinzel, serif; text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.6rem; color: ${esc(layer.color)};">${esc(feat.tag)}</p>`);
+        if (feat.description) parts.push(`<p style="margin-top: 0.4rem; color: #aa9c84;">${esc(feat.description)}</p>`);
+        if (!parts.length) parts.push(`<p style="color: #6e6253;"><em>No details.</em></p>`);
+        return parts.join('');
+      },
+
+      toggleLayer(layer) {
+        layer.visible = !layer.visible;
+        if (layer.visible) layer._leafletGroup.addTo(this._map);
+        else this._map.removeLayer(layer._leafletGroup);
+      },
+    };
+  }
+</script>
+{% endblock %}

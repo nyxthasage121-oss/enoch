@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from ..api import get_active_period, get_player_characters
+from ..config import settings
 
 log = logging.getLogger(__name__)
 
@@ -13,11 +14,84 @@ _GOLD  = 0xC8A85B
 _BLOOD = 0x8B1A1A
 
 
+def _web(path: str) -> str:
+    return settings.WEB_URL.rstrip("/") + path
+
+
 class XPCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
     xp = app_commands.Group(name="xp", description="XP balance and history")
+
+    @xp.command(
+        name="submit",
+        description="Submit an XP claim for a scene or event.",
+    )
+    async def xp_submit(self, interaction: discord.Interaction) -> None:
+        """Check for an active period, then send a link to the XP claim form."""
+        await interaction.response.defer(ephemeral=True)
+
+        period = None
+        try:
+            resp = await get_active_period()
+            if resp and resp.get("active"):
+                period = resp.get("period")
+        except Exception:
+            pass
+
+        if not period:
+            await interaction.followup.send(
+                "❌ There is no active XP period right now. "
+                "Check back when staff opens the next period.",
+                ephemeral=True,
+            )
+            return
+
+        e = discord.Embed(
+            title="📋 Submit an XP Claim",
+            description=(
+                f"**Period:** {period.get('label', 'Current Period')}\n\n"
+                "Log in to **Enoch** and fill out the XP claim form. "
+                "Staff will review your submission and notify you here once it's processed."
+            ),
+            color=_GOLD,
+        )
+
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(
+            label="Open XP Claim Form",
+            style=discord.ButtonStyle.link,
+            url=_web("/xp/claim"),
+            emoji="🩸",
+        ))
+
+        await interaction.followup.send(embed=e, view=view, ephemeral=True)
+
+    @xp.command(
+        name="spend",
+        description="Request to spend XP on a trait or discipline.",
+    )
+    async def xp_spend(self, interaction: discord.Interaction) -> None:
+        """Send a link to the XP spend form on the web app."""
+        e = discord.Embed(
+            title="🩸 Spend XP",
+            description=(
+                "Submit a spend request on **Enoch**. "
+                "A Storyteller will review your request and notify you here once it's approved or returned."
+            ),
+            color=_GOLD,
+        )
+
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(
+            label="Open XP Spend Form",
+            style=discord.ButtonStyle.link,
+            url=_web("/xp/spend"),
+            emoji="🩸",
+        ))
+
+        await interaction.response.send_message(embed=e, view=view, ephemeral=True)
 
     @xp.command(name="check", description="Check your XP balance for your active character(s).")
     async def xp_check(self, interaction: discord.Interaction) -> None:

@@ -6,6 +6,25 @@
 
 document.addEventListener('alpine:init', () => {
 
+  // ── Animated number counter ─────────────────────────────────────
+  // Usage:
+  //   <span x-data="counter(0, {{ char.xp_total }})" x-text="value"></span>
+  //   <span x-data="counter(0, {{ char.xp_available }}, 600)" x-text="value"></span>
+  Alpine.data('counter', (initial, target, duration = 800) => ({
+    value: initial,
+    init() {
+      if (target === initial) return;
+      const start = performance.now();
+      const tick  = (t) => {
+        const p     = Math.min(1, (t - start) / duration);
+        const eased = 1 - Math.pow(1 - p, 3);
+        this.value  = Math.round(initial + (target - initial) * eased);
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    },
+  }));
+
   // ── Card Spotlight + Tilt ───────────────────────────────────────
   // Usage:
   //   <a x-data="cardSpotlight" @mousemove="onMove" @mouseleave="onLeave"
@@ -48,7 +67,7 @@ document.addEventListener('alpine:init', () => {
 
     get glareStyle() {
       return `background:radial-gradient(circle at ${this.gx}% ${this.gy}%,`
-           + `rgba(176,138,62,0.13) 0%,rgba(176,138,62,0.04) 38%,transparent 68%);`
+           + `rgba(212,169,77,0.22) 0%,rgba(176,138,62,0.08) 38%,transparent 65%);`
            + `opacity:${this.active ? 1 : 0};`;
     },
   }));
@@ -101,4 +120,81 @@ document.addEventListener('DOMContentLoaded', () => {
       el.style.transform = '';
     }));
   });
+});
+
+// ── Ember particles ─────────────────────────────────────────────
+// Slow-drifting embers in the background. Pure canvas, no deps.
+// Sits behind content (z-index < gilded panels) so nothing is occluded.
+// Respects prefers-reduced-motion.
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (document.querySelector('canvas[data-embers]')) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.dataset.embers = '1';
+  canvas.style.cssText  = 'position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.5;';
+  const sync = () => {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  };
+  sync();
+  document.body.appendChild(canvas);
+  window.addEventListener('resize', sync);
+
+  const ctx       = canvas.getContext('2d');
+  const particles = [];
+  const MAX       = 22;
+
+  function spawn() {
+    particles.push({
+      x:         Math.random() * canvas.width,
+      y:         canvas.height + 8,
+      vx:        (Math.random() - 0.5) * 0.18,
+      vy:        -(0.20 + Math.random() * 0.40),
+      size:      0.8 + Math.random() * 1.6,
+      life:      0,
+      maxLife:   6000 + Math.random() * 5000,
+      // Mostly gold embers, a few blood-red ones for variety
+      hue:       Math.random() < 0.75 ? '200,138,62' : '139,26,26',
+      drift:     (Math.random() - 0.5) * 0.0008,   // sideways sway
+    });
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - last);  // clamp dt so tab-resume doesn't burst-spawn
+    last     = now;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Maintain a slow spawn rate
+    if (particles.length < MAX && Math.random() < dt * 0.0012) spawn();
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p     = particles[i];
+      p.life     += dt;
+      p.vx       += p.drift * dt;
+      p.x        += p.vx * dt * 0.08;
+      p.y        += p.vy * dt * 0.08;
+      const t     = p.life / p.maxLife;
+      // Fade in over 20%, fade out over last 50%
+      let alpha   = 1;
+      if (t < 0.2)      alpha = t / 0.2;
+      else if (t > 0.5) alpha = (1 - t) / 0.5;
+      alpha       = Math.max(0, alpha) * 0.55;
+
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(${p.hue},${alpha})`;
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      // Soft glow
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(${p.hue},${alpha * 0.18})`;
+      ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (p.life >= p.maxLife || p.y < -10) particles.splice(i, 1);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
 });

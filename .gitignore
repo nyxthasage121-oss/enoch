@@ -25,6 +25,12 @@ requirements-local.txt
 node_modules/
 web/package-lock.json
 
+# User-uploaded files (per-deployment, not source)
+web/static/uploads/
+
+# Logs (runtime artifacts — regenerated each run)
+*.log
+
 # OS
 .DS_Store
 Thumbs.db

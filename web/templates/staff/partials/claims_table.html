@@ -1,103 +1,179 @@
 {# claims_table.html — refreshed by HTMX after approve/reject actions #}
 <div id="claims-table">
   {% if claims %}
-  <div class="gilded overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="border-b border-ink-700">
-          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Character</th>
-          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Player</th>
-          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Period</th>
-          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Criteria</th>
-          <th class="px-4 py-3 text-right label-gold font-normal text-xs">XP</th>
-          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Submitted</th>
-          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for claim in claims %}
-        <tr class="border-b border-ink-800 align-top"
-            x-data="{ rejecting: false, reason: '' }">
-          <td class="px-4 py-3">
-            <p class="font-cinzel text-xs text-bone-300">{{ claim.character_name }}</p>
-            <p class="font-cinzel text-[0.6rem] text-bone-600 mt-0.5">{{ claim.character_clan }}</p>
-          </td>
-          <td class="px-4 py-3 font-garamond text-xs text-bone-500">{{ claim.player_username }}</td>
-          <td class="px-4 py-3 font-garamond text-xs text-bone-600">{{ claim.period_label or '—' }}</td>
-          <td class="px-4 py-3">
-            {% for c in claim.claimed_criteria %}
-            <p class="font-garamond text-xs text-bone-500 leading-snug">
-              {{ c.label }}
-              <span class="text-gold-600">+{{ c.xp_value_at_submission }}</span>
-            </p>
-            {% endfor %}
-            {% if claim.rp_links %}
-            <div class="mt-1 space-y-0.5">
+  <div class="space-y-4">
+    {% for claim in claims %}
+    <div class="gilded p-5 clan-{{ claim.character_clan }} relative overflow-hidden aurora-beam {{ 'aurora-pulse-blood' if claim.status == 'pending' }}"
+         x-data="{
+           rejecting: false, reason: '',
+           gx: 50, gy: 50, active: false,
+           onMove(e) {
+             const r = $el.getBoundingClientRect();
+             this.gx = ((e.clientX - r.left) / r.width)  * 100;
+             this.gy = ((e.clientY - r.top)  / r.height) * 100;
+             this.active = true;
+           },
+           onLeave() { this.active = false; },
+           get glareStyle() {
+             return `background:radial-gradient(circle at ${this.gx}% ${this.gy}%,`
+                  + `rgba(176,138,62,0.10) 0%,rgba(176,138,62,0.03) 40%,transparent 65%);`
+                  + `opacity:${this.active ? 1 : 0};transition:opacity 0.3s ease;`;
+           }
+         }"
+         @mousemove="onMove" @mouseleave="onLeave">
+      <div class="card-glare" :style="glareStyle"></div>
+
+      {# ── Header ── #}
+      <div class="flex items-start justify-between gap-4 mb-5 pb-4 border-b border-ink-800">
+        <div class="min-w-0 flex-1">
+          <p class="label-gold text-[0.7rem] tracking-[0.25em] mb-1">
+            {{ claim.character_clan | replace('-',' ') | title }}
+            <span class="text-bone-700">·</span>
+            {{ claim.player_username }}
+          </p>
+          <a href="/staff/characters/{{ claim.character_id }}"
+             class="font-cinzel text-lg text-bone-200 hover:text-gold-400 transition-colors block truncate">
+            {{ claim.character_name }}
+          </a>
+          <p class="font-cinzel text-[0.6rem] text-bone-600 mt-1.5">
+            {{ claim.period_label or 'No period' }}
+            <span class="text-bone-700">·</span>
+            Submitted {{ claim.submitted_at[:10] }}
+          </p>
+        </div>
+        <div class="text-right shrink-0">
+          <p class="label-gold text-[0.7rem] tracking-[0.25em] mb-0.5">Claimed</p>
+          <p class="font-cinzel text-3xl text-gold-400 leading-none">
+            +{{ claim.xp_claimed }}<span class="text-bone-700 text-xs ml-1">XP</span>
+          </p>
+        </div>
+      </div>
+
+      {# ── Two-column body ── #}
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        {# Evidence (left, 2/3) #}
+        <div class="md:col-span-2 space-y-4">
+          <div>
+            <p class="label-gold mb-2">Claimed Criteria</p>
+            <div class="space-y-0">
+              {% for c in claim.claimed_criteria %}
+              <div class="flex items-center justify-between py-1.5 border-b border-ink-800 last:border-0">
+                <span class="font-garamond text-sm text-bone-300">{{ c.label }}</span>
+                <span class="font-cinzel text-xs text-gold-500 whitespace-nowrap">+{{ c.xp_value_at_submission }} XP</span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          {% if claim.rp_links %}
+          <div>
+            <p class="label-gold mb-2">RP Evidence</p>
+            <div class="space-y-1">
               {% for link in claim.rp_links %}
               <a href="{{ link }}" target="_blank" rel="noopener"
-                 class="block font-garamond text-[0.6rem] text-gold-700 hover:text-gold-400 truncate max-w-[16rem]">
-                {{ link | truncate(50) }}
+                 class="block font-garamond text-xs text-gold-700 hover:text-gold-400 truncate transition-colors">
+                ↗ {{ link | truncate(90) }}
               </a>
               {% endfor %}
             </div>
-            {% endif %}
-            {% if claim.helper_note %}
-            <p class="font-garamond text-xs text-mauve-500 italic mt-1">{{ claim.helper_note }}</p>
-            {% endif %}
-          </td>
-          <td class="px-4 py-3 font-cinzel text-xs text-gold-400 text-right">+{{ claim.xp_claimed }}</td>
-          <td class="px-4 py-3 font-cinzel text-[0.6rem] text-bone-600 text-right whitespace-nowrap">
-            {{ claim.submitted_at[:10] }}
-          </td>
-          <td class="px-4 py-3 text-right">
-            {# Approve / Reject buttons #}
-            <div x-show="!rejecting" class="flex gap-1.5 justify-end">
-              <button hx-post="/staff/claims/{{ claim.id }}/approve"
-                      hx-target="#claims-table"
-                      hx-swap="outerHTML"
-                      class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
-                Approve
+          </div>
+          {% endif %}
+
+          {% if claim.helper_note %}
+          <div>
+            <p class="label-gold mb-2">Helper Note</p>
+            <p class="font-garamond text-mauve-400 text-sm italic leading-relaxed">{{ claim.helper_note }}</p>
+          </div>
+          {% endif %}
+
+          {% if claim.staff_claim_conflict %}
+          <p class="font-garamond text-blood-400 text-xs italic">
+            ⚠ Player flagged a potential staff/helper conflict on this claim.
+          </p>
+          {% endif %}
+        </div>
+
+        {# Right column — approve/reject when pending, status badge when historic #}
+        <div class="md:col-span-1">
+          {% if claim.status == 'pending' %}
+          <p class="label-gold mb-3">Review</p>
+
+          <div x-show="!rejecting" class="space-y-2 aurora-sparkle-host">
+            <button hx-post="/staff/claims/{{ claim.id }}/approve"
+                    hx-target="#claims-table"
+                    hx-swap="outerHTML"
+                    @click="if(window.Aurora) window.Aurora.sparkles($el.parentElement, 14)"
+                    class="btn-send font-cinzel tracking-widest text-xs w-full py-2.5 aurora-beam">
+              Approve
+            </button>
+            <button @click="rejecting = true"
+                    class="btn-ghost font-cinzel tracking-widest text-xs w-full py-2.5">
+              Reject
+            </button>
+          </div>
+
+          <form x-show="rejecting" x-cloak
+                hx-post="/staff/claims/{{ claim.id }}/reject"
+                hx-target="#claims-table"
+                hx-swap="outerHTML"
+                class="space-y-2">
+            <textarea name="reason"
+                      x-model="reason"
+                      rows="3"
+                      placeholder="Feedback for player…"
+                      required
+                      class="w-full text-xs resize-none"></textarea>
+            <div class="flex gap-2">
+              <button type="submit"
+                      class="btn-send font-cinzel tracking-widest text-[0.6rem] flex-1 py-2">
+                Confirm Reject
               </button>
-              <button @click="rejecting = true"
-                      class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
-                Reject
+              <button type="button" @click="rejecting = false; reason = ''"
+                      class="btn-ghost font-cinzel text-[0.6rem] px-3 py-2">
+                Cancel
               </button>
             </div>
-
-            {# Inline reject form #}
-            <form x-show="rejecting" x-cloak
-                  hx-post="/staff/claims/{{ claim.id }}/reject"
-                  hx-target="#claims-table"
-                  hx-swap="outerHTML"
-                  class="flex flex-col gap-1.5 items-end min-w-[180px]">
-              <input name="reason"
-                     x-model="reason"
-                     placeholder="Reason…"
-                     required
-                     class="w-full text-xs py-1 px-2">
-              <div class="flex gap-1.5">
-                <button type="submit"
-                        class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
-                  Confirm
-                </button>
-                <button type="button"
-                        @click="rejecting = false; reason = ''"
-                        class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1.5">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+          </form>
+          {% else %}
+          {# Historic — show resolution status, reviewer, and reason if any #}
+          <p class="label-gold mb-3">Resolution</p>
+          <p class="font-cinzel text-[0.65rem] tracking-widest mb-1
+            {{ 'text-gold-400' if claim.status == 'approved' else 'text-blood-400' }}">
+            {{ claim.status | upper }}
+          </p>
+          {% if claim.reviewed_at %}
+          <p class="font-cinzel text-[0.55rem] text-bone-600 mb-2">
+            {{ claim.reviewed_at[:10] }}
+          </p>
+          {% endif %}
+          {% if claim.reviewed_by %}
+          <p class="font-garamond text-[0.7rem] text-bone-500 italic mb-2">
+            by <span class="text-bone-300">{{ claim.reviewed_by }}</span>
+          </p>
+          {% endif %}
+          {% if claim.rejection_reason %}
+          <p class="font-garamond text-[0.7rem] text-blood-400 italic border-l border-blood-900 pl-2">
+            {{ claim.rejection_reason }}
+          </p>
+          {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
   </div>
 
   {% else %}
   <div class="gilded p-10 text-center">
     <p class="label-gold mb-2">All Clear</p>
-    <p class="font-garamond text-bone-600 text-sm">No pending claims to review.</p>
+    <p class="font-garamond text-bone-600 text-sm">
+      {% if filter_status and filter_status != 'pending' %}
+      No claims match this filter.
+      {% else %}
+      No pending claims to review.
+      {% endif %}
+    </p>
   </div>
   {% endif %}
 </div>

@@ -7,10 +7,12 @@
 {% endblock %}
 
 {% block content %}
-{# Aurora backdrop — only visible on landing page (body.landing-page) #}
+{# Existing static warm halo from codex.css does the work — no WebGL
+   shader, no animated motion. The .aurora-layer's CSS-only radial
+   gradients are slow + ambient enough on their own. #}
 <div class="aurora-layer" aria-hidden="true"></div>
 
-<div class="page-enter">
+<div class="page-enter relative">
 
   {% if current_user %}
   {# Authenticated users are redirected to /characters — this block is a fallback #}
@@ -23,38 +25,76 @@
 
   {% else %}
   {# ── Unauthenticated: landing / login gate ── #}
-  <div class="flex flex-col items-center justify-center min-h-[calc(100vh-3rem)] text-center px-4">
+  <div class="flex flex-col items-center justify-center min-h-screen text-center px-4">
 
-    {# Brand mark #}
-    <div class="mb-10">
-      <p class="font-cinzel text-gold-400 text-xs tracking-[0.4em] uppercase mb-3">
+    {# Brand mark — static drop-shadow only, no animated beam. #}
+    <div class="mb-3 inline-block px-6 py-2">
+      <img src="/static/images/EnochLogo.svg"
+           alt="Enoch — the all-seeing watcher"
+           class="w-28 md:w-36 mx-auto mb-1"
+           style="filter: drop-shadow(0 0 24px rgba(212,169,77,0.35));">
+      <p class="font-cinzel text-gold-400 text-xs tracking-[0.4em] uppercase mb-1">
         New York by Night
       </p>
-      <h1 class="font-cinzel text-5xl md:text-6xl text-bone-200 tracking-widest leading-tight mb-2">
+      <h1 class="font-cinzel text-5xl md:text-6xl text-bone-200 tracking-widest leading-tight mb-1">
         Enoch
       </h1>
-      <div class="divider-gold my-5 max-w-[8rem] mx-auto"></div>
-      <p class="font-garamond text-bone-500 text-lg italic max-w-sm mx-auto leading-relaxed">
+      <div class="divider-gold my-2 max-w-[8rem] mx-auto"></div>
+      <p class="font-garamond text-bone-500 text-base italic max-w-sm mx-auto leading-snug">
         The oldest city. The first blood. A tracker built for the long night.
       </p>
     </div>
 
-    {# Login CTA #}
-    <div class="gilded p-8 max-w-sm w-full">
-      <p class="font-garamond text-bone-400 mb-6 leading-relaxed">
-        Authenticate with Discord to access your character roster, submit XP claims,
-        and track your place in the Danse Macabre.
-      </p>
-      <a href="/auth/login"
-         class="btn-send font-cinzel tracking-widest text-sm w-full flex items-center justify-center gap-2">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.033.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
-        </svg>
-        Sign In with Discord
-      </a>
+    {# Login CTA — gilded panel + frame-gold double-line interior
+       border + flanking ornament glyphs for a manuscript-page feel. #}
+    <div class="relative max-w-sm w-full">
+
+      {# Top ornament — small flanking stars + a hairline rule #}
+      <div class="flex items-center justify-center gap-3 mb-1.5">
+        <span class="h-px flex-1 bg-gradient-to-r from-transparent to-gold-700"></span>
+        <span class="font-cinzel text-gold-500 text-sm leading-none">✦</span>
+        <span class="h-px flex-1 bg-gradient-to-l from-transparent to-gold-700"></span>
+      </div>
+
+      <div class="gilded frame-gold p-5">
+        <p class="font-garamond text-bone-400 mb-4 leading-snug">
+          Authenticate with Discord to access your character roster, submit XP claims,
+          and track your place in the Danse Macabre.
+        </p>
+        <a href="/auth/login"
+           class="btn-send font-cinzel tracking-widest text-sm w-full flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.033.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
+          </svg>
+          Sign In with Discord
+        </a>
+      </div>
+
+      {# Bottom ornament — mirrors the top #}
+      <div class="flex items-center justify-center gap-3 mt-1.5">
+        <span class="h-px flex-1 bg-gradient-to-r from-transparent to-gold-700"></span>
+        <span class="font-cinzel text-gold-500 text-sm leading-none">✦</span>
+        <span class="h-px flex-1 bg-gradient-to-l from-transparent to-gold-700"></span>
+      </div>
+
     </div>
 
+    {% if dev_preview %}
+    {# Dev preview entry — kept inside the viewport so testers don't
+       have to hunt for it under the fold. #}
+    <div class="mt-3 text-center">
+      <p class="font-cinzel text-[0.55rem] tracking-[0.3em] uppercase text-bone-700 mb-1.5">
+        Development
+      </p>
+      <a href="/_dev/login"
+         class="font-cinzel text-[0.65rem] tracking-[0.3em] uppercase text-gold-500 hover:text-gold-300 transition-colors border border-gold-900 hover:border-gold-400 px-4 py-2 inline-block">
+        ⚠ Dev Login
+      </a>
+    </div>
+    {% endif %}
+
   </div>
+
   {% endif %}
 
 </div>

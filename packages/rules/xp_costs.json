@@ -67,12 +67,6 @@
     "min_dots": 0,
     "max_dots": 5
   },
-  "Loresheet": {
-    "flat_per_dot": 3,
-    "description": "3 XP per dot",
-    "min_dots": 1,
-    "max_dots": 5
-  },
   "Blood Potency": {
     "multiplier": 10,
     "description": "New rating × 10",

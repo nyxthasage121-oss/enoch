@@ -1,0 +1,2404 @@
+{% extends "base.html" %}
+{% from "_macros.html" import clan_icon %}
+{% block title %}Submit a Character — Enoch{% endblock %}
+
+{% block content %}
+{# ────────────────────────────────────────────────────────────────────
+   Character creation wizard — 10 steps. Steps 1-3 collect the basics
+   (name/clan/concept), 4-9 build the V5 sheet, 10 is review + submit.
+
+   Alpine state holds the entire sheet. On submit, hidden inputs (one
+   per trait + JSON blobs for lists) mirror the state so the server
+   sees a flat form. Rules are intentionally light — staff validates
+   on approval.
+   ──────────────────────────────────────────────────────────────────── #}
+<div class="page-enter max-w-5xl mx-auto"
+     x-data="characterWizard({
+       initialForm:       {{ (form | default({})) | tojson | forceescape }},
+       clans:             {{ (clans | default([])) | tojson | forceescape }},
+       clanDisciplines:   {{ (clan_disciplines | default({})) | tojson | forceescape }},
+       revenantsEnabled:  {{ 'true' if (revenants_enabled | default(false)) else 'false' }},
+       revenantFamilies:  {{ (revenant_families | default([])) | tojson | forceescape }},
+       budgets:           {{ (budgets | default({})) | tojson | forceescape }},
+       tierBudgets:       {{ (tier_budgets | default({})) | tojson | forceescape }},
+       activeRuleset:     {{ (active_ruleset | default('standard')) | tojson | forceescape }},
+       clanInfo:          {{ (clan_info | default({})) | tojson | forceescape }},
+       predatorInfo:      {{ (predator_info | default({})) | tojson | forceescape }},
+     })">
+
+  {# Back link #}
+  <a href="/characters"
+     class="inline-flex items-center gap-1.5 text-bone-600 hover:text-gold-400 font-cinzel text-xs tracking-widest uppercase mb-8 transition-colors">
+    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="square" d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    All Characters
+  </a>
+
+  {# ── Step indicator. When the chronicle has the "require full sheet"
+       toggle off, the wizard collapses to just the three basics steps —
+       sheet data is filled in later via the Sheet tab. ── #}
+  {% if require_sheet %}
+  {% set step_labels = [
+    (1, 'Nature'), (2, 'Memoriam'), (3, 'Blood'), (4, 'Hunt'), (5, 'Story'),
+    (6, 'Flesh'), (7, 'Skill'), (8, 'Legacy'), (9, 'Curse'),
+    (10, 'Lore'), (11, 'Soul'), (12, 'Vow'),
+  ] %}
+  {% else %}
+  {% set step_labels = [(1, 'Nature'), (2, 'Blood'), (3, 'Hunt'), (4, 'Story')] %}
+  {% endif %}
+  <div class="flex items-center gap-0 mb-8 flex-wrap">
+    {% for n, label in step_labels %}
+    <div class="flex items-center {{ 'flex-1' if not loop.last else '' }}"
+         x-show="!_isStepHidden({{ n }})">
+      <div class="flex items-center gap-1.5">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center font-cinzel text-[0.6rem] transition-colors duration-300 border"
+             :class="step === {{ n }}
+               ? 'bg-blood-dim border-blood-bright text-bone-200 aurora-pulse-blood'
+               : step > {{ n }}
+                 ? 'bg-blood-dim border-blood-bright text-bone-200'
+                 : 'bg-ink-900 border-ink-700 text-bone-700'">
+          {{ n }}
+        </div>
+        <span class="font-cinzel text-[0.55rem] tracking-widest uppercase hidden md:block transition-colors duration-300"
+              :class="step >= {{ n }} ? 'text-gold-400' : 'text-bone-700'">
+          {{ label }}
+        </span>
+      </div>
+      {% if not loop.last %}
+      <div class="flex-1 mx-1.5 h-px transition-colors duration-300"
+           :class="step > {{ n }} ? 'bg-blood-dim' : 'bg-ink-800'"></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {# ── Validation errors (always visible) ── #}
+  {% if errors %}
+  <div class="gilded-inset px-5 py-4 mb-6 border-l-2 border-blood-bright">
+    <p class="label-gold mb-2 text-blood-400">Please correct the following</p>
+    <ul class="space-y-1">
+      {% for e in errors %}
+      <li class="font-garamond text-blood-400 text-sm flex items-start gap-2">
+        <span class="mt-1 shrink-0">·</span>{{ e }}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# Sidebar + main content side-by-side on wide screens #}
+  <div class="lg:grid lg:grid-cols-[1fr_240px] lg:gap-6 items-start">
+
+  <form method="post" action="/characters/new" enctype="multipart/form-data" @submit="onSubmit($event)" class="min-w-0">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+    {# Draft tracking — set by Save Draft, read by route #}
+    <input type="hidden" name="draft_id" :value="draftId">
+    <input type="hidden" name="as_draft" :value="asDraft ? '1' : ''">
+
+    {# Hidden inputs mirroring the new Nature-step fields #}
+    <input type="hidden" name="character_type"  :value="charName.character_type">
+    <input type="hidden" name="revenant_family" :value="charName.revenant_family">
+    <input type="hidden" name="ghoul_regnant"   :value="charName.ghoul_regnant">
+
+    {# ═══════════════════════════════════════════════════
+       STEP 1 — NATURE: Kindred / Mortal / Ghoul / Revenant
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 1" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Nature</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          What are you? Vampire, mortal, blood-bound servant, or hereditary
+          half-Kindred? Your nature determines which sheet sections apply.
+        </p>
+      </div>
+
+      {# ── Character name (moved here from the Blood step) ──
+           Steward UX feedback: collecting the name on the Blood step
+           together with the clan picker confused players — they'd pick
+           a clan, see the Next button stay dim, and not realise the
+           name field at the top of that step was empty. Asking for the
+           name first means the Blood step has only the clan to pick. #}
+      <div class="gilded p-5 mb-5">
+        <label class="label-gold block mb-2" for="char-name">
+          Character Name <span class="text-blood-500 font-sans normal-case text-xs">*</span>
+        </label>
+        <input id="char-name" type="text" name="name" maxlength="80"
+               placeholder="Full name as known in the court…"
+               x-model="charName.name" autocomplete="off" class="w-full text-lg">
+      </div>
+
+      {# Type picker grid #}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+        {% set _types = [
+          ('kindred',  'Kindred',  'A vampire of one of the clans. Full sheet.'),
+          ('mortal',   'Mortal',   'A regular human. No Disciplines, no Hunger.'),
+          ('ghoul',    'Ghoul',    'A mortal sustained by a Kindred regnant. Limited Disciplines.'),
+        ] %}
+        {% for slug, label, blurb in _types %}
+        <button type="button"
+                class="gilded-inset px-5 py-4 text-left transition-all duration-200 border-2
+                       hover:border-gold-700 relative"
+                :class="charName.character_type === '{{ slug }}'
+                  ? 'border-gold-400 bg-ink-900/80 shadow-[0_0_18px_-2px_rgba(212,160,23,0.5)]'
+                  : 'border-ink-800 hover:bg-ink-900/40'"
+                @click="charName.character_type = '{{ slug }}'; applyTierBloodDefaults();">
+          <span x-show="charName.character_type === '{{ slug }}'" x-cloak
+                class="absolute top-2 right-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold-500 text-ink-950 font-bold text-xs">✓</span>
+          <p class="font-cinzel text-base tracking-wide mb-1"
+             :class="charName.character_type === '{{ slug }}' ? 'text-gold-300' : 'text-bone-200'">{{ label }}</p>
+          <p class="font-garamond text-xs text-bone-500 leading-snug">{{ blurb }}</p>
+        </button>
+        {% endfor %}
+
+        {% if revenants_enabled %}
+        <button type="button"
+                class="gilded-inset px-5 py-4 text-left transition-all duration-200 border-2
+                       hover:border-gold-700 relative"
+                :class="charName.character_type === 'revenant'
+                  ? 'border-gold-400 bg-ink-900/80 shadow-[0_0_18px_-2px_rgba(212,160,23,0.5)]'
+                  : 'border-ink-800 hover:bg-ink-900/40'"
+                @click="charName.character_type = 'revenant'; applyTierBloodDefaults();">
+          <span x-show="charName.character_type === 'revenant'" x-cloak
+                class="absolute top-2 right-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold-500 text-ink-950 font-bold text-xs">✓</span>
+          <p class="font-cinzel text-base tracking-wide mb-1"
+             :class="charName.character_type === 'revenant' ? 'text-gold-300' : 'text-bone-200'">Revenant</p>
+          <p class="font-garamond text-xs text-bone-500 leading-snug">
+            Hereditary half-Kindred bound to a vampire clan through bloodline.
+          </p>
+        </button>
+        {% endif %}
+      </div>
+
+      {# Revenant family dropdown — shown only when Revenant is picked #}
+      <div x-show="charName.character_type === 'revenant'" x-cloak
+           class="gilded p-5 mb-5">
+        <label class="label-gold block mb-2">
+          Revenant Family <span class="text-blood-500 font-sans normal-case text-xs">*</span>
+        </label>
+        <select x-model="charName.revenant_family" required class="w-full">
+          <option value="">— Select a family —</option>
+          <template x-for="fam in revenantFamilies" :key="fam.name">
+            <option :value="fam.name"
+                    x-text="fam.parent_clan ? fam.name + ' (' + fam.parent_clan + ')' : fam.name"></option>
+          </template>
+        </select>
+        <p class="font-garamond text-bone-700 text-xs mt-2 italic">
+          Your family's parent clan grants access to its in-clan Disciplines.
+        </p>
+
+        {# Family disciplines — just the mechanics, no flavor text #}
+        <template x-if="charName.revenant_family">
+          <div class="mt-4 pt-4 border-t border-ink-800">
+            <template x-for="fam in revenantFamilies.filter(f => f.name === charName.revenant_family)"
+                      :key="fam.name">
+              <template x-if="fam.disciplines && fam.disciplines.length">
+                <div>
+                  <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Family Disciplines</p>
+                  <p class="font-garamond text-sm text-gold-400" x-text="fam.disciplines.join(' · ')"></p>
+                </div>
+              </template>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      {# Ghoul regnant field — shown only when Ghoul is picked #}
+      <div x-show="charName.character_type === 'ghoul'" x-cloak
+           class="gilded p-5 mb-5">
+        <label class="label-gold block mb-2">
+          Regnant <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(your domitor)</span>
+        </label>
+        <input type="text" x-model="charName.ghoul_regnant" maxlength="80"
+               placeholder="Name of the Kindred who sustains you…"
+               class="w-full">
+        <p class="font-garamond text-bone-700 text-xs mt-2 italic">
+          Their clan determines which Disciplines you can inherit.
+        </p>
+      </div>
+
+      {# ── Kindred tier picker (V5 Sea of Time) ──
+           Elder removed per Steward direction — players don't create
+           Elder PCs through the wizard. Fledgling/Thin-Blood added per
+           Steward direction (2026-05). Thin-Blood auto-sets clan to
+           "thin-blood" and hides the regular clan picker — they don't
+           have a clan in V5 RAW. #}
+      <div x-show="charName.character_type === 'kindred'" x-cloak class="mb-5">
+        <p class="label-gold mb-3">Generation Tier</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {% set _tiers = [
+            ('fledgling', 'Fledgling',   'Childer — embraced in the last 15 years. Baseline allocation, BP 1.'),
+            ('thinblood', 'Thin-Blood',  '14th-16th gen. No clan, no Disciplines (uses Alchemy). BP 0. Take 1-3 Thin-Blood Merits + matching Flaws.'),
+            ('neonate',   'Neonate',     'Embraced 1940 to a decade ago. BP 1. +15 XP over baseline.'),
+            ('ancilla',   'Ancilla',     'Embraced 1780-1940. BP 2. +35 XP, +2 Advantages, +2 Flaws, -1 Humanity.'),
+          ] %}
+          {% for slug, label, blurb in _tiers %}
+          <button type="button"
+                  class="gilded-inset px-4 py-3 text-left transition-all duration-200 border-2
+                         hover:border-gold-700 relative"
+                  :class="charName.character_tier === '{{ slug }}'
+                    ? 'border-gold-400 bg-ink-900/80 shadow-[0_0_14px_-2px_rgba(212,160,23,0.45)]'
+                    : 'border-ink-800 hover:bg-ink-900/40'"
+                  @click="charName.character_tier = '{{ slug }}';
+                          if ('{{ slug }}' !== 'ancilla') charName.ancilla_mode = '';
+                          else if (activeRuleset === 'in_memoriam') charName.ancilla_mode = 'in_memoriam';
+                          // Thin-Blood auto-pins clan to 'thin-blood' since
+                          // they're clanless in V5 RAW. Other tiers clear
+                          // any prior thin-blood pin so the picker re-shows.
+                          if ('{{ slug }}' === 'thinblood') {
+                            charName.clan = 'thin-blood';
+                          } else if (charName.clan === 'thin-blood') {
+                            charName.clan = '';
+                          }
+                          // Auto-seed Blood Potency + Humanity from the
+                          // Sea of Time table for the new tier.
+                          applyTierBloodDefaults();">
+            <span x-show="charName.character_tier === '{{ slug }}'" x-cloak
+                  class="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-gold-500 text-ink-950 font-bold text-[0.6rem]">✓</span>
+            <p class="font-cinzel text-sm tracking-wide mb-1"
+               :class="charName.character_tier === '{{ slug }}' ? 'text-gold-300' : 'text-bone-200'">{{ label }}</p>
+            <p class="font-garamond text-[0.7rem] text-bone-500 leading-snug">{{ blurb }}</p>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ── Ancilla mode picker (only for Ancilla) ──
+         When the chronicle ruleset is 'in_memoriam', IM is the only
+         path and the picker is hidden — a banner explains why. #}
+      <div x-show="charName.character_type === 'kindred'
+                   && charName.character_tier === 'ancilla'
+                   && activeRuleset === 'in_memoriam'"
+           x-cloak class="mb-5 gilded-inset px-4 py-3 border border-gold-800">
+        <p class="font-cinzel text-[0.6rem] tracking-widest uppercase text-gold-500 mb-1">
+          Chronicle Rule · In Memoriam
+        </p>
+        <p class="font-garamond text-bone-500 text-xs leading-relaxed">
+          This chronicle runs the In Memoriam ruleset. Every Ancilla character
+          builds their history era-by-era and earns XP from lived experience.
+        </p>
+      </div>
+
+      <div x-show="charName.character_type === 'kindred'
+                   && charName.character_tier === 'ancilla'
+                   && activeRuleset !== 'in_memoriam'"
+           x-cloak class="mb-5">
+        <p class="label-gold mb-3">Ancilla Path</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {% set _modes = [
+            ('standard',     'Standard',     '+35 XP boost over neonate baseline. Quick and clean.'),
+            ('in_memoriam',  'In Memoriam',  'Build your character\'s history era-by-era. Earn XP from lived experience.'),
+          ] %}
+          {% for slug, label, blurb in _modes %}
+          <button type="button"
+                  class="gilded-inset px-4 py-4 text-left transition-all duration-200 border
+                         hover:border-gold-800"
+                  :class="charName.ancilla_mode === '{{ slug }}'
+                    ? 'border-gold-500 bg-ink-900/60'
+                    : 'border-ink-800 hover:bg-ink-900/40'"
+                  @click="charName.ancilla_mode = '{{ slug }}'">
+            <p class="font-cinzel text-sm text-bone-200 tracking-wide mb-1">{{ label }}</p>
+            <p class="font-garamond text-[0.7rem] text-bone-500 leading-snug">{{ blurb }}</p>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Hidden inputs so the new picker values reach the server #}
+      <input type="hidden" name="character_tier"        :value="charName.character_tier">
+      <input type="hidden" name="ancilla_mode"          :value="charName.ancilla_mode">
+
+      <div class="flex items-center justify-end gap-3 mt-8">
+        <span x-show="!canAdvanceNature()" x-cloak
+              class="font-garamond text-bone-500 text-xs italic">
+          <span x-show="!charName.name || !charName.name.trim()">Enter a name to continue</span>
+          <span x-show="charName.name && charName.name.trim() && !charName.character_type">Pick a type to continue</span>
+          <span x-show="charName.character_type === 'kindred' && charName.character_tier === 'ancilla' && !charName.ancilla_mode && activeRuleset !== 'in_memoriam'">
+            Pick an Ancilla path to continue
+          </span>
+          <span x-show="charName.character_type === 'revenant' && !charName.revenant_family">
+            Pick a Revenant family to continue
+          </span>
+        </span>
+        <button type="button"
+                @click="canAdvanceNature() && goStep(3)"
+                :disabled="!canAdvanceNature()"
+                :class="canAdvanceNature() ? 'btn-send aurora-pulse' : 'btn-ghost opacity-60 cursor-not-allowed'"
+                class="font-cinzel tracking-widest text-xs flex items-center gap-2">
+          Next: Blood
+          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="square" d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 2 — MEMORIAM: Oceans of Time builder
+       Only visible when Kindred + Ancilla + In Memoriam.
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 2" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">In Memoriam</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          Build your character's history era-by-era. Each era grants base
+          benefits and lets you gamble for more — at a cost. Total Era XP and
+          Humanity floor update live as you choose.
+        </p>
+      </div>
+
+      {# Generation → sets Blood Potency #}
+      <div class="gilded p-5 mb-4">
+        <p class="label-gold mb-3 text-xs">Generation</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {% set _gens = [
+            ('12th',      '12th', 'Blood Potency 1'),
+            ('11th-10th', '11th–10th', 'Blood Potency 2'),
+            ('9th-8th',   '9th–8th',   'Blood Potency 3'),
+          ] %}
+          {% for slug, label, bp in _gens %}
+          <button type="button"
+                  class="gilded-inset px-3 py-3 text-center transition-all duration-200 border
+                         hover:border-gold-800"
+                  :class="im.generation === '{{ slug }}'
+                    ? 'border-gold-500 bg-ink-900/60'
+                    : 'border-ink-800 hover:bg-ink-900/40'"
+                  @click="im.generation = '{{ slug }}'">
+            <p class="font-cinzel text-sm text-bone-200 tracking-wide">{{ label }}</p>
+            <p class="font-garamond text-[0.65rem] text-bone-500 mt-1">{{ bp }}</p>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Embrace age → number of eras + humanity loss #}
+      <div class="gilded p-5 mb-4">
+        <p class="label-gold mb-3 text-xs">Embrace Age</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <template x-for="opt in EMBRACE_AGES" :key="opt.id">
+            <button type="button"
+                    class="gilded-inset px-3 py-3 text-left transition-all duration-200 border
+                           hover:border-gold-800"
+                    :class="im.embrace_age === opt.id
+                      ? 'border-gold-500 bg-ink-900/60'
+                      : 'border-ink-800 hover:bg-ink-900/40'"
+                    @click="setEmbraceAge(opt.id)">
+              <p class="font-cinzel text-sm text-bone-200 tracking-wide" x-text="opt.label"></p>
+              <p class="font-garamond text-[0.65rem] text-bone-500 mt-1" x-text="opt.detail"></p>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      {# Era slots — one card per slot #}
+      <template x-if="im.embrace_age">
+        <div class="space-y-3 mb-5">
+          <template x-for="(era, idx) in im.eras" :key="idx">
+            <div class="gilded p-4">
+              <div class="flex items-baseline justify-between mb-2">
+                <p class="label-gold text-xs" x-text="'Era ' + (idx + 1)"></p>
+                <p class="font-cinzel text-[0.6rem] text-bone-700"
+                   x-text="era.type ? eraDef(era.type).label : 'Unfilled'"></p>
+              </div>
+              <select x-model="era.type"
+                      @change="onEraTypeChange(idx)"
+                      class="w-full text-xs mb-2">
+                <option value="">— Pick an era type —</option>
+                <template x-for="def in ERA_DEFS" :key="def.type">
+                  <option :value="def.type"
+                          :disabled="def.type === 'violence' && violenceBlocked(idx)"
+                          x-text="def.label
+                            + ' (+' + def.baseXp + ' XP'
+                            + (def.baseHumanityLoss ? ', −' + def.baseHumanityLoss + ' Humanity' : '')
+                            + (def.baseOther ? ', ' + def.baseOther : '')
+                            + ')'"></option>
+                </template>
+              </select>
+
+              <template x-if="era.type">
+                <div class="text-[0.7rem] text-bone-500 font-garamond italic leading-snug mb-2"
+                     x-text="eraDef(era.type).flavor"></div>
+              </template>
+
+              {# Gambit row — only for era types that support it #}
+              <template x-if="era.type && eraDef(era.type).hasGambit">
+                <div class="flex items-center gap-3 flex-wrap pt-2 border-t border-ink-800">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" x-model="era.gambit_taken" class="accent-[#8B1A1A]">
+                    <span class="font-cinzel text-[0.6rem] tracking-widest uppercase text-gold-500">Take Gambit</span>
+                  </label>
+                  <span class="font-garamond text-[0.7rem] text-bone-500"
+                        x-text="'+' + eraDef(era.type).gambitXp + ' XP'
+                                  + (eraDef(era.type).gambitOther ? ' (' + eraDef(era.type).gambitOther + ')' : '')
+                                  + ' · ' + eraDef(era.type).gambitRisk"></span>
+                  <template x-if="era.gambit_taken">
+                    <label class="flex items-center gap-2">
+                      <span class="font-cinzel text-[0.6rem] tracking-widest text-bone-700">d10 result</span>
+                      <input type="number" min="1" max="10"
+                             x-model.number="era.gambit_roll"
+                             class="text-xs py-1 px-2 w-14 text-center">
+                    </label>
+                  </template>
+                </div>
+              </template>
+
+              {# Violence note — special case, can only succeed once #}
+              <template x-if="era.type === 'violence'">
+                <p class="font-garamond text-[0.7rem] text-blood-400 italic mt-2 pt-2 border-t border-ink-800">
+                  Each Violence choice triggers an auto-roll. On 1–5, gain Dark Secret Flaw (••) — and Violence cannot be picked again. Roll your d10:
+                  <input type="number" min="1" max="10"
+                         x-model.number="era.gambit_roll"
+                         class="text-xs py-1 px-2 w-14 text-center ml-1">
+                </p>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      {# Discipline spread #}
+      <div class="gilded p-5 mb-4">
+        <p class="label-gold mb-3 text-xs">Discipline Spread</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {% set _spreads = [
+            ('focused',   'Focused (3 + 1 + 1)',
+             'Three dots in one Discipline, one each in two others. Specialist.'),
+            ('strategic', 'Strategic (2 + 2 + 1 + 1)',
+             'Two dots in each of two Disciplines, one each in two more. Generalist.'),
+          ] %}
+          {% for slug, label, blurb in _spreads %}
+          <button type="button"
+                  class="gilded-inset px-3 py-3 text-left transition-all duration-200 border
+                         hover:border-gold-800"
+                  :class="im.discipline_spread === '{{ slug }}'
+                    ? 'border-gold-500 bg-ink-900/60'
+                    : 'border-ink-800 hover:bg-ink-900/40'"
+                  @click="im.discipline_spread = '{{ slug }}'">
+            <p class="font-cinzel text-sm text-bone-200 tracking-wide">{{ label }}</p>
+            <p class="font-garamond text-[0.7rem] text-bone-500 leading-snug mt-1">{{ blurb }}</p>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Live totals #}
+      <div class="gilded-inset px-5 py-4 mb-5 border border-ink-700">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Era XP</p>
+            <p class="font-cinzel text-2xl text-gold-400" x-text="imTotals.totalXp"></p>
+          </div>
+          <div>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Starting Humanity</p>
+            <p class="font-cinzel text-2xl"
+               :class="imTotals.humanity < 5 ? 'text-blood-400' : 'text-bone-300'"
+               x-text="imTotals.humanity"></p>
+          </div>
+        </div>
+        <p x-show="imTotals.humanity < 5" x-cloak
+           class="font-garamond text-[0.7rem] text-blood-400 italic mt-2">
+          Warning: Humanity below 5 puts your character close to the Beast.
+        </p>
+      </div>
+
+      <input type="hidden" name="im_generation"        :value="im.generation">
+      <input type="hidden" name="im_discipline_spread" :value="im.discipline_spread">
+      <input type="hidden" name="in_memoriam"          :value="JSON.stringify(im)">
+
+      {% include "player/partials/wizard_nav.html" %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 3 — BLOOD: Name + Clan
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 3" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Blood</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          <template x-if="charName.character_type === 'kindred'">
+            <span>Choose a name and select your clan. Your clan cannot be changed after approval.</span>
+          </template>
+          <template x-if="charName.character_type === 'mortal'">
+            <span>Choose a name. Mortals have no clan affiliation.</span>
+          </template>
+          <template x-if="charName.character_type === 'ghoul'">
+            <span>Choose a name. Your clan is your regnant's — you may indicate it below.</span>
+          </template>
+          <template x-if="charName.character_type === 'revenant'">
+            <span>Choose a name. Your parent clan comes from your family — no need to pick one here.</span>
+          </template>
+        </p>
+      </div>
+
+      {# Name moved to Step 1 (Nature). Echo it read-only here so the
+           player sees their pick is locked in for the clan step. #}
+      <div class="gilded p-4 mb-5 flex items-center justify-between gap-3 flex-wrap"
+           :class="charName.clan ? 'clan-' + charName.clan : ''">
+        <div class="min-w-0">
+          <p class="label-gold text-[0.7rem] mb-0.5">Character</p>
+          <p class="font-cinzel text-bone-200 text-lg truncate"
+             x-text="charName.name || '— unnamed —'"></p>
+        </div>
+        <button type="button" @click="goStep(1)"
+                class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
+          Edit name
+        </button>
+      </div>
+
+      {# Thin-Blood notice — replaces the clan picker, since Thin-Bloods
+           are clanless in V5 RAW and the tier auto-pins clan slug. #}
+      <div x-show="charName.character_type === 'kindred' && charName.character_tier === 'thinblood'"
+           x-cloak class="gilded-inset px-4 py-3 mb-5 border-l-2 border-bone-700">
+        <p class="font-garamond text-bone-400 text-sm leading-relaxed">
+          <span class="font-cinzel text-bone-200 text-xs tracking-widest uppercase block mb-1">No Clan</span>
+          Thin-Bloods are clanless. Your clan slug is set to <em>Thin-Blood</em>.
+          You'll use Thin-Blood Alchemy instead of in-clan Disciplines, and your
+          Blood Potency starts at 0.
+        </p>
+      </div>
+
+      {# Clan picker — hidden for Mortals, Revenants, and Kindred Thin-Bloods.
+         Optional for Ghouls (regnant's clan). #}
+      <div class="mb-5"
+           x-show="charName.character_type !== 'mortal'
+                   && charName.character_type !== 'revenant'
+                   && !(charName.character_type === 'kindred' && charName.character_tier === 'thinblood')"
+           x-cloak>
+        <p class="label-gold mb-3">
+          <template x-if="charName.character_type === 'kindred'">
+            <span>Clan <span class="text-blood-500 font-sans normal-case text-xs">*</span></span>
+          </template>
+          <template x-if="charName.character_type === 'ghoul'">
+            <span>Regnant's Clan <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional)</span></span>
+          </template>
+        </p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {% for slug, label in clans %}
+          <button type="button"
+                  class="clan-{{ slug }} gilded-inset px-4 py-4 text-left transition-all duration-200 hover:border-[var(--clan)] border-2 group aurora-sparkle-host relative overflow-hidden"
+                  :class="charName.clan === '{{ slug }}'
+                    ? 'border-[var(--clan)] bg-[color:var(--clan)]/10 shadow-[0_0_18px_-2px_var(--clan)]'
+                    : 'border-ink-800 hover:bg-ink-900/40'"
+                  @click="charName.clan = '{{ slug }}';
+                          if (window.Aurora) window.Aurora.sparkles($el, 18);">
+            <span x-show="charName.clan === '{{ slug }}'" x-cloak
+                  class="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-ink-950 font-bold text-xs"
+                  :style="charName.clan === '{{ slug }}' ? 'background:var(--clan);' : ''">✓</span>
+            <div class="flex items-center gap-3">
+              {{ clan_icon(slug, size='w-10 h-10', font_size=14) }}
+              <span class="font-cinzel text-sm tracking-wide"
+                    :class="charName.clan === '{{ slug }}' ? 'text-bone-100' : 'text-bone-500'">
+                {{ label }}
+              </span>
+            </div>
+          </button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="clan" :value="charName.clan">
+
+        {# Clan reference panel — Bane + Compulsion summaries #}
+        <template x-if="charName.clan && clanInfo[charName.clan]">
+          <div class="gilded-inset p-4 mt-3 border border-ink-700"
+               :class="'clan-' + charName.clan">
+            <p class="label-gold mb-2 text-[0.75rem]"
+               x-text="clanInfo[charName.clan].name"></p>
+            <div class="space-y-2">
+              <div>
+                <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Bane</p>
+                <p class="font-garamond text-xs text-bone-400 leading-snug"
+                   x-text="clanInfo[charName.clan].bane"></p>
+              </div>
+              <div>
+                <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Compulsion</p>
+                <p class="font-garamond text-xs text-bone-400 leading-snug"
+                   x-text="clanInfo[charName.clan].compulsion"></p>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 mt-8">
+        <span x-show="!canAdvanceBlood()" x-cloak
+              class="font-garamond text-bone-500 text-xs italic">
+          Pick a clan to continue
+        </span>
+        <button type="button"
+                @click="canAdvanceBlood() && goStep(4)"
+                :disabled="!canAdvanceBlood()"
+                :class="canAdvanceBlood() ? 'btn-send aurora-pulse' : 'btn-ghost opacity-60 cursor-not-allowed'"
+                class="font-cinzel tracking-widest text-xs flex items-center gap-2">
+          Next: The Hunt
+          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="square" d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 2 — THE HUNT: Predator + Covenant + Sire
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 4" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">The Hunt</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          How does your character feed, and where do they place their loyalties?
+        </p>
+      </div>
+
+      <div class="gilded p-6 space-y-6 mb-5" :class="charName.clan ? 'clan-' + charName.clan : ''">
+
+        {# Predator type — Kindred + Revenant only (Ghouls + Mortals don't hunt). #}
+        <div x-show="charName.character_type === 'kindred' || charName.character_type === 'revenant'"
+             x-cloak>
+          <label class="label-gold block mb-2">Predator Type
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
+          <select name="predator_type" x-model="charName.predator_type" class="w-full">
+            <option value="">— Select —</option>
+            {% for pt in predator_types %}<option value="{{ pt }}">{{ pt }}</option>{% endfor %}
+          </select>
+
+          {# Predator benefits panel — shown once a type is chosen. #}
+          <template x-if="charName.predator_type && predatorInfo[charName.predator_type]">
+            <div class="gilded-inset px-4 py-3 mt-3 border border-ink-700">
+              <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Benefits</p>
+              <p class="font-garamond text-xs text-bone-400 leading-snug"
+                 x-text="predatorInfo[charName.predator_type].benefits"></p>
+              <p class="font-garamond text-[0.65rem] text-bone-700 italic mt-2">
+                Pick your option among the listed Disciplines/specialties. Staff confirms placement at approval.
+              </p>
+            </div>
+          </template>
+        </div>
+
+        <div>
+          <label class="label-gold block mb-2">Covenant / Sect
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
+          <select name="covenant" x-model="charName.covenant" class="w-full">
+            <option value="">— Select —</option>
+            {% for cov in covenants %}<option value="{{ cov }}">{{ cov }}</option>{% endfor %}
+          </select>
+        </div>
+
+        {# Sire — Kindred only. Mortals have parents, Ghouls have a regnant,
+           Revenants have family elders rather than a sire in the V5 sense. #}
+        <div x-show="charName.character_type === 'kindred'" x-cloak>
+          <label class="label-gold block mb-2">Sire
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
+          <input type="text" name="sire" maxlength="80" x-model="charName.sire"
+                 placeholder="Name of sire, if known…" class="w-full">
+        </div>
+
+        {# Profession + pronouns + ages — apply to all character types. #}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="label-gold block mb-2">Profession
+              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(day job / cover)</span></label>
+            <input type="text" name="profession" maxlength="80"
+                   x-model="charName.profession"
+                   placeholder="e.g. Bartender, Detective…" class="w-full text-sm">
+          </div>
+          <div>
+            <label class="label-gold block mb-2">Pronouns
+              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
+            <input type="text" name="pronouns" maxlength="40"
+                   x-model="charName.pronouns"
+                   placeholder="e.g. she/her, they/them…" class="w-full text-sm">
+          </div>
+          <div>
+            <label class="label-gold block mb-2">True Age
+              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(years lived)</span></label>
+            <input type="number" name="true_age" min="0" max="2000"
+                   x-model.number="charName.true_age"
+                   placeholder="0" class="w-full text-sm">
+          </div>
+          <div>
+            <label class="label-gold block mb-2">Apparent Age
+              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(age at Embrace)</span></label>
+            <input type="number" name="apparent_age" min="0" max="120"
+                   x-model.number="charName.apparent_age"
+                   placeholder="0" class="w-full text-sm">
+          </div>
+        </div>
+      </div>
+
+      {% include "player/partials/wizard_nav.html" %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 3 — THE STORY: Concept + Blurb + Ingrained
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 5" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">The Story</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          Who were they before the Embrace? Who are they now?
+        </p>
+      </div>
+
+      <div class="gilded p-6 space-y-6 mb-5" :class="charName.clan ? 'clan-' + charName.clan : ''">
+        <div>
+          <label class="label-gold block mb-2">Concept
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
+          <input type="text" name="concept" maxlength="120"
+                 x-model="charName.concept"
+                 placeholder="e.g. 'Former NYPD detective turned investigator'" class="w-full">
+        </div>
+        <div>
+          <label class="label-gold block mb-2">Profile Blurb
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(visible to other players)</span></label>
+          <textarea name="profile_blurb" rows="3" maxlength="600"
+                    x-model="charName.profile_blurb"
+                    placeholder="Public reputation, demeanour, or appearance…"
+                    class="w-full resize-y"></textarea>
+        </div>
+
+        {# Ambition + Desire — V5 RAW chargen #}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="label-gold block mb-2">Ambition
+              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(long-term goal)</span></label>
+            <input type="text" name="ambition" maxlength="120"
+                   x-model="charName.ambition"
+                   placeholder="e.g. Become Prince of the city"
+                   class="w-full text-sm">
+          </div>
+          <div>
+            <label class="label-gold block mb-2">Desire
+              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(short-term goal)</span></label>
+            <input type="text" name="desire" maxlength="120"
+                   x-model="charName.desire"
+                   placeholder="e.g. Find out who killed my sire"
+                   class="w-full text-sm">
+          </div>
+        </div>
+
+        {# Staff-private backstory #}
+        <div>
+          <label class="label-gold block mb-2">Backstory
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(staff-only, optional)</span></label>
+          <textarea name="backstory" rows="4" maxlength="2000"
+                    x-model="charName.backstory"
+                    placeholder="Long-form history visible only to staff — your pre-Embrace life, the Embrace itself, key NPCs, secrets…"
+                    class="w-full resize-y text-sm"></textarea>
+        </div>
+
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <input type="checkbox" name="has_ingrained_flaw"
+                 x-model="charName.has_ingrained_flaw" class="accent-[#8B1A1A] mt-1">
+          <div>
+            <p class="font-cinzel text-xs text-bone-300 tracking-wide">Ingrained Discipline Flaw</p>
+            <p class="font-garamond text-bone-500 text-sm mt-0.5">
+              Grants a separate 15 XP budget at staff discretion.
+            </p>
+          </div>
+        </label>
+      </div>
+
+      {% if require_sheet %}
+        {% include "player/partials/wizard_nav.html" %}
+      {% else %}
+      {# Short-form chronicle: skip steps 4-9 entirely. Submit directly. #}
+      <div class="gilded-inset px-5 py-4 mb-5 border border-ink-700">
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          This chronicle approves sheets from an external source (PDF, Progeny
+          export, etc.). Submit now and fill in your sheet on the next page —
+          you can keep editing it until staff opens the review.
+        </p>
+      </div>
+      <div class="flex items-center justify-between">
+        <button type="button" @click="goStep(step - 1)"
+                class="btn-ghost font-cinzel tracking-widest text-xs">Back</button>
+        <button type="submit"
+                class="btn-send font-cinzel tracking-widest text-xs">
+          Submit Character
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if require_sheet %}
+    {# ═══════════════════════════════════════════════════
+       STEP 4 — FLESH: Attributes
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 6" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Flesh</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          Allocate dots across the nine attributes. Standard V5 distribution is
+          one category at 4, one at 3, one at 2 (plus a starting dot in each).
+          Staff verifies the spread on approval.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        {% for cat, traits in v5_attributes %}
+        <div class="gilded p-5">
+          <p class="label-gold mb-3 text-xs">{{ cat }}</p>
+          <div class="space-y-1">
+            {% for key, label in traits %}
+            <div class="flex items-center justify-between py-1">
+              <span class="font-garamond text-sm text-bone-300">{{ label }}</span>
+              {% set tplkey = key %}
+              {% include "player/partials/wizard_pips.html" %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% for cat, traits in v5_attributes %}
+        {% for key, _ in traits %}
+        <input type="hidden" name="{{ key }}" :value="sheet['{{ key }}'] || 0">
+        {% endfor %}
+      {% endfor %}
+
+      {% include "player/partials/wizard_nav.html" %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 5 — SKILL: Skills + inline specialties
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 7" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Skill</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          27 skills across three pillars. Tap the <span class="text-gold-500">+</span>
+          beside any skill to record a specialty (e.g. "Insight · Reading Faces").
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        {% for cat, traits in v5_skills %}
+        <div class="gilded p-5">
+          <p class="label-gold mb-3 text-xs">{{ cat }}</p>
+          <div class="space-y-1">
+            {% for key, label in traits %}
+            <div class="border-b border-ink-800 last:border-0 py-1.5">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="font-garamond text-sm text-bone-300 truncate">{{ label }}</span>
+                  <button type="button"
+                          @click="startAddingSpec('{{ key }}')"
+                          class="text-bone-700 hover:text-gold-400 text-[0.65rem] leading-none">+</button>
+                </div>
+                {% set tplkey = key %}
+                {% include "player/partials/wizard_pips.html" %}
+              </div>
+
+              {# Specialty add-input #}
+              <template x-if="addingSpecFor === '{{ key }}'">
+                <div class="flex items-center gap-1.5 mt-1.5 ml-2">
+                  <input :id="'spec-' + '{{ key }}'"
+                         type="text" maxlength="80"
+                         x-model="specBuffer"
+                         @keydown.enter.prevent="saveSpec()"
+                         @keydown.escape="cancelSpec()"
+                         placeholder="Specialty…"
+                         class="text-xs py-1 px-2 flex-1">
+                  <button type="button" @click="saveSpec()"
+                          class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Save</button>
+                  <button type="button" @click="cancelSpec()"
+                          class="font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-bone-500">Cancel</button>
+                </div>
+              </template>
+
+              {# Existing specialties — INLINE chips below the skill row #}
+              <template x-for="s in specsFor('{{ key }}')" :key="s.name">
+                <div class="flex items-center gap-1.5 mt-1 ml-2">
+                  <span class="font-garamond text-[0.7rem] italic text-bone-500">· <span x-text="s.name"></span></span>
+                  <button type="button" @click="removeSpec('{{ key }}', s.name)"
+                          class="text-bone-700 hover:text-blood-400 text-[0.65rem] leading-none">×</button>
+                </div>
+              </template>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% for cat, traits in v5_skills %}
+        {% for key, _ in traits %}
+        <input type="hidden" name="{{ key }}" :value="sheet['{{ key }}'] || 0">
+        {% endfor %}
+      {% endfor %}
+      <input type="hidden" name="specialties" :value="JSON.stringify(specialties)">
+
+      {% include "player/partials/wizard_nav.html" %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 8 — CURSE: Disciplines + Powers
+       (Was step 7; swapped with Legacy per user request.)
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 9" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Curse</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          Set discipline ratings. <span class="text-gold-400">Gold-bordered</span>
+          disciplines are in-clan for your clan. Add the specific powers your
+          character has learned at each level.
+        </p>
+      </div>
+
+      {# Character-type hints — quick mechanic reminders for non-Kindred. #}
+      <template x-if="charName.character_type === 'ghoul'">
+        <div class="gilded-inset px-4 py-3 mb-4 border border-ink-700">
+          <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Ghoul Disciplines</p>
+          <p class="font-garamond text-xs text-bone-400 leading-snug">
+            Start with 1 dot of a Discipline drawn from your regnant's clan.
+            Additional Discipline dots beyond that come at staff discretion
+            (typically capped at 3 dots total without extraordinary
+            circumstances).
+          </p>
+        </div>
+      </template>
+
+      <template x-if="charName.character_type === 'revenant'">
+        <div class="gilded-inset px-4 py-3 mb-4 border border-ink-700">
+          <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Revenant Disciplines</p>
+          <p class="font-garamond text-xs text-bone-400 leading-snug">
+            Start with 2 dots split across your family's Disciplines, plus 1
+            dot of a Discipline drawn from your domitor's clan. Family
+            Disciplines are listed back on the Nature step. Max 5 powers per
+            Discipline; Blood Sorcery / Oblivion rituals may be learned.
+          </p>
+        </div>
+      </template>
+
+      <template x-if="charName.character_type === 'mortal'">
+        <div class="gilded-inset px-4 py-3 mb-4 border border-ink-700">
+          <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Mortal</p>
+          <p class="font-garamond text-xs text-bone-400 leading-snug">
+            Mortals don't have Disciplines. If your concept includes
+            supernatural elements (True Faith, Numina, Thaumaturgy), discuss
+            with staff before submitting — these typically require a
+            chronicle-specific merit.
+          </p>
+        </div>
+      </template>
+
+      <div class="gilded p-5 mb-4">
+        <p class="label-gold mb-3 text-xs">Disciplines</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+          {% for key, label in v5_disciplines %}
+          <div class="flex items-center justify-between py-1 border-b border-ink-800"
+               :class="isInClan('{{ key }}') ? 'border-gold-900' : ''">
+            <div class="flex items-center gap-2">
+              <span class="font-garamond text-sm" :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-bone-200' : 'text-bone-500'">{{ label }}</span>
+              <span x-show="isInClan('{{ key }}')"
+                    class="font-cinzel text-[0.5rem] tracking-[0.2em] text-gold-500 uppercase">In-Clan</span>
+            </div>
+            {% set tplkey = key %}
+            {% include "player/partials/wizard_pips.html" %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Powers (per-discipline named powers) #}
+      <div class="gilded p-5 mb-5" x-show="learnedDisciplines().length > 0" x-cloak>
+        <div class="flex items-baseline justify-between mb-3">
+          <p class="label-gold text-xs">Powers</p>
+          <p class="font-garamond text-[0.65rem] text-bone-700 italic">
+            Name powers your character has learned. Use the discipline level (1-5).
+          </p>
+        </div>
+
+        <div class="space-y-3">
+          <template x-for="disc in learnedDisciplines()" :key="disc.key">
+            <div>
+              <p class="font-cinzel text-[0.7rem] tracking-[0.2em] uppercase text-bone-500 mb-1.5"
+                 x-text="disc.label + ' · ' + (sheet[disc.key] || 0) + ' dot' + ((sheet[disc.key]||0) === 1 ? '' : 's')"></p>
+              <template x-for="(p, idx) in powersFor(disc.key)" :key="idx">
+                <div class="flex items-center gap-2 mb-1 ml-2">
+                  <span class="font-cinzel text-[0.6rem] text-bone-700 w-5 shrink-0" x-text="p.level"></span>
+                  <span class="font-garamond text-xs text-bone-300 flex-1" x-text="p.name"></span>
+                  <button type="button" @click="removePower(disc.key, p.name)"
+                          class="text-bone-700 hover:text-blood-400 text-xs">×</button>
+                </div>
+              </template>
+              <div class="flex items-center gap-2 mt-1 ml-2">
+                <input type="number" min="1" :max="sheet[disc.key] || 1"
+                       x-model.number="newPowerLevel[disc.key]"
+                       class="text-xs py-1 px-1.5 w-12 text-center">
+                <input type="text" maxlength="80"
+                       :placeholder="'Power name… (' + disc.label + ')'"
+                       x-model="newPowerName[disc.key]"
+                       @keydown.enter.prevent="addPower(disc.key)"
+                       class="text-xs py-1 px-2 flex-1">
+                <button type="button" @click="addPower(disc.key)"
+                        class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      {% for key, _ in v5_disciplines %}
+      <input type="hidden" name="{{ key }}" :value="sheet['{{ key }}'] || 0">
+      {% endfor %}
+      <input type="hidden" name="powers" :value="JSON.stringify(powers)">
+
+      {% include "player/partials/wizard_nav.html" %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 7 — LEGACY: Merits + Advantages + Backgrounds + Flaws
+       (Moved BEFORE Curse so dot allocations land before powers.)
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 8" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Legacy</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          What advantages do you carry, and what holds you back?
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+
+        {# Merits #}
+        <div class="gilded p-5">
+          <p class="label-gold mb-3 text-xs">Merits</p>
+          <template x-for="(m, idx) in merits" :key="'m'+idx">
+            <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
+              <span class="font-garamond text-xs text-bone-300 flex-1 truncate" x-text="m.name"></span>
+              <div class="flex gap-0.5">
+                <template x-for="n in 5">
+                  <button type="button" @click="m.dots = (m.dots === n ? n - 1 : n)"
+                          class="w-2.5 h-2.5 rounded-full border transition-colors"
+                          :class="m.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
+                </template>
+              </div>
+              <button type="button" @click="merits.splice(idx, 1)"
+                      class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+            </div>
+          </template>
+          <div class="flex items-center gap-2 mt-3">
+            <input type="text" maxlength="80" x-model="newMeritName"
+                   @keydown.enter.prevent="addMerit()"
+                   placeholder="e.g. Iron Will, Beautiful…" class="text-xs py-1 px-2 flex-1">
+            <button type="button" @click="addMerit()"
+                    class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
+          </div>
+        </div>
+
+        {# Advantages #}
+        <div class="gilded p-5">
+          <p class="label-gold mb-3 text-xs">Advantages</p>
+          <template x-for="(a, idx) in advantages" :key="'a'+idx">
+            <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
+              <span class="font-garamond text-xs text-bone-300 flex-1 truncate" x-text="a.name"></span>
+              <div class="flex gap-0.5">
+                <template x-for="n in 5">
+                  <button type="button" @click="a.dots = (a.dots === n ? n - 1 : n)"
+                          class="w-2.5 h-2.5 rounded-full border transition-colors"
+                          :class="a.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
+                </template>
+              </div>
+              <button type="button" @click="advantages.splice(idx, 1)"
+                      class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+            </div>
+          </template>
+          <div class="flex items-center gap-2 mt-3">
+            <input type="text" maxlength="80" x-model="newAdvantageName"
+                   @keydown.enter.prevent="addAdvantage()"
+                   placeholder="e.g. Linguistics, Catenating Blood…" class="text-xs py-1 px-2 flex-1">
+            <button type="button" @click="addAdvantage()"
+                    class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
+          </div>
+        </div>
+
+        {# Backgrounds #}
+        <div class="gilded p-5">
+          <p class="label-gold mb-3 text-xs">Backgrounds</p>
+          <template x-for="(b, idx) in backgrounds" :key="'b'+idx">
+            <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
+              <span class="font-garamond text-xs text-bone-300 flex-1 truncate" x-text="b.name"></span>
+              <div class="flex gap-0.5">
+                <template x-for="n in 5">
+                  <button type="button" @click="b.dots = (b.dots === n ? n - 1 : n)"
+                          class="w-2.5 h-2.5 rounded-full border transition-colors"
+                          :class="b.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
+                </template>
+              </div>
+              <button type="button" @click="backgrounds.splice(idx, 1)"
+                      class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+            </div>
+          </template>
+          <div class="flex items-center gap-2 mt-3">
+            <input type="text" maxlength="80" x-model="newBackgroundName"
+                   @keydown.enter.prevent="addBackground()"
+                   placeholder="e.g. Haven, Resources, Allies…" class="text-xs py-1 px-2 flex-1">
+            <button type="button" @click="addBackground()"
+                    class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
+          </div>
+        </div>
+
+        {# Flaws #}
+        <div class="gilded p-5">
+          <p class="label-gold mb-3 text-xs">Flaws</p>
+          <template x-for="(f, idx) in flaws" :key="'f'+idx">
+            <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
+              <span class="font-garamond text-xs text-blood-300 flex-1 truncate" x-text="f.name"></span>
+              <div class="flex gap-0.5">
+                <template x-for="n in 5">
+                  <button type="button" @click="f.dots = (f.dots === n ? n - 1 : n)"
+                          class="w-2.5 h-2.5 rounded-full border transition-colors"
+                          :class="f.dots >= n ? 'bg-blood-bright border-blood-bright' : 'border-bone-700'"></button>
+                </template>
+              </div>
+              <button type="button" @click="flaws.splice(idx, 1)"
+                      class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+            </div>
+          </template>
+          <div class="flex items-center gap-2 mt-3">
+            <input type="text" maxlength="80" x-model="newFlawName"
+                   @keydown.enter.prevent="addFlaw()"
+                   placeholder="e.g. Disliked, Stake Bait…" class="text-xs py-1 px-2 flex-1">
+            <button type="button" @click="addFlaw()"
+                    class="font-cinzel text-[0.55rem] tracking-widest text-blood-400 hover:text-blood-300">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <input type="hidden" name="merits"      :value="JSON.stringify(merits)">
+      <input type="hidden" name="advantages"  :value="JSON.stringify(advantages)">
+      <input type="hidden" name="backgrounds" :value="JSON.stringify(backgrounds)">
+      <input type="hidden" name="flaws"       :value="JSON.stringify(flaws)">
+
+      {% include "player/partials/wizard_nav.html" %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 8 — LORE: Rituals + Ceremonies + Formulae
+       (conditional — only meaningful if relevant disciplines learned)
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 10" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Lore</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          Rituals, ceremonies, and thin-blood formulae. Skip any section that
+          doesn't apply — these only matter if you took the corresponding
+          discipline.
+        </p>
+      </div>
+
+      <div class="space-y-4 mb-5">
+        {# Rituals — Blood Sorcery #}
+        <div class="gilded p-5" :class="(sheet.disc_blood_sorcery || 0) > 0 ? '' : 'opacity-60'">
+          <div class="flex items-baseline justify-between mb-2">
+            <p class="label-gold text-xs">Blood Sorcery Rituals</p>
+            <span class="font-cinzel text-[0.6rem] text-bone-700">
+              Blood Sorcery: <span x-text="sheet.disc_blood_sorcery || 0"></span>
+            </span>
+          </div>
+          {% include "player/partials/wizard_leveled_list.html" with context %}
+        </div>
+
+        {# Ceremonies — Oblivion #}
+        <div class="gilded p-5" :class="(sheet.disc_oblivion || 0) > 0 ? '' : 'opacity-60'">
+          <div class="flex items-baseline justify-between mb-2">
+            <p class="label-gold text-xs">Oblivion Ceremonies</p>
+            <span class="font-cinzel text-[0.6rem] text-bone-700">
+              Oblivion: <span x-text="sheet.disc_oblivion || 0"></span>
+            </span>
+          </div>
+          {% with list_key='ceremonies', list_label='ceremony' %}
+            {% include "player/partials/wizard_leveled_list.html" %}
+          {% endwith %}
+        </div>
+
+        {# Formulae — Thin-Blood Alchemy #}
+        <div class="gilded p-5" :class="(sheet.disc_thin_blood_alchemy || 0) > 0 ? '' : 'opacity-60'">
+          <div class="flex items-baseline justify-between mb-2">
+            <p class="label-gold text-xs">Thin-Blood Formulae</p>
+            <span class="font-cinzel text-[0.6rem] text-bone-700">
+              Alchemy: <span x-text="sheet.disc_thin_blood_alchemy || 0"></span>
+            </span>
+          </div>
+          {% with list_key='formulae', list_label='formula' %}
+            {% include "player/partials/wizard_leveled_list.html" %}
+          {% endwith %}
+        </div>
+      </div>
+
+      <input type="hidden" name="rituals"    :value="JSON.stringify(rituals)">
+      <input type="hidden" name="ceremonies" :value="JSON.stringify(ceremonies)">
+      <input type="hidden" name="formulae"   :value="JSON.stringify(formulae)">
+
+      {% include "player/partials/wizard_nav.html" %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 9 — SOUL: Touchstones + Convictions
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 11" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Soul</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          Touchstones are the mortals who anchor you to your Humanity.
+          Convictions are the lines you refuse to cross.
+        </p>
+      </div>
+
+      <div class="mb-5 space-y-3">
+        <div class="flex items-baseline justify-between">
+          <p class="label-gold">Touchstones &amp; Convictions</p>
+          <p class="font-cinzel text-[0.55rem] tracking-widest uppercase"
+             :class="touchstonesOk() ? 'text-gold-500' : 'text-blood-400'"
+             x-text="touchstones.length + ' / 2–3 pairs'"></p>
+        </div>
+        <p class="font-garamond text-[0.7rem] text-bone-700 italic">
+          Each Touchstone (the mortal who anchors you) is paired with the
+          Conviction they uphold. V5 chargen: 2–3 pairs.
+        </p>
+
+        <template x-for="(t, idx) in touchstones" :key="idx">
+          <div class="gilded p-4 grid grid-cols-1 sm:grid-cols-[1fr_2fr_auto] gap-3 items-start">
+            <div>
+              <label class="label-gold block mb-1 text-[0.7rem]">
+                Touchstone <span x-text="idx + 1"></span>
+              </label>
+              <input type="text" maxlength="120" x-model="t.name"
+                     placeholder="Sister Maria — last living family"
+                     class="w-full text-xs py-1.5 px-2">
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.7rem]">Conviction</label>
+              <input type="text" maxlength="200" x-model="t.conviction"
+                     placeholder="Never harm a child"
+                     class="w-full text-xs py-1.5 px-2">
+            </div>
+            <button type="button" @click="touchstones.splice(idx, 1)"
+                    class="self-end text-bone-700 hover:text-blood-400 text-xs py-1.5 px-2 self-end">
+              Remove
+            </button>
+          </div>
+        </template>
+
+        <button type="button" @click="addTouchstonePair()"
+                x-show="touchstones.length < 3"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest">
+          + Add another pair
+        </button>
+
+        <p x-show="touchstones.length < 2" x-cloak
+           class="font-garamond text-[0.75rem] text-blood-400 italic">
+          At least 2 touchstone+conviction pairs required at creation.
+        </p>
+      </div>
+
+      <input type="hidden" name="touchstones" :value="JSON.stringify(touchstones)">
+
+      {% include "player/partials/wizard_nav.html" %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════
+       STEP 10 — VOW: Review + Submit
+       ═══════════════════════════════════════════════════ #}
+    <div x-show="step === 12" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Vow</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          Review everything below. Once submitted, staff will be notified —
+          you can keep editing until they open the review.
+        </p>
+      </div>
+
+      <div class="gilded p-6 mb-5 space-y-5" :class="charName.clan ? 'clan-' + charName.clan : ''">
+
+        {# Identity #}
+        <div>
+          <p class="label-gold mb-2 text-[0.75rem]">Identity</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Name</span><span class="font-garamond text-bone-300" x-text="charName.name || '—'"></span></div>
+            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Nature</span><span class="font-garamond text-bone-300" x-text="natureSummary()"></span></div>
+            <div class="flex gap-2" x-show="charName.character_type === 'kindred'"><span class="text-bone-700 w-24 shrink-0">Clan</span><span class="font-garamond text-bone-300" x-text="clanLabel() || '—'"></span></div>
+            <div class="flex gap-2" x-show="charName.character_type === 'revenant'"><span class="text-bone-700 w-24 shrink-0">Family</span><span class="font-garamond text-bone-300" x-text="charName.revenant_family || '—'"></span></div>
+            <div class="flex gap-2" x-show="charName.character_type === 'ghoul'"><span class="text-bone-700 w-24 shrink-0">Regnant</span><span class="font-garamond text-bone-300" x-text="charName.ghoul_regnant || '—'"></span></div>
+            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Predator</span><span class="font-garamond text-bone-400" x-text="charName.predator_type || '—'"></span></div>
+            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Covenant</span><span class="font-garamond text-bone-400" x-text="charName.covenant || '—'"></span></div>
+            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Profession</span><span class="font-garamond text-bone-400" x-text="charName.profession || '—'"></span></div>
+            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Pronouns</span><span class="font-garamond text-bone-400" x-text="charName.pronouns || '—'"></span></div>
+            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">True / Apparent</span><span class="font-garamond text-bone-400" x-text="(charName.true_age || '—') + ' / ' + (charName.apparent_age || '—')"></span></div>
+          </div>
+        </div>
+
+        <template x-if="charName.ambition || charName.desire">
+          <div>
+            <p class="label-gold mb-2 text-[0.75rem]">Drives</p>
+            <div class="space-y-1.5 text-sm">
+              <div x-show="charName.ambition" class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Ambition</span><span class="font-garamond text-bone-300 italic" x-text="charName.ambition"></span></div>
+              <div x-show="charName.desire" class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Desire</span><span class="font-garamond text-bone-300 italic" x-text="charName.desire"></span></div>
+            </div>
+          </div>
+        </template>
+
+        {# Attributes — detail #}
+        <div>
+          <p class="label-gold mb-2 text-[0.75rem]">Attributes
+            <span class="text-bone-700 ml-2" x-text="'(' + sumAttrs() + ' dots)'"></span>
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-0.5 text-xs">
+            {% for cat, traits in v5_attributes %}
+              {% for key, label in traits %}
+              <div class="flex justify-between font-garamond text-bone-400"
+                   :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-bone-300' : 'text-bone-700'">
+                <span>{{ label }}</span>
+                <span x-text="sheet['{{ key }}'] || 0"></span>
+              </div>
+              {% endfor %}
+            {% endfor %}
+          </div>
+        </div>
+
+        {# Skills — only show ones with dots #}
+        <div>
+          <p class="label-gold mb-2 text-[0.75rem]">Skills
+            <span class="text-bone-700 ml-2" x-text="'(' + sumSkills() + ' dots, ' + specialties.length + ' specialt' + (specialties.length === 1 ? 'y' : 'ies') + ')'"></span>
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-0.5 text-xs">
+            {% for cat, traits in v5_skills %}
+              {% for key, label in traits %}
+              <div class="flex justify-between font-garamond text-bone-400"
+                   x-show="(sheet['{{ key }}'] || 0) > 0">
+                <span>
+                  {{ label }}
+                  <template x-for="s in specsFor('{{ key }}')" :key="s.name">
+                    <span class="italic text-bone-600 text-[0.7em]" x-text="' · ' + s.name"></span>
+                  </template>
+                </span>
+                <span x-text="sheet['{{ key }}'] || 0"></span>
+              </div>
+              {% endfor %}
+            {% endfor %}
+          </div>
+          <p x-show="sumSkills() === 0" class="font-garamond text-bone-700 italic text-xs">No skills allocated.</p>
+        </div>
+
+        {# Disciplines + Powers #}
+        <template x-if="learnedDisciplines().length > 0">
+          <div>
+            <p class="label-gold mb-2 text-[0.75rem]">Disciplines</p>
+            <div class="space-y-1.5 text-xs">
+              <template x-for="disc in learnedDisciplines()" :key="disc.key">
+                <div>
+                  <div class="flex justify-between font-garamond text-bone-300">
+                    <span x-text="disc.label"></span>
+                    <span x-text="sheet[disc.key]"></span>
+                  </div>
+                  <template x-for="p in powersFor(disc.key)" :key="p.name">
+                    <p class="font-garamond text-[0.7rem] text-bone-500 italic pl-3"
+                       x-text="'L' + p.level + ' · ' + p.name"></p>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        {# Legacy — Merits / Advantages / Backgrounds / Flaws #}
+        <template x-if="merits.length || advantages.length || backgrounds.length || flaws.length">
+          <div>
+            <p class="label-gold mb-2 text-[0.75rem]">Legacy</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+              <template x-for="(list, name) in {
+                  'Merits': merits, 'Advantages': advantages,
+                  'Backgrounds': backgrounds, 'Flaws': flaws
+                }" :key="name">
+                <div x-show="list.length">
+                  <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1" x-text="name"></p>
+                  <template x-for="(item, idx) in list" :key="idx">
+                    <p class="font-garamond text-bone-400">
+                      <span x-text="item.name"></span>
+                      <span class="text-bone-700" x-text="' (' + item.dots + ')'"></span>
+                    </p>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        {# Lore — Rituals / Ceremonies / Formulae #}
+        <template x-if="rituals.length || ceremonies.length || formulae.length">
+          <div>
+            <p class="label-gold mb-2 text-[0.75rem]">Lore</p>
+            <div class="space-y-1 text-xs font-garamond text-bone-400">
+              <template x-for="r in rituals"    :key="'r'+r.name"><p><span class="text-bone-700">L<span x-text="r.level"></span></span> Ritual · <span x-text="r.name"></span></p></template>
+              <template x-for="c in ceremonies" :key="'c'+c.name"><p><span class="text-bone-700">L<span x-text="c.level"></span></span> Ceremony · <span x-text="c.name"></span></p></template>
+              <template x-for="f in formulae"   :key="'f'+f.name"><p><span class="text-bone-700">L<span x-text="f.level"></span></span> Formula · <span x-text="f.name"></span></p></template>
+            </div>
+          </div>
+        </template>
+
+        {# Touchstones + Convictions pairs #}
+        <div>
+          <p class="label-gold mb-2 text-[0.75rem]">Touchstones &amp; Convictions
+            <span class="text-bone-700 ml-2" x-text="'(' + touchstones.length + ')'"></span>
+          </p>
+          <div class="space-y-1.5 text-xs">
+            <template x-for="(t, idx) in touchstones" :key="idx">
+              <div class="font-garamond">
+                <span class="text-bone-300" x-text="t.name || '—'"></span>
+                <span class="text-bone-700 mx-1.5">·</span>
+                <span class="text-bone-500 italic" x-text="t.conviction || '—'"></span>
+              </div>
+            </template>
+            <p x-show="touchstones.length === 0" class="font-garamond text-bone-700 italic">None set.</p>
+          </div>
+        </div>
+
+        {# In Memoriam summary #}
+        <template x-if="charName.character_type === 'kindred'
+                        && charName.character_tier === 'ancilla'
+                        && charName.ancilla_mode === 'in_memoriam'">
+          <div>
+            <p class="label-gold mb-2 text-[0.75rem]">In Memoriam</p>
+            <div class="text-xs font-garamond space-y-1">
+              <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Generation</span><span class="text-bone-300" x-text="im.generation || '—'"></span></div>
+              <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Disc Spread</span><span class="text-bone-300" x-text="im.discipline_spread || '—'"></span></div>
+              <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Embrace</span><span class="text-bone-300" x-text="im.embrace_age || '—'"></span></div>
+              <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Era XP</span><span class="text-gold-400" x-text="imTotals.totalXp"></span></div>
+              <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Humanity</span><span :class="imTotals.humanity < 5 ? 'text-blood-400' : 'text-bone-300'" x-text="imTotals.humanity"></span></div>
+              <template x-for="(era, idx) in im.eras" :key="idx">
+                <div class="pl-3" x-show="era.type">
+                  <span class="text-bone-700">Era <span x-text="idx + 1"></span> ·</span>
+                  <span class="text-bone-300" x-text="eraDef(era.type).label"></span>
+                  <template x-if="era.gambit_taken || era.type === 'violence'">
+                    <span class="text-bone-600 italic">
+                      <span class="mx-1">·</span>
+                      <span x-text="(era.gambit_taken ? 'gambit ' : 'roll ') + (era.gambit_roll || '—')"></span>
+                    </span>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="gilded-inset px-5 py-4 mb-6 border border-ink-700">
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          After submitting, your character will be marked
+          <strong class="text-mauve-400 font-cinzel text-xs tracking-wider">Pending Approval</strong>.
+          You can keep editing until staff opens the review.
+        </p>
+      </div>
+
+      <p x-show="!touchstonesOk()" x-cloak
+         class="font-garamond text-[0.75rem] text-blood-400 italic mb-3">
+        At least 2 touchstones are required before submitting (you currently have <span x-text="touchstones.length"></span>).
+      </p>
+
+      {# Profile image — optional file upload, processed server-side after create #}
+      <div class="gilded p-5 mb-5">
+        <label class="label-gold block mb-2" for="wizard-image-upload">
+          Profile Image
+          <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span>
+        </label>
+        <p class="font-garamond text-bone-500 text-xs mb-3 leading-relaxed">
+          Visible to other players on your character's IC profile.
+          JPG, PNG, WebP, or GIF up to 2 MB. You can also add or replace this later from the character page.
+        </p>
+        <div class="flex items-start gap-4">
+          <div x-show="imagePreview" x-cloak
+               class="w-24 h-24 shrink-0 border border-[var(--clan,theme(colors.ink.700))] bg-ink-900 overflow-hidden">
+            <img :src="imagePreview" alt="Preview" class="w-full h-full object-cover">
+          </div>
+          <div class="flex-1 min-w-0">
+            <input id="wizard-image-upload"
+                   type="file"
+                   name="profile_image"
+                   accept="image/jpeg,image/png,image/webp,image/gif"
+                   @change="onImageSelected($event)"
+                   class="w-full text-xs">
+            <p x-show="imageError" x-cloak x-text="imageError"
+               class="font-garamond text-[0.7rem] text-blood-400 italic mt-2"></p>
+            <button x-show="imagePreview" x-cloak
+                    type="button" @click="clearImage()"
+                    class="font-cinzel tracking-widest text-[0.6rem] text-blood-500 hover:text-blood-400 mt-2">
+              Remove
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {# Submission notes — free-text "anything for the ST" before submit #}
+      <div class="gilded p-5 mb-5">
+        <label class="label-gold block mb-2">
+          Notes for Staff
+          <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span>
+        </label>
+        <textarea name="submission_notes" rows="3" maxlength="600"
+                  x-model="submissionNotes"
+                  placeholder="Anything staff should know — house rule clarifications, concept context, requested loresheets, etc."
+                  class="w-full text-sm resize-y"></textarea>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <button type="button" @click="goStep(11)"
+                class="btn-ghost font-cinzel tracking-widest text-xs">Back</button>
+        <div class="flex gap-2">
+          <button type="button" @click="saveAsDraft($event)"
+                  class="btn-ghost font-cinzel tracking-widest text-xs">
+            Save Draft
+          </button>
+          <button type="submit"
+                  :disabled="!touchstonesOk()"
+                  :class="touchstonesOk()
+                    ? 'btn-send'
+                    : 'btn-ghost opacity-40 cursor-not-allowed'"
+                  class="font-cinzel tracking-widest text-xs">
+            Submit for Approval
+          </button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </form>
+
+  {# Mobile FAB — opens the sidebar drawer. Visible only below lg. #}
+  <button type="button"
+          x-show="!wizardSidebarOpen"
+          @click="wizardSidebarOpen = true"
+          class="lg:hidden fixed bottom-4 right-4 z-30 gilded px-3 py-2 font-cinzel text-[0.6rem] tracking-widest text-bone-300 shadow-lg border border-gold-700">
+    Budget + Search
+  </button>
+
+  {# Mobile drawer backdrop #}
+  <div x-show="wizardSidebarOpen" x-cloak
+       @click="wizardSidebarOpen = false"
+       x-transition:enter="transition-opacity duration-150"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       class="lg:hidden fixed inset-0 z-30 bg-black/70"></div>
+
+  {# ── Sidebar: trait search + budgets + draft controls.
+       Desktop: sticky right column. Mobile: drawer triggered by the FAB
+       above. #}
+  <aside class="fixed z-40 inset-y-0 right-0 w-[280px] overflow-y-auto bg-ink-950 p-4 border-l border-ink-700
+                transform transition-transform duration-200
+                lg:static lg:bg-transparent lg:p-0 lg:border-0 lg:translate-x-0 lg:overflow-visible
+                lg:sticky lg:top-6 lg:self-start"
+         :class="wizardSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'"
+         x-cloak>
+
+    {# Mobile close button — invisible on desktop #}
+    <button type="button"
+            @click="wizardSidebarOpen = false"
+            class="lg:hidden mb-3 ml-auto block text-bone-600 hover:text-blood-400 text-2xl leading-none">
+      ×
+    </button>
+
+
+    {# Trait search — searches across clans, predator types, disciplines,
+       attributes, skills. Click a hit to expand its info inline. #}
+    <div class="gilded p-4 mb-4"
+         x-data='traitSearch({
+           clanInfo:     {{ (clan_info     | default({})) | tojson | forceescape }},
+           predatorInfo: {{ (predator_info | default({})) | tojson | forceescape }},
+           disciplines:  {{ (v5_disciplines | default([])) | tojson | forceescape }},
+           attributes:   {{ (v5_attributes  | default([])) | tojson | forceescape }},
+           skills:       {{ (v5_skills      | default([])) | tojson | forceescape }}
+         })'>
+      <label for="trait-search" class="label-gold mb-2 text-[0.75rem] block">
+        Quick Reference
+      </label>
+      <input id="trait-search"
+             type="search"
+             x-model.debounce.150ms="q"
+             placeholder="clan, discipline, predator…"
+             autocomplete="off"
+             class="w-full text-xs px-2 py-1.5 mb-2">
+      <div x-show="q.length >= 2" x-cloak class="space-y-1 max-h-72 overflow-y-auto">
+        <template x-for="hit in results()" :key="hit.kind + ':' + hit.key">
+          <div class="border-l-2 border-ink-700 pl-2 py-1 hover:border-gold-700 cursor-pointer"
+               @click="openKey = openKey === hit.kind + ':' + hit.key ? '' : hit.kind + ':' + hit.key">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="font-cinzel text-bone-300 text-xs" x-text="hit.label"></span>
+              <span class="font-cinzel text-[0.55rem] tracking-widest text-bone-700"
+                    x-text="hit.kind"></span>
+            </div>
+            <div x-show="openKey === hit.kind + ':' + hit.key" x-cloak
+                 class="mt-1 space-y-1">
+              <template x-if="hit.bane">
+                <p class="font-garamond text-[0.7rem] text-bone-500 italic">
+                  <span class="text-blood-500">Bane:</span> <span x-text="hit.bane"></span>
+                </p>
+              </template>
+              <template x-if="hit.compulsion">
+                <p class="font-garamond text-[0.7rem] text-bone-500 italic">
+                  <span class="text-mauve-500">Compulsion:</span> <span x-text="hit.compulsion"></span>
+                </p>
+              </template>
+              <template x-if="hit.benefits">
+                <p class="font-garamond text-[0.7rem] text-bone-500 italic">
+                  <span class="text-gold-500">Benefits:</span> <span x-text="hit.benefits"></span>
+                </p>
+              </template>
+              <template x-if="hit.note">
+                <p class="font-garamond text-[0.7rem] text-bone-600 italic" x-text="hit.note"></p>
+              </template>
+            </div>
+          </div>
+        </template>
+        <p x-show="results().length === 0" x-cloak
+           class="font-garamond text-bone-700 text-[0.7rem] italic">
+          No matches for that term.
+        </p>
+      </div>
+      <p x-show="q.length < 2" x-cloak class="font-garamond text-bone-700 text-[0.65rem] italic">
+        Type 2+ letters to search V5 traits.
+      </p>
+    </div>
+
+    <div class="gilded p-4 space-y-4">
+      <div>
+        <p class="label-gold mb-2 text-[0.75rem]">
+          Budget
+          <span x-show="budgets.homebrew" class="text-bone-700 normal-case ml-1">(homebrew)</span>
+        </p>
+        <ul class="space-y-1.5 text-xs font-cinzel tracking-wide">
+          {% for key, label in [
+            ('merits',      'Merits'),
+            ('advantages',  'Advantages'),
+            ('backgrounds', 'Backgrounds'),
+          ] %}
+          <li class="flex items-center justify-between gap-2">
+            <span class="text-bone-500">{{ label }}</span>
+            <span :class="budgetUsed.{{ key }} > budgets.{{ key }}
+                            ? 'text-blood-400 aurora-pulse-blood inline-block rounded px-1' : 'text-gold-400'">
+              <span x-text="budgetUsed.{{ key }}"></span>
+              <span class="text-bone-700">/</span>
+              <span x-text="budgets.{{ key }}"></span>
+            </span>
+          </li>
+          {% endfor %}
+          <li class="flex items-center justify-between gap-2">
+            <span class="text-bone-500">Flaws</span>
+            <span :class="budgetUsed.flaws > budgets.flaw_cap
+                            ? 'text-blood-400' : 'text-bone-400'">
+              <span x-text="budgetUsed.flaws"></span>
+              <span class="text-bone-700">/</span>
+              <span x-text="budgets.flaw_cap"></span>
+            </span>
+          </li>
+          <li class="flex items-center justify-between gap-2 pt-1.5 border-t border-ink-800">
+            <span class="text-bone-500">Touchstones</span>
+            <span :class="touchstones.length < 2 || touchstones.length > 3
+                            ? 'text-blood-400' : 'text-gold-400'">
+              <span x-text="touchstones.length"></span>
+              <span class="text-bone-700">/</span>
+              <span>2&ndash;3</span>
+            </span>
+          </li>
+        </ul>
+      </div>
+
+      {# Standard sidebar XP row — replaced by Era XP for IM Ancilla #}
+      <div class="pt-3 border-t border-ink-800"
+           x-show="!(charName.character_type === 'kindred'
+                     && charName.character_tier === 'ancilla'
+                     && charName.ancilla_mode === 'in_memoriam')"
+           x-cloak>
+        <p class="label-gold mb-2 text-[0.75rem]">Starting XP</p>
+        <p class="font-cinzel text-gold-400 text-lg">
+          <span x-text="charName.character_type === 'kindred'
+                         && charName.character_tier === 'ancilla'
+                         && charName.ancilla_mode === 'standard'
+                         ? budgets.starting_xp + 35
+                         : budgets.starting_xp"></span>
+          <span x-show="charName.character_type === 'kindred'
+                        && charName.character_tier === 'ancilla'
+                        && charName.ancilla_mode === 'standard'"
+                class="text-bone-700 text-[0.65rem] ml-1">(Ancilla +35)</span>
+        </p>
+        <p class="font-garamond text-bone-700 text-[0.65rem] italic mt-1">
+          Pre-approval XP pool for first spends after the chronicle starts.
+        </p>
+      </div>
+
+      {# In Memoriam variant — live Era XP from the era builder #}
+      <div class="pt-3 border-t border-ink-800"
+           x-show="charName.character_type === 'kindred'
+                   && charName.character_tier === 'ancilla'
+                   && charName.ancilla_mode === 'in_memoriam'"
+           x-cloak>
+        <p class="label-gold mb-2 text-[0.75rem]">Era XP</p>
+        <p class="font-cinzel text-gold-400 text-lg" x-text="imTotals.totalXp"></p>
+        <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase mt-2"
+           :class="imTotals.humanity < 5 ? 'text-blood-400' : 'text-bone-600'">
+          Humanity <span x-text="imTotals.humanity"></span>
+        </p>
+        <p class="font-garamond text-bone-700 text-[0.65rem] italic mt-1">
+          Earned from your lived eras. Humanity starts at 7 minus age + era loss.
+        </p>
+      </div>
+
+      <div class="pt-3 border-t border-ink-800">
+        <button type="button" @click="saveAsDraft($event)"
+                form="" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest w-full py-1.5">
+          Save Draft
+        </button>
+        <p class="font-garamond text-bone-700 text-[0.6rem] italic mt-1.5 leading-relaxed">
+          Save and resume later. Drafts don't go to staff until you submit.
+        </p>
+      </div>
+    </div>
+  </aside>
+
+  </div>
+</div>
+
+<script>
+  function characterWizard(opts) {
+    const initial = opts.initialForm || {};
+    const seededSheet = (initial && typeof initial.sheet === 'object') ? initial.sheet : {};
+    return {
+      step: 1,
+      wizardSidebarOpen: false,  // mobile drawer toggle (lg:always open)
+      clans:             opts.clans || [],
+      clanDisciplines:   opts.clanDisciplines || {},
+      clanInfo:          opts.clanInfo || {},
+      predatorInfo:      opts.predatorInfo || {},
+      revenantsEnabled:  !!opts.revenantsEnabled,
+      revenantFamilies:  opts.revenantFamilies || [],
+      // Default ("seed") budget — only used if tierBudgets is missing.
+      // budgets is now a *computed* getter below that picks the right
+      // tier dict based on character_type + character_tier.
+      _budgetsSeed:      opts.budgets || {
+        starting_xp: 75, merits: 7, advantages: 2, backgrounds: 5, flaw_cap: 2, homebrew: false,
+      },
+      tierBudgets:       opts.tierBudgets || {},
+      activeRuleset:     opts.activeRuleset || 'standard',
+      // Draft tracking — when resuming, draft_id is pre-filled so the
+      // POST handler updates this row instead of creating a new one.
+      draftId:           initial.draft_id || '',
+      asDraft:           false,
+      submissionNotes:   initial.submission_notes || '',
+      // Profile image upload (wizard only; persists post-create via server)
+      imagePreview:      '',     // data URL for preview
+      imageError:        '',     // user-facing validation message
+      charName: {
+        name:               initial.name || '',
+        clan:               initial.clan || '',
+        predator_type:      initial.predator_type || '',
+        covenant:           initial.covenant || '',
+        sire:               initial.sire || '',
+        concept:            initial.concept || '',
+        profile_blurb:      initial.profile_blurb || '',
+        has_ingrained_flaw: !!initial.has_ingrained_flaw,
+        character_type:     initial.character_type || 'kindred',
+        revenant_family:    initial.revenant_family || '',
+        ghoul_regnant:      initial.ghoul_regnant || '',
+        character_tier:     initial.character_tier || 'neonate',
+        // If chronicle ruleset forces IM, default any Ancilla to IM
+        // mode regardless of what's in the draft. Standard/homebrew
+        // chronicles honor the draft's saved mode as-is.
+        ancilla_mode:       (initial.character_tier === 'ancilla'
+                              && (opts.activeRuleset || 'standard') === 'in_memoriam')
+                              ? 'in_memoriam'
+                              : (initial.ancilla_mode || ''),
+        // Phase 5 metadata
+        ambition:           initial.ambition     || '',
+        desire:             initial.desire       || '',
+        profession:         initial.profession   || '',
+        pronouns:           initial.pronouns     || '',
+        true_age:           initial.true_age     || null,
+        apparent_age:       initial.apparent_age || null,
+        backstory:          initial.backstory    || '',
+      },
+      // In Memoriam state — only populated when the player chooses IM.
+      im: Object.assign(
+        { generation: '', discipline_spread: '', embrace_age: '', eras: [] },
+        (initial.in_memoriam && typeof initial.in_memoriam === 'object') ? initial.in_memoriam : {}
+      ),
+
+      // ── Era definitions (mirror friend's MCbN code) ─────────────────
+      ERA_DEFS: [
+        { type:'adversity', label:'A Time of Adversity',
+          flavor:"You spent more nights than you would've preferred huddled up in damp cellars, licking your wounds.",
+          baseXp:12, baseOther:'2 Background Flaw dots · 1 Archaic specialty',
+          baseHumanityLoss:0, hasGambit:true,
+          gambitXp:10, gambitOther:null,
+          gambitRisk:'On 1–5: −1 Humanity', gambitHumanityOnFail:1 },
+        { type:'calm', label:'A Time of Calm',
+          flavor:'For a while, your nights were mostly free of dangers. You immersed yourself in your passions.',
+          baseXp:6, baseOther:'1 Archaic specialty',
+          baseHumanityLoss:0, hasGambit:true,
+          gambitXp:3, gambitOther:null,
+          gambitRisk:'On 1–5: gain 1 dot of Antiquated Flaws', gambitHumanityOnFail:0 },
+        { type:'intrigue', label:'A Time of Intrigue',
+          flavor:'As others jealously reached for your assets, you had to be clever to protect yourself.',
+          baseXp:0, baseOther:'2 Background Advantage dots · 1 Archaic specialty',
+          baseHumanityLoss:0, hasGambit:true,
+          gambitXp:0, gambitOther:'+2 Background Advantage dots',
+          gambitRisk:'On 1–5: −1 Humanity', gambitHumanityOnFail:1 },
+        { type:'excess', label:'A Time of Excess',
+          flavor:'The consummate leech, you indulged in every vice and even managed to overcome some of them.',
+          baseXp:0, baseOther:'3 Advantage dots (Bonding or Feeding Merits)',
+          baseHumanityLoss:0, hasGambit:true,
+          gambitXp:10, gambitOther:null,
+          gambitRisk:'On 1–5: 3 dots of Supernatural/Substance Use Flaws, or −1 Humanity', gambitHumanityOnFail:0 },
+        { type:'violence', label:'A Time of Violence',
+          flavor:'You indulged your Beast, letting it loose upon your enemies and any others who were in the way.',
+          baseXp:15, baseOther:null,
+          baseHumanityLoss:1, hasGambit:false,
+          gambitXp:0, gambitOther:null,
+          gambitRisk:'Auto-roll: on 1–5, gain Dark Secret Flaw (••) and cannot pick again.', gambitHumanityOnFail:0 },
+        { type:'sorcery', label:'A Time of Sorcery',
+          flavor:'You turned your mind to the sorcerous side of undead existence, finding secrets in the Blood.',
+          baseXp:15, baseOther:'Spend on Mental Attributes, Occult, or Blood Sorcery/Oblivion (Rituals/Ceremonies only)',
+          baseHumanityLoss:1, hasGambit:true,
+          gambitXp:3, gambitOther:null,
+          gambitRisk:'On 1–5: gain a Cursed Object (•)', gambitHumanityOnFail:0 },
+        { type:'torpor', label:'Torpor',
+          flavor:'You spent an era in torpor, hoping time would erase some of your mistakes.',
+          baseXp:0, baseOther:'Remove 1 dot of Flaws',
+          baseHumanityLoss:0, hasGambit:true,
+          gambitXp:0, gambitOther:'Remove 2 additional Flaw dots',
+          gambitRisk:'On 1–5: lose 1 dot from your lowest-rated Discipline', gambitHumanityOnFail:0 },
+      ],
+      EMBRACE_AGES: [
+        { id:'up_to_100', label:'Up to 100 years ago', eraCount:3, humanityLoss:0, detail:'Choose 3 eras' },
+        { id:'up_to_150', label:'Up to 150 years ago', eraCount:4, humanityLoss:1, detail:'Choose 4 eras · −1 Humanity' },
+        { id:'over_150',  label:'151 years or more ago', eraCount:5, humanityLoss:2, detail:'Choose 5 eras · −2 Humanity' },
+      ],
+      // Hydrate from seeded sheet so resume-draft re-fills attributes,
+      // skills, disciplines, humanity, blood potency, hunger, etc.
+      sheet:       Object.assign({}, seededSheet),
+      specialties: seededSheet.specialties || [],
+      powers:      seededSheet.powers      || [],
+      merits:      seededSheet.merits      || [],
+      advantages:  seededSheet.advantages  || [],
+      backgrounds: seededSheet.backgrounds || [],
+      flaws:       seededSheet.flaws       || [],
+      rituals:     seededSheet.rituals     || [],
+      ceremonies:  seededSheet.ceremonies  || [],
+      formulae:    seededSheet.formulae    || [],
+      // Touchstones are now paired with Convictions. Backward-compat:
+      // older drafts may have stored each as a plain string; normalize
+      // on load so the UI always sees {name, conviction} objects.
+      touchstones: (function () {
+        const ts = seededSheet.touchstones || [];
+        const cs = seededSheet.convictions || [];
+        if (ts.length && typeof ts[0] === 'object' && 'name' in ts[0]) return ts;
+        // Zip the two old arrays into pairs, falling back to empty.
+        const out = [];
+        const len = Math.max(ts.length, cs.length);
+        for (let i = 0; i < len; i++) {
+          out.push({ name: ts[i] || '', conviction: cs[i] || '' });
+        }
+        return out;
+      })(),
+      convictions: [],  // legacy state retained but unused going forward
+      newMeritName: '', newAdvantageName: '',
+      newBackgroundName: '', newFlawName: '',
+      newTouchstone: '', newConviction: '',
+      // Pre-allocated so Alpine reactivity tracks bracket-indexed writes
+      // from the per-discipline power inputs. Without this, x-model on
+      // newPowerName[disc.key] silently no-ops on freshly-revealed rows.
+      newPowerName: {
+        disc_animalism: '', disc_auspex: '', disc_blood_sorcery: '',
+        disc_celerity:  '', disc_dominate: '', disc_fortitude: '',
+        disc_obfuscate: '', disc_oblivion: '', disc_potence: '',
+        disc_presence:  '', disc_protean:  '', disc_thin_blood_alchemy: '',
+      },
+      newPowerLevel: {
+        disc_animalism: 1, disc_auspex: 1, disc_blood_sorcery: 1,
+        disc_celerity:  1, disc_dominate: 1, disc_fortitude: 1,
+        disc_obfuscate: 1, disc_oblivion: 1, disc_potence: 1,
+        disc_presence:  1, disc_protean:  1, disc_thin_blood_alchemy: 1,
+      },
+      addingSpecFor: '', specBuffer: '',
+
+      // ── Sea of Time auto-seed ──
+      // Per V5 Corebook (p.130) every chargen archetype has a starting
+      // Blood Potency + Humanity baked into the generation tier. We
+      // auto-fill those on the sheet when the player picks a type or
+      // tier so the Blood step's number inputs aren't blank. The player
+      // can still override after the fact — this just removes the "wait,
+      // what BP do I start at?" friction.
+      applyTierBloodDefaults() {
+        const t    = this.charName.character_type;
+        const tier = this.charName.character_tier || 'neonate';
+        // Defaults table — keep in sync with the tier blurbs in the picker.
+        let bp = 0, humanity = 7;
+        if (t === 'kindred') {
+          if (tier === 'thinblood')      { bp = 0; humanity = 7; }
+          else if (tier === 'fledgling') { bp = 1; humanity = 7; }
+          else if (tier === 'neonate')   { bp = 1; humanity = 7; }
+          else if (tier === 'ancilla')   { bp = 2; humanity = 6; }
+        } else if (t === 'ghoul' || t === 'revenant') {
+          bp = 0; humanity = 7;
+        } else if (t === 'mortal') {
+          bp = 0; humanity = 7;
+        }
+        this.sheet.blood_potency = bp;
+        this.sheet.humanity      = humanity;
+        // Hunger starts at 1 for Kindred only, 0 otherwise (mortals,
+        // ghouls, revenants — they're not yet vampires).
+        if (t === 'kindred' && !this.sheet.hunger) {
+          this.sheet.hunger = 1;
+        } else if (t !== 'kindred') {
+          this.sheet.hunger = 0;
+        }
+      },
+
+      // Step navigation
+      canAdvanceNature() {
+        const t = this.charName.character_type;
+        if (!t) return false;
+        // Name collected on Nature step — required before leaving.
+        if (!this.charName.name || !this.charName.name.trim().length) return false;
+        if (t === 'revenant' && !this.charName.revenant_family) return false;
+        // Kindred Ancilla must pick a path before moving on.
+        if (t === 'kindred'
+            && this.charName.character_tier === 'ancilla'
+            && !this.charName.ancilla_mode) {
+          return false;
+        }
+        return true;
+      },
+      canAdvanceBlood() {
+        const t = this.charName.character_type;
+        // Mortals + ghouls + revenants don't require a clan — they
+        // inherit one or have none. Kindred must pick a clan
+        // (Thin-Blood tier auto-pins clan to 'thin-blood').
+        return (t === 'kindred') ? !!this.charName.clan : true;
+      },
+      // True for character types that have V5 vampire mechanics
+      // (Disciplines, Blood Potency, Hunger). Mortals are excluded.
+      hasVampireMechanics() {
+        const t = this.charName.character_type;
+        return t === 'kindred' || t === 'ghoul' || t === 'revenant';
+      },
+      // Step-visibility gates.
+      //   - Step 2 (In Memoriam) is shown only for Kindred Ancilla with
+      //     ancilla_mode === 'in_memoriam'.
+      //   - Mortals skip Curse (9) and Lore (10): no Disciplines, no rituals.
+      //   - Lore (10) shows only when player has at least one dot of
+      //     Blood Sorcery, Oblivion, or Thin-Blood Alchemy.
+      _hasRitualDiscipline() {
+        return (this.sheet.disc_blood_sorcery       || 0) > 0
+            || (this.sheet.disc_oblivion            || 0) > 0
+            || (this.sheet.disc_thin_blood_alchemy  || 0) > 0;
+      },
+      _isStepHidden(n) {
+        const t = this.charName.character_type;
+        if (n === 2) {
+          if (t !== 'kindred') return true;
+          if (this.charName.character_tier !== 'ancilla') return true;
+          if (this.charName.ancilla_mode !== 'in_memoriam') return true;
+          return false;
+        }
+        if (t === 'mortal' && (n === 9 || n === 10)) return true;
+        if (n === 10 && !this._hasRitualDiscipline()) return true;
+        return false;
+      },
+
+      // ── In Memoriam helpers ─────────────────────────────────────────
+      eraDef(type) {
+        return this.ERA_DEFS.find(e => e.type === type) || {};
+      },
+      setEmbraceAge(id) {
+        this.im.embrace_age = id;
+        const opt = this.EMBRACE_AGES.find(o => o.id === id);
+        const count = opt ? opt.eraCount : 0;
+        // Resize era slots, preserving existing picks where possible.
+        const existing = (this.im.eras || []).slice(0, count);
+        while (existing.length < count) {
+          existing.push({ type: '', gambit_taken: false, gambit_roll: null });
+        }
+        this.im.eras = existing;
+      },
+      onEraTypeChange(idx) {
+        const era = this.im.eras[idx];
+        // Reset gambit state when the era type changes.
+        era.gambit_taken = false;
+        era.gambit_roll = null;
+      },
+      violenceBlocked(idx) {
+        // Once a Violence era's auto-roll has come up 1–5, no further
+        // Violence picks allowed. Earlier successful Violence picks are fine.
+        return this.im.eras.some((e, i) =>
+          i !== idx && e.type === 'violence' && e.gambit_roll != null && e.gambit_roll <= 5
+        );
+      },
+      get imTotals() {
+        const opt = this.EMBRACE_AGES.find(o => o.id === this.im.embrace_age);
+        const ageHumanityLoss = opt ? opt.humanityLoss : 0;
+        let totalXp = 0, humanityLoss = ageHumanityLoss;
+        for (const era of (this.im.eras || [])) {
+          if (!era.type) continue;
+          const def = this.eraDef(era.type);
+          totalXp      += def.baseXp || 0;
+          humanityLoss += def.baseHumanityLoss || 0;
+          if (era.gambit_taken) {
+            totalXp += def.gambitXp || 0;
+            if (era.gambit_roll != null && era.gambit_roll <= 5) {
+              humanityLoss += def.gambitHumanityOnFail || 0;
+            }
+          }
+          // Violence has an automatic risk, not a gambit
+          if (era.type === 'violence' && era.gambit_roll != null && era.gambit_roll <= 5) {
+            // Dark Secret Flaw consequence handled narratively
+          }
+        }
+        return { totalXp, humanity: Math.max(0, 7 - humanityLoss) };
+      },
+      goStep(n) {
+        const dir = (n > this.step) ? 1 : -1;
+        // Skip hidden steps in the direction of motion. Clamp to valid range.
+        while (this._isStepHidden(n) && n >= 1 && n <= 12) {
+          n = n + dir;
+        }
+        if (n < 1)  n = 1;
+        if (n > 12) n = 12;
+        this.step = n;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      },
+
+      // Dot pip click — toggles highest = N OR N-1 if already at N
+      togglePip(key, n) {
+        const cur = this.sheet[key] || 0;
+        this.sheet[key] = cur === n ? n - 1 : n;
+      },
+
+      // Skills + specialties
+      specsFor(key) {
+        return this.specialties.filter(s => s.skill === key);
+      },
+      startAddingSpec(key) {
+        this.addingSpecFor = key;
+        this.specBuffer = '';
+        this.$nextTick(() => {
+          const el = document.getElementById('spec-' + key);
+          if (el) el.focus();
+        });
+      },
+      cancelSpec() { this.addingSpecFor = ''; this.specBuffer = ''; },
+      saveSpec() {
+        const name = (this.specBuffer || '').trim().slice(0, 80);
+        if (!name || !this.addingSpecFor) { this.cancelSpec(); return; }
+        this.specialties.push({ skill: this.addingSpecFor, name: name });
+        this.cancelSpec();
+      },
+      removeSpec(skill, name) {
+        const idx = this.specialties.findIndex(s => s.skill === skill && s.name === name);
+        if (idx >= 0) this.specialties.splice(idx, 1);
+      },
+
+      // Disciplines + powers
+      isInClan(key) {
+        const list = this.clanDisciplines[this.charName.clan] || [];
+        return list.includes(key);
+      },
+      learnedDisciplines() {
+        const labels = {
+          disc_animalism: 'Animalism', disc_auspex: 'Auspex',
+          disc_blood_sorcery: 'Blood Sorcery', disc_celerity: 'Celerity',
+          disc_dominate: 'Dominate', disc_fortitude: 'Fortitude',
+          disc_obfuscate: 'Obfuscate', disc_oblivion: 'Oblivion',
+          disc_potence: 'Potence', disc_presence: 'Presence',
+          disc_protean: 'Protean', disc_thin_blood_alchemy: 'Thin-Blood Alchemy',
+        };
+        return Object.keys(labels)
+          .filter(k => (this.sheet[k] || 0) > 0)
+          .map(k => ({ key: k, label: labels[k] }));
+      },
+      powersFor(disc) {
+        return this.powers.filter(p => p.discipline === disc);
+      },
+      addPower(disc) {
+        const name  = (this.newPowerName[disc]  || '').trim().slice(0, 80);
+        const level = parseInt(this.newPowerLevel[disc] || 1, 10) || 1;
+        if (!name) return;
+        const max = this.sheet[disc] || 1;
+        this.powers.push({ discipline: disc, name, level: Math.max(1, Math.min(max, level)) });
+        this.newPowerName[disc] = '';
+        this.newPowerLevel[disc] = 1;
+      },
+      removePower(disc, name) {
+        const idx = this.powers.findIndex(p => p.discipline === disc && p.name === name);
+        if (idx >= 0) this.powers.splice(idx, 1);
+      },
+
+      // Legacy lists — each item is { name, dots }
+      addMerit() {
+        const name = (this.newMeritName || '').trim().slice(0, 80);
+        if (!name) return;
+        this.merits.push({ name, dots: 1 });
+        this.newMeritName = '';
+      },
+      addAdvantage() {
+        const name = (this.newAdvantageName || '').trim().slice(0, 80);
+        if (!name) return;
+        this.advantages.push({ name, dots: 1 });
+        this.newAdvantageName = '';
+      },
+      addBackground() {
+        const name = (this.newBackgroundName || '').trim().slice(0, 80);
+        if (!name) return;
+        this.backgrounds.push({ name, dots: 1 });
+        this.newBackgroundName = '';
+      },
+      addFlaw() {
+        const name = (this.newFlawName || '').trim().slice(0, 80);
+        if (!name) return;
+        this.flaws.push({ name, dots: 1 });
+        this.newFlawName = '';
+      },
+
+      // Rituals / Ceremonies / Formulae helpers — used by the partial
+      addToLeveledList(listKey, name, level) {
+        name = (name || '').trim().slice(0, 80);
+        level = Math.max(1, Math.min(5, parseInt(level, 10) || 1));
+        if (!name) return;
+        this[listKey].push({ name, level });
+      },
+
+      // Touchstone+Conviction pairs. V5 chargen: 2–3 pairs.
+      addTouchstonePair() {
+        if (this.touchstones.length >= 3) return;
+        this.touchstones.push({ name: '', conviction: '' });
+      },
+      touchstonesOk() {
+        const filled = this.touchstones.filter(t =>
+          (t.name || '').trim() || (t.conviction || '').trim()
+        );
+        return filled.length >= 2 && filled.length <= 3;
+      },
+      addConviction() {
+        const v = (this.newConviction || '').trim().slice(0, 120);
+        if (!v) return;
+        this.convictions.push(v);
+        this.newConviction = '';
+      },
+
+      // Review helpers
+      clanLabel() {
+        const c = this.clans.find(c => c[0] === this.charName.clan);
+        return c ? c[1] : '—';
+      },
+      // Human-readable Nature summary for the Review step:
+      // "Kindred · Neonate", "Kindred · Ancilla (In Memoriam)",
+      // "Mortal", "Ghoul", "Revenant", etc.
+      natureSummary() {
+        const t    = this.charName.character_type || '';
+        const tier = this.charName.character_tier || '';
+        const mode = this.charName.ancilla_mode   || '';
+        if (!t) return '—';
+        if (t === 'kindred') {
+          const tierLabel = {
+            fledgling: 'Fledgling',
+            thinblood: 'Thin-Blood',
+            neonate:   'Neonate',
+            ancilla:   'Ancilla',
+          }[tier] || tier || '—';
+          if (tier === 'ancilla' && mode === 'in_memoriam') {
+            return `Kindred · ${tierLabel} (In Memoriam)`;
+          }
+          if (tier === 'ancilla' && mode === 'standard') {
+            return `Kindred · ${tierLabel} (Standard)`;
+          }
+          return `Kindred · ${tierLabel}`;
+        }
+        if (t === 'revenant') {
+          return this.charName.revenant_family
+            ? `Revenant · ${this.charName.revenant_family}`
+            : 'Revenant';
+        }
+        const label = { mortal: 'Mortal', ghoul: 'Ghoul' }[t] || t;
+        return label;
+      },
+      sumAttrs() {
+        let total = 0;
+        for (const k of Object.keys(this.sheet)) {
+          if (k.startsWith('attr_')) total += this.sheet[k] || 0;
+        }
+        return total;
+      },
+      sumSkills() {
+        let total = 0;
+        for (const k of Object.keys(this.sheet)) {
+          if (k.startsWith('skill_')) total += this.sheet[k] || 0;
+        }
+        return total;
+      },
+
+      // Form submit safety — make sure hidden inputs reflect Alpine state.
+      // Alpine bindings already do this, but a defensive sync on submit
+      // prevents stale values if the user typed in the wizard with autosave off.
+      onSubmit(ev) {
+        // No-op; bindings handle it. Kept for future telemetry.
+      },
+
+      // Profile image — client-side preview + soft validation.
+      // The actual file ride along with the form POST and is saved by
+      // the server after the character row is created.
+      onImageSelected(ev) {
+        this.imageError = '';
+        this.imagePreview = '';
+        const file = ev.target.files && ev.target.files[0];
+        if (!file) return;
+        const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        const MAX_BYTES = 2 * 1024 * 1024;
+        if (!ALLOWED.includes(file.type)) {
+          this.imageError = 'Unsupported file type — use JPG, PNG, WebP, or GIF.';
+          ev.target.value = '';
+          return;
+        }
+        if (file.size > MAX_BYTES) {
+          this.imageError = `File is too large (${Math.round(file.size / 1024)} KB) — max 2 MB.`;
+          ev.target.value = '';
+          return;
+        }
+        // Read for preview only — the file itself is uploaded via the form.
+        const reader = new FileReader();
+        reader.onload = (e) => { this.imagePreview = e.target.result; };
+        reader.readAsDataURL(file);
+      },
+
+      clearImage() {
+        this.imagePreview = '';
+        this.imageError = '';
+        const el = document.getElementById('wizard-image-upload');
+        if (el) el.value = '';
+      },
+
+      // Save the wizard state as a draft without submitting to staff.
+      // The hidden as_draft input flips to "1" for one tick so the
+      // server-side route treats this as a draft save.
+      saveAsDraft(ev) {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        this.asDraft = true;
+        const form = (ev && ev.target && ev.target.closest)
+                       ? ev.target.closest('form')
+                       : document.querySelector('form[action="/characters/new"]');
+        // Defer so Alpine writes the as_draft hidden input first.
+        this.$nextTick(() => { if (form) form.submit(); });
+      },
+
+      // Active budget — derived from the picked tier so the sidebar
+      // caps switch live when the player toggles character type or
+      // tier. Falls back to the seed budget if tier data is missing
+      // (shouldn't happen post-migration, but cheap insurance).
+      get budgets() {
+        const ct   = (this.charName.character_type || 'kindred');
+        const tier = (this.charName.character_tier || 'neonate');
+        // Map the wizard's character_type + tier onto the chronicle's
+        // 7 tier keys. Kindred uses the tier directly (fledgling,
+        // thinblood, neonate, ancilla). A Kindred who has clan pinned
+        // to 'thin-blood' (because they picked the Thin-Blood tier)
+        // still maps to thinblood — kept as a fallback safety net.
+        let key;
+        if (ct === 'mortal')   key = 'mortal';
+        else if (ct === 'ghoul')    key = 'ghoul';
+        else if (ct === 'revenant') key = 'revenant';
+        else if (ct === 'kindred' && tier === 'thinblood') key = 'thinblood';
+        else if (ct === 'kindred' && this.charName.clan === 'thin-blood') key = 'thinblood';
+        else if (ct === 'kindred' && tier === 'fledgling') key = 'fledgling';
+        else if (ct === 'kindred' && tier === 'ancilla')   key = 'ancilla';
+        else if (ct === 'kindred') key = 'neonate';
+        else key = 'neonate';
+
+        const dict = (this.tierBudgets && this.tierBudgets[key]) || null;
+        if (!dict) return this._budgetsSeed;
+        return {
+          starting_xp: dict.xp,
+          merits:      dict.merits,
+          advantages:  dict.advantages,
+          backgrounds: dict.backgrounds,
+          flaw_cap:    dict.flaw_cap,
+          homebrew:    this.activeRuleset === 'homebrew',
+          ruleset:     this.activeRuleset,
+          tierKey:     key,
+        };
+      },
+
+      // Live budget usage — sum dot allocations for the sidebar.
+      get budgetUsed() {
+        const sum = list => list.reduce((acc, x) => acc + (x.dots || 0), 0);
+        return {
+          merits:      sum(this.merits),
+          advantages:  sum(this.advantages),
+          backgrounds: sum(this.backgrounds),
+          flaws:       sum(this.flaws),
+        };
+      },
+    };
+  }
+
+  // Sidebar Quick Reference search — flat-indexes V5 trait data from the
+  // server-rendered opts and filters as the player types. Stays self-
+  // contained so it works independent of the main wizard state.
+  function traitSearch(opts) {
+    const clanInfo     = opts && opts.clanInfo     || {};
+    const predatorInfo = opts && opts.predatorInfo || {};
+    const disciplines  = opts && opts.disciplines  || [];
+    const attributes   = opts && opts.attributes   || [];
+    const skills       = opts && opts.skills       || [];
+
+    // Build a flat index up front — fewer transforms during keystrokes.
+    const index = [];
+    for (const [key, info] of Object.entries(clanInfo)) {
+      index.push({
+        kind: 'clan', key,
+        label: info.name || key,
+        bane: info.bane || '',
+        compulsion: info.compulsion || '',
+      });
+    }
+    for (const [name, info] of Object.entries(predatorInfo)) {
+      index.push({
+        kind: 'predator', key: name,
+        label: name,
+        benefits: info.benefits || '',
+      });
+    }
+    for (const [key, label] of disciplines) {
+      index.push({
+        kind: 'discipline', key, label,
+        note: 'In-clan for some clans; out-of-clan costs more XP per dot.',
+      });
+    }
+    for (const [cat, traits] of attributes) {
+      for (const [key, label] of traits) {
+        index.push({ kind: 'attribute', key, label, note: cat + ' attribute · max 5 dots' });
+      }
+    }
+    for (const [cat, traits] of skills) {
+      for (const [key, label] of traits) {
+        index.push({ kind: 'skill', key, label, note: cat + ' skill · max 5 dots' });
+      }
+    }
+
+    return {
+      q: '',
+      openKey: '',
+      results() {
+        const needle = (this.q || '').trim().toLowerCase();
+        if (needle.length < 2) return [];
+        // Rank: exact label match > prefix > contains. Cap to 12 hits to
+        // keep the list scannable.
+        const scored = [];
+        for (const hit of index) {
+          const hay = hit.label.toLowerCase();
+          if (hay === needle)             scored.push({ hit, score: 0 });
+          else if (hay.startsWith(needle)) scored.push({ hit, score: 1 });
+          else if (hay.includes(needle))   scored.push({ hit, score: 2 });
+        }
+        scored.sort((a, b) => a.score - b.score || a.hit.label.localeCompare(b.hit.label));
+        return scored.slice(0, 12).map(s => s.hit);
+      },
+    };
+  }
+</script>
+{% endblock %}

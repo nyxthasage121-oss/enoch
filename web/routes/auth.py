@@ -221,7 +221,16 @@ async def callback(
     request.session["is_staff"] = is_staff
     request.session["_csrf"]    = secrets.token_urlsafe(32)
 
-    log.info("Login: %s (%s) staff=%s", username, user_id, is_staff)
+    # Pull the assigned Enoch staff role (if any) into the session so
+    # require_permission can gate without hitting the DB on every request.
+    if is_staff:
+        from ..db import get_db, get_staff_role
+        with get_db() as conn:
+            role = get_staff_role(conn, user_id)
+        request.session["staff_role"] = role or ""
+
+    log.info("Login: %s (%s) staff=%s role=%s", username, user_id, is_staff,
+             request.session.get("staff_role") or "—")
 
     # ── Redirect back to where they were going ────────────────────────────────
     next_url = request.session.pop("login_next", "/")

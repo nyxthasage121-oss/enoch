@@ -18,15 +18,20 @@ from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..db import (
+    HUNT_OUTCOMES,
     ack_outbox,
     create_character,
+    create_hunt_log,
     drain_outbox,
     get_active_period,
     get_character,
+    get_coterie_for_character,
     get_db,
+    get_hunting_site,
     get_player,
     list_characters,
     list_claims_for_character,
+    list_coterie_members,
     list_player_characters,
     list_spends_for_character,
     upsert_player,
@@ -76,6 +81,22 @@ class AckIn(BaseModel):
 class CharacterStatusIn(BaseModel):
     status: str = Field(..., pattern="^(active|retired|dead)$")
     note: str | None = None            # audit note (e.g. "died in Session 12")
+
+
+class DamageDeltaIn(BaseModel):
+    """Delta updates to a character's damage tracks. All fields optional.
+
+    A dice bot pushes deltas — never absolutes — so two concurrent rolls
+    can both apply without one clobbering the other. Negative values are
+    allowed (healing).
+    """
+    damage_health_sup:    int = 0
+    damage_health_agg:    int = 0
+    damage_willpower_sup: int = 0
+    damage_willpower_agg: int = 0
+    hunger:               int = 0   # delta against current hunger (0..5)
+    humanity:             int = 0   # delta against current humanity (0..10)
+    source: str | None = None       # optional label for audit (e.g. "dice:bot")
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -218,6 +239,128 @@ async def set_character_status(character_id: int, body: CharacterStatusIn):
             after={"status": body.status, "note": body.note},
         )
     return updated
+
+
+@router.post("/characters/{character_id}/state", dependencies=[Depends(_require_bot)])
+async def apply_state_delta(character_id: int, body: DamageDeltaIn):
+    """Apply incremental updates to a character's damage tracks / hunger / humanity.
+
+    Used by the dice bot to push roll outcomes back to the sheet. All values
+    are clamped: damage tracks 0..15, hunger 0..5, humanity 0..10. Returns
+    the new resolved state so the bot can confirm what landed.
+    """
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+
+        sheet = dict(char.get("sheet_json") or {})
+
+        def _apply(key: str, delta: int, lo: int, hi: int) -> int:
+            if not delta:
+                return sheet.get(key, 0)
+            new = max(lo, min(hi, (sheet.get(key, 0) or 0) + delta))
+            if new == 0:
+                sheet.pop(key, None)
+            else:
+                sheet[key] = new
+            return new
+
+        result = {
+            "damage_health_sup":    _apply("damage_health_sup",    body.damage_health_sup,    0, 15),
+            "damage_health_agg":    _apply("damage_health_agg",    body.damage_health_agg,    0, 15),
+            "damage_willpower_sup": _apply("damage_willpower_sup", body.damage_willpower_sup, 0, 15),
+            "damage_willpower_agg": _apply("damage_willpower_agg", body.damage_willpower_agg, 0, 15),
+            "hunger":               _apply("hunger",               body.hunger,                0, 5),
+            "humanity":             _apply("humanity",             body.humanity,              0, 10),
+        }
+
+        update_character(conn, character_id, sheet_json=sheet)
+        write_audit(
+            conn,
+            actor_id="bot",
+            action="apply_state_delta",
+            target_type="character",
+            target_id=character_id,
+            after={"deltas": body.model_dump(exclude={"source"}), "source": body.source},
+        )
+
+    return {"character_id": character_id, "state": result}
+
+
+class HuntLogIn(BaseModel):
+    character_id: int
+    outcome:      str = Field(..., description="clean | success | messy_critical | bestial_failure")
+    note:         str = ""
+
+
+@router.post("/sites/{site_id}/hunt", dependencies=[Depends(_require_bot)],
+             status_code=201)
+async def bot_log_hunt(site_id: int, body: HuntLogIn):
+    """Record a hunt outcome for a character at a site. Called by the
+    dice bot after a feeding roll completes so the chronicle's site
+    activity feed reflects what actually happened on the dice."""
+    if body.outcome not in HUNT_OUTCOMES:
+        raise HTTPException(status_code=400,
+                            detail=f"outcome must be one of {HUNT_OUTCOMES}")
+    with get_db() as conn:
+        site = get_hunting_site(conn, site_id)
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+        char = get_character(conn, body.character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        row = create_hunt_log(
+            conn,
+            site_id=site_id,
+            character_id=body.character_id,
+            outcome=body.outcome,
+            note=body.note,
+            source="bot",
+        )
+    return {"hunt_id": row["id"], "outcome": row["outcome"],
+            "hunted_at": row["hunted_at"]}
+
+
+@router.get("/characters/{character_id}/coterie", dependencies=[Depends(_require_bot)])
+async def character_coterie(character_id: int):
+    """Coterie info for a character — for `/coterie status` bot command.
+
+    Returns the coterie's domain stats (chasse / lien / portillon) plus
+    its current members. Returns 404 if the character has no coterie.
+    """
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        coterie = get_coterie_for_character(conn, character_id)
+        if not coterie:
+            raise HTTPException(status_code=404, detail="Character is not in a coterie")
+        members = list_coterie_members(conn, coterie["id"])
+
+    return {
+        "character_id":   character_id,
+        "character_name": char["name"],
+        "coterie": {
+            "id":           coterie["id"],
+            "name":         coterie["name"],
+            "chasse":       coterie["chasse"],
+            "lien":         coterie["lien"],
+            "portillon":    coterie["portillon"],
+            "status":       coterie["status"],
+            "member_count": len(members),
+        },
+        "members": [
+            {
+                "character_id": m["character_id"],
+                "name":         m["character_name"],
+                "clan":         m["character_clan"],
+                "role":         m["role"],
+                "player":       m.get("player_username"),
+            }
+            for m in members
+        ],
+    }
 
 
 @router.get("/characters/{character_id}/history", dependencies=[Depends(_require_bot)])

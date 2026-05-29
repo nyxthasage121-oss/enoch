@@ -1,0 +1,8 @@
+# Dev / test dependencies. Install with:
+#   pip install -r requirements-dev.txt
+#
+# Production install uses requirements.txt only.
+
+-r requirements.txt
+
+pytest>=9.0

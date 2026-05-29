@@ -12,31 +12,45 @@
   {# ── Stat cards ── #}
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
 
-    <a href="/staff/claims" class="gilded p-5 block hover:border-gold-800 transition-colors {{ 'pending-pulse' if n_claims > 0 else '' }}">
-      <p class="label-gold mb-2 text-[0.6rem]">Pending Claims</p>
-      <p class="font-cinzel text-4xl {{ 'text-blood-400' if n_claims > 0 else 'text-bone-600' }}">
+    <a href="/staff/claims" class="gilded p-5 block hover:border-gold-800 transition-colors aurora-beam {{ 'pending-pulse' if n_claims > 0 else '' }}">
+      <p class="label-gold mb-2 text-[0.75rem]">Pending Claims</p>
+      <p class="font-cinzel text-4xl {{ 'text-blood-400 aurora-badge-pulse inline-block' if n_claims > 0 else 'text-bone-600' }}">
         {{ n_claims }}
       </p>
     </a>
 
-    <a href="/staff/spends" class="gilded p-5 block hover:border-gold-800 transition-colors {{ 'pending-pulse' if n_spends > 0 else '' }}">
-      <p class="label-gold mb-2 text-[0.6rem]">Pending Spends</p>
-      <p class="font-cinzel text-4xl {{ 'text-blood-400' if n_spends > 0 else 'text-bone-600' }}">
+    <a href="/staff/spends" class="gilded p-5 block hover:border-gold-800 transition-colors aurora-beam {{ 'pending-pulse' if n_spends > 0 else '' }}">
+      <p class="label-gold mb-2 text-[0.75rem]">Pending Spends</p>
+      <p class="font-cinzel text-4xl {{ 'text-blood-400 aurora-badge-pulse inline-block' if n_spends > 0 else 'text-bone-600' }}">
         {{ n_spends }}
       </p>
     </a>
 
-    <a href="/staff/characters" class="gilded p-5 block hover:border-gold-800 transition-colors {{ 'pending-pulse' if n_chars > 0 else '' }}">
-      <p class="label-gold mb-2 text-[0.6rem]">Pending Chars</p>
-      <p class="font-cinzel text-4xl {{ 'text-mauve-400' if n_chars > 0 else 'text-bone-600' }}">
+    <a href="/staff/characters" class="gilded p-5 block hover:border-gold-800 transition-colors aurora-beam {{ 'pending-pulse' if n_chars > 0 else '' }}">
+      <p class="label-gold mb-2 text-[0.75rem]">Pending Chars</p>
+      <p class="font-cinzel text-4xl {{ 'text-mauve-400 aurora-badge-pulse inline-block' if n_chars > 0 else 'text-bone-600' }}">
         {{ n_chars }}
       </p>
     </a>
 
-    <a href="/staff/coteries" class="gilded p-5 block hover:border-gold-800 transition-colors {{ 'pending-pulse' if n_coterie_reqs > 0 else '' }}">
-      <p class="label-gold mb-2 text-[0.6rem]">Coterie Requests</p>
-      <p class="font-cinzel text-4xl {{ 'text-mauve-400' if n_coterie_reqs > 0 else 'text-bone-600' }}">
+    <a href="/staff/coteries" class="gilded p-5 block hover:border-gold-800 transition-colors aurora-beam {{ 'pending-pulse' if n_coterie_reqs > 0 else '' }}">
+      <p class="label-gold mb-2 text-[0.75rem]">Coterie Requests</p>
+      <p class="font-cinzel text-4xl {{ 'text-mauve-400 aurora-badge-pulse inline-block' if n_coterie_reqs > 0 else 'text-bone-600' }}">
         {{ n_coterie_reqs }}
+      </p>
+    </a>
+
+    {# Near-cap tile — surfaces characters within 30 XP of retirement so
+       staff can engage proactively before the auto-retire sweep fires. #}
+    <a href="/staff/characters?near_cap=1"
+       class="gilded p-5 block hover:border-gold-800 transition-colors aurora-beam"
+       title="Active characters within 30 XP of their cap">
+      <p class="label-gold mb-2 text-[0.75rem]">Near Cap</p>
+      <p class="font-cinzel text-4xl {{ 'text-gold-400' if (n_near_cap or 0) > 0 else 'text-bone-600' }}">
+        {{ n_near_cap or 0 }}
+      </p>
+      <p class="font-garamond text-bone-600 text-[0.6rem] italic mt-1">
+        within 30 XP
       </p>
     </a>
 
@@ -47,35 +61,14 @@
     <div x-data="panelGlow" @mousemove="onMove" @mouseleave="onLeave"
          class="gilded p-5 relative overflow-hidden">
       <div class="card-glare" :style="glareStyle"></div>
-      <p class="label-gold mb-2 text-[0.6rem]">Active Characters</p>
+      <p class="label-gold mb-2 text-[0.75rem]">Active Characters</p>
       <p class="font-cinzel text-4xl text-bone-400">{{ n_active }}</p>
     </div>
 
   </div>
 
-  {# ── Active period ── #}
-  <div x-data="panelGlow" @mousemove="onMove" @mouseleave="onLeave"
-       class="gilded p-5 mb-8 relative overflow-hidden">
-    <div class="card-glare" :style="glareStyle"></div>
-    <p class="label-gold mb-2">Current XP Window</p>
-    {% if active_period %}
-    <div class="flex items-center justify-between">
-      <div>
-        <p class="font-cinzel text-bone-200 text-lg">{{ active_period.label }}</p>
-        <p class="font-garamond text-bone-500 text-sm mt-0.5">
-          {{ active_period.opens_at[:16] | replace('T',' ') }} →
-          {{ active_period.closes_at[:16] | replace('T',' ') }} UTC
-        </p>
-      </div>
-      <span class="chip text-gold-400 border-gold-800">Open</span>
-    </div>
-    {% else %}
-    <p class="font-garamond text-bone-600 text-sm">
-      No active period.
-      <a href="/staff/periods" class="text-gold-500 hover:text-gold-300">Open a new window →</a>
-    </p>
-    {% endif %}
-  </div>
+  {# ── Chronicle calendar ── #}
+  {% include "partials/calendar_widget.html" %}
 
   {# ── Recent pending claims ── #}
   {% if recent_claims %}

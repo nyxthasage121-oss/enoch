@@ -64,6 +64,19 @@ async def get_character(character_id: int) -> dict:
         return r.json()
 
 
+async def get_character_coterie(character_id: int) -> dict | None:
+    """Fetch coterie info for a character. Returns None if not in a coterie."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.get(
+            f"{_base()}/api/characters/{character_id}/coterie",
+            headers=_headers(),
+        )
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+
 # ── Outbox ────────────────────────────────────────────────────────────────────
 
 async def drain_outbox(limit: int = 20) -> list[dict]:

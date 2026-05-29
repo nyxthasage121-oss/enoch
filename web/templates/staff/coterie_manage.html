@@ -17,7 +17,7 @@
     <div class="grid grid-cols-3 gap-4">
       {% for trait, val in [('Chasse', coterie.chasse), ('Lien', coterie.lien), ('Portillon', coterie.portillon)] %}
       <div class="gilded-inset p-3 text-center">
-        <p class="label-gold text-[0.6rem] mb-1">{{ trait }}</p>
+        <p class="label-gold text-[0.75rem] mb-1">{{ trait }}</p>
         <div class="flex justify-center gap-0.5 mb-1">
           {% for i in range(5) %}
           <span class="w-2.5 h-2.5 rounded-full border
@@ -38,39 +38,187 @@
     </div>
   </div>
 
-  {# Spend history #}
-  {% if spends %}
+  {# Merits #}
+  <div class="mb-6">
+    <p class="label-gold text-xs mb-3">Merits</p>
+    {% include "staff/partials/coterie_merits_table.html" %}
+  </div>
+
+  {# Flaws #}
+  <div class="mb-6">
+    <p class="label-gold text-xs mb-3">Flaws</p>
+    {% include "staff/partials/coterie_flaws_table.html" %}
+  </div>
+
+  {# Open proposals (pending + funded) — actionable for staff #}
+  {% set open_spends = spends | selectattr('status', 'in', ['pending', 'funded']) | list %}
+  {% if open_spends %}
+  <div class="mb-6">
+    <p class="label-gold text-xs mb-3">Open Proposals
+      <span class="text-bone-700 ml-2 normal-case">{{ open_spends | length }}</span>
+    </p>
+    <div class="space-y-3">
+      {% for s in open_spends %}
+      {% set contributions = s.contributions or {} %}
+      {% set committed_ids = contributions.keys() | map('int') | list %}
+      {% set committed_count = committed_ids | length %}
+      {% set member_count = members | length %}
+      <div class="gilded p-4 border aurora-beam {{ 'border-gold-800 aurora-pulse' if s.status == 'funded' else 'border-mauve-800 aurora-pulse-blood' }}">
+
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div class="min-w-0">
+            <p class="font-cinzel text-sm text-bone-200">
+              {{ s.trait_name }}
+              {% if (s.spend_category or 'domain') == 'domain' and s.new_dots %}
+              <span class="text-bone-700 text-xs ml-1">{{ s.current_dots }} → {{ s.new_dots }}</span>
+              {% endif %}
+            </p>
+            <p class="font-cinzel text-[0.55rem] tracking-widest uppercase text-bone-600 mt-0.5">
+              {{ (s.spend_category or 'domain') | replace('other', 'special') }}
+              · {{ s.per_member_cost }} XP/member
+              · {{ s.total_cost }} XP total
+            </p>
+          </div>
+          {% if s.status == 'funded' %}
+          <span class="chip text-gold-400 border-gold-700 text-[0.6rem]">Funded</span>
+          {% else %}
+          <span class="chip text-mauve-400 border-mauve-800 text-[0.6rem]">
+            Pending · {{ committed_count }}/{{ member_count }}
+          </span>
+          {% endif %}
+        </div>
+
+        {% if s.justification %}
+        <p class="font-garamond text-bone-500 text-xs italic mb-3 border-l border-ink-700 pl-3 whitespace-pre-line">{{ s.justification }}</p>
+        {% endif %}
+
+        {# Commit grid — same as player view #}
+        <div class="mb-3">
+          <p class="label-gold text-[0.7rem] mb-2">Commits</p>
+          <div class="flex flex-wrap gap-1.5">
+            {% for m in members %}
+            {% set is_committed = m.character_id in committed_ids %}
+            <span class="chip text-[0.6rem] inline-flex items-center gap-1.5
+                         {{ 'text-gold-400 border-gold-800 bg-gold-900/20' if is_committed else 'text-bone-600 border-ink-700' }}"
+                  title="{{ 'Committed' if is_committed else 'Not committed yet' }}">
+              {% if is_committed %}<span class="text-gold-400">✓</span>{% endif %}
+              {{ m.character_name }}
+            </span>
+            {% endfor %}
+          </div>
+        </div>
+
+        {# Action row #}
+        <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-ink-800"
+             x-data="{ approving: false, rejecting: false, notes: '' }">
+
+          {% if s.status == 'pending' %}
+          <form hx-post="/staff/coteries/spends/{{ s.id }}/commit-all"
+                hx-target="#coterie-page-anchor"
+                hx-swap="none"
+                hx-on::after-request="if(event.detail.successful) window.location.reload();"
+                class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button type="submit"
+                    title="Commit every uncommitted member in one shot"
+                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+              Commit Remaining
+            </button>
+          </form>
+          {% endif %}
+
+          <button x-show="!approving && !rejecting" x-cloak
+                  @click="approving = true; notes = ''"
+                  :disabled="'{{ s.status }}' !== 'funded'"
+                  :class="'{{ s.status }}' === 'funded' ? 'btn-send' : 'btn-ghost opacity-40 cursor-not-allowed'"
+                  class="font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5"
+                  :title="'{{ s.status }}' === 'funded' ? 'Approve and deduct XP from contributors' : 'Spend must be Funded before staff can approve'">
+            Approve
+          </button>
+          <button x-show="!approving && !rejecting" x-cloak
+                  @click="rejecting = true; notes = ''"
+                  class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+            Reject
+          </button>
+
+          {# Approve form with optional ST note #}
+          <form x-show="approving" x-cloak
+                method="POST" action="/staff/coteries/spends/{{ s.id }}/approve"
+                class="flex flex-wrap items-end gap-2 w-full">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="text" name="notes" x-model="notes" maxlength="400"
+                   placeholder="ST note (optional)"
+                   class="flex-1 min-w-[14rem] text-xs py-1 px-2">
+            <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+              Confirm Approve
+            </button>
+            <button type="button" @click="approving = false"
+                    class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1.5">
+              Cancel
+            </button>
+          </form>
+
+          {# Reject form with required reason #}
+          <form x-show="rejecting" x-cloak
+                method="POST" action="/staff/coteries/spends/{{ s.id }}/reject"
+                class="flex flex-wrap items-end gap-2 w-full">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="text" name="reason" x-model="notes" maxlength="400"
+                   placeholder="Reason (required)" required
+                   class="flex-1 min-w-[14rem] text-xs py-1 px-2">
+            <button type="submit" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest text-blood-400 px-3 py-1.5">
+              Confirm Reject
+            </button>
+            <button type="button" @click="rejecting = false"
+                    class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1.5">
+              Cancel
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div id="coterie-page-anchor"></div>
+  {% endif %}
+
+  {# Closed spend history #}
+  {% set closed_spends = spends | rejectattr('status', 'in', ['pending', 'funded']) | list %}
+  {% if closed_spends %}
   <div>
-    <p class="label-gold text-xs mb-3">Domain Spend History</p>
+    <p class="label-gold text-xs mb-3">Spend History</p>
     <div class="gilded overflow-hidden">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-ink-700">
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Category</th>
             <th class="px-4 py-3 text-left label-gold font-normal text-xs">Trait</th>
-            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Upgrade</th>
             <th class="px-4 py-3 text-right label-gold font-normal text-xs">Per Member</th>
             <th class="px-4 py-3 text-center label-gold font-normal text-xs">Status</th>
+            <th class="px-4 py-3 text-left label-gold font-normal text-xs">Note</th>
             <th class="px-4 py-3 text-left label-gold font-normal text-xs">Date</th>
           </tr>
         </thead>
         <tbody>
-          {% for s in spends %}
+          {% for s in closed_spends %}
           <tr class="border-b border-ink-800">
-            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300 capitalize">{{ s.trait_name }}</td>
-            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">
-              {{ s.current_dots }} → {{ s.new_dots }}
+            <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-600 uppercase">{{ s.spend_category or 'domain' }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300">
+              {{ s.trait_name }}
+              {% if (s.spend_category or 'domain') == 'domain' and s.new_dots %}
+              <span class="text-bone-700 ml-1">{{ s.current_dots }} → {{ s.new_dots }}</span>
+              {% endif %}
             </td>
-            <td class="px-4 py-2.5 font-cinzel text-xs text-gold-400 text-right">
-              {{ s.per_member_cost }} XP
-            </td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-gold-400 text-right">{{ s.per_member_cost }} XP</td>
             <td class="px-4 py-2.5 text-center">
               {% if s.status == 'approved' %}
               <span class="chip text-gold-400 border-gold-800 text-[0.6rem]">Approved</span>
-              {% elif s.status == 'rejected' %}
-              <span class="chip text-blood-400 border-blood-900 text-[0.6rem]">Rejected</span>
               {% else %}
-              <span class="chip text-bone-500 border-ink-600 text-[0.6rem]">Pending</span>
+              <span class="chip text-blood-400 border-blood-900 text-[0.6rem]">Rejected</span>
               {% endif %}
+            </td>
+            <td class="px-4 py-2.5 font-garamond text-xs text-bone-600 italic max-w-xs">
+              {{ s.notes or '—' }}
             </td>
             <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-600">
               {{ s.submitted_at[:10] }}

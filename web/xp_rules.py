@@ -24,7 +24,8 @@ SPEND_CATEGORIES: list[str] = [
     "Blood Sorcery Ritual",
     "Thin-Blood Alchemy Formula",
     "Advantage",
-    "Loresheet",
+    # Loresheets count as Backgrounds in this chronicle — purchased
+    # under Advantage in the spend form rather than as their own line.
     "Blood Potency",
     "Humanity",
 ]
@@ -152,6 +153,54 @@ def validate_spend(
             )
 
     return cost, errors
+
+
+def revalidate_spend(spend: dict) -> dict:
+    """Recompute the cost of an existing spend request and compare it
+    against the stored verified_cost. Returns a dict the staff review
+    template can render as a "player said X / system says Y" diff badge.
+
+    Lifted from MCbN's `validate_spend_request` pattern — the point is to
+    surface drift between submission-time and review-time, which can
+    happen if rule formulas change, the character's clan/discipline
+    state shifts, or a manual fix-up was needed.
+
+    Returns:
+        {
+          "valid":        bool,   # did the rule lookup succeed
+          "correct_cost": int,    # what the rules say the cost should be
+          "stored_cost":  int,    # spend.verified_cost (what landed in DB)
+          "matches":      bool,   # correct_cost == stored_cost
+          "message":      str,    # short human-readable note
+        }"""
+    cat   = spend.get("category") or ""
+    cur   = int(spend.get("current_dots") or 0)
+    new   = int(spend.get("new_dots")     or 0)
+    stored = int(spend.get("verified_cost") or 0)
+    correct, calc_error = calculate_cost(cat, cur, new)
+    if calc_error:
+        return {
+            "valid":        False,
+            "correct_cost": correct,
+            "stored_cost":  stored,
+            "matches":      False,
+            "message":      f"Rule lookup failed: {calc_error}",
+        }
+    matches = (correct == stored)
+    if matches:
+        msg = f"Cost agrees with stored value ({stored} XP)."
+    else:
+        msg = (
+            f"System now says {correct} XP; player submitted {stored} XP "
+            f"(Δ {correct - stored:+d})."
+        )
+    return {
+        "valid":        True,
+        "correct_cost": correct,
+        "stored_cost":  stored,
+        "matches":      matches,
+        "message":      msg,
+    }
 
 
 def validate_humanity_conditions(conditions_checked: list[bool]) -> tuple[bool, str | None]:

@@ -23,7 +23,8 @@
       Something has gone wrong in the dark places between the servers.
       The Seneschal has been notified. If this persists, seek aid in the Discord.
     </p>
-    <a href="/" class="btn-ghost font-cinzel tracking-widest text-xs">
+    <a href="{{ '/staff' if is_staff else '/characters' }}"
+       class="btn-ghost font-cinzel tracking-widest text-xs">
       Return to Safety
     </a>
   </div>

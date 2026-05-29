@@ -1,0 +1,134 @@
+{# Shared Jinja macros. Import with: {% from "_macros.html" import clan_icon %} #}
+
+{# Two-letter clan monogram — fallback when no PNG silhouette is on disk.
+   Disambiguates B/M/T which have multiple V5 clans. #}
+{% set _CLAN_MONOGRAM = {
+    "banu-haqim": "Bh",
+    "brujah":     "Br",
+    "gangrel":    "Ga",
+    "hecata":     "He",
+    "lasombra":   "La",
+    "malkavian":  "Ma",
+    "ministry":   "Mi",
+    "nosferatu":  "No",
+    "ravnos":     "Ra",
+    "salubri":    "Sa",
+    "toreador":   "To",
+    "tremere":    "Tr",
+    "tzimisce":   "Tz",
+    "ventrue":    "Ve",
+    "caitiff":    "C",
+    "thin-blood": "Tb",
+} %}
+
+{# ───────────────────────────────────────────────────────────────────
+   themed_confirm — drop-in replacement for `onsubmit="return confirm(...)"`
+   browser dialogs. Renders an Alpine-managed modal styled to match the
+   parchment + gilded theme. Self-contained: the trigger button +
+   modal + form live in one block so multiple instances on the page
+   don't collide.
+
+   Usage:
+     {% from "_macros.html" import themed_confirm %}
+     {{ themed_confirm(
+          form_url='/staff/characters/' ~ char.id ~ '/retire',
+          trigger_label='Retire Now',
+          title='Retire ' ~ char.name ~ '?',
+          body='They\\'ll move to the Retired list. Reversible via Un-Retire.',
+          confirm_label='Retire',
+          confirm_class='btn-send',
+          trigger_class='btn-ghost text-blood-400 border-blood-900',
+          csrf_token=csrf_token,
+          hidden_fields={'reason': 'staff action'}) }}
+
+   Pure-template — no JS imports required beyond the global Alpine
+   already loaded by base.html.
+─────────────────────────────────────────────────────────────────── #}
+{% macro themed_confirm(form_url, trigger_label, title, body,
+                       confirm_label='Confirm', confirm_class='btn-send',
+                       cancel_label='Cancel',
+                       trigger_class='btn-ghost',
+                       csrf_token='',
+                       hidden_fields=None) %}
+<div x-data="{ open: false }" class="inline">
+  <button type="button" @click="open = true"
+          class="{{ trigger_class }} font-cinzel tracking-widest text-xs">
+    {{ trigger_label }}
+  </button>
+  <template x-teleport="body">
+    <div x-show="open" x-cloak x-transition.opacity
+         @keydown.escape.window="open = false"
+         class="fixed inset-0 z-[100] flex items-center justify-center px-4"
+         style="background:rgba(8,5,7,0.78); backdrop-filter:blur(4px);"
+         @click.self="open = false">
+      <div class="gilded p-6 max-w-md w-full aurora-beam relative"
+           x-transition.scale.85.origin.center>
+        <p class="label-gold mb-3 text-[0.9rem]">{{ title }}</p>
+        <div class="divider-gold my-3"></div>
+        <p class="font-garamond text-bone-300 text-sm leading-relaxed mb-5">
+          {{ body }}
+        </p>
+        <div class="flex items-center justify-end gap-2">
+          <button type="button" @click="open = false"
+                  class="btn-ghost font-cinzel text-[0.7rem] tracking-widest">
+            {{ cancel_label }}
+          </button>
+          <form method="post" action="{{ form_url }}" class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            {% if hidden_fields %}
+              {% for k, v in hidden_fields.items() %}
+              <input type="hidden" name="{{ k }}" value="{{ v }}">
+              {% endfor %}
+            {% endif %}
+            <button type="submit"
+                    class="{{ confirm_class }} font-cinzel text-[0.7rem] tracking-widest">
+              {{ confirm_label }}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>
+{% endmacro %}
+
+
+{# Heraldic clan icon — hexagonal frame containing the V5 clan symbol
+   (CSS-tinted to the clan color) when a /static/images/clans/{slug}.png
+   silhouette is available, otherwise falling back to a 2-letter monogram.
+
+   Usage:
+     {% from "_macros.html" import clan_icon %}
+     {{ clan_icon('brujah') }}
+     {{ clan_icon(char.clan, size='w-12 h-12', font_size=18) }}
+#}
+{% macro clan_icon(clan, size='w-7 h-7', font_size=12) %}
+  <div class="clan-{{ clan }} {{ size }} relative inline-flex items-center justify-center shrink-0">
+    {# Hex frame — always rendered #}
+    <svg viewBox="0 0 40 40" class="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <polygon points="20,2 36,11 36,29 20,38 4,29 4,11"
+               fill="none" stroke="var(--clan, #b08a3e)" stroke-width="1.5"/>
+      <polygon points="20,5 33,12.5 33,27.5 20,35 7,27.5 7,12.5"
+               fill="none" stroke="var(--clan, #b08a3e)" stroke-width="0.5" opacity="0.4"/>
+    </svg>
+    {# Symbol silhouette — masked into the clan color. Browsers that don't
+       support mask-image will see the SVG below instead.  Width is 58% so
+       the symbol sits comfortably inside the inner hex. #}
+    <span class="clan-symbol"
+          style="position: relative;
+                 z-index: 1;
+                 width: 58%;
+                 height: 58%;
+                 background-color: var(--clan, #b08a3e);
+                 -webkit-mask: url('/static/images/clans/{{ clan }}.png') center/contain no-repeat;
+                         mask: url('/static/images/clans/{{ clan }}.png') center/contain no-repeat;"
+          aria-hidden="true"></span>
+    {# Monogram fallback — shown only if a parent class disables the mask.
+       Keeps the icon readable if the PNG is missing or fails to load. #}
+    <noscript>
+      <span class="font-cinzel" style="font-size:{{ font_size }}px; color: var(--clan, #b08a3e); font-weight:600;">
+        {{ _CLAN_MONOGRAM.get(clan, clan[0] | upper) }}
+      </span>
+    </noscript>
+  </div>
+{% endmacro %}

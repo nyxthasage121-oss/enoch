@@ -1,0 +1,74 @@
+{# coterie_flaws_table.html — list + add form for coterie flaws.
+   Flaws are coterie-wide (no per-member ownership) and may carry an
+   XP creation grant the storyteller awards back when chargen. #}
+<div id="coterie-flaws-table">
+  {% if flaws %}
+  <div class="gilded overflow-hidden mb-3">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Flaw</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Dots</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Creation Grant</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in flaws %}
+        <tr class="border-b border-ink-800">
+          <td class="px-4 py-2.5 font-cinzel text-xs text-blood-400">{{ f.flaw_name }}</td>
+          <td class="px-4 py-2.5 text-center">
+            <div class="flex justify-center gap-0.5">
+              {% for i in range(5) %}
+              <span class="w-2 h-2 rounded-full
+                {{ 'bg-blood-bright' if i < f.dots else 'border border-bone-700' }}"></span>
+              {% endfor %}
+            </div>
+          </td>
+          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500 text-right">
+            {% if f.creation_grant %}+{{ f.creation_grant }} XP{% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-right">
+            <button hx-post="/staff/coteries/{{ coterie.id }}/flaws/{{ f.id }}/remove"
+                    hx-target="#coterie-flaws-table"
+                    hx-swap="outerHTML"
+                    hx-confirm="Remove {{ f.flaw_name }} from this coterie?"
+                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-2 py-1">
+              Remove
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="font-garamond text-bone-600 text-sm px-1 mb-3">No flaws recorded.</p>
+  {% endif %}
+
+  <form hx-post="/staff/coteries/{{ coterie.id }}/flaws/add"
+        hx-target="#coterie-flaws-table"
+        hx-swap="outerHTML"
+        class="flex flex-wrap gap-2 items-end">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div>
+      <label class="label-gold block mb-1.5 text-[0.75rem]">Flaw</label>
+      <input type="text" name="flaw_name" required maxlength="80"
+             placeholder="e.g. Disliked" class="py-1.5 px-2 text-xs w-48">
+    </div>
+    <div>
+      <label class="label-gold block mb-1.5 text-[0.75rem]">Dots</label>
+      <input type="number" name="dots" min="1" max="5" value="1" required
+             class="py-1.5 px-2 text-xs w-16 text-center">
+    </div>
+    <div>
+      <label class="label-gold block mb-1.5 text-[0.75rem]">XP Grant</label>
+      <input type="number" name="creation_grant" min="0" max="20" value="0"
+             class="py-1.5 px-2 text-xs w-16 text-center">
+    </div>
+    <button type="submit"
+            class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+      Add
+    </button>
+  </form>
+</div>

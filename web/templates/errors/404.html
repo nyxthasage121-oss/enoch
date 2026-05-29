@@ -23,7 +23,8 @@
       The page you seek has passed beyond the veil — or perhaps it never existed at all.
       Even Kindred cannot walk where there is no path.
     </p>
-    <a href="/" class="btn-ghost font-cinzel tracking-widest text-xs">
+    <a href="{{ '/staff' if is_staff else '/characters' }}"
+       class="btn-ghost font-cinzel tracking-widest text-xs">
       Return to Safety
     </a>
   </div>

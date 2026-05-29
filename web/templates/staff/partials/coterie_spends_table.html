@@ -1,45 +1,68 @@
-{# coterie_spends_table.html — refreshed by HTMX after approve/reject #}
+{# coterie_spends_table.html — open coterie proposals (pending + funded).
+   Funded rows float to the top so staff sees what's actionable first. #}
 <div id="coterie-spends-table">
   {% if co_spends %}
   <div class="gilded overflow-hidden">
     <table class="w-full text-sm">
       <thead>
         <tr class="border-b border-ink-700">
-          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Coterie</th>
-          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Trait</th>
-          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Upgrade</th>
-          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Total XP</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Coterie</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Category</th>
+          <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Trait</th>
           <th class="px-4 py-3 text-right label-gold font-normal text-xs">Per Member</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Commits</th>
           <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for s in co_spends %}
+        {% set contributions   = s.contributions or {} %}
+        {% set committed_count = contributions | length %}
         <tr class="border-b border-ink-800"
             x-data="{ rejecting: false, reason: '' }">
-          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">
-            Coterie #{{ s.coterie_id }}
+          <td class="px-4 py-2.5">
+            <a href="/staff/coteries/{{ s.coterie_id }}"
+               class="font-cinzel text-xs text-bone-200 hover:text-gold-400 transition-colors">
+              Coterie #{{ s.coterie_id }}
+            </a>
+            {% if s.status == 'funded' %}
+            <span class="chip text-gold-400 border-gold-700 text-[0.55rem] ml-1.5">Funded</span>
+            {% else %}
+            <span class="chip text-mauve-400 border-mauve-800 text-[0.55rem] ml-1.5">Pending</span>
+            {% endif %}
           </td>
-          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300 capitalize">
+          <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-600 uppercase">
+            {{ s.spend_category or 'domain' }}
+          </td>
+          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-300">
             {{ s.trait_name }}
-          </td>
-          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">
-            {{ s.current_dots }} → {{ s.new_dots }}
-          </td>
-          <td class="px-4 py-2.5 font-cinzel text-xs text-gold-400 text-right">
-            {{ s.total_cost }} XP
+            {% if (s.spend_category or 'domain') == 'domain' and s.new_dots %}
+            <span class="text-bone-700 ml-1">{{ s.current_dots }} → {{ s.new_dots }}</span>
+            {% endif %}
           </td>
           <td class="px-4 py-2.5 font-cinzel text-xs text-gold-400 text-right">
             {{ s.per_member_cost }} XP
           </td>
+          <td class="px-4 py-2.5 font-cinzel text-xs text-center"
+              :class="'{{ s.status }}' === 'funded' ? 'text-gold-400' : 'text-bone-500'">
+            {{ committed_count }}
+          </td>
           <td class="px-4 py-2.5 text-right">
             <div x-show="!rejecting" class="flex gap-1 justify-end">
+              {% if s.status == 'funded' %}
               <button hx-post="/staff/coteries/spends/{{ s.id }}/approve"
                       hx-target="#coterie-spends-table"
                       hx-swap="outerHTML"
                       class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
                 Approve
               </button>
+              {% else %}
+              <a href="/staff/coteries/{{ s.coterie_id }}"
+                 title="Open coterie to commit on members' behalf"
+                 class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+                Manage
+              </a>
+              {% endif %}
               <button @click="rejecting = true"
                       class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
                 Reject
@@ -72,6 +95,6 @@
     </table>
   </div>
   {% else %}
-  <p class="font-garamond text-bone-600 text-sm px-1">No pending domain upgrades.</p>
+  <p class="font-garamond text-bone-600 text-sm px-1">No open coterie proposals.</p>
   {% endif %}
 </div>

@@ -23,17 +23,23 @@ class Settings:
     # ── Discord Guild ─────────────────────────────────────────────
     # Primary NYbN server ID
     DISCORD_GUILD_ID: int|None = (
-        int(os.getenv("DISCORD_GUILD_ID", 0)) or None
+        int(os.getenv("DISCORD_GUILD_ID") or 0) or None
     )
     # Comma-separated role IDs that grant staff access
     STAFF_ROLE_IDS: list[int] = [
         int(x) for x in os.getenv("STAFF_ROLE_IDS", "").split(",") if x.strip()
     ]
+    # Channel ID the bot posts period-closing reminders + chronicle
+    # announcements to. Falls back to None which silently disables
+    # announcements (e.g. during testing).
+    CHRONICLE_CHANNEL_ID: int|None = (
+        int(os.getenv("CHRONICLE_CHANNEL_ID") or 0) or None
+    )
 
     # ── Enoch / Inconnu sync ──────────────────────────────────────
     # The guild ID used inside the Inconnu bot's tables (may differ)
     ENOCH_GUILD_ID: int|None = (
-        int(os.getenv("ENOCH_GUILD_ID", 0)) or None
+        int(os.getenv("ENOCH_GUILD_ID") or 0) or None
     )
 
     # ── Bot service token ─────────────────────────────────────────
@@ -44,8 +50,9 @@ class Settings:
     PROFILE_WEBHOOK_URL: str|None = os.getenv("PROFILE_WEBHOOK_URL")
 
     # ── NYbN rules ────────────────────────────────────────────────
-    XP_CAP: int             = 350
-    COTERIE_MAX_MEMBERS: int = 6
+    XP_CAP: int                  = 350
+    COTERIE_MAX_MEMBERS: int     = 6
+    RETIREMENT_WINDOW_DAYS: int  = 180   # 6-month auto-retirement window after XP cap
 
     # ── Runtime ───────────────────────────────────────────────────
     # True when running on Railway (sets https_only on session cookie)

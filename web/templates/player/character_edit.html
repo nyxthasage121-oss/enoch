@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ char.name }} — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter clan-{{ char.clan }}">
+
+  {# ── Back link ── #}
+  <a href="/characters/{{ char.id }}"
+     class="inline-flex items-center gap-1.5 text-bone-600 hover:text-gold-400 font-cinzel text-xs tracking-widest uppercase mb-6 transition-colors">
+    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="square" d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    {{ char.name }}
+  </a>
+
+  <div class="mb-8">
+    <p class="label-gold mb-1">Character</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Edit Details</h1>
+    {% if not char.is_approved %}
+    <p class="font-garamond text-bone-500 text-sm mt-1 leading-relaxed">
+      Changes will clear the rejection notice and return this character to the approval queue.
+    </p>
+    {% else %}
+    <p class="font-garamond text-bone-500 text-sm mt-1 leading-relaxed">
+      Name and clan are locked after approval. All other fields can be updated freely.
+    </p>
+    {% endif %}
+  </div>
+
+  {# ── Rejection notice ── #}
+  {% if char.rejection_reason %}
+  <div class="gilded border border-blood-900 p-5 mb-6">
+    <p class="label-gold text-blood-400 mb-1">Staff Feedback</p>
+    <p class="font-garamond text-bone-400 text-sm leading-relaxed">{{ char.rejection_reason }}</p>
+    {% if char.rejected_at %}
+    <p class="font-cinzel text-[0.6rem] text-bone-700 mt-2">{{ char.rejected_at[:10] }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── Validation errors ── #}
+  {% if errors %}
+  <div class="gilded-inset px-5 py-4 mb-6 border-l-2 border-blood-bright">
+    <p class="label-gold mb-2 text-blood-400">Please correct the following</p>
+    <ul class="space-y-1">
+      {% for e in errors %}
+      <li class="font-garamond text-blood-400 text-sm flex items-start gap-2">
+        <span class="mt-1 shrink-0">·</span>{{ e }}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# ── Profile Image (own forms, outside the main edit form) ── #}
+  <div class="gilded p-6 mb-6">
+    <p class="label-gold mb-2">Profile Image</p>
+    <p class="font-garamond text-bone-500 text-sm mb-4 leading-relaxed">
+      Visible to other players on this character's IC profile.
+      JPG, PNG, WebP, or GIF up to 2 MB.
+    </p>
+
+    {% if char.profile_image_url %}
+    <div class="flex items-start gap-5 mb-5">
+      <div class="w-24 h-24 shrink-0 border border-[var(--clan,theme(colors.ink.700))] bg-ink-900 overflow-hidden">
+        <img src="{{ char.profile_image_url }}" alt="Current profile" class="w-full h-full object-cover">
+      </div>
+      <form method="post" action="/characters/{{ char.id }}/image/delete">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <button type="submit"
+                class="btn-ghost font-cinzel tracking-widest text-[0.65rem] px-3 py-1.5 border-blood-900 text-blood-500 hover:text-blood-400">
+          Remove Image
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    <form method="post"
+          action="/characters/{{ char.id }}/image"
+          enctype="multipart/form-data"
+          class="flex flex-wrap items-end gap-3">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div class="flex-1 min-w-[14rem]">
+        <label class="label-gold block mb-2" for="image-upload">
+          {% if char.profile_image_url %}Replace Image{% else %}Upload Image{% endif %}
+        </label>
+        <input id="image-upload"
+               type="file"
+               name="image"
+               accept="image/jpeg,image/png,image/webp,image/gif"
+               required
+               class="w-full text-xs">
+      </div>
+      <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
+        Upload
+      </button>
+    </form>
+  </div>
+
+  <form method="post" action="/characters/{{ char.id }}/edit" class="space-y-6">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+    {# ── Identity ── #}
+    <div class="gilded p-6">
+      <p class="label-gold mb-4">Identity</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+        {# Name — locked if approved #}
+        <div class="md:col-span-2">
+          <label class="label-gold block mb-2" for="edit-name">
+            Character Name
+            {% if char.is_approved %}
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(locked after approval)</span>
+            {% else %}
+            <span class="text-blood-500 font-sans normal-case">*</span>
+            {% endif %}
+          </label>
+          <input id="edit-name"
+                 type="text"
+                 name="name"
+                 maxlength="80"
+                 value="{{ char.name }}"
+                 {% if char.is_approved %}readonly{% endif %}
+                 class="w-full {% if char.is_approved %}opacity-50 cursor-not-allowed{% endif %}">
+        </div>
+
+        {# Clan — locked if approved #}
+        <div>
+          <label class="label-gold block mb-2" for="edit-clan">
+            Clan
+            {% if char.is_approved %}
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(locked after approval)</span>
+            {% endif %}
+          </label>
+          {% if char.is_approved %}
+          <input type="text"
+                 value="{{ char.clan | replace('-',' ') | title }}"
+                 readonly
+                 class="w-full opacity-50 cursor-not-allowed">
+          {% else %}
+          <select id="edit-clan" name="clan" required class="w-full">
+            <option value="" disabled>— Select a clan —</option>
+            {% for slug, label in clans %}
+            <option value="{{ slug }}" {{ 'selected' if char.clan == slug else '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
+        </div>
+
+        {# Predator type — always editable #}
+        <div>
+          <label class="label-gold block mb-2" for="edit-predator">
+            Predator Type
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span>
+          </label>
+          <select id="edit-predator" name="predator_type" class="w-full">
+            <option value="">— Select a predator type —</option>
+            {% for pt in predator_types %}
+            <option value="{{ pt }}" {{ 'selected' if char.predator_type == pt else '' }}>{{ pt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {# Covenant #}
+        <div>
+          <label class="label-gold block mb-2" for="edit-covenant">
+            Covenant / Sect
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span>
+          </label>
+          <select id="edit-covenant" name="covenant" class="w-full">
+            <option value="">— Select a covenant —</option>
+            {% for cov in covenants %}
+            <option value="{{ cov }}" {{ 'selected' if char.covenant == cov else '' }}>{{ cov }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {# Sire #}
+        <div>
+          <label class="label-gold block mb-2" for="edit-sire">
+            Sire
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span>
+          </label>
+          <input id="edit-sire"
+                 type="text"
+                 name="sire"
+                 maxlength="80"
+                 placeholder="Name of sire, if known…"
+                 value="{{ char.sire or '' }}"
+                 class="w-full">
+        </div>
+
+      </div>
+    </div>
+
+    {# ── Background ── #}
+    <div class="gilded p-6">
+      <p class="label-gold mb-4">Background</p>
+      <div class="space-y-5">
+
+        <div>
+          <label class="label-gold block mb-2" for="edit-concept">
+            Concept
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span>
+          </label>
+          <input id="edit-concept"
+                 type="text"
+                 name="concept"
+                 maxlength="120"
+                 value="{{ char.concept or '' }}"
+                 class="w-full">
+        </div>
+
+      </div>
+    </div>
+
+    {# ── Profile / IC details — frozen when profile_locked ── #}
+    {% set _locked = char.profile_locked %}
+    <div class="gilded p-6">
+      <div class="flex items-baseline justify-between mb-4">
+        <p class="label-gold">IC Profile</p>
+        {% if _locked %}
+        <span class="chip text-mauve-400 border-mauve-800 text-[0.55rem]">Locked by Staff</span>
+        {% endif %}
+      </div>
+
+      {% if _locked %}
+      <p class="font-garamond text-bone-500 text-xs italic mb-4 leading-relaxed">
+        Staff has frozen this profile after approval. Reach out in chronicle channels
+        if you need to update any field below.
+      </p>
+      {% endif %}
+
+      <div class="space-y-5 {{ 'opacity-60 pointer-events-none' if _locked }}">
+        <div>
+          <label class="label-gold block mb-2" for="edit-blurb">
+            Profile Blurb
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span>
+          </label>
+          <textarea id="edit-blurb"
+                    name="profile_blurb"
+                    rows="4"
+                    maxlength="600"
+                    {% if _locked %}readonly{% endif %}
+                    placeholder="Public-facing description visible to other players…"
+                    class="w-full resize-y">{{ char.profile_blurb or '' }}</textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label class="label-gold block mb-2" for="edit-pronouns">Pronouns</label>
+            <input id="edit-pronouns" type="text" name="pronouns" maxlength="60"
+                   {% if _locked %}readonly{% endif %}
+                   value="{{ char.pronouns or '' }}" class="w-full">
+          </div>
+          <div>
+            <label class="label-gold block mb-2" for="edit-profession">Profession</label>
+            <input id="edit-profession" type="text" name="profession" maxlength="80"
+                   {% if _locked %}readonly{% endif %}
+                   value="{{ char.profession or '' }}" class="w-full">
+          </div>
+          <div>
+            <label class="label-gold block mb-2" for="edit-apparent">Apparent Age</label>
+            <input id="edit-apparent" type="number" name="apparent_age" min="0" max="999"
+                   {% if _locked %}readonly{% endif %}
+                   value="{{ char.apparent_age or '' }}" class="w-full">
+          </div>
+          <div>
+            <label class="label-gold block mb-2" for="edit-true">True Age</label>
+            <input id="edit-true" type="number" name="true_age" min="0" max="2000"
+                   {% if _locked %}readonly{% endif %}
+                   value="{{ char.true_age or '' }}" class="w-full">
+          </div>
+        </div>
+
+        <div>
+          <label class="label-gold block mb-2" for="edit-ambition">Ambition
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(long-term goal)</span>
+          </label>
+          <input id="edit-ambition" type="text" name="ambition" maxlength="200"
+                 {% if _locked %}readonly{% endif %}
+                 value="{{ char.ambition or '' }}" class="w-full">
+        </div>
+        <div>
+          <label class="label-gold block mb-2" for="edit-desire">Desire
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(short-term drive)</span>
+          </label>
+          <input id="edit-desire" type="text" name="desire" maxlength="200"
+                 {% if _locked %}readonly{% endif %}
+                 value="{{ char.desire or '' }}" class="w-full">
+        </div>
+
+        <div>
+          <label class="label-gold block mb-2" for="edit-backstory">
+            Backstory
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(staff-private)</span>
+          </label>
+          <textarea id="edit-backstory" name="backstory" rows="5" maxlength="4000"
+                    {% if _locked %}readonly{% endif %}
+                    placeholder="Backstory + context — only staff sees this."
+                    class="w-full resize-y">{{ char.backstory or '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    {# ── Special rules (only editable while unapproved) ── #}
+    {% if not char.is_approved %}
+    <div class="gilded p-6">
+      <p class="label-gold mb-4">Special Rules</p>
+      <label class="flex items-start gap-3 cursor-pointer group">
+        <div class="pt-0.5">
+          <input type="checkbox"
+                 name="has_ingrained_flaw"
+                 id="edit-ingrained"
+                 {{ 'checked' if char.has_ingrained_flaw else '' }}
+                 class="accent-[#8B1A1A]">
+        </div>
+        <div>
+          <p class="font-cinzel text-xs text-bone-300 tracking-wide group-hover:text-bone-200 transition-colors">
+            Ingrained Discipline Flaw
+          </p>
+          <p class="font-garamond text-bone-500 text-sm mt-0.5 leading-relaxed">
+            Grants a separate 15 XP budget at staff discretion.
+          </p>
+        </div>
+      </label>
+    </div>
+    {% endif %}
+
+    {# ── Actions ── #}
+    <div class="flex items-center gap-4">
+      <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
+        {% if not char.is_approved and char.rejection_reason %}
+          Save &amp; Resubmit
+        {% else %}
+          Save Changes
+        {% endif %}
+      </button>
+      <a href="/characters/{{ char.id }}"
+         class="btn-ghost font-cinzel tracking-widest text-xs">
+        Cancel
+      </a>
+    </div>
+
+  </form>
+
+</div>
+{% endblock %}

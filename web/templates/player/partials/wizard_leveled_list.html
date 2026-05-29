@@ -1,0 +1,28 @@
+{# wizard_leveled_list.html — leveled item list (rituals / ceremonies /
+   formulae) with inline add. Caller sets:
+     list_key    — Alpine state list (defaults to 'rituals')
+     list_label  — singular UI label (e.g. 'ritual', 'ceremony', 'formula') #}
+{% set _list  = list_key   | default('rituals') %}
+{% set _label = list_label | default('ritual') %}
+
+<template x-for="(item, idx) in {{ _list }}" :key="idx">
+  <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
+    <span class="font-cinzel text-[0.6rem] text-bone-700 w-5 shrink-0" x-text="'L' + item.level"></span>
+    <span class="font-garamond text-xs text-bone-300 flex-1 truncate" x-text="item.name"></span>
+    <button type="button" @click="{{ _list }}.splice(idx, 1)"
+            class="text-bone-700 hover:text-blood-400 text-xs">×</button>
+  </div>
+</template>
+
+<div class="flex items-center gap-2 mt-3"
+     x-data="{ name: '', level: 1 }">
+  <input type="number" min="1" max="5" x-model.number="level"
+         class="text-xs py-1 px-1.5 w-12 text-center">
+  <input type="text" maxlength="80" x-model="name"
+         placeholder="{{ _label | capitalize }} name…"
+         @keydown.enter.prevent="addToLeveledList('{{ _list }}', name, level); name=''; level=1;"
+         class="text-xs py-1 px-2 flex-1">
+  <button type="button"
+          @click="addToLeveledList('{{ _list }}', name, level); name=''; level=1;"
+          class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
+</div>

@@ -1,16 +1,60 @@
 {% extends "base.html" %}
-{% block title %}Claims Queue — Enoch{% endblock %}
+{% block title %}Claims — Enoch{% endblock %}
 
 {% block content %}
 <div class="page-enter">
-  <div class="mb-8">
-    <p class="label-gold mb-1">Staff</p>
-    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">
-      Claims Queue
-      {% if claims %}
-      <span class="font-cinzel text-xl text-blood-400 ml-3">{{ claims | length }}</span>
+  <div class="flex items-end justify-between mb-6 flex-wrap gap-4">
+    <div>
+      <p class="label-gold mb-1">Staff</p>
+      <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">
+        {% if filter_status == 'pending' %}Claims Queue{% else %}Claims History{% endif %}
+        {% if claims %}
+        <span class="font-cinzel text-xl
+                     {{ 'text-blood-400' if filter_status == 'pending'
+                        else 'text-bone-600' }} ml-3">{{ claims | length }}</span>
+        {% endif %}
+      </h1>
+    </div>
+
+    {# ── Filter bar — switches between pending/all/approved/rejected ── #}
+    <form method="GET" action="/staff/claims" class="flex flex-wrap gap-2 items-end">
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Status</label>
+        <select name="status" onchange="this.form.submit()" class="text-xs py-1.5 px-2">
+          {% for opt_val, opt_label in [
+            ('pending',  'Pending'),
+            ('approved', 'Approved'),
+            ('rejected', 'Rejected'),
+            ('all',      'All Statuses'),
+          ] %}
+          <option value="{{ opt_val }}"
+                  {{ 'selected' if (filter_status or 'pending') == opt_val or
+                     (opt_val == 'all' and not filter_status) }}>
+            {{ opt_label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.75rem]">Period</label>
+        <select name="period_id" onchange="this.form.submit()" class="text-xs py-1.5 px-2">
+          <option value="0">All</option>
+          {% for p in periods or [] %}
+          <option value="{{ p.id }}" {{ 'selected' if filter_period_id == p.id }}>{{ p.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <noscript>
+        <button type="submit" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+          Filter
+        </button>
+      </noscript>
+      {% if filter_status and filter_status != 'pending' or filter_period_id %}
+      <a href="/staff/claims" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
+        Reset
+      </a>
       {% endif %}
-    </h1>
+    </form>
   </div>
 
   {% include "staff/partials/claims_table.html" %}
