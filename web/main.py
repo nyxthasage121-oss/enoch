@@ -246,14 +246,22 @@ if settings.DEV_PREVIEW:
 
       <a href="/_dev/player"
          class="btn-ghost font-cinzel tracking-widest text-xs w-full flex items-center justify-center gap-2 py-2.5">
-        Login as Player (TestPlayer)
+        Login as Player 1 (TestPlayer)
+      </a>
+      <a href="/_dev/player2"
+         class="btn-ghost font-cinzel tracking-widest text-xs w-full flex items-center justify-center gap-2 py-2.5">
+        Login as Player 2 (TestPlayer2)
+      </a>
+      <a href="/_dev/player3"
+         class="btn-ghost font-cinzel tracking-widest text-xs w-full flex items-center justify-center gap-2 py-2.5">
+        Login as Player 3 (TestPlayer3)
       </a>
     </div>
 
     <div style="border-top:1px solid #2a1f22;" class="mt-8 pt-6">
       <p class="font-garamond text-bone-700 text-xs leading-relaxed">
         Staff: DevStaff · is_staff=true<br>
-        Player: TestPlayer · character: Valeria Morano (Brujah)
+        P1 Valeria Morano · P2 Marcus Reyes · P3 Cassia Vane
       </p>
     </div>
   </div>
@@ -287,42 +295,53 @@ if settings.DEV_PREVIEW:
             conn.commit()
         return RedirectResponse(url="/staff", status_code=307)
 
+    # Three distinct dev players so coterie flows (which forbid a player from
+    # putting two of their own characters in one coterie) and the per-player
+    # character cap can be tested without real OAuth accounts.
+    _DEV_PLAYERS = [
+        ("111111111111111111", "TestPlayer",  "Valeria Morano", "brujah",   "Siren"),
+        ("222222222222222222", "TestPlayer2", "Marcus Reyes",   "ventrue",  "Sandman"),
+        ("333333333333333333", "TestPlayer3", "Cassia Vane",    "toreador", "Cleaver"),
+    ]
+
     @app.get("/_dev/seed_data")
     async def _dev_seed_data(request: Request):
-        """Create a test player + character directly — never ships to production."""
+        """Create the three dev players, each with one approved character —
+        never ships to production. Switch between them via /_dev/player,
+        /_dev/player2, /_dev/player3 to test coterie + multi-player flows."""
         from .db import get_db, upsert_player, create_character, approve_character
-        DEV_PLAYER_ID = "111111111111111111"
-        DEV_CHAR_NAME = "Valeria Morano"
         with get_db() as conn:
-            upsert_player(conn, discord_id=DEV_PLAYER_ID, username="TestPlayer")
-            existing = conn.execute(
-                "SELECT id FROM characters WHERE discord_id=? AND name=? LIMIT 1",
-                (DEV_PLAYER_ID, DEV_CHAR_NAME),
-            ).fetchone()
-            if not existing:
-                char = create_character(
-                    conn,
-                    discord_id=DEV_PLAYER_ID,
-                    name=DEV_CHAR_NAME,
-                    clan="brujah",
-                    predator_type="Siren",
-                    concept="Former NYC DA turned revolutionary",
-                    sire="Alejandro Cruz",
-                )
-                approve_character(conn, char["id"], reviewer_id=DEV_PLAYER_ID)
+            for pid, uname, cname, clan, pred in _DEV_PLAYERS:
+                upsert_player(conn, discord_id=pid, username=uname)
+                existing = conn.execute(
+                    "SELECT id FROM characters WHERE discord_id=? AND name=? LIMIT 1",
+                    (pid, cname),
+                ).fetchone()
+                if not existing:
+                    ch = create_character(conn, discord_id=pid, name=cname,
+                                          clan=clan, predator_type=pred)
+                    approve_character(conn, ch["id"], reviewer_id=pid)
         return RedirectResponse(url="/_dev/login", status_code=307)
+
+    def _dev_login_player(request: Request, idx: int):
+        pid, uname = _DEV_PLAYERS[idx][0], _DEV_PLAYERS[idx][1]
+        request.session["user"]     = {"id": pid, "username": uname, "avatar": None}
+        request.session["is_staff"] = False
+        request.session["_csrf"]    = "dev-csrf-token"
+        return RedirectResponse(url="/characters", status_code=307)
 
     @app.get("/_dev/player")
     async def _dev_player(request: Request):
-        """Switch session to TestPlayer (non-staff) — never ships to production."""
-        request.session["user"] = {
-            "id": "111111111111111111",
-            "username": "TestPlayer",
-            "avatar": None,
-        }
-        request.session["is_staff"]   = False
-        request.session["_csrf"]      = "dev-csrf-token"
-        return RedirectResponse(url="/characters", status_code=307)
+        """Switch session to TestPlayer (player 1) — never ships to production."""
+        return _dev_login_player(request, 0)
+
+    @app.get("/_dev/player2")
+    async def _dev_player2(request: Request):
+        return _dev_login_player(request, 1)
+
+    @app.get("/_dev/player3")
+    async def _dev_player3(request: Request):
+        return _dev_login_player(request, 2)
 
     log.warning("⚠  ENOCH_DEV_PREVIEW=1 — OAuth bypass is active. Never use in production.")
 
