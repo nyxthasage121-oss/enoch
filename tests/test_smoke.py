@@ -223,6 +223,42 @@ def test_staff_criteria(staff):
     assert "Criteria" in r.text
 
 
+def test_criteria_create_toggle_update(staff):
+    """Staff criteria CRUD (S4): create -> active row; toggle -> deactivates;
+    update -> fields change."""
+    from web.db import get_db, list_criteria
+
+    def _find(cid=None, label=None):
+        with get_db() as conn:
+            for c in list_criteria(conn, active_only=False):
+                if (cid and c["id"] == cid) or (label and c["label"] == label):
+                    return c
+        return None
+
+    staff.post("/staff/criteria",
+               data={"_csrf": "dev-csrf-token", "label": "QA Crit",
+                     "xp_value": "3", "category": "player",
+                     "description": "qa", "sort_order": "0"},
+               follow_redirects=False)
+    crit = _find(label="QA Crit")
+    assert crit is not None and crit["active"] == 1 and crit["xp_value"] == 3
+    cid = crit["id"]
+    try:
+        staff.post(f"/staff/criteria/{cid}/toggle",
+                   data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+        assert _find(cid=cid)["active"] == 0
+        staff.post(f"/staff/criteria/{cid}/update",
+                   data={"_csrf": "dev-csrf-token", "label": "QA Updated",
+                         "xp_value": "5", "description": "u", "sort_order": "1"},
+                   follow_redirects=False)
+        updated = _find(cid=cid)
+        assert updated["label"] == "QA Updated" and updated["xp_value"] == 5
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM criteria WHERE id=?", (cid,))
+            conn.commit()
+
+
 def test_staff_periods(staff):
     r = staff.get("/staff/periods")
     assert r.status_code == 200
