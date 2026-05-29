@@ -3211,10 +3211,36 @@ def _enrich_site(row: dict | None) -> dict | None:
     return _parse(row, "predator_dcs")
 
 
+def _apply_coterie_chasse(conn, site: dict | None) -> dict | None:
+    """A controlling coterie's Chasse lowers this site's hunting difficulties
+    by 1 per dot (floored at 1) — V5: each Chasse dot eases feeding in the
+    domain. Adds chasse_reduction, controlling_coterie, and effective_dcs
+    (which equals the base DCs when the site is uncontrolled)."""
+    if site is None:
+        return None
+    chasse, coterie_name = 0, None
+    cid = site.get("coterie_id")
+    if cid:
+        co = conn.execute(
+            "SELECT name, chasse FROM coteries WHERE id=? AND status='active'", (cid,)
+        ).fetchone()
+        if co:
+            chasse = int(co["chasse"] or 0)
+            coterie_name = co["name"]
+    dcs = site.get("predator_dcs") or {}
+    site["chasse_reduction"]    = chasse
+    site["controlling_coterie"] = coterie_name
+    site["effective_dcs"] = {
+        pt: max(1, int(dc) - chasse)
+        for pt, dc in dcs.items() if isinstance(dc, (int, float))
+    }
+    return site
+
+
 def get_hunting_site(conn, site_id: int) -> dict | None:
-    return _enrich_site(
+    return _apply_coterie_chasse(conn, _enrich_site(
         conn.execute("SELECT * FROM hunting_sites WHERE id=?", (site_id,)).fetchone()
-    )
+    ))
 
 
 def list_hunting_sites(conn, active_only: bool = True) -> list[dict]:
@@ -3222,7 +3248,8 @@ def list_hunting_sites(conn, active_only: bool = True) -> list[dict]:
     if active_only:
         sql += " WHERE active=1"
     sql += " ORDER BY borough, name"
-    return [_enrich_site(r) for r in conn.execute(sql).fetchall()]
+    return [_apply_coterie_chasse(conn, _enrich_site(r))
+            for r in conn.execute(sql).fetchall()]
 
 
 def create_hunting_site(

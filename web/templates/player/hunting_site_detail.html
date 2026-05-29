@@ -34,7 +34,11 @@
   {% if site.predator_dcs %}
   <div class="gilded p-5 mb-6">
     <div class="flex items-baseline justify-between mb-4 flex-wrap gap-2">
-      <p class="label-gold">Predator-Type Difficulties</p>
+      <p class="label-gold">Predator-Type Difficulties
+        {% if site.chasse_reduction %}
+        <span class="text-bone-600 normal-case text-[0.6rem] ml-1">· {{ site.controlling_coterie }} Chasse −{{ site.chasse_reduction }}</span>
+        {% endif %}
+      </p>
       {% if active_chars | length > 1 %}
       <form method="GET" action="/hunting-sites/{{ site.id }}" class="flex items-center gap-2">
         <label class="label-gold text-[0.75rem]">As</label>
@@ -60,8 +64,11 @@
         <span class="font-garamond text-xs {{ 'text-gold-300' if _highlight else 'text-bone-400' }}">
           {{ pt }}{% if _highlight %} <span class="text-[0.55rem] text-gold-500 tracking-widest uppercase ml-1">You</span>{% endif %}
         </span>
+        {% set _eff = site.effective_dcs.get(pt, dc) %}
         <span class="font-cinzel text-sm {{ 'text-gold-400' if _highlight else 'text-bone-500' }}">
-          {{ dc }}
+          {% if site.chasse_reduction and _eff != dc %}
+          <span class="line-through text-bone-700 text-xs mr-0.5">{{ dc }}</span>{{ _eff }}
+          {% else %}{{ dc }}{% endif %}
         </span>
       </div>
       {% endfor %}

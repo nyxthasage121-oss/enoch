@@ -2417,6 +2417,37 @@ def test_coterie_spend_flows_gated_by_state(player):
             conn.commit()
 
 
+def test_hunting_site_chasse_reduces_dcs(_client):
+    """Feature D: a controlling coterie's Chasse lowers a site's predator DCs
+    (1 per dot, floored at 1); effective_dcs == base when uncontrolled."""
+    from web.db import (get_db, create_hunting_site, create_coterie,
+                        get_hunting_site, update_hunting_site)
+    with get_db() as conn:
+        co = create_coterie(conn, "ChasseSmoke")
+        conn.execute("UPDATE coteries SET chasse=2 WHERE id=?", (co["id"],))
+        site = create_hunting_site(conn, "DC Test Site", "Manhattan",
+                                   predator_dcs={"Alleycat": 3, "Bagger": 1})
+        sid = site["id"]
+        conn.commit()
+    try:
+        with get_db() as conn:
+            s0 = get_hunting_site(conn, sid)
+        assert s0["chasse_reduction"] == 0
+        assert s0["effective_dcs"]["Alleycat"] == 3          # uncontrolled = base
+        with get_db() as conn:
+            update_hunting_site(conn, sid, coterie_id=co["id"])
+            s1 = get_hunting_site(conn, sid)
+        assert s1["chasse_reduction"] == 2
+        assert s1["controlling_coterie"] == "ChasseSmoke"
+        assert s1["effective_dcs"]["Alleycat"] == 1          # 3 - 2
+        assert s1["effective_dcs"]["Bagger"] == 1            # max(1, 1 - 2)
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM hunting_sites WHERE id=?", (sid,))
+            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
+            conn.commit()
+
+
 def test_aurora_visual_layer_wired(player):
     """The aurora CSS + JS bundles should be linked from every page
     via base.html, the SVG LUT filter should be inlined for body { filter: url(#aurora-grade) },
