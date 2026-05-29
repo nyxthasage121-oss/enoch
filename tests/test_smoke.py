@@ -2723,6 +2723,49 @@ def test_chargen_error_rerender_with_image_does_not_500(player):
     assert "Please correct the following" in r.text
 
 
+def test_coterie_one_character_per_player(_client):
+    """A player can't put two of their own characters in the same coterie."""
+    import pytest
+    from web.db import (
+        get_db, create_character, approve_character, create_coterie, add_coterie_member,
+    )
+    with get_db() as conn:
+        a = create_character(conn, discord_id="770000000000000001", name="Twin Aa", clan="brujah")
+        b = create_character(conn, discord_id="770000000000000001", name="Twin Bb", clan="brujah")
+        approve_character(conn, a["id"], "staff")
+        approve_character(conn, b["id"], "staff")
+        cot = create_coterie(conn, name="One Per Player Test")
+        try:
+            add_coterie_member(conn, cot["id"], a["id"])
+            with pytest.raises(ValueError, match="one character per player"):
+                add_coterie_member(conn, cot["id"], b["id"])
+        finally:
+            conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (cot["id"],))
+            conn.execute("DELETE FROM coteries WHERE id=?", (cot["id"],))
+            conn.execute("DELETE FROM characters WHERE id IN (?, ?)", (a["id"], b["id"]))
+
+
+def test_char_cap_blocks_creation(player):
+    """At the per-player cap, both the chargen page and a submit are blocked."""
+    from web.db import get_db, upsert_settings
+    try:
+        with get_db() as conn:
+            upsert_settings(conn, actor_id="test", max_chars_per_player=1)
+        # Dev player 1 already has a character, so the cap (1) is reached.
+        r = player.get("/characters/new", follow_redirects=False)
+        assert r.status_code == 303, "chargen page should redirect at cap"
+        r2 = player.post("/characters/new", data={
+            "_csrf": "dev-csrf-token", "name": "Over Cap", "clan": "brujah",
+            "touchstones": '["A", "B"]',
+        }, follow_redirects=False)
+        assert r2.status_code == 200, "submit should re-render, not redirect"
+        assert "limit" in r2.text.lower()
+    finally:
+        with get_db() as conn:
+            upsert_settings(conn, actor_id="test", max_chars_per_player=0)
+            conn.execute("DELETE FROM characters WHERE name='Over Cap'")
+
+
 def test_clan_color_utilities_defined_and_used():
     """Clan-color arbitrary Tailwind classes (border-[var(--clan,…)] etc.)
     don't survive the precompiled build, so clan identity must use the

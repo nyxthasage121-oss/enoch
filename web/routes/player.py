@@ -336,6 +336,26 @@ def _is_sheet_required() -> bool:
     return bool(_chronicle_settings().get("require_sheet_on_create", 1))
 
 
+def _char_cap() -> int:
+    """Per-player character cap (0 = unlimited)."""
+    try:
+        return int(_chronicle_settings().get("max_chars_per_player", 2) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _player_at_cap(discord_id: str) -> int:
+    """Return the cap value if the player is at/over it (truthy), else 0.
+    Counts active + pending characters; drafts / retired / dead don't count."""
+    cap = _char_cap()
+    if not cap:
+        return 0
+    from ..db import count_active_player_characters
+    with get_db() as conn:
+        have = count_active_player_characters(conn, str(discord_id))
+    return cap if have >= cap else 0
+
+
 def _wizard_extras() -> dict:
     """Settings the wizard JS needs at render time.
 
@@ -386,6 +406,13 @@ def _wizard_extras() -> dict:
 
 @router.get("/characters/new", response_class=HTMLResponse)
 async def character_new(request: Request, user: dict = Depends(require_auth)):
+    capped = _player_at_cap(str(user["id"]))
+    if capped:
+        request.session["flash"] = [{
+            "kind": "error",
+            "message": f"You've reached the {capped}-character limit for this chronicle.",
+        }]
+        return RedirectResponse(url="/characters", status_code=303)
     return templates.TemplateResponse(
         request, "player/character_create.html",
         _ctx(request, clans=_CLANS, predator_types=_available_predator_types(),
@@ -524,6 +551,14 @@ async def character_create(
         # On drafts, sanitize clan to a known value but don't error.
         if clan and clan not in {c[0] for c in _CLANS}:
             clan = ""
+
+    # Per-player character cap — block a non-draft submission that would push
+    # the player past their active+pending limit (drafts don't count, and a
+    # draft being finalized isn't counted yet).
+    if not as_draft:
+        capped = _player_at_cap(str(user["id"]))
+        if capped:
+            errors.append(f"You've reached the {capped}-character limit for this chronicle.")
 
     if errors:
         return templates.TemplateResponse(

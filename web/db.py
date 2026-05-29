@@ -433,6 +433,18 @@ def list_characters(conn, status: str | None = None, clan: str | None = None) ->
     return [_enrich_char(r) for r in rows]
 
 
+def count_active_player_characters(conn, discord_id: str) -> int:
+    """Count a player's characters that occupy a 'slot' for the per-player
+    cap: active + pending (awaiting approval). Drafts, retired, and Final
+    Death characters don't count."""
+    row = conn.execute("""
+        SELECT COUNT(*) AS n FROM characters
+        WHERE discord_id=? AND COALESCE(is_draft, 0)=0
+          AND status NOT IN ('retired', 'dead')
+    """, (str(discord_id),)).fetchone()
+    return int(row["n"]) if row else 0
+
+
 def create_character(
     conn,
     discord_id: str,
@@ -657,6 +669,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "auto_create_periods_enabled",
         # XP cap on/off toggle (migration 027) + amount (migration 028)
         "xp_cap_enabled", "xp_cap_amount",
+        # Per-player character cap (migration 032)
+        "max_chars_per_player",
     }
     # Validate ruleset before persisting — guard against typo'd POSTs.
     if "active_ruleset" in kwargs and kwargs["active_ruleset"] not in RULESETS:
@@ -2094,6 +2108,23 @@ def add_coterie_member(conn, coterie_id: int, character_id: int, role: str = "me
             raise ValueError(
                 f"Coterie is full — max {settings.COTERIE_MAX_MEMBERS} members."
             )
+        # One character per player: a player can't have two of their own
+        # characters in the same coterie.
+        owner = conn.execute(
+            "SELECT discord_id FROM characters WHERE id=?", (character_id,)
+        ).fetchone()
+        if owner and owner["discord_id"]:
+            clash = conn.execute("""
+                SELECT 1 FROM coterie_memberships cm
+                JOIN characters c ON c.id = cm.character_id
+                WHERE cm.coterie_id=? AND c.discord_id=? AND cm.character_id != ?
+                LIMIT 1
+            """, (coterie_id, owner["discord_id"], character_id)).fetchone()
+            if clash:
+                raise ValueError(
+                    "That player already has a character in this coterie — "
+                    "one character per player."
+                )
     now = _now()
     conn.execute("""
         INSERT INTO coterie_memberships (coterie_id, character_id, role, joined_at)

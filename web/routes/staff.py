@@ -1898,6 +1898,10 @@ async def admin_settings_save(
         "homebrew_flaw_cap":         form_int(form.get("homebrew_flaw_cap"), 2, lo=0),
         "revenants_enabled":         1 if form.get("revenants_enabled") == "on" else 0,
     }
+    # Only touch the per-player cap when the form actually submits it, so a
+    # partial settings save (or API call) doesn't silently reset it.
+    if "max_chars_per_player" in form:
+        payload["max_chars_per_player"] = form_int(form.get("max_chars_per_player"), 2, lo=0, hi=20)
 
     # Restricted predator types unlock list — Steward opt-in per
     # chronicle for normally-banned predator types like Blood Leech and

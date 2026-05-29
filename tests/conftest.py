@@ -32,6 +32,11 @@ def _client():
     with TestClient(app) as client:
         # Trigger dev seed once so a baseline character exists for tests.
         client.get("/_dev/seed_data", follow_redirects=False)
+        # Tests create many characters per dev player; disable the per-player
+        # cap by default so it never blocks them. The cap test sets it back.
+        from web.db import get_db, upsert_settings
+        with get_db() as conn:
+            upsert_settings(conn, actor_id="test", max_chars_per_player=0)
         yield client
 
 

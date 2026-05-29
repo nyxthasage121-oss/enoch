@@ -125,6 +125,19 @@
 
         <div class="divider-gold"></div>
 
+        <div>
+          <label class="label-gold block mb-1.5 text-[0.7rem]">Characters per player</label>
+          <input type="number" name="max_chars_per_player" min="0" max="20"
+                 value="{{ _cs.get('max_chars_per_player', 2) }}"
+                 class="w-28 text-sm py-1 px-2">
+          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
+            Max active + pending characters a player may hold (NYbN = 2). Set 0 for
+            unlimited. Retired and Final Death characters don't count.
+          </p>
+        </div>
+
+        <div class="divider-gold"></div>
+
         {# Ruleset selector — two-way Standard vs Homebrew. The In
            Memoriam path is now a SEPARATE checkbox below since it only
            affects Ancilla characters and is orthogonal to whether
