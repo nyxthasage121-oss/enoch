@@ -2386,6 +2386,37 @@ def test_staff_coterie_traits_unified_to_contributions(staff):
             conn.commit()
 
 
+def test_coterie_spend_flows_gated_by_state(player):
+    """C4: advance/buy/donate flows show while active (ongoing advancement) but
+    are frozen (hidden) while the sheet is submitted for staff sign-off."""
+    from web.db import get_db, create_coterie, add_coterie_member
+    DEV = "111111111111111111"
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id FROM characters WHERE discord_id=? AND name='Valeria Morano' LIMIT 1",
+            (DEV,)).fetchone()
+        cid = row["id"]
+        co = create_coterie(conn, "C4Smoke", creation_state="active")
+        add_coterie_member(conn, co["id"], cid)
+        conn.commit()
+    try:
+        r = player.get(f"/coteries/{co['id']}")
+        assert r.status_code == 200
+        assert "Advance Coterie Rating" in r.text       # active -> available
+        with get_db() as conn:
+            conn.execute("UPDATE coteries SET creation_state='submitted' WHERE id=?", (co["id"],))
+            conn.commit()
+        r2 = player.get(f"/coteries/{co['id']}")
+        assert r2.status_code == 200
+        assert "Advance Coterie Rating" not in r2.text   # submitted -> frozen
+        assert "Awaiting Sign-off" in r2.text
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
+            conn.commit()
+
+
 def test_aurora_visual_layer_wired(player):
     """The aurora CSS + JS bundles should be linked from every page
     via base.html, the SVG LUT filter should be inlined for body { filter: url(#aurora-grade) },

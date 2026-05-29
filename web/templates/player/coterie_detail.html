@@ -305,9 +305,16 @@
        One member funds each action — same cost model as a character
        merit (flat 3 XP / dot). Donations cost no XP but flag the
        donating character's sheet entry as "shared with this coterie"
-       so both sides show the trait. #}
-  {% if viewer_member_chars %}
+       so both sides show the trait. Available while forming (creation
+       purchases) and active (ongoing advancement); frozen during
+       staff sign-off. #}
+  {% if viewer_member_chars and coterie.creation_state != 'submitted' %}
   <div class="space-y-4 mb-6">
+    {% if coterie.creation_state == 'active' %}
+    <p class="label-gold text-xs">Advancement
+      <span class="text-bone-700 ml-2 normal-case">raise domain or add traits with a member's XP, or donate a trait</span>
+    </p>
+    {% endif %}
 
     {# ── ADVANCE Chasse / Lien / Portillon ── #}
     <div class="gilded p-5"
