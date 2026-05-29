@@ -7,8 +7,8 @@
   },
   "Skill": {
     "multiplier": 3,
-    "description": "New rating × 3 (for existing skills)",
-    "min_dots": 2,
+    "description": "New rating × 3 (raising an existing skill, rating 1+)",
+    "min_dots": 1,
     "max_dots": 5
   },
   "New Skill": {
