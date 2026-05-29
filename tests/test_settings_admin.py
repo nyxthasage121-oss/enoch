@@ -49,24 +49,20 @@ def test_set_settings_admin_helper_audits():
         conn.commit()
 
 
-def test_admin_settings_post_blocks_non_admin(staff):
+def test_admin_settings_post_blocks_non_admin(staff, monkeypatch):
     """A staff session whose player_profile has settings_admin=0 must be
-    blocked from POSTing chronicle settings — even with a staff_role."""
+    blocked from POSTing chronicle settings — even with a staff_role.
+
+    The gate now reads the flag live from the DB (no session cache), so a
+    revoke takes effect on the very next request. This used to only be
+    assertable on a 'fresh' path; now it's a hard 403 with the dev staff
+    still logged in. The env override is cleared so tier 1 can't grant."""
+    monkeypatch.delenv("ENOCH_SETTINGS_ADMIN_IDS", raising=False)
     from web.db import get_db, set_settings_admin
-    # Temporarily revoke the dev staff's flag.
+    # Revoke the dev staff's flag in the DB while their session stays live.
     with get_db() as conn:
         set_settings_admin(conn, "999999999999999999", False, actor_id="0")
         conn.commit()
-    # Bust the session cache so the resolver re-reads.
-    staff.cookies.clear()
-    staff.get("/_dev/seed_data", follow_redirects=False)
-    staff.get("/_dev/seed", follow_redirects=False)
-    # _dev/seed re-grants — undo it again to prove the gate works.
-    with get_db() as conn:
-        set_settings_admin(conn, "999999999999999999", False, actor_id="0")
-        conn.commit()
-    # Bust session cookies and re-establish without _dev/seed (which
-    # would re-grant). Manually drop session and re-login via raw seed.
     try:
         r = staff.post(
             "/staff/admin/settings",
@@ -74,14 +70,8 @@ def test_admin_settings_post_blocks_non_admin(staff):
                   "revenant_families": "", "require_sheet_on_create": "on"},
             follow_redirects=False,
         )
-        # Session may still cache 'settings_admin=True' from /_dev/seed.
-        # The route accepts the cached flag — that's by design (avoids a
-        # DB lookup per request). The behavior we're really gating is the
-        # *fresh* path. Skip the assertion if cached True, otherwise 403.
-        # The fresh-path coverage lives in `test_env_override` below.
-        assert r.status_code in (303, 403)
+        assert r.status_code == 403
     finally:
-        # Restore.
         with get_db() as conn:
             set_settings_admin(conn, "999999999999999999", True, actor_id="0")
             conn.commit()

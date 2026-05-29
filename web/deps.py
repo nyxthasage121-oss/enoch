@@ -58,22 +58,21 @@ def require_staff(request: Request, user: dict = Depends(require_auth)) -> dict:
 
 
 def _current_staff_role(request: Request) -> str | None:
-    """Read the viewer's assigned staff role from the session, or fall
-    back to a DB lookup on miss. Returns None if no role assigned."""
-    cached = request.session.get("staff_role")
-    if cached is not None:
-        return cached or None
+    """Read the viewer's assigned staff role from the DB — the source of
+    truth the admin UI writes. Deliberately NOT cached in the session: a
+    role change or revoke must take effect on the very next request, not at
+    re-login. (Sessions here are client-side signed cookies, so we couldn't
+    invalidate another user's cached copy from the server anyway.) The
+    Discord-role-driven `is_staff` flag is separate and still refreshes at
+    login by design. Returns None if no role is assigned."""
     user = request.session.get("user") or {}
     discord_id = user.get("id")
     if not discord_id:
         return None
-    # Lazy lookup — populated on next request after assignment via the
-    # admin UI. We import here to dodge a circular import at module load.
+    # Imported here to dodge a circular import at module load.
     from .db import get_db, get_staff_role
     with get_db() as conn:
-        role = get_staff_role(conn, str(discord_id))
-    request.session["staff_role"] = role or ""
-    return role
+        return get_staff_role(conn, str(discord_id))
 
 
 def require_permission(permission: str):
@@ -94,24 +93,25 @@ def require_permission(permission: str):
 
 
 def is_settings_admin(request: Request, user: dict) -> bool:
-    """Three-tier resolver for the settings-admin gate (migration 024):
+    """Resolver for the settings-admin gate (migration 024):
         1. ENOCH_SETTINGS_ADMIN_IDS env var (comma-separated discord ids)
            — emergency / bootstrap override.
-        2. player_profiles.settings_admin = 1.
-        3. Otherwise: False."""
+        2. player_profiles.settings_admin = 1 (read live from the DB).
+        Otherwise: False.
+
+    Read straight from the DB on every call — never cached in the session —
+    so revoking the flag via the admin UI takes effect on the next request
+    instead of lingering until the affected user happens to re-log in. These
+    checks only run on low-traffic staff config routes, so the per-call
+    lookup is cheap and correctness wins over shaving a query."""
     import os
     env_ids = (os.environ.get("ENOCH_SETTINGS_ADMIN_IDS") or "")
     if str(user.get("id", "")) in {i.strip() for i in env_ids.split(",") if i.strip()}:
         return True
-    cached = request.session.get("settings_admin")
-    if cached is not None:
-        return bool(cached)
     from .db import get_db, get_player
     with get_db() as conn:
         prof = get_player(conn, str(user["id"]))
-    flag = bool(prof.get("settings_admin")) if prof else False
-    request.session["settings_admin"] = flag
-    return flag
+    return bool(prof.get("settings_admin")) if prof else False
 
 
 def require_settings_admin(
