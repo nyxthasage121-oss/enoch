@@ -167,7 +167,7 @@
               <label class="flex items-center gap-2 cursor-pointer min-w-0">
                 <input type="checkbox" :checked="layer.visible"
                        @change="toggleLayer(layer)"
-                       class="accent-gold-500 shrink-0">
+                       class="accent-gold shrink-0">
                 <span class="font-cinzel text-xs text-bone-300 truncate" x-text="layer.name"></span>
               </label>
               <span class="font-cinzel text-[0.55rem] text-bone-700 shrink-0"
@@ -540,7 +540,7 @@
       </div>
       <label class="flex items-center gap-2 text-xs font-garamond text-bone-400 cursor-pointer">
         <input type="checkbox" name="active" value="1" :checked="layer && layer.active"
-               class="accent-gold-500">
+               class="accent-gold">
         Active (uncheck to hide without deleting)
       </label>
       <div class="flex gap-2 justify-end pt-2 border-t border-ink-800">

@@ -129,7 +129,7 @@
                    :class="baseRuleset === '{{ val }}' ? 'border-gold-700' : ''">
               <input type="radio" value="{{ val }}"
                      x-model="baseRuleset"
-                     class="accent-gold-500 mt-0.5">
+                     class="accent-gold mt-0.5">
               <div>
                 <p class="font-cinzel text-xs text-bone-200">{{ label }}</p>
                 <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">{{ desc }}</p>
@@ -454,7 +454,7 @@
                        {{ 'checked' if p.settings_admin else '' }}
                        onchange="this.form.submit()"
                        title="Allow this player to edit chronicle settings + XP rules"
-                       style="accent-color:#c29b48;width:14px;height:14px">
+                       class="accent-gold" style="width:14px;height:14px">
                 <noscript><button type="submit" class="text-[0.6rem] btn-ghost px-1.5 py-0.5 ml-1">Set</button></noscript>
               </form>
             </td>

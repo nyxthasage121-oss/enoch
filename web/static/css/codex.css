@@ -32,6 +32,10 @@
 .text-gold-600 { color: #a67a35; }   /* was #8a6a2a — labels / borders */
 .text-gold-700 { color: #9d7233; }   /* was #7a5e29 — small breadcrumb labels */
 .text-gold-dim  { color: #9d7233; }   /* mirrors gold-700 */
+/* Form-control accent: tints checkboxes/radios to chronicle gold. Lives
+   here (not as a Tailwind `accent-gold-500`/`accent-[#c29b48]` class) because
+   neither compiled into the vendored tailwind.css — this needs no rebuild. */
+.accent-gold    { accent-color: #c29b48; }
 
 /* ── blood ──────────────────────────────────────────────────────── */
 .text-blood-300  { color: #e04545; }
