@@ -1688,6 +1688,7 @@ async def coteries_list(request: Request, user: dict = Depends(require_auth)):
         ]
         all_active = list_characters(conn, status="active")
         roster = [c for c in all_active if c["is_approved"]]
+        sites = list_hunting_sites(conn)
 
     return templates.TemplateResponse(
         request, "player/coteries.html",
@@ -1698,6 +1699,7 @@ async def coteries_list(request: Request, user: dict = Depends(require_auth)):
             spends=spends,
             eligible_chars=eligible,
             roster=roster,
+            hunting_sites=sites,
         ),
     )
 
@@ -1711,6 +1713,8 @@ async def submit_coterie_request(
     form          = await request.form()
     proposed_name = (form.get("proposed_name") or "").strip()
     note          = (form.get("note") or "").strip() or None
+    members_acquainted = form.get("members_acquainted") == "on"
+    requested_site_id  = form_int(form.get("requested_site_id")) or None
     # member_ids: character IDs the player wants in the coterie (JSON array from hidden input)
     raw_ids       = (form.get("member_ids") or "").strip()
 
@@ -1718,6 +1722,8 @@ async def submit_coterie_request(
 
     if not proposed_name:
         errors.append("A coterie name is required.")
+    if not members_acquainted:
+        errors.append("Please confirm your characters know and have met each other.")
 
     member_ids: list[int] = []
     if raw_ids:
@@ -1733,9 +1739,13 @@ async def submit_coterie_request(
         )
 
     if errors:
+        with get_db() as conn:
+            sites = list_hunting_sites(conn)
         resp = templates.TemplateResponse(
             request, "player/partials/coterie_request_form.html",
-            _ctx(request, request_errors=errors, form={"proposed_name": proposed_name, "note": note}),
+            _ctx(request, request_errors=errors,
+                 form={"proposed_name": proposed_name, "note": note},
+                 hunting_sites=sites),
         )
         _toast(resp, "Please fix the errors below.", "error")
         return resp
@@ -1747,6 +1757,8 @@ async def submit_coterie_request(
             proposed_name=proposed_name,
             member_ids=member_ids,
             note=note,
+            members_acquainted=members_acquainted,
+            requested_site_id=requested_site_id,
         )
 
     resp = templates.TemplateResponse(

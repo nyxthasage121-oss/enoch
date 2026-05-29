@@ -7,6 +7,7 @@
         <tr class="border-b border-ink-700">
           <th class="px-4 py-3 text-left label-gold font-normal text-xs">Proposed Name</th>
           <th class="px-4 py-3 text-left label-gold font-normal text-xs">Members</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Site</th>
           <th class="px-4 py-3 text-left label-gold font-normal text-xs">Note</th>
           <th class="px-4 py-3 text-left label-gold font-normal text-xs">Submitted</th>
           <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
@@ -16,13 +17,22 @@
         {% for r in requests %}
         <tr class="border-b border-ink-800"
             x-data="{ rejecting: false, reason: '' }">
-          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">{{ r.proposed_name }}</td>
+          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">
+            {{ r.proposed_name }}
+            {% if r.members_acquainted %}
+            <span class="chip text-gold-400 border-gold-800 text-[0.5rem] ml-1"
+                  title="Player confirmed the characters know each other">acquainted</span>
+            {% endif %}
+          </td>
           <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">
             {% if r.member_ids %}
               {{ r.member_ids | length }} proposed
             {% else %}
               —
             {% endif %}
+          </td>
+          <td class="px-4 py-2.5 font-garamond text-xs text-bone-400">
+            {{ r.requested_site_name or '—' }}
           </td>
           <td class="px-4 py-2.5 font-garamond text-xs text-bone-500 max-w-xs truncate">
             {{ r.note or '—' }}

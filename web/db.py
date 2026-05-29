@@ -2645,9 +2645,13 @@ def get_coterie_request(conn, request_id: int) -> dict | None:
 
 
 def list_pending_coterie_requests(conn) -> list[dict]:
-    rows = conn.execute(
-        "SELECT * FROM coterie_requests WHERE status='pending' ORDER BY submitted_at ASC"
-    ).fetchall()
+    rows = conn.execute("""
+        SELECT cr.*, hs.name AS requested_site_name
+        FROM coterie_requests cr
+        LEFT JOIN hunting_sites hs ON hs.id = cr.requested_site_id
+        WHERE cr.status='pending'
+        ORDER BY cr.submitted_at ASC
+    """).fetchall()
     return [_parse(r, "member_ids") for r in rows]
 
 
@@ -2657,11 +2661,16 @@ def create_coterie_request(
     proposed_name: str,
     member_ids: list[int],
     note: str | None = None,
+    members_acquainted: bool = False,
+    requested_site_id: int | None = None,
 ) -> dict:
     cur = conn.execute("""
-        INSERT INTO coterie_requests (requested_by, proposed_name, member_ids, note, submitted_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (requested_by, proposed_name, _j(member_ids), note, _now()))
+        INSERT INTO coterie_requests
+            (requested_by, proposed_name, member_ids, note, submitted_at,
+             members_acquainted, requested_site_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (requested_by, proposed_name, _j(member_ids), note, _now(),
+          1 if members_acquainted else 0, requested_site_id))
     return get_coterie_request(conn, cur.lastrowid)
 
 
@@ -2682,6 +2691,20 @@ def approve_coterie_request(conn, request_id: int, reviewer_id: str) -> dict:
     coterie = create_coterie(conn, req["proposed_name"])
     for char_id in member_ids:
         add_coterie_member(conn, coterie["id"], char_id)
+
+    # Link the requested hunting site to the new coterie — but only if it
+    # isn't already controlled, so approving one request can't silently
+    # steal a site another coterie already holds.
+    site_id = req.get("requested_site_id")
+    if site_id:
+        site_row = conn.execute(
+            "SELECT coterie_id FROM hunting_sites WHERE id=?", (site_id,)
+        ).fetchone()
+        if site_row is not None and site_row["coterie_id"] is None:
+            conn.execute(
+                "UPDATE hunting_sites SET coterie_id=?, updated_at=? WHERE id=?",
+                (coterie["id"], _now(), site_id),
+            )
 
     now = _now()
     conn.execute("""

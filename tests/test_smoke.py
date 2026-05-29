@@ -2195,6 +2195,66 @@ def test_about_panel_renders_and_saves_with_gating(player):
             conn.commit()
 
 
+def test_coterie_proposal_wizard_fields_and_site_link(player):
+    """C1: the proposal stores the acquaintance acknowledgment + requested
+    hunting site, the acknowledgment is required, and approval links an
+    unclaimed site to the newly-formed coterie."""
+    from web.db import (get_db, list_pending_coterie_requests,
+                        approve_coterie_request, get_coterie_request)
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO hunting_sites (name, borough) VALUES (?, ?)",
+            ("Test Site C1", "Manhattan"))
+        site_id = cur.lastrowid
+        conn.commit()
+    req_id = coterie_id = None
+    try:
+        # Acknowledgment is required — a submission without it re-renders the
+        # form with the error and creates no request.
+        r0 = player.post("/coteries/request", data={
+            "_csrf": "dev-csrf-token", "proposed_name": "NoAck Coterie",
+            "member_ids": "[]",
+        }, follow_redirects=False)
+        assert r0.status_code == 200
+        assert "know and have met" in r0.text
+
+        # Valid submission with the ack + a requested site.
+        r = player.post("/coteries/request", data={
+            "_csrf": "dev-csrf-token", "proposed_name": "WizardTest Coterie",
+            "members_acquainted": "on", "requested_site_id": str(site_id),
+            "member_ids": "[]", "note": "We've met IC.",
+        }, follow_redirects=False)
+        assert r.status_code == 200
+        with get_db() as conn:
+            req = next(q for q in list_pending_coterie_requests(conn)
+                       if q["proposed_name"] == "WizardTest Coterie")
+        req_id = req["id"]
+        assert req["members_acquainted"] == 1
+        assert req["requested_site_id"] == site_id
+        assert req["requested_site_name"] == "Test Site C1"
+
+        # Approval forms the coterie and links the (unclaimed) site to it.
+        with get_db() as conn:
+            approve_coterie_request(conn, req_id, reviewer_id="staff-smoke")
+            conn.commit()
+            done = get_coterie_request(conn, req_id)
+            coterie_id = done["coterie_id"]
+            site = conn.execute(
+                "SELECT coterie_id FROM hunting_sites WHERE id=?", (site_id,)
+            ).fetchone()
+        assert done["status"] == "approved"
+        assert site["coterie_id"] == coterie_id
+    finally:
+        with get_db() as conn:
+            if coterie_id:
+                conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (coterie_id,))
+                conn.execute("DELETE FROM coteries WHERE id=?", (coterie_id,))
+            if req_id:
+                conn.execute("DELETE FROM coterie_requests WHERE id=?", (req_id,))
+            conn.execute("DELETE FROM hunting_sites WHERE id=?", (site_id,))
+            conn.commit()
+
+
 def test_aurora_visual_layer_wired(player):
     """The aurora CSS + JS bundles should be linked from every page
     via base.html, the SVG LUT filter should be inlined for body { filter: url(#aurora-grade) },

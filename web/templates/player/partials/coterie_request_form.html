@@ -19,62 +19,112 @@
 <form hx-post="/coteries/request"
       hx-target="#coterie-request-form"
       hx-swap="outerHTML"
-      class="gilded p-5 space-y-4"
+      class="gilded p-5"
       x-data="coterieRequest()">
   <input type="hidden" name="_csrf" value="{{ csrf_token }}">
   <input type="hidden" name="member_ids" x-bind:value="JSON.stringify(selectedIds)">
 
-  <div>
-    <label class="label-gold block mb-2">Proposed Coterie Name</label>
-    <input type="text" name="proposed_name" required
-           placeholder="e.g. The Dusk Accord"
-           value="{{ (form or {}).get('proposed_name', '') }}"
-           class="w-full">
+  {# Step rail #}
+  <div class="flex items-center gap-2 mb-5">
+    <template x-for="n in 2" :key="n">
+      <div class="flex-1 h-1 rounded" :class="step >= n ? 'bg-gold-700' : 'bg-ink-700'"></div>
+    </template>
   </div>
 
-  <div>
-    <label class="label-gold block mb-2">
-      Proposed Members
-      <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional — staff finalises roster)</span>
-    </label>
-    <p class="font-garamond text-bone-600 text-xs mb-2">
-      Select active characters you'd like to include. Max 6 per coterie.
+  {# ── Step 1 — acquaintance ── #}
+  <div x-show="step === 1" class="space-y-4">
+    <p class="label-gold">Before You Begin</p>
+    <p class="font-garamond text-bone-400 text-sm leading-relaxed">
+      A coterie forms between characters who already know one another. Confirm your
+      proposed members have met and have an in-character reason to band together —
+      staff will look for this when reviewing.
     </p>
-    <div class="space-y-1 max-h-48 overflow-y-auto">
-      {% for c in (roster or []) %}
-      <label class="flex items-center gap-2 cursor-pointer py-1">
-        <input type="checkbox" :value="{{ c.id }}"
-               @change="toggleMember({{ c.id }})"
-               class="accent-[#8B1A1A]">
-        <span class="font-cinzel text-xs text-bone-300">{{ c.name }}</span>
-        <span class="font-garamond text-bone-600 text-xs">{{ c.clan | replace('-',' ') | title }}</span>
-      </label>
-      {% endfor %}
-    </div>
-    <p class="font-garamond text-bone-700 text-[0.65rem] mt-1"
-       x-text="selectedIds.length + ' / 6 selected'"></p>
-  </div>
-
-  <div>
-    <label class="label-gold block mb-2">
-      Note
-      <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional)</span>
+    <label class="flex items-start gap-3 cursor-pointer group">
+      <input type="checkbox" name="members_acquainted" x-model="acquainted"
+             class="accent-[#8B1A1A] mt-1">
+      <span class="font-garamond text-bone-300 text-sm">
+        Our characters know and have met each other in-character.
+      </span>
     </label>
-    <textarea name="note" rows="3"
-              placeholder="Any context for staff — IC reasons, which characters are involved, etc."
-              class="w-full">{{ (form or {}).get('note', '') }}</textarea>
+    <div class="flex justify-end">
+      <button type="button" @click="if (acquainted) step = 2"
+              :disabled="!acquainted"
+              :class="acquainted ? 'btn-send aurora-beam aurora-pulse' : 'btn-ghost opacity-50 cursor-not-allowed'"
+              class="font-cinzel tracking-widest text-xs px-4 py-2">Next</button>
+    </div>
   </div>
 
-  <div>
-    <button type="submit" class="btn-send font-cinzel tracking-widest text-xs aurora-beam aurora-pulse">
-      Submit Request
-    </button>
+  {# ── Step 2 — details ── #}
+  <div x-show="step === 2" x-cloak class="space-y-4">
+    <div>
+      <label class="label-gold block mb-2">Proposed Coterie Name</label>
+      <input type="text" name="proposed_name"
+             placeholder="e.g. The Dusk Accord"
+             value="{{ (form or {}).get('proposed_name', '') }}"
+             class="w-full">
+    </div>
+
+    <div>
+      <label class="label-gold block mb-2">
+        Proposed Members
+        <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional — staff finalises roster)</span>
+      </label>
+      <p class="font-garamond text-bone-600 text-xs mb-2">
+        Select active characters you'd like to include. Max 6 per coterie.
+      </p>
+      <div class="space-y-1 max-h-48 overflow-y-auto">
+        {% for c in (roster or []) %}
+        <label class="flex items-center gap-2 cursor-pointer py-1">
+          <input type="checkbox" :value="{{ c.id }}"
+                 @change="toggleMember({{ c.id }})"
+                 class="accent-[#8B1A1A]">
+          <span class="font-cinzel text-xs text-bone-300">{{ c.name }}</span>
+          <span class="font-garamond text-bone-600 text-xs">{{ c.clan | replace('-',' ') | title }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="font-garamond text-bone-700 text-[0.65rem] mt-1"
+         x-text="selectedIds.length + ' / 6 selected'"></p>
+    </div>
+
+    <div>
+      <label class="label-gold block mb-2">
+        Hunting Site to Occupy
+        <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional — staff confirms the claim)</span>
+      </label>
+      <select name="requested_site_id" class="w-full text-sm">
+        <option value="">— None / undecided —</option>
+        {% for s in (hunting_sites or []) %}
+        <option value="{{ s.id }}"{% if s.coterie_id %} disabled{% endif %}>{{ s.name }}{% if s.borough %} · {{ s.borough }}{% endif %}{% if s.coterie_id %} (already claimed){% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="label-gold block mb-2">
+        Note
+        <span class="text-bone-700 font-sans normal-case text-[0.65rem]">(optional)</span>
+      </label>
+      <textarea name="note" rows="3"
+                placeholder="Any context for staff — IC reasons, which characters are involved, etc."
+                class="w-full">{{ (form or {}).get('note', '') }}</textarea>
+    </div>
+
+    <div class="flex items-center justify-between gap-2">
+      <button type="button" @click="step = 1"
+              class="btn-ghost font-cinzel tracking-widest text-xs px-4 py-2">Back</button>
+      <button type="submit" class="btn-send font-cinzel tracking-widest text-xs aurora-beam aurora-pulse">
+        Submit Request
+      </button>
+    </div>
   </div>
 </form>
 
 <script>
 function coterieRequest() {
   return {
+    step: 1,
+    acquainted: false,
     selectedIds: [],
     toggleMember(id) {
       const idx = this.selectedIds.indexOf(id);
