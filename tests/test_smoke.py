@@ -1300,6 +1300,55 @@ def test_start_character_review_locks_player_sheet_edit(staff, player):
         conn.execute("DELETE FROM characters WHERE id=?", (char_id,))
 
 
+def test_approved_character_sheet_edit_unlocked_despite_review_flag(staff, player):
+    """approve_character intentionally leaves review_started_at set, but the
+    sheet-save lock is gated on `not is_approved AND review_started_at`, so an
+    approved character is editable again. Guards against the lock being
+    'simplified' to review_started_at-only — which would freeze every
+    approved character's sheet for good."""
+    import json as _j
+    r = player.post(
+        "/characters/new",
+        data={"_csrf": "dev-csrf-token", "name": "Unlock Smoke", "clan": "ventrue",
+              "attr_strength": "2",
+              "touchstones": _j.dumps(["Anchor One", "Anchor Two"])},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+    from web.db import get_db, start_character_review, approve_character
+    with get_db() as conn:
+        cid = conn.execute(
+            "SELECT id FROM characters WHERE name='Unlock Smoke' ORDER BY id DESC LIMIT 1"
+        ).fetchone()["id"]
+    try:
+        with get_db() as conn:
+            start_character_review(conn, cid, reviewer_id="staff-smoke")
+            approve_character(conn, cid, reviewer_id="staff-smoke")
+            row = conn.execute(
+                "SELECT is_approved, review_started_at FROM characters WHERE id=?", (cid,)
+            ).fetchone()
+            assert row["is_approved"] == 1
+            assert row["review_started_at"] is not None  # intentionally lingers
+        # Player edits the sheet on the now-approved character — must persist.
+        rr = player.post(
+            f"/characters/{cid}/sheet",
+            data={"_csrf": "dev-csrf-token", "attr_strength": "4"},
+            follow_redirects=False,
+        )
+        assert rr.status_code == 303
+        with get_db() as conn:
+            sj = _j.loads(conn.execute(
+                "SELECT sheet_json FROM characters WHERE id=?", (cid,)
+            ).fetchone()["sheet_json"])
+        assert sj.get("attr_strength") == 4, \
+            "approved sheet must stay editable despite the lingering review flag"
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE id=?", (cid,))
+            conn.commit()
+
+
 # ── Hunting sites + hunt logs ────────────────────────────────────────────────
 
 def test_staff_site_create_with_predator_dcs_and_coterie(staff):
