@@ -76,7 +76,7 @@
       (2,  'Memoriam', 'Era history'),
       (3,  'Blood',    'Clan'),
       (4,  'Hunt',     'Predator & sire'),
-      (5,  'Final',    'Last options'),
+      (5,  'Submit',   'Send to staff'),
       (6,  'Flesh',    'Attributes'),
       (7,  'Skill',    'Skills'),
       (8,  'Legacy',   'Merits & Flaws'),
@@ -865,29 +865,14 @@
     </div>
 
     {# ═══════════════════════════════════════════════════
-       STEP 3 — THE STORY: Concept + Blurb + Ingrained
+       STEP 3 — SUBMIT (short-form / external-sheet chronicles only)
        ═══════════════════════════════════════════════════ #}
     <div x-show="step === 5" x-cloak>
       <div class="mb-6">
-        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Final Touches</h1>
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Submit Character</h1>
         <p class="font-garamond text-bone-500 text-sm leading-relaxed">
-          A last creation option below. You'll add your concept, story, and other
-          details from your character page after submitting.
+          You're ready to send this character to staff for review.
         </p>
-      </div>
-
-      <div class="gilded p-6 space-y-6 mb-5" x-show="hasVampireMechanics()" x-cloak
-           :class="charName.clan ? 'clan-' + charName.clan : ''">
-        <label class="flex items-start gap-3 cursor-pointer group">
-          <input type="checkbox" name="has_ingrained_flaw"
-                 x-model="charName.has_ingrained_flaw" class="accent-[#8B1A1A] mt-1">
-          <div>
-            <p class="font-cinzel text-xs text-bone-300 tracking-wide">Ingrained Discipline Flaw</p>
-            <p class="font-garamond text-bone-500 text-sm mt-0.5">
-              Grants a separate 15 XP budget at staff discretion.
-            </p>
-          </div>
-        </label>
       </div>
 
       {% if require_sheet %}
@@ -1097,6 +1082,21 @@
           </div>
           {% endfor %}
         </div>
+      </div>
+
+      {# Ingrained Discipline Flaw — lives with discipline setup (it's a
+         Discipline-level creation flaw). Vampires only. #}
+      <div class="gilded p-5 mb-5" x-show="hasVampireMechanics()" x-cloak>
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <input type="checkbox" name="has_ingrained_flaw"
+                 x-model="charName.has_ingrained_flaw" class="accent-[#8B1A1A] mt-1">
+          <div>
+            <p class="font-cinzel text-xs text-bone-300 tracking-wide">Ingrained Discipline Flaw</p>
+            <p class="font-garamond text-bone-500 text-sm mt-0.5">
+              Grants a separate 15 XP budget at staff discretion.
+            </p>
+          </div>
+        </label>
       </div>
 
       {# Powers (per-discipline named powers) #}
@@ -1932,9 +1932,9 @@
         if (n === 3 && t !== 'kindred') return true;
         // Hunt (4) is predator type + sire — both Kindred/Revenant only.
         if (n === 4 && (t === 'mortal' || t === 'ghoul')) return true;
-        // Final (5) holds only the short-form submit + the vampire ingrained
-        // flaw, so a long-form non-vampire has nothing to do here.
-        if (n === 5 && {{ 'true' if require_sheet else 'false' }} && !this.hasVampireMechanics()) return true;
+        // Submit (5) is just the short-form submit gateway now — long-form
+        // characters continue straight to the sheet, so hide it for them.
+        if (n === 5 && {{ 'true' if require_sheet else 'false' }}) return true;
         if (t === 'mortal' && (n === 9 || n === 10)) return true;
         if (n === 10 && !this._hasRitualDiscipline()) return true;
         return false;
