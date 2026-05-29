@@ -1,4 +1,11 @@
 {# claims_table.html — refreshed by HTMX after approve/reject actions #}
+{# When served as an HTMX action response (oob_count set by the approve/
+   reject routes) also refresh the header count out-of-band. The full-page
+   include never sets oob_count, so there's no duplicate #claims-count id. #}
+{% if oob_count %}
+<span id="claims-count" hx-swap-oob="true"
+      class="font-cinzel text-xl text-blood-400 ml-3">{{ claims | length }}</span>
+{% endif %}
 <div id="claims-table">
   {% if claims %}
   <div class="space-y-4">

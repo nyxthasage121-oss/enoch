@@ -272,7 +272,8 @@ async def do_approve_claim(
         claims = list_pending_claims(conn)
 
     resp = templates.TemplateResponse(
-        request, "staff/partials/claims_table.html", _ctx(request, claims=claims)
+        request, "staff/partials/claims_table.html",
+        _ctx(request, claims=claims, oob_count=True),
     )
     _toast(resp, err or "Claim approved.", "error" if err else "success")
     return resp
@@ -299,7 +300,8 @@ async def do_reject_claim(
         claims = list_pending_claims(conn)
 
     resp = templates.TemplateResponse(
-        request, "staff/partials/claims_table.html", _ctx(request, claims=claims)
+        request, "staff/partials/claims_table.html",
+        _ctx(request, claims=claims, oob_count=True),
     )
     _toast(resp, err or "Claim rejected.", "error" if err else "info")
     return resp
