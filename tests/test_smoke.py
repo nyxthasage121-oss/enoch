@@ -2700,9 +2700,27 @@ def test_chargen_persists_spreads_and_predator_picks(player):
         assert sheet.get("skill_spread") == "specialist"
         assert sheet.get("discipline_spread") == "standard"
         assert sheet.get("predator_choices", {}).get("d1") == "disc_potence"
+        # Alleycat grants −1 Humanity; applied server-side on top of the
+        # neonate base of 7.
+        assert sheet.get("humanity") == 6
     finally:
         with get_db() as conn:
             conn.execute("DELETE FROM characters WHERE name='Spread Test'")
+
+
+def test_chargen_error_rerender_with_image_does_not_500(player):
+    """A validation error on chargen must re-render the wizard (200), not
+    500. The multipart form carries a profile_image UploadFile that isn't
+    JSON-serializable, so the re-render must drop non-string fields before
+    the wizard's `initialForm | tojson`."""
+    r = player.post(
+        "/characters/new",
+        data={"_csrf": "dev-csrf-token", "name": "Img Err", "clan": "brujah"},
+        files={"profile_image": ("a.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+        follow_redirects=False,
+    )
+    assert r.status_code == 200, f"expected wizard re-render, got {r.status_code}"
+    assert "Please correct the following" in r.text
 
 
 def test_clan_color_utilities_defined_and_used():

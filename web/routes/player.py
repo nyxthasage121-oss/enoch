@@ -533,7 +533,11 @@ async def character_create(
                  v5_attributes=_V5_ATTRIBUTES, v5_skills=_V5_SKILLS,
                  v5_disciplines=_V5_DISCIPLINES,
                  clan_disciplines=_CLAN_DISCIPLINES,
-                 errors=errors, form=dict(form),
+                 # Keep only string fields — the profile_image UploadFile is
+                 # not JSON-serializable and would 500 the wizard's
+                 # `initialForm | tojson` on any validation re-render.
+                 errors=errors,
+                 form={k: v for k, v in form.items() if isinstance(v, str)},
                  **_wizard_extras()),
         )
 
@@ -570,6 +574,16 @@ async def character_create(
         sheet.setdefault("humanity", 7)
         sheet.pop("hunger", None)
         sheet.pop("blood_potency", None)
+
+    # Apply the predator type's flat Humanity / Blood Potency grants on top of
+    # the seeded base. The wizard previews this, but humanity/BP are seeded
+    # server-side (not posted), so persist the delta here to match.
+    if character_type == "kindred" and predator_type in _V5_PREDATOR_INFO:
+        for g in _V5_PREDATOR_INFO[predator_type].get("grants", []):
+            if g.get("kind") == "delta":
+                trait = g.get("trait")
+                if trait in ("humanity", "blood_potency") and trait in sheet:
+                    sheet[trait] = max(0, min(10, int(sheet[trait]) + int(g.get("delta", 0))))
 
     # Short-form Submit moves the character past the wizard but keeps it in
     # the draft state so the player can keep editing the sheet on the detail
