@@ -75,8 +75,8 @@
       (1,  'Nature',   'Type & tier'),
       (2,  'Memoriam', 'Era history'),
       (3,  'Blood',    'Clan'),
-      (4,  'Hunt',     'Predator type'),
-      (5,  'Story',    'Background'),
+      (4,  'Hunt',     'Predator & sire'),
+      (5,  'Final',    'Last options'),
       (6,  'Flesh',    'Attributes'),
       (7,  'Skill',    'Skills'),
       (8,  'Legacy',   'Merits & Flaws'),
@@ -821,7 +821,7 @@
       <div class="mb-6">
         <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">The Hunt</h1>
         <p class="font-garamond text-bone-500 text-sm leading-relaxed">
-          How does your character feed, and where do they place their loyalties?
+          How does your character hunt, and who brought them into the night?
         </p>
       </div>
 
@@ -850,15 +850,6 @@
           </template>
         </div>
 
-        <div>
-          <label class="label-gold block mb-2">Covenant / Sect
-            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
-          <select name="covenant" x-model="charName.covenant" class="w-full">
-            <option value="">— Select —</option>
-            {% for cov in covenants %}<option value="{{ cov }}">{{ cov }}</option>{% endfor %}
-          </select>
-        </div>
-
         {# Sire — Kindred only. Mortals have parents, Ghouls have a regnant,
            Revenants have family elders rather than a sire in the V5 sense. #}
         <div x-show="charName.character_type === 'kindred'" x-cloak>
@@ -868,37 +859,6 @@
                  placeholder="Name of sire, if known…" class="w-full">
         </div>
 
-        {# Profession + pronouns + ages — apply to all character types. #}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="label-gold block mb-2">Profession
-              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(day job / cover)</span></label>
-            <input type="text" name="profession" maxlength="80"
-                   x-model="charName.profession"
-                   placeholder="e.g. Bartender, Detective…" class="w-full text-sm">
-          </div>
-          <div>
-            <label class="label-gold block mb-2">Pronouns
-              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
-            <input type="text" name="pronouns" maxlength="40"
-                   x-model="charName.pronouns"
-                   placeholder="e.g. she/her, they/them…" class="w-full text-sm">
-          </div>
-          <div>
-            <label class="label-gold block mb-2">True Age
-              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(years lived)</span></label>
-            <input type="number" name="true_age" min="0" max="2000"
-                   x-model.number="charName.true_age"
-                   placeholder="0" class="w-full text-sm">
-          </div>
-          <div>
-            <label class="label-gold block mb-2">Apparent Age
-              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(age at Embrace)</span></label>
-            <input type="number" name="apparent_age" min="0" max="120"
-                   x-model.number="charName.apparent_age"
-                   placeholder="0" class="w-full text-sm">
-          </div>
-        </div>
       </div>
 
       {% include "player/partials/wizard_nav.html" %}
@@ -909,59 +869,15 @@
        ═══════════════════════════════════════════════════ #}
     <div x-show="step === 5" x-cloak>
       <div class="mb-6">
-        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">The Story</h1>
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Final Touches</h1>
         <p class="font-garamond text-bone-500 text-sm leading-relaxed">
-          Who were they before the Embrace? Who are they now?
+          A last creation option below. You'll add your concept, story, and other
+          details from your character page after submitting.
         </p>
       </div>
 
-      <div class="gilded p-6 space-y-6 mb-5" :class="charName.clan ? 'clan-' + charName.clan : ''">
-        <div>
-          <label class="label-gold block mb-2">Concept
-            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
-          <input type="text" name="concept" maxlength="120"
-                 x-model="charName.concept"
-                 placeholder="e.g. 'Former NYPD detective turned investigator'" class="w-full">
-        </div>
-        <div>
-          <label class="label-gold block mb-2">Profile Blurb
-            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(visible to other players)</span></label>
-          <textarea name="profile_blurb" rows="3" maxlength="600"
-                    x-model="charName.profile_blurb"
-                    placeholder="Public reputation, demeanour, or appearance…"
-                    class="w-full resize-y"></textarea>
-        </div>
-
-        {# Ambition + Desire — V5 RAW chargen #}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="label-gold block mb-2">Ambition
-              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(long-term goal)</span></label>
-            <input type="text" name="ambition" maxlength="120"
-                   x-model="charName.ambition"
-                   placeholder="e.g. Become Prince of the city"
-                   class="w-full text-sm">
-          </div>
-          <div>
-            <label class="label-gold block mb-2">Desire
-              <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(short-term goal)</span></label>
-            <input type="text" name="desire" maxlength="120"
-                   x-model="charName.desire"
-                   placeholder="e.g. Find out who killed my sire"
-                   class="w-full text-sm">
-          </div>
-        </div>
-
-        {# Staff-private backstory #}
-        <div>
-          <label class="label-gold block mb-2">Backstory
-            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(staff-only, optional)</span></label>
-          <textarea name="backstory" rows="4" maxlength="2000"
-                    x-model="charName.backstory"
-                    placeholder="Long-form history visible only to staff — your pre-Embrace life, the Embrace itself, key NPCs, secrets…"
-                    class="w-full resize-y text-sm"></textarea>
-        </div>
-
+      <div class="gilded p-6 space-y-6 mb-5" x-show="hasVampireMechanics()" x-cloak
+           :class="charName.clan ? 'clan-' + charName.clan : ''">
         <label class="flex items-start gap-3 cursor-pointer group">
           <input type="checkbox" name="has_ingrained_flaw"
                  x-model="charName.has_ingrained_flaw" class="accent-[#8B1A1A] mt-1">
@@ -2014,6 +1930,11 @@
         // Nature — so skip the clan picker entirely (canAdvanceBlood already
         // lets them pass, but no reason to show an irrelevant step).
         if (n === 3 && t !== 'kindred') return true;
+        // Hunt (4) is predator type + sire — both Kindred/Revenant only.
+        if (n === 4 && (t === 'mortal' || t === 'ghoul')) return true;
+        // Final (5) holds only the short-form submit + the vampire ingrained
+        // flaw, so a long-form non-vampire has nothing to do here.
+        if (n === 5 && {{ 'true' if require_sheet else 'false' }} && !this.hasVampireMechanics()) return true;
         if (t === 'mortal' && (n === 9 || n === 10)) return true;
         if (n === 10 && !this._hasRitualDiscipline()) return true;
         return false;
