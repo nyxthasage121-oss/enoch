@@ -131,6 +131,15 @@ V5_RESTRICTED_PREDATOR_TYPES: tuple[str, ...] = (
     "Tithe Collector",
 )
 
+# Predator types valid as a HUNTING-SITE favored predator. The restricted
+# types don't represent a mortal hunting profile — Blood Leech feeds on other
+# vampires, Tithe Collector bends the Hunger economy — so they're excluded
+# from the staff site editor, matching the chargen picker (which hides
+# restricted types unless the chronicle explicitly unlocks them).
+V5_SITE_PREDATOR_TYPES: list[str] = [
+    p for p in V5_PREDATOR_TYPES if p not in V5_RESTRICTED_PREDATOR_TYPES
+]
+
 
 # ── Clan reference: Bane + Compulsion names ──────────────────────────────────
 # Concise paraphrased summaries of each clan's signature weakness (Bane) and

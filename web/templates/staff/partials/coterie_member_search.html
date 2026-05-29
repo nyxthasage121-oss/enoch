@@ -16,7 +16,7 @@
     <div class="min-w-0">
       <p class="font-cinzel text-xs text-bone-200 truncate">{{ r.name }}</p>
       <p class="font-garamond text-[0.65rem] text-bone-600 truncate">
-        {% if r.clan %}<span class="clan-{{ r.clan }} text-[var(--clan)]">{{ r.clan | replace('-', ' ') | title }}</span> · {% endif %}
+        {% if r.clan %}<span class="clan-{{ r.clan }} text-clan">{{ r.clan | replace('-', ' ') | title }}</span> · {% endif %}
         {{ r.player_username or 'unknown player' }}
       </p>
     </div>

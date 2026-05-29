@@ -63,7 +63,7 @@
 
     {% if char.profile_image_url %}
     <div class="flex items-start gap-5 mb-5">
-      <div class="w-24 h-24 shrink-0 border border-[var(--clan,theme(colors.ink.700))] bg-ink-900 overflow-hidden">
+      <div class="w-24 h-24 shrink-0 border border-clan bg-ink-900 overflow-hidden">
         <img src="{{ char.profile_image_url }}" alt="Current profile" class="w-full h-full object-cover">
       </div>
       <form method="post" action="/characters/{{ char.id }}/image/delete">

@@ -15,7 +15,7 @@
   </a>
 
   {# ── Hero — ember drift on desktop, clan-portrait frame, beam sweep ── #}
-  <div class="relative overflow-hidden mb-6 border border-[var(--clan,theme(colors.ink.700))]
+  <div class="relative overflow-hidden mb-6 border border-clan
               bg-gradient-to-b from-ink-900 to-ink-950 aurora-beam aurora-sparkle-host"
        x-data="{}"
        x-init="
@@ -33,14 +33,14 @@
       {# Avatar / monogram — aurora-portrait wraps the inner frame for
          the slow clan-colored rotating border. #}
       <div class="aurora-portrait w-14 h-14 shrink-0">
-        <div class="w-full h-full border border-[var(--clan,theme(colors.ink.700))]
+        <div class="w-full h-full border border-clan
                     bg-ink-900 flex items-center justify-center">
           {% if char.profile_image_url %}
             <img src="{{ char.profile_image_url }}" alt=""
                  class="w-full h-full object-cover"
                  style="filter: url(#aurora-portrait-warm);">
           {% else %}
-            <span class="font-cinzel text-2xl text-[var(--clan,theme(colors.gold.400))]">
+            <span class="font-cinzel text-2xl text-clan">
               {{ char.name[0] | upper }}
             </span>
           {% endif %}
@@ -123,7 +123,7 @@
     {% for t, lbl in [('overview','Overview'),('sheet','Sheet')] + xp_tabs + [('history','History')] %}
     <button @click="tab='{{ t }}'"
             :class="tab === '{{ t }}'
-              ? 'text-gold-400 border-b-2 border-[var(--clan,theme(colors.gold.400))]'
+              ? 'text-gold-400 border-b-2 border-clan'
               : 'text-bone-600 hover:text-bone-400 border-b-2 border-transparent'"
             class="font-cinzel text-[0.65rem] tracking-[0.2em] uppercase px-4 py-2.5 -mb-px transition-colors whitespace-nowrap">
       {{ lbl }}
@@ -161,13 +161,13 @@
       {# ── Profile image — avatar + management, relocated into About ── #}
       <div class="flex items-center gap-4 mb-5">
         <div class="aurora-portrait w-20 h-20 shrink-0">
-          <div class="w-full h-full border border-[var(--clan,theme(colors.ink.700))]
+          <div class="w-full h-full border border-clan
                       bg-ink-900 flex items-center justify-center overflow-hidden">
             {% if char.profile_image_url %}
             <img src="{{ char.profile_image_url }}" alt="" class="w-full h-full object-cover"
                  style="filter: url(#aurora-portrait-warm);">
             {% else %}
-            <span class="font-cinzel text-3xl text-[var(--clan,theme(colors.gold.400))]">{{ char.name[0] | upper }}</span>
+            <span class="font-cinzel text-3xl text-clan">{{ char.name[0] | upper }}</span>
             {% endif %}
           </div>
         </div>
@@ -591,8 +591,6 @@
                           : 'pip-off'">
                 </button>
                 {% endfor %}
-                <span class="ml-2 w-3 text-right font-cinzel text-xs text-gold-400 tabular-nums"
-                      x-text="get('{{ key }}') || 0"></span>
               </div>
             </div>
             {% endfor %}
@@ -626,8 +624,6 @@
                             : 'pip-off'">
                   </button>
                   {% endfor %}
-                  <span class="ml-1.5 w-3 text-right font-cinzel text-xs text-gold-400 tabular-nums"
-                        x-text="get('{{ key }}') || 0"></span>
                   <button type="button" @click="startAdding('{{ key }}')"
                           class="ml-1 w-4 h-4 rounded-full border border-bone-700 text-bone-700 hover:text-gold-400 hover:border-gold-700 text-[0.6rem] leading-none flex items-center justify-center opacity-0 group-hover/skill:opacity-100 focus:opacity-100 transition-opacity"
                           :class="addingFor === '{{ key }}' ? 'opacity-100' : ''"
@@ -717,8 +713,6 @@
                         : 'pip-off'">
               </button>
               {% endfor %}
-              <span class="ml-2 w-3 text-right font-cinzel text-xs text-gold-400 tabular-nums"
-                    x-text="get('{{ key }}') || 0"></span>
             </div>
           </div>
           {% endfor %}
@@ -967,7 +961,7 @@
       <div class="gilded p-5">
         <p class="label-gold mb-4">Core Traits</p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-3">
-          {% for key, label, max_dots in [('humanity','Humanity',10),('blood_potency','Blood Potency',5),('hunger','Hunger',5)] %}
+          {% for key, label, max_dots in [('humanity','Humanity',10),('blood_potency','Blood Potency',10),('hunger','Hunger',5)] %}
           <div class="flex items-center justify-between py-1">
             <span class="font-garamond text-sm text-bone-300">{{ label }}</span>
             <div class="flex items-center gap-1 flex-wrap">
@@ -979,8 +973,6 @@
                         : 'pip-off'">
               </button>
               {% endfor %}
-              <span class="ml-2 w-3 text-right font-cinzel text-xs text-gold-400 tabular-nums"
-                    x-text="get('{{ key }}') || 0"></span>
             </div>
           </div>
           {% endfor %}

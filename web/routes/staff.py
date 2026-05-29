@@ -1750,7 +1750,7 @@ def _admin_ctx_extras() -> dict:
         get_settings, list_restrictions, list_periods, list_period_schedules,
         list_hunting_sites,
     )
-    from ..v5_traits import V5_PREDATOR_TYPES
+    from ..v5_traits import V5_SITE_PREDATOR_TYPES
     with get_db() as conn:
         restrictions = list_restrictions(conn)
     # Flatten restrictions into a {(type, id): mode} dict the template can
@@ -1778,7 +1778,7 @@ def _admin_ctx_extras() -> dict:
             # Hunting Sites tab
             "sites":                 list_hunting_sites(conn, active_only=False),
             "coteries":              _all_coteries_for_picker(conn),
-            "predator_types":        V5_PREDATOR_TYPES,
+            "predator_types":        V5_SITE_PREDATOR_TYPES,
             "boroughs":              _BOROUGHS,
         }
 
@@ -2165,9 +2165,9 @@ def _parse_predator_dcs(form) -> dict:
     are dropped — only populated entries are stored.
     Per Steward direction (2026-05): values must be in 1-5 (0 was
     previously allowed but a DC of 0 has no in-game meaning)."""
-    from ..v5_traits import V5_PREDATOR_TYPES
+    from ..v5_traits import V5_SITE_PREDATOR_TYPES
     out: dict[str, int] = {}
-    for p in V5_PREDATOR_TYPES:
+    for p in V5_SITE_PREDATOR_TYPES:
         raw = form.get(f"dc_{p}")
         if raw is None or raw == "":
             continue
@@ -2272,7 +2272,7 @@ async def edit_site_route(
     user: dict = Depends(require_permission("manage_site")),
     _: None = Depends(csrf_protect),
 ):
-    from ..v5_traits import V5_PREDATOR_TYPES
+    from ..v5_traits import V5_SITE_PREDATOR_TYPES
     form          = await request.form()
     name          = (form.get("name") or "").strip()
     borough       = (form.get("borough") or "").strip()
@@ -2307,7 +2307,7 @@ async def edit_site_route(
     resp = templates.TemplateResponse(
         request, "staff/partials/sites_table.html",
         _ctx(request, sites=sites, coteries=coteries,
-             predator_types=V5_PREDATOR_TYPES, boroughs=_BOROUGHS),
+             predator_types=V5_SITE_PREDATOR_TYPES, boroughs=_BOROUGHS),
     )
     _toast(resp, err or "Site updated.", "error" if err else "success")
     return resp

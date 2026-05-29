@@ -899,6 +899,26 @@ body.landing-page > div > main { padding: 0; }
 }
 .pip-off:hover { border-color: #b08a3e; }
 
+/* ── Clan-colored utilities ─────────────────────────────────────────
+   Reliable replacements for Tailwind arbitrary classes like
+   border-[var(--clan,…)] / text-[var(--clan,…)] / bg-[var(--clan,…)] —
+   the precompiled tailwind.css drops arbitrary values, so those silently
+   fell back to defaults and clan identity never showed. `--clan` is set
+   by the clan-<slug> classes; fallbacks mirror the old arbitrary ones. */
+.border-clan { border-color: var(--clan, #3a3533); }
+.text-clan   { color: var(--clan, #d4a94d); }
+.bg-clan     { background-color: var(--clan, #d4a94d); }
+.hover-border-clan:hover { border-color: var(--clan, #d4a94d); }
+.hover-text-clan:hover   { color: var(--clan, #ece4d6); }
+/* group-hover variant — tints when an ancestor .group is hovered (cards). */
+.group:hover .gh-text-clan { color: var(--clan, #ece4d6); }
+/* Selected clan card (chargen picker): tinted fill + glow ring. */
+.clan-selected {
+  border-color: var(--clan, #d4a94d);
+  background-color: color-mix(in srgb, var(--clan, #d4a94d) 10%, transparent);
+  box-shadow: 0 0 18px -2px var(--clan, #d4a94d);
+}
+
 /* ── Dashboard pending-pulse ────────────────────────────────────── */
 @keyframes pendingPulse {
   0%, 100% { box-shadow:

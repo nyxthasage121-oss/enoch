@@ -77,7 +77,7 @@
        @mousemove="onMove"
        @mouseleave="onLeave"
        :style="tiltStyle"
-       class="clan-{{ char.clan }} gilded aurora-beam {{ 'aurora-pulse-blood' if not char.is_approved }} relative overflow-hidden block no-underline group hover:border-[var(--clan,theme(colors.gold.dim))] transition-colors">
+       class="clan-{{ char.clan }} gilded aurora-beam {{ 'aurora-pulse-blood' if not char.is_approved }} relative overflow-hidden block no-underline group hover-border-clan transition-colors">
       <div class="card-glare" :style="glareStyle"></div>
 
       <div class="p-5">
@@ -96,7 +96,7 @@
           {% endif %}
         </div>
 
-        <h2 class="font-cinzel text-xl text-bone-200 tracking-wide group-hover:text-[var(--clan,theme(colors.bone.100))] transition-colors mb-4 truncate">
+        <h2 class="font-cinzel text-xl text-bone-200 tracking-wide gh-text-clan transition-colors mb-4 truncate">
           {{ char.name }}
         </h2>
 

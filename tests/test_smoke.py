@@ -2602,6 +2602,36 @@ def test_about_section_hosts_profile_image_form():
     )
 
 
+def test_site_predator_types_exclude_restricted():
+    """Hunting-site favored-predator list must exclude the restricted
+    predators (Blood Leech feeds on vampires, Tithe Collector bends the
+    Hunger economy) — they don't represent a mortal hunting profile and
+    shouldn't be selectable as a site's favored predator."""
+    from web.v5_traits import (
+        V5_SITE_PREDATOR_TYPES, V5_RESTRICTED_PREDATOR_TYPES, V5_PREDATOR_TYPES,
+    )
+    for r in V5_RESTRICTED_PREDATOR_TYPES:
+        assert r not in V5_SITE_PREDATOR_TYPES, f"{r} must not be a site predator"
+    assert "Alleycat" in V5_SITE_PREDATOR_TYPES
+    assert set(V5_SITE_PREDATOR_TYPES) == set(V5_PREDATOR_TYPES) - set(V5_RESTRICTED_PREDATOR_TYPES)
+
+
+def test_clan_color_utilities_defined_and_used():
+    """Clan-color arbitrary Tailwind classes (border-[var(--clan,…)] etc.)
+    don't survive the precompiled build, so clan identity must use the
+    reliable codex.css utilities — and the character pages must not
+    reintroduce the arbitrary classes that silently fail."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    codex = (root / "web" / "static" / "css" / "codex.css").read_text(encoding="utf-8")
+    for util in (".border-clan", ".text-clan", ".bg-clan"):
+        assert util in codex, f"codex.css must define {util}"
+    for rel in ("web/templates/player/character.html",
+                "web/templates/staff/character_detail.html"):
+        txt = (root / rel).read_text(encoding="utf-8")
+        assert "-[var(--clan" not in txt, f"{rel} still uses an arbitrary clan class"
+
+
 def test_aurora_landing_renders_atmosphere(_client):
     """Unauthenticated landing page renders the static aurora-layer
     backdrop (CSS-only halo, no WebGL motion) so the landing remains
