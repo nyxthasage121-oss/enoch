@@ -89,13 +89,13 @@
       </div>
     </div>
 
-    {# XP bar #}
-    {% set pct = [(char.xp_total / char.xp_cap * 100)|int, 100]|min %}
+    {# XP bar. The cap figure + progress bar + retirement notice only show
+       when the chronicle enforces the XP cap (migration 027). #}
     <div class="px-6 pb-5">
       <div class="flex justify-between items-center mb-1.5">
         <span class="font-cinzel text-[0.6rem] text-bone-600 tracking-[0.2em] uppercase">Experience</span>
         <span class="font-cinzel text-[0.65rem] text-bone-500">
-          <span x-data="counter(0, {{ char.xp_total }})" x-text="value"></span> / {{ char.xp_cap }}
+          <span x-data="counter(0, {{ char.xp_total }})" x-text="value"></span>{% if xp_cap_enabled %} / {{ char.xp_cap }}{% else %} XP total{% endif %}
           {% if char.xp_available > 0 %}
             <span class="text-gold-500 ml-2">
               <span x-data="counter(0, {{ char.xp_available }}, 700)" x-text="value"></span> available
@@ -103,6 +103,8 @@
           {% endif %}
         </span>
       </div>
+      {% if xp_cap_enabled %}
+      {% set pct = [(char.xp_total / char.xp_cap * 100)|int, 100]|min %}
       <div class="h-0.5 bg-ink-800 w-full overflow-hidden aurora-beam">
         <div class="xp-fill-anim" style="--xp-target: {{ pct }}%"></div>
       </div>
@@ -110,6 +112,7 @@
         <p class="text-right font-cinzel text-[0.6rem] text-gold-600 mt-1">
           Cap reached — retirement window open
         </p>
+      {% endif %}
       {% endif %}
     </div>
   </div>

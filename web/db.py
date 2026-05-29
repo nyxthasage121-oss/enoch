@@ -650,6 +650,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "unlocked_predator_types",
         # Auto period-generation toggle (migration 025)
         "auto_create_periods_enabled",
+        # XP cap on/off toggle (migration 027)
+        "xp_cap_enabled",
     }
     # Validate ruleset before persisting — guard against typo'd POSTs.
     if "active_ruleset" in kwargs and kwargs["active_ruleset"] not in RULESETS:
@@ -1404,9 +1406,17 @@ def approve_claim(conn, claim_id: int, reviewer_id: str) -> dict:
     if char is None:
         raise ValueError(f"Character {claim['character_id']} not found")
 
-    # Cap XP — never exceed xp_cap
-    cap_room = max(0, char["xp_cap"] - char["xp_total"])
-    awarded  = min(claim["xp_claimed"], cap_room)
+    # XP cap is chronicle-wide and optional (migration 027). When enabled
+    # (default) award up to the per-character cap and open the retirement
+    # window on first hit; when disabled award the full claim and never
+    # auto-trigger retirement from the cap.
+    settings = get_settings(conn)
+    cap_on   = bool((settings or {}).get("xp_cap_enabled", 1))
+    if cap_on:
+        cap_room = max(0, char["xp_cap"] - char["xp_total"])
+        awarded  = min(claim["xp_claimed"], cap_room)
+    else:
+        awarded  = claim["xp_claimed"]
 
     now = _now()
     conn.execute("""
@@ -1416,7 +1426,7 @@ def approve_claim(conn, claim_id: int, reviewer_id: str) -> dict:
     if awarded > 0:
         new_total    = char["xp_total"] + awarded
         retirement   = char.get("retirement_eligible_at")
-        if new_total >= char["xp_cap"] and not retirement:
+        if cap_on and new_total >= char["xp_cap"] and not retirement:
             retirement = now
         conn.execute("""
             UPDATE characters SET xp_total=?, retirement_eligible_at=?, updated_at=?

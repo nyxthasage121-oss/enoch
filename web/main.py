@@ -134,6 +134,19 @@ def static_url(rel_path: str) -> str:
     return f"/static/{rel_path}?v={fp}"
 
 
+def _xp_cap_enabled() -> bool:
+    """Whether the chronicle enforces the XP cap (migration 027). Read per
+    render so an admin toggle takes effect immediately; defaults to True
+    (cap on) if settings can't be read."""
+    try:
+        from .db import get_db, get_settings
+        with get_db() as conn:
+            s = get_settings(conn)
+        return bool((s or {}).get("xp_cap_enabled", 1))
+    except Exception:
+        return True
+
+
 def _ctx(request: Request, **extra) -> dict:
     """Base template context — injected into every render call."""
     user = request.session.get("user")
@@ -149,6 +162,7 @@ def _ctx(request: Request, **extra) -> dict:
         "flash_messages": flash,
         "dev_preview": settings.DEV_PREVIEW,
         "static_url": static_url,
+        "xp_cap_enabled": _xp_cap_enabled(),
         **extra,
     }
 

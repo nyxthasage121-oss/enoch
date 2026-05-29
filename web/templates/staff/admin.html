@@ -95,6 +95,24 @@
           </div>
         </label>
 
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <div class="pt-0.5">
+            <input type="checkbox" name="xp_cap_enabled"
+                   {{ 'checked' if _cs.get('xp_cap_enabled', 1) else '' }}
+                   class="accent-[#8B1A1A]">
+          </div>
+          <div>
+            <p class="font-cinzel text-xs text-bone-300 tracking-wide group-hover:text-bone-200 transition-colors">
+              Enforce the XP cap
+            </p>
+            <p class="font-garamond text-bone-500 text-sm mt-0.5 leading-relaxed">
+              When checked, characters cap at 350 XP and the retirement window opens
+              on reaching it. When unchecked, claims award in full, the cap never
+              auto-retires a character, and the "/cap" figure is hidden in the UI.
+            </p>
+          </div>
+        </label>
+
         <div class="divider-gold"></div>
 
         {# Ruleset selector — two-way Standard vs Homebrew. The In
