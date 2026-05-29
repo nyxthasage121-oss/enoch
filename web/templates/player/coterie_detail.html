@@ -8,6 +8,23 @@
     <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">{{ coterie.name }}</h1>
   </div>
 
+  {# ── Creation-state banner ── #}
+  {% if coterie.creation_state == 'forming' %}
+  <div class="gilded-inset px-4 py-3 mb-6 border border-mauve-800">
+    <p class="font-cinzel text-mauve-300 text-xs tracking-widest uppercase mb-1">Forming</p>
+    <p class="font-garamond text-bone-400 text-sm">
+      Build your coterie sheet below — allocate each member's free dots, then submit it for staff sign-off.
+    </p>
+  </div>
+  {% elif coterie.creation_state == 'submitted' %}
+  <div class="gilded-inset px-4 py-3 mb-6 border border-gold-800">
+    <p class="font-cinzel text-gold-400 text-xs tracking-widest uppercase mb-1">Awaiting Sign-off</p>
+    <p class="font-garamond text-bone-400 text-sm">
+      Your sheet is with staff for review — they'll approve it or send it back with notes.
+    </p>
+  </div>
+  {% endif %}
+
   {# ── Domain ──
        Each tile shows current dots + the single-funder XP cost to bump
        it by 1. Per Steward house rules (2026-05) advances cost the same
@@ -158,26 +175,38 @@
   </div>
   {% endif %}
 
-  {# ── Free creation dots — each member's no-XP starting allocation ── #}
-  {% if viewer_free_dots %}
-  {% set _free_avail = viewer_free_dots | selectattr('left', 'gt', 0) | list %}
-  {% if _free_avail %}
+  {# ── Free creation dots (only while forming) — any member can assemble the
+       sheet, allocating on behalf of any member; each has a 2-dot pool. ── #}
+  {% if coterie.creation_state == 'forming' and viewer_member_chars %}
   <div class="gilded p-5 mb-6">
     <p class="label-gold text-xs mb-1">Free Creation Dots</p>
-    <p class="font-garamond text-bone-500 text-xs mb-4 leading-relaxed">
-      Each member starts with {{ free_dots_per_member }} free dots to spend on the coterie —
-      Domain (Chasse / Lien / Portillon, max 3 at creation) or a named merit / background
-      (max {{ named_trait_cap }}). No XP.
+    <p class="font-garamond text-bone-500 text-xs mb-3 leading-relaxed">
+      Each member has {{ free_dots_per_member }} free dots (no XP) — Domain (Chasse / Lien /
+      Portillon, max 3 at creation) or a named merit / background (max {{ named_trait_cap }}).
+      One person can fill in the whole sheet.
     </p>
-    {% for fd in _free_avail %}
+
+    {# Per-member remaining #}
+    <div class="flex flex-wrap gap-1.5 mb-4">
+      {% for fd in coterie_free_dots %}
+      <span class="chip text-[0.6rem] {{ 'text-bone-600 border-ink-700' if fd.left == 0 else 'text-gold-400 border-gold-800' }}">
+        {{ fd.char_name }}: {{ fd.used }}/{{ free_dots_per_member }}
+      </span>
+      {% endfor %}
+    </div>
+
+    {% set _free_avail = coterie_free_dots | selectattr('left', 'gt', 0) | list %}
+    {% if _free_avail %}
     <form method="POST" action="/coteries/{{ coterie.id }}/free-dots"
-          class="flex flex-wrap items-end gap-2 py-2 border-t border-ink-800"
-          x-data="{ kind: 'chasse' }">
+          class="flex flex-wrap items-end gap-2" x-data="{ kind: 'chasse' }">
       <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-      <input type="hidden" name="character_id" value="{{ fd.char_id }}">
-      <div class="min-w-0 mr-1">
-        <p class="font-cinzel text-xs text-bone-300">{{ fd.char_name }}</p>
-        <p class="font-garamond text-bone-600 text-[0.65rem]">{{ fd.left }} of {{ free_dots_per_member }} left</p>
+      <div>
+        <label class="label-gold block text-[0.6rem] mb-1">For</label>
+        <select name="character_id" class="text-xs">
+          {% for fd in _free_avail %}
+          <option value="{{ fd.char_id }}">{{ fd.char_name }} ({{ fd.left }} left)</option>
+          {% endfor %}
+        </select>
       </div>
       <div>
         <label class="label-gold block text-[0.6rem] mb-1">Toward</label>
@@ -197,14 +226,29 @@
       <div>
         <label class="label-gold block text-[0.6rem] mb-1">Dots</label>
         <select name="dots" class="text-xs">
-          {% for n in range(1, fd.left + 1) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+          <option value="1">1</option>
+          <option value="2">2</option>
         </select>
       </div>
       <button type="submit" class="btn-send font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">Allocate</button>
     </form>
-    {% endfor %}
+    {% else %}
+    <p class="font-garamond text-bone-600 text-xs italic">All members have spent their free dots.</p>
+    {% endif %}
+
+    {# Submit the assembled sheet for staff sign-off #}
+    <form method="POST" action="/coteries/{{ coterie.id }}/submit-sheet"
+          class="mt-4 pt-4 border-t border-ink-800"
+          onsubmit="return confirm('Submit this coterie sheet to staff for sign-off?');">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <button type="submit" class="btn-send font-cinzel tracking-widest text-xs px-4 py-2 aurora-beam aurora-pulse">
+        Submit for staff sign-off
+      </button>
+      <p class="font-garamond text-bone-600 text-[0.65rem] mt-2">
+        Do this once the group has agreed in your cubby — staff will approve it or send it back.
+      </p>
+    </form>
   </div>
-  {% endif %}
   {% endif %}
 
   {# ── Single-funder spend flows (advance / buy / donate) ──

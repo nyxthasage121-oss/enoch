@@ -1,0 +1,59 @@
+{# coterie_signoff_table.html — coteries submitted for staff sign-off (C3a) #}
+<div id="coterie-signoff-table">
+  {% if coteries_awaiting_signoff %}
+  <div class="gilded overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left   label-gold font-normal text-xs">Coterie</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Chasse</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Lien</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Portillon</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Members</th>
+          <th class="px-4 py-3 text-right  label-gold font-normal text-xs">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for co in coteries_awaiting_signoff %}
+        <tr class="border-b border-ink-800" x-data="{ returning: false, reason: '' }">
+          <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">
+            <a href="/staff/coteries/{{ co.id }}" class="hover:text-gold-400 transition-colors">{{ co.name }}</a>
+            <span class="chip text-gold-400 border-gold-700 text-[0.5rem] ml-1">submitted</span>
+          </td>
+          <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.chasse }}</td>
+          <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.lien }}</td>
+          <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.portillon }}</td>
+          <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.member_count }}</td>
+          <td class="px-4 py-2.5 text-right">
+            <div x-show="!returning" class="flex gap-1 justify-end">
+              <a href="/staff/coteries/{{ co.id }}"
+                 class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Review</a>
+              <button hx-post="/staff/coteries/{{ co.id }}/approve-sheet"
+                      hx-target="#coterie-signoff-table" hx-swap="outerHTML"
+                      class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Approve</button>
+              <button @click="returning = true"
+                      class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Return</button>
+            </div>
+            <div x-show="returning" x-cloak class="flex gap-1 justify-end items-center">
+              <form hx-post="/staff/coteries/{{ co.id }}/return-sheet"
+                    hx-target="#coterie-signoff-table" hx-swap="outerHTML"
+                    @submit="returning = false" class="flex gap-1">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <input type="text" name="reason" x-model="reason"
+                       placeholder="Reason (optional)" class="text-xs py-1 px-2 w-36">
+                <button type="submit"
+                        class="btn-send font-cinzel text-[0.6rem] tracking-widest px-2 py-1">Confirm</button>
+              </form>
+              <button type="button" @click="returning = false"
+                      class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1">Cancel</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="font-garamond text-bone-600 text-sm px-1">No coterie sheets awaiting sign-off.</p>
+  {% endif %}
+</div>

@@ -1287,10 +1287,13 @@ async def delete_schedule_route(
 # ── Coteries ──────────────────────────────────────────────────────────────────
 
 def _coterie_ctx(conn) -> dict:
+    from ..db import list_coteries_awaiting_signoff
     coteries  = list_coteries(conn, status="active")
     requests  = list_pending_coterie_requests(conn)
     co_spends = list_pending_coterie_spends(conn)
-    return {"coteries": coteries, "requests": requests, "co_spends": co_spends}
+    awaiting  = list_coteries_awaiting_signoff(conn)
+    return {"coteries": coteries, "requests": requests, "co_spends": co_spends,
+            "coteries_awaiting_signoff": awaiting}
 
 
 @router.get("/coteries", response_class=HTMLResponse)
@@ -1391,6 +1394,56 @@ async def reject_co_spend(
         request, "staff/partials/coterie_spends_table.html", _ctx(request, **ctx)
     )
     _toast(resp, err or "Domain upgrade rejected.", "error" if err else "info")
+    return resp
+
+
+@router.post("/coteries/{coterie_id}/approve-sheet", response_class=HTMLResponse)
+async def approve_coterie_sheet_route(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_permission("manage_coterie")),
+    _: None = Depends(csrf_protect),
+):
+    """Staff sign-off: a submitted coterie sheet becomes active."""
+    from ..db import approve_coterie_sheet
+    err = None
+    try:
+        with get_db() as conn:
+            approve_coterie_sheet(conn, coterie_id, user["id"])
+    except ValueError as e:
+        err = str(e)
+    with get_db() as conn:
+        ctx = _coterie_ctx(conn)
+    resp = templates.TemplateResponse(
+        request, "staff/partials/coterie_signoff_table.html", _ctx(request, **ctx)
+    )
+    _toast(resp, err or "Coterie sheet approved — now active.", "error" if err else "success")
+    return resp
+
+
+@router.post("/coteries/{coterie_id}/return-sheet", response_class=HTMLResponse)
+async def return_coterie_sheet_route(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_permission("manage_coterie")),
+    _: None = Depends(csrf_protect),
+):
+    """Staff sends a submitted coterie back to its members for changes."""
+    from ..db import return_coterie_sheet
+    form   = await request.form()
+    reason = (form.get("reason") or "").strip() or None
+    err = None
+    try:
+        with get_db() as conn:
+            return_coterie_sheet(conn, coterie_id, user["id"], reason)
+    except ValueError as e:
+        err = str(e)
+    with get_db() as conn:
+        ctx = _coterie_ctx(conn)
+    resp = templates.TemplateResponse(
+        request, "staff/partials/coterie_signoff_table.html", _ctx(request, **ctx)
+    )
+    _toast(resp, err or "Coterie returned to the group for changes.", "error" if err else "info")
     return resp
 
 

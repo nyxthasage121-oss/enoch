@@ -2267,7 +2267,7 @@ def test_free_creation_dots_budget_and_caps(_client):
         upsert_player(conn, discord_id="c2b", username="C2B")
         a = create_character(conn, discord_id="c2a", name="FreeDotA", clan="brujah")
         b = create_character(conn, discord_id="c2b", name="FreeDotB", clan="brujah")
-        co = create_coterie(conn, "FreeDotsSmoke")
+        co = create_coterie(conn, "FreeDotsSmoke", creation_state="forming")
         add_coterie_member(conn, co["id"], a["id"])
         add_coterie_member(conn, co["id"], b["id"])
         try:
@@ -2299,6 +2299,47 @@ def test_free_creation_dots_budget_and_caps(_client):
             conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
             conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
             conn.execute("DELETE FROM characters WHERE id IN (?,?)", (a["id"], b["id"]))
+            conn.commit()
+
+
+def test_coterie_lifecycle_signoff_and_free_dot_gate(_client):
+    """C3a: a coterie forms → submits → staff sign off → active. Free creation
+    dots (and submission) are only valid while forming."""
+    import pytest as _p
+    from web.db import (get_db, create_coterie, add_coterie_member, create_character,
+                        upsert_player, submit_coterie_sheet, approve_coterie_sheet,
+                        commit_free_creation_dots, get_coterie)
+    with get_db() as conn:
+        upsert_player(conn, discord_id="c3a", username="C3A")
+        a = create_character(conn, discord_id="c3a", name="C3aChar", clan="brujah")
+        co = create_coterie(conn, "LifecycleSmoke", creation_state="forming")
+        add_coterie_member(conn, co["id"], a["id"])
+        try:
+            # Free dots work while forming.
+            commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
+                                      target_kind="chasse", target_name=None, dots=1)
+            # forming -> submitted
+            submit_coterie_sheet(conn, co["id"], "c3a")
+            assert get_coterie(conn, co["id"])["creation_state"] == "submitted"
+            # No free dots once submitted.
+            with _p.raises(ValueError, match="forming"):
+                commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
+                                          target_kind="lien", target_name=None, dots=1)
+            # submitted -> active (staff sign-off)
+            approve_coterie_sheet(conn, co["id"], "staff-smoke")
+            assert get_coterie(conn, co["id"])["creation_state"] == "active"
+            # No free dots once active, and you can't re-submit a finalised coterie.
+            with _p.raises(ValueError, match="forming"):
+                commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
+                                          target_kind="lien", target_name=None, dots=1)
+            with _p.raises(ValueError, match="forming"):
+                submit_coterie_sheet(conn, co["id"], "c3a")
+            conn.commit()
+        finally:
+            conn.execute("DELETE FROM coterie_contributions WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
+            conn.execute("DELETE FROM characters WHERE id=?", (a["id"],))
             conn.commit()
 
 

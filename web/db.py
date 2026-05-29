@@ -1973,6 +1973,9 @@ def list_coteries(conn, status: str = "active") -> list[dict]:
     """, (status,)).fetchall()
 
 
+COTERIE_CREATION_STATES = {"forming", "submitted", "active"}
+
+
 def create_coterie(
     conn,
     name: str,
@@ -1980,13 +1983,88 @@ def create_coterie(
     lien: int = 0,
     portillon: int = 0,
     discord_role_id: str | None = None,
+    creation_state: str = "active",
 ) -> dict:
+    if creation_state not in COTERIE_CREATION_STATES:
+        raise ValueError(f"Unknown creation_state: {creation_state!r}")
     now = _now()
     cur = conn.execute("""
-        INSERT INTO coteries (name, chasse, lien, portillon, discord_role_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (name, chasse, lien, portillon, discord_role_id, now, now))
+        INSERT INTO coteries (name, chasse, lien, portillon, discord_role_id,
+                              creation_state, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (name, chasse, lien, portillon, discord_role_id, creation_state, now, now))
     return get_coterie(conn, cur.lastrowid)
+
+
+def submit_coterie_sheet(conn, coterie_id: int, actor_id: str) -> dict:
+    """A member submits the assembled sheet for staff sign-off: forming →
+    submitted. Members build the sheet (free dots / advantages / flaws) while
+    forming; any member may submit once the group has agreed."""
+    co = get_coterie(conn, coterie_id)
+    if co is None:
+        raise ValueError(f"Coterie {coterie_id} not found")
+    if co["creation_state"] != "forming":
+        raise ValueError(f"Coterie isn't forming (state: {co['creation_state']}).")
+    conn.execute(
+        "UPDATE coteries SET creation_state='submitted', updated_at=? WHERE id=?",
+        (_now(), coterie_id),
+    )
+    write_audit(conn, actor_id, "submit_coterie_sheet", "coterie", coterie_id,
+                after={"creation_state": "submitted"})
+    return get_coterie(conn, coterie_id)
+
+
+def approve_coterie_sheet(conn, coterie_id: int, reviewer_id: str) -> dict:
+    """Staff sign-off: submitted → active. Creation-time allocation (free dots
+    + the flaw budget) closes; further changes go through XP advances and
+    donations. Notifies the members."""
+    co = get_coterie(conn, coterie_id)
+    if co is None:
+        raise ValueError(f"Coterie {coterie_id} not found")
+    if co["creation_state"] != "submitted":
+        raise ValueError(f"Coterie isn't submitted (state: {co['creation_state']}).")
+    conn.execute(
+        "UPDATE coteries SET creation_state='active', updated_at=? WHERE id=?",
+        (_now(), coterie_id),
+    )
+    write_audit(conn, reviewer_id, "approve_coterie_sheet", "coterie", coterie_id,
+                after={"creation_state": "active"})
+    for m in list_coterie_members(conn, coterie_id):
+        ch = get_character(conn, m["character_id"])
+        if ch and ch.get("discord_id"):
+            enqueue_bot(conn, "coterie_sheet_approved", {
+                "discord_id": ch["discord_id"],
+                "coterie_name": co["name"], "coterie_id": coterie_id,
+            })
+    return get_coterie(conn, coterie_id)
+
+
+def return_coterie_sheet(conn, coterie_id: int, reviewer_id: str, reason: str | None = None) -> dict:
+    """Staff sends a submitted coterie back to forming for changes."""
+    co = get_coterie(conn, coterie_id)
+    if co is None:
+        raise ValueError(f"Coterie {coterie_id} not found")
+    if co["creation_state"] != "submitted":
+        raise ValueError(f"Coterie isn't submitted (state: {co['creation_state']}).")
+    conn.execute(
+        "UPDATE coteries SET creation_state='forming', updated_at=? WHERE id=?",
+        (_now(), coterie_id),
+    )
+    write_audit(conn, reviewer_id, "return_coterie_sheet", "coterie", coterie_id,
+                after={"creation_state": "forming", "reason": reason})
+    return get_coterie(conn, coterie_id)
+
+
+def list_coteries_awaiting_signoff(conn) -> list[dict]:
+    """Coteries that have been submitted and await staff sign-off."""
+    return conn.execute("""
+        SELECT co.*, COUNT(cm.id) AS member_count
+        FROM coteries co
+        LEFT JOIN coterie_memberships cm ON cm.coterie_id = co.id
+        WHERE co.creation_state='submitted' AND co.status='active'
+        GROUP BY co.id
+        ORDER BY co.updated_at ASC
+    """).fetchall()
 
 
 def list_coterie_members(conn, coterie_id: int) -> list[dict]:
@@ -2305,6 +2383,10 @@ def commit_free_creation_dots(
     members = list_coterie_members(conn, coterie_id)
     if not any(m["character_id"] == character_id for m in members):
         raise ValueError("Character is not a member of this coterie.")
+
+    co = get_coterie(conn, coterie_id)
+    if co is None or co["creation_state"] != "forming":
+        raise ValueError("Free creation dots are only available while the coterie is forming.")
 
     used = member_free_dots_used(conn, coterie_id, character_id)
     if used + dots > CREATION_FREE_DOTS_PER_MEMBER:
@@ -2763,7 +2845,7 @@ def approve_coterie_request(conn, request_id: int, reviewer_id: str) -> dict:
             f"(max {settings.COTERIE_MAX_MEMBERS})."
         )
 
-    coterie = create_coterie(conn, req["proposed_name"])
+    coterie = create_coterie(conn, req["proposed_name"], creation_state="forming")
     for char_id in member_ids:
         add_coterie_member(conn, coterie["id"], char_id)
 

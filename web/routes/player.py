@@ -1803,6 +1803,20 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
     members = list_coterie_members(conn, coterie_id)
     spends  = list_coterie_spends(conn, coterie_id)
 
+    # Free creation dots per member — only meaningful while the coterie is
+    # still 'forming'. Surfaced for ALL members so a single assembler can
+    # allocate on everyone's behalf (how coteries are built in practice).
+    coterie_free_dots: list[dict] = []
+    if coterie and coterie["creation_state"] == "forming":
+        for m in members:
+            used = member_free_dots_used(conn, coterie_id, m["character_id"])
+            coterie_free_dots.append({
+                "char_id":   m["character_id"],
+                "char_name": m["character_name"],
+                "used":      used,
+                "left":      max(0, CREATION_FREE_DOTS_PER_MEMBER - used),
+            })
+
     # Single-funder advance costs — what one member pays personally for
     # +1 Chasse/Lien/Portillon. Uses the "Advantage" rule (flat 3/dot)
     # because the Steward rules say C/L/P are treated the same as any
@@ -1840,18 +1854,11 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
     # and to surface their donatable merits.
     viewer_member_chars: list[dict] = []
     viewer_donatable: list[dict] = []
-    viewer_free_dots: list[dict] = []
     if viewer_discord_id:
         member_char_ids = {m["character_id"] for m in members}
         for c in list_player_characters(conn, viewer_discord_id):
             if c["id"] in member_char_ids:
                 viewer_member_chars.append(c)
-                _fd_used = member_free_dots_used(conn, coterie_id, c["id"])
-                viewer_free_dots.append({
-                    "char_id": c["id"], "char_name": c["name"],
-                    "used": _fd_used,
-                    "left": max(0, CREATION_FREE_DOTS_PER_MEMBER - _fd_used),
-                })
                 full = get_character(conn, c["id"])
                 sheet = (full or {}).get("sheet_json") or {}
                 # Collect every merit/background/advantage on the sheet
@@ -1894,7 +1901,7 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
             "named_trait_cap": COTERIE_NAMED_TRAIT_CAP,
             "viewer_member_chars": viewer_member_chars,
             "viewer_donatable": viewer_donatable,
-            "viewer_free_dots": viewer_free_dots,
+            "coterie_free_dots": coterie_free_dots,
             "free_dots_per_member": CREATION_FREE_DOTS_PER_MEMBER}
 
 
@@ -1987,9 +1994,10 @@ async def submit_coterie_free_dots(
     user: dict = Depends(require_auth),
     _: None = Depends(csrf_protect),
 ):
-    """A member spends some of their free creation dots on a coterie trait —
-    Domain (chasse/lien/portillon) or a named merit/background. No XP; applied
-    directly to the sheet (the coterie is already staff-approved)."""
+    """Allocate free creation dots on a coterie trait — Domain (chasse/lien/
+    portillon) or a named merit/background. No XP. Any member may assemble the
+    sheet, allocating on behalf of any member (capped 2/member), so one person
+    can build it all; only valid while the coterie is 'forming'."""
     from ..db import commit_free_creation_dots
     form        = await request.form()
     char_id     = form_int(form.get("character_id"))
@@ -2001,16 +2009,21 @@ async def submit_coterie_free_dots(
         coterie = get_coterie(conn, coterie_id)
         if not coterie:
             raise HTTPException(status_code=404)
-        members      = list_coterie_members(conn, coterie_id)
-        player_chars = list_player_characters(conn, user["id"])
-        actor = _resolve_member_char(player_chars, members, char_id)
-        if actor is None:
+        members    = list_coterie_members(conn, coterie_id)
+        member_ids = {m["character_id"] for m in members}
+        owned      = {c["id"] for c in list_player_characters(conn, user["id"])}
+        # The actor must own a member of this coterie to assemble its sheet.
+        if not (member_ids & owned):
             raise HTTPException(status_code=403)
+        # Dots are attributed to the chosen member (any member — one assembler
+        # can fill in everyone's). Default to the actor's own member char.
+        if char_id not in member_ids:
+            char_id = next(iter(member_ids & owned))
 
         flash_kind, flash_msg = "success", "Free dots allocated."
         try:
             commit_free_creation_dots(
-                conn, coterie_id=coterie_id, character_id=actor["id"],
+                conn, coterie_id=coterie_id, character_id=char_id,
                 target_kind=target_kind, target_name=target_name, dots=dots,
             )
             label = target_name or target_kind.title()
@@ -2020,6 +2033,38 @@ async def submit_coterie_free_dots(
 
         ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
 
+    resp = templates.TemplateResponse(
+        request, "player/coterie_detail.html", _ctx(request, **ctx),
+    )
+    _toast(resp, flash_msg, flash_kind)
+    return resp
+
+
+@router.post("/coteries/{coterie_id}/submit-sheet", response_class=HTMLResponse)
+async def submit_coterie_sheet_route(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Submit the assembled coterie sheet for staff sign-off (forming →
+    submitted). Any member may submit (the group has agreed in their cubby)."""
+    from ..db import submit_coterie_sheet
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+        members    = list_coterie_members(conn, coterie_id)
+        member_ids = {m["character_id"] for m in members}
+        owned      = {c["id"] for c in list_player_characters(conn, user["id"])}
+        if not (member_ids & owned):
+            raise HTTPException(status_code=403)
+        flash_kind, flash_msg = "success", "Coterie sheet submitted for staff sign-off."
+        try:
+            submit_coterie_sheet(conn, coterie_id, user["id"])
+        except ValueError as e:
+            flash_kind, flash_msg = "error", str(e)
+        ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
     resp = templates.TemplateResponse(
         request, "player/coterie_detail.html", _ctx(request, **ctx),
     )

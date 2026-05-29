@@ -18,6 +18,14 @@
     </div>
   </div>
 
+  {# ── Coterie sheets awaiting sign-off ── #}
+  <div class="mb-8">
+    <p class="label-gold mb-3">Coterie Sheets Awaiting Sign-off
+      {% if coteries_awaiting_signoff %}<span class="chip text-blood-400 border-blood-900 text-[0.55rem] ml-2">{{ coteries_awaiting_signoff | length }}</span>{% endif %}
+    </p>
+    {% include "staff/partials/coterie_signoff_table.html" %}
+  </div>
+
   {# ── Domain upgrade spends ── #}
   <div class="mb-8">
     <p class="label-gold mb-3">Pending Domain Upgrades
@@ -96,7 +104,11 @@
           {% for co in coteries %}
           <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors cursor-pointer"
               onclick="window.location.href='/staff/coteries/{{ co.id }}'">
-            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">{{ co.name }}</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-bone-200">{{ co.name }}
+              {% if co.creation_state and co.creation_state != 'active' %}
+              <span class="chip text-mauve-400 border-mauve-800 text-[0.5rem] ml-1">{{ co.creation_state }}</span>
+              {% endif %}
+            </td>
             <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.chasse }}</td>
             <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.lien }}</td>
             <td class="px-4 py-2.5 text-center font-cinzel text-xs text-bone-400">{{ co.portillon }}</td>
