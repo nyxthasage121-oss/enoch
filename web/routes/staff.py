@@ -1406,12 +1406,18 @@ async def approve_coterie_sheet_route(
             approve_coterie_sheet(conn, coterie_id, user["id"])
     except ValueError as e:
         err = str(e)
+    msg = err or "Coterie sheet approved — now active."
+    # Plain POST from the coterie review page → redirect back there; the
+    # queue's HTMX call gets the refreshed sign-off table swapped in.
+    if not request.headers.get("HX-Request"):
+        request.session["flash"] = [{"kind": "error" if err else "success", "message": msg}]
+        return RedirectResponse(url=f"/staff/coteries/{coterie_id}", status_code=303)
     with get_db() as conn:
         ctx = _coterie_ctx(conn)
     resp = templates.TemplateResponse(
         request, "staff/partials/coterie_signoff_table.html", _ctx(request, **ctx)
     )
-    _toast(resp, err or "Coterie sheet approved — now active.", "error" if err else "success")
+    _toast(resp, msg, "error" if err else "success")
     return resp
 
 
@@ -1432,12 +1438,16 @@ async def return_coterie_sheet_route(
             return_coterie_sheet(conn, coterie_id, user["id"], reason)
     except ValueError as e:
         err = str(e)
+    msg = err or "Coterie returned to the group for changes."
+    if not request.headers.get("HX-Request"):
+        request.session["flash"] = [{"kind": "error" if err else "info", "message": msg}]
+        return RedirectResponse(url=f"/staff/coteries/{coterie_id}", status_code=303)
     with get_db() as conn:
         ctx = _coterie_ctx(conn)
     resp = templates.TemplateResponse(
         request, "staff/partials/coterie_signoff_table.html", _ctx(request, **ctx)
     )
-    _toast(resp, err or "Coterie returned to the group for changes.", "error" if err else "info")
+    _toast(resp, msg, "error" if err else "info")
     return resp
 
 

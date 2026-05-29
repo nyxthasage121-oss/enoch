@@ -286,6 +286,28 @@
       {% endif %}
     </div>
 
+    {# Allocations so far — removable while forming (undo mis-clicks) #}
+    {% set _creation = active_contribs | selectattr('contribution_type', 'in', ['creation_free', 'flaw_bonus']) | list %}
+    {% if _creation %}
+    <div class="mt-3 pt-3 border-t border-ink-800">
+      <p class="label-gold text-[0.7rem] mb-2">Allocated so far</p>
+      <div class="space-y-1">
+        {% for c in _creation %}
+        <div class="flex items-center justify-between gap-2 text-xs">
+          <span class="font-garamond {{ 'text-blood-400' if c.target_kind == 'flaw' else 'text-bone-400' }}">
+            {% if c.target_kind == 'flaw' %}Flaw:{% elif c.character_name %}{{ c.character_name }} →{% endif %}
+            {{ c.target_name or (c.target_kind | title) }} <span class="text-gold-500">{{ c.dots }}</span>
+          </span>
+          <form method="POST" action="/coteries/{{ coterie.id }}/creation/{{ c.id }}/remove">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button type="submit" class="font-cinzel text-[0.55rem] text-blood-500 hover:text-blood-400 tracking-widest">Remove</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     {# Submit the assembled sheet for staff sign-off #}
     <form method="POST" action="/coteries/{{ coterie.id }}/submit-sheet"
           class="mt-4 pt-4 border-t border-ink-800"

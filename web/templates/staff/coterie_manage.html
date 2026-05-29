@@ -11,6 +11,40 @@
     <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">{{ coterie.name }}</h1>
   </div>
 
+  {# ── Creation sign-off (when submitted for review) ── #}
+  {% if coterie.creation_state == 'submitted' %}
+  <div class="gilded p-5 mb-6 border border-gold-800" x-data="{ returning: false, reason: '' }">
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <div class="min-w-0">
+        <p class="label-gold text-gold-400 mb-1">Awaiting Sign-off</p>
+        <p class="font-garamond text-bone-400 text-sm">
+          The members submitted this sheet. Review the Domain, merits, backgrounds, and flaws
+          below, then approve it (goes active) or send it back for changes.
+        </p>
+      </div>
+      <div x-show="!returning" class="flex gap-2 shrink-0">
+        <form method="POST" action="/staff/coteries/{{ coterie.id }}/approve-sheet">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-4 py-2">Approve</button>
+        </form>
+        <button type="button" @click="returning = true"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-4 py-2">Return</button>
+      </div>
+      <form x-show="returning" x-cloak method="POST" action="/staff/coteries/{{ coterie.id }}/return-sheet"
+            class="flex gap-1 items-center shrink-0">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <input type="text" name="reason" x-model="reason" placeholder="Reason (optional)" class="text-xs py-1 px-2 w-40">
+        <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Send back</button>
+        <button type="button" @click="returning = false" class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1">Cancel</button>
+      </form>
+    </div>
+  </div>
+  {% elif coterie.creation_state == 'forming' %}
+  <div class="gilded-inset px-4 py-3 mb-6 border border-mauve-800">
+    <p class="font-cinzel text-mauve-300 text-xs tracking-widest uppercase">Forming — members are still assembling this sheet</p>
+  </div>
+  {% endif %}
+
   {# Domain values (read-only display) #}
   <div class="gilded p-5 mb-6">
     <p class="label-gold text-xs mb-3">Domain</p>

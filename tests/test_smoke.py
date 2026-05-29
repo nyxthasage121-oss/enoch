@@ -2484,6 +2484,60 @@ def test_chasse_reduction_only_for_owning_coterie(player):
             conn.commit()
 
 
+def test_coterie_creation_undo(player):
+    """Polish: a member can remove a free-dot / flaw allocation while forming."""
+    from web.db import (get_db, create_coterie, add_coterie_member, create_character,
+                        commit_free_creation_dots, list_coterie_contributions, update_character)
+    DEV = "111111111111111111"
+    with get_db() as conn:
+        a = create_character(conn, discord_id=DEV, name="UndoViewer", clan="brujah")
+        update_character(conn, a["id"], is_approved=1)
+        co = create_coterie(conn, "UndoSmoke", creation_state="forming")
+        add_coterie_member(conn, co["id"], a["id"])
+        c = commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
+                                      target_kind="chasse", target_name=None, dots=1)
+        cid = c["id"]
+        conn.commit()
+    try:
+        r = player.post(f"/coteries/{co['id']}/creation/{cid}/remove",
+                        data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+        assert r.status_code == 200
+        with get_db() as conn:
+            active = list_coterie_contributions(conn, co["id"], status="active")
+        assert not any(x["id"] == cid for x in active)   # removed
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM coterie_contributions WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
+            conn.execute("DELETE FROM characters WHERE id=?", (a["id"],))
+            conn.commit()
+
+
+def test_staff_review_page_signoff(staff):
+    """Polish: staff can sign off a submitted coterie from the review page
+    (plain POST -> redirect, coterie goes active)."""
+    from web.db import get_db, create_coterie, get_coterie
+    with get_db() as conn:
+        co = create_coterie(conn, "ReviewSignoff", creation_state="submitted")
+        cid = co["id"]
+        conn.commit()
+    try:
+        r = staff.get(f"/staff/coteries/{cid}")
+        assert r.status_code == 200
+        assert "Awaiting Sign-off" in r.text
+        assert f"/staff/coteries/{cid}/approve-sheet" in r.text
+        ap = staff.post(f"/staff/coteries/{cid}/approve-sheet",
+                        data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+        assert ap.status_code == 303
+        with get_db() as conn:
+            assert get_coterie(conn, cid)["creation_state"] == "active"
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM coteries WHERE id=?", (cid,))
+            conn.commit()
+
+
 def test_aurora_visual_layer_wired(player):
     """The aurora CSS + JS bundles should be linked from every page
     via base.html, the SVG LUT filter should be inlined for body { filter: url(#aurora-grade) },

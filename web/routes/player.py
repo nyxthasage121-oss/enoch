@@ -2101,6 +2101,48 @@ async def submit_coterie_flaw(
     return resp
 
 
+@router.post("/coteries/{coterie_id}/creation/{contribution_id}/remove", response_class=HTMLResponse)
+async def remove_coterie_creation_entry(
+    request: Request,
+    coterie_id: int,
+    contribution_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Undo a free-dot or flaw allocation while the coterie is forming (any
+    member). Only creation contributions can be removed this way."""
+    from ..db import set_contribution_status
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+        members    = list_coterie_members(conn, coterie_id)
+        member_ids = {m["character_id"] for m in members}
+        owned      = {c["id"] for c in list_player_characters(conn, user["id"])}
+        if not (member_ids & owned):
+            raise HTTPException(status_code=403)
+
+        flash_kind, flash_msg = "success", "Allocation removed."
+        row = conn.execute(
+            "SELECT coterie_id, contribution_type FROM coterie_contributions WHERE id=?",
+            (contribution_id,),
+        ).fetchone()
+        if coterie["creation_state"] != "forming":
+            flash_kind, flash_msg = "error", "Edits are locked once the sheet is submitted."
+        elif (not row or row["coterie_id"] != coterie_id
+              or row["contribution_type"] not in ("creation_free", "flaw_bonus")):
+            flash_kind, flash_msg = "error", "That isn't a removable creation entry."
+        else:
+            set_contribution_status(conn, contribution_id, "removed", actor_id=user["id"])
+        ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
+
+    resp = templates.TemplateResponse(
+        request, "player/coterie_detail.html", _ctx(request, **ctx),
+    )
+    _toast(resp, flash_msg, flash_kind)
+    return resp
+
+
 @router.post("/coteries/{coterie_id}/submit-sheet", response_class=HTMLResponse)
 async def submit_coterie_sheet_route(
     request: Request,
