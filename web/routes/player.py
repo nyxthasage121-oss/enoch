@@ -759,6 +759,15 @@ async def character_edit_post(
     if not char:
         raise HTTPException(status_code=404)
 
+    # Lock: while staff has this pending character under review, freeze ALL
+    # player edits (identity + profile), mirroring the /sheet lock — so the
+    # character can't change out from under the reviewer. Edits are free
+    # again before review starts and after approval (gated on is_approved).
+    if not char.get("is_approved") and char.get("review_started_at"):
+        request.session["flash"] = [{"kind": "error",
+            "message": "Staff is reviewing this character — edits are locked until they finish."}]
+        return RedirectResponse(url=f"/characters/{character_id}", status_code=303)
+
     form          = await request.form()
     concept       = (form.get("concept") or "").strip() or None
     sire          = (form.get("sire") or "").strip() or None

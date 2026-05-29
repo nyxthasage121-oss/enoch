@@ -1349,6 +1349,46 @@ def test_approved_character_sheet_edit_unlocked_despite_review_flag(staff, playe
             conn.commit()
 
 
+def test_edit_locked_during_review(staff, player):
+    """While staff has a pending character under review, /edit is frozen too
+    (not just /sheet) — identity + profile fields can't change out from under
+    the reviewer."""
+    import json as _j
+    r = player.post(
+        "/characters/new",
+        data={"_csrf": "dev-csrf-token", "name": "Edit Lock Smoke", "clan": "brujah",
+              "concept": "Original Concept", "attr_strength": "2",
+              "touchstones": _j.dumps(["Anchor One", "Anchor Two"])},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+    from web.db import get_db, start_character_review
+    with get_db() as conn:
+        cid = conn.execute(
+            "SELECT id FROM characters WHERE name='Edit Lock Smoke' ORDER BY id DESC LIMIT 1"
+        ).fetchone()["id"]
+    try:
+        with get_db() as conn:
+            start_character_review(conn, cid, reviewer_id="staff-smoke")
+        rr = player.post(
+            f"/characters/{cid}/edit",
+            data={"_csrf": "dev-csrf-token", "name": "Edit Lock Smoke",
+                  "clan": "brujah", "concept": "CHANGED Concept"},
+            follow_redirects=False,
+        )
+        assert rr.status_code == 303
+        with get_db() as conn:
+            concept = conn.execute(
+                "SELECT concept FROM characters WHERE id=?", (cid,)
+            ).fetchone()["concept"]
+        assert concept == "Original Concept", "identity edits must be frozen during review"
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE id=?", (cid,))
+            conn.commit()
+
+
 # ── Hunting sites + hunt logs ────────────────────────────────────────────────
 
 def test_staff_site_create_with_predator_dcs_and_coterie(staff):
