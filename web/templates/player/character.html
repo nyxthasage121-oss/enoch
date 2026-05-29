@@ -145,47 +145,115 @@
     </div>
     {% endif %}
 
-    {% if char.concept or char.sire or char.covenant or char.profile_blurb %}
-    <div class="gilded p-5">
-      {% if char.profile_blurb %}
-        <p class="font-garamond text-bone-400 text-base leading-relaxed italic mb-4">
-          {{ char.profile_blurb }}
-        </p>
-        <div class="divider-gold mb-4"></div>
-      {% endif %}
+    {# ══ About My Character — identity + narrative, relocated out of chargen ══ #}
+    {% set _about_locked = (not char.is_approved and char.review_started_at) %}
+    <div class="gilded p-5" x-data="{ editing: false }">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <p class="label-gold">About My Character</p>
+        {% if _about_locked %}
+        <span class="font-cinzel text-[0.6rem] tracking-widest uppercase text-bone-700">Locked during review</span>
+        {% else %}
+        <button type="button" x-show="!editing" @click="editing = true"
+                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Edit</button>
+        {% endif %}
+      </div>
 
-      <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-        {% if char.concept %}
+      {# ── View mode ── #}
+      <div x-show="!editing">
+        {% if char.profile_blurb %}
+        <p class="font-garamond text-bone-400 text-base leading-relaxed italic mb-4">{{ char.profile_blurb }}</p>
+        <div class="divider-gold mb-4"></div>
+        {% endif %}
+        {% set _has_any = char.concept or char.sire or char.covenant or char.predator_type
+                          or char.profession or char.pronouns or char.true_age or char.apparent_age
+                          or char.ambition or char.desire or char.profile_blurb or char.backstory %}
+        {% if _has_any %}
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          {% for label, val in [
+            ('Concept', char.concept), ('Sire', char.sire),
+            ('Predator Type', char.predator_type), ('Covenant', char.covenant),
+            ('Profession', char.profession), ('Pronouns', char.pronouns),
+            ('True Age', char.true_age), ('Apparent Age', char.apparent_age),
+            ('Ambition', char.ambition), ('Desire', char.desire),
+          ] %}
+            {% if val %}
+            <div>
+              <dt class="label-gold mb-0.5">{{ label }}</dt>
+              <dd class="font-garamond text-bone-300">{{ val }}</dd>
+            </div>
+            {% endif %}
+          {% endfor %}
+        </dl>
+        {% if char.backstory %}
+        <div class="divider-gold my-4"></div>
+        <dt class="label-gold mb-1">Backstory
+          <span class="text-bone-700 normal-case text-[0.6rem]">(staff-only)</span></dt>
+        <dd class="font-garamond text-bone-400 text-sm leading-relaxed whitespace-pre-line">{{ char.backstory }}</dd>
+        {% endif %}
+        {% else %}
+        <p class="font-garamond text-bone-600 text-sm">No details yet{% if not _about_locked %} — click Edit to add your concept, story, and more{% endif %}.</p>
+        {% endif %}
+      </div>
+
+      {# ── Edit mode ── #}
+      {% if not _about_locked %}
+      <form x-show="editing" x-cloak method="post" action="/characters/{{ char.id }}/about" class="space-y-4">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="label-gold block mb-1">Concept</label>
+            <input type="text" name="concept" maxlength="120" value="{{ char.concept or '' }}" class="w-full text-sm">
+          </div>
+          <div>
+            <label class="label-gold block mb-1">Sire</label>
+            <input type="text" name="sire" maxlength="80" value="{{ char.sire or '' }}" class="w-full text-sm">
+          </div>
+          <div>
+            <label class="label-gold block mb-1">Covenant / Sect</label>
+            <input type="text" name="covenant" maxlength="80" value="{{ char.covenant or '' }}" class="w-full text-sm">
+          </div>
+        </div>
+
+        {% if char.profile_locked %}
+        <p class="font-garamond text-bone-600 text-xs italic border-l border-ink-700 pl-3">
+          Staff locked your IC profile — concept, sire, and covenant stay editable; the rest is frozen.
+        </p>
+        {% else %}
         <div>
-          <dt class="label-gold mb-0.5">Concept</dt>
-          <dd class="font-garamond text-bone-300">{{ char.concept }}</dd>
+          <label class="label-gold block mb-1">Profile Blurb
+            <span class="text-bone-700 normal-case text-[0.6rem]">(visible to other players)</span></label>
+          <textarea name="profile_blurb" rows="3" maxlength="600" class="w-full text-sm resize-y">{{ char.profile_blurb or '' }}</textarea>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div><label class="label-gold block mb-1">Profession</label>
+            <input type="text" name="profession" maxlength="80" value="{{ char.profession or '' }}" class="w-full text-sm"></div>
+          <div><label class="label-gold block mb-1">Pronouns</label>
+            <input type="text" name="pronouns" maxlength="40" value="{{ char.pronouns or '' }}" class="w-full text-sm"></div>
+          <div><label class="label-gold block mb-1">True Age</label>
+            <input type="number" name="true_age" min="0" max="2000" value="{{ char.true_age or '' }}" class="w-full text-sm"></div>
+          <div><label class="label-gold block mb-1">Apparent Age</label>
+            <input type="number" name="apparent_age" min="0" max="120" value="{{ char.apparent_age or '' }}" class="w-full text-sm"></div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div><label class="label-gold block mb-1">Ambition</label>
+            <input type="text" name="ambition" maxlength="120" value="{{ char.ambition or '' }}" class="w-full text-sm"></div>
+          <div><label class="label-gold block mb-1">Desire</label>
+            <input type="text" name="desire" maxlength="120" value="{{ char.desire or '' }}" class="w-full text-sm"></div>
+        </div>
+        <div>
+          <label class="label-gold block mb-1">Backstory
+            <span class="text-bone-700 normal-case text-[0.6rem]">(staff-only)</span></label>
+          <textarea name="backstory" rows="4" maxlength="2000" class="w-full text-sm resize-y">{{ char.backstory or '' }}</textarea>
         </div>
         {% endif %}
-        {% if char.sire %}
-        <div>
-          <dt class="label-gold mb-0.5">Sire</dt>
-          <dd class="font-garamond text-bone-300">{{ char.sire }}</dd>
+
+        <div class="flex items-center gap-2">
+          <button type="submit" class="btn-send font-cinzel tracking-widest text-xs px-4 py-2">Save</button>
+          <button type="button" @click="editing = false" class="btn-ghost font-cinzel tracking-widest text-xs px-4 py-2">Cancel</button>
         </div>
-        {% endif %}
-        {% if char.predator_type %}
-        <div>
-          <dt class="label-gold mb-0.5">Predator Type</dt>
-          <dd class="font-garamond text-bone-300">{{ char.predator_type }}</dd>
-        </div>
-        {% endif %}
-        {% if char.covenant %}
-        <div>
-          <dt class="label-gold mb-0.5">Covenant</dt>
-          <dd class="font-garamond text-bone-300">{{ char.covenant }}</dd>
-        </div>
-        {% endif %}
-      </dl>
+      </form>
+      {% endif %}
     </div>
-    {% else %}
-    <div class="gilded p-5 text-center">
-      <p class="font-garamond text-bone-600 text-sm">No overview information on file.</p>
-    </div>
-    {% endif %}
 
     {% if coterie %}
     <div class="gilded p-5">

@@ -728,6 +728,49 @@ async def character_resume_draft(
     )
 
 
+@router.post("/characters/{character_id}/about", response_class=HTMLResponse)
+async def character_about_save(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Save the inline "About My Character" panel — the identity + narrative
+    fields relocated out of chargen. Mirrors /edit's gating: concept/sire/
+    covenant stay editable; the IC profile fields freeze once staff sets
+    profile_locked; everything locks while the character is under review."""
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+    if not char:
+        raise HTTPException(status_code=404)
+    if not char.get("is_approved") and char.get("review_started_at"):
+        request.session["flash"] = [{"kind": "error",
+            "message": "Staff is reviewing this character — edits are locked until they finish."}]
+        return RedirectResponse(url=f"/characters/{character_id}", status_code=303)
+
+    form = await request.form()
+    updates: dict = dict(
+        concept=(form.get("concept") or "").strip() or None,
+        sire=(form.get("sire") or "").strip() or None,
+        covenant=(form.get("covenant") or "").strip() or None,
+    )
+    if not char.get("profile_locked"):
+        updates.update(
+            profile_blurb=(form.get("profile_blurb") or "").strip() or None,
+            pronouns=(form.get("pronouns") or "").strip()[:60] or None,
+            profession=(form.get("profession") or "").strip()[:80] or None,
+            backstory=(form.get("backstory") or "").strip() or None,
+            ambition=(form.get("ambition") or "").strip() or None,
+            desire=(form.get("desire") or "").strip() or None,
+            true_age=form_int(form.get("true_age")) or None,
+            apparent_age=form_int(form.get("apparent_age")) or None,
+        )
+    with get_db() as conn:
+        update_character(conn, character_id, **updates)
+    request.session["flash"] = [{"kind": "success", "message": "Character details updated."}]
+    return RedirectResponse(url=f"/characters/{character_id}", status_code=303)
+
+
 @router.get("/characters/{character_id}/edit", response_class=HTMLResponse)
 async def character_edit(
     request: Request,

@@ -2139,6 +2139,62 @@ def test_coterie_pages_render_single_funder_spend(_client):
             conn.commit()
 
 
+def test_about_panel_renders_and_saves_with_gating(player):
+    """The 'About My Character' panel renders on the character page, the
+    /about endpoint saves the relocated identity/narrative fields, and
+    profile_locked freezes the IC profile while concept/sire/covenant stay
+    editable."""
+    from web.db import get_db, get_character, create_character, update_character
+    DEV = "111111111111111111"
+    with get_db() as conn:
+        c = create_character(conn, discord_id=DEV, name="AboutPanelTest", clan="brujah")
+        cid = c["id"]
+        update_character(conn, cid, is_approved=1)
+        conn.commit()
+    try:
+        page = player.get(f"/characters/{cid}")
+        assert page.status_code == 200
+        assert "About My Character" in page.text
+
+        # Save (unlocked) — all fields land
+        r = player.post(f"/characters/{cid}/about", data={
+            "_csrf": "dev-csrf-token",
+            "concept": "Test Concept", "sire": "Test Sire", "covenant": "Anarch",
+            "ambition": "Rule the night", "profession": "Bartender",
+            "profile_blurb": "A blurb", "backstory": "Long story",
+            "true_age": "120", "apparent_age": "30",
+        }, follow_redirects=False)
+        assert r.status_code == 303
+        with get_db() as conn:
+            c1 = get_character(conn, cid)
+        assert c1["concept"] == "Test Concept"
+        assert c1["ambition"] == "Rule the night"
+        assert c1["profession"] == "Bartender"
+        assert c1["true_age"] == 120
+        assert c1["profile_blurb"] == "A blurb"
+
+        # Lock the profile — concept stays editable, IC fields freeze
+        with get_db() as conn:
+            conn.execute("UPDATE characters SET profile_locked=1 WHERE id=?", (cid,))
+            conn.commit()
+        r2 = player.post(f"/characters/{cid}/about", data={
+            "_csrf": "dev-csrf-token",
+            "concept": "Locked Concept", "sire": "Test Sire", "covenant": "Anarch",
+            "profile_blurb": "SHOULD NOT SAVE", "profession": "SHOULD NOT SAVE",
+        }, follow_redirects=False)
+        assert r2.status_code == 303
+        with get_db() as conn:
+            c2 = get_character(conn, cid)
+        assert c2["concept"] == "Locked Concept"     # always editable
+        assert c2["profile_blurb"] == "A blurb"       # frozen
+        assert c2["profession"] == "Bartender"        # frozen
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM ledger_entries WHERE character_id=?", (cid,))
+            conn.execute("DELETE FROM characters WHERE id=?", (cid,))
+            conn.commit()
+
+
 def test_aurora_visual_layer_wired(player):
     """The aurora CSS + JS bundles should be linked from every page
     via base.html, the SVG LUT filter should be inlined for body { filter: url(#aurora-grade) },
