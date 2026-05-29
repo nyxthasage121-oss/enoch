@@ -2940,16 +2940,17 @@ def test_short_form_submit_stages_as_draft(player):
         assert "tab=sheet" in r.headers.get("location", "")
         with get_db() as conn:
             row = conn.execute(
-                "SELECT is_draft, is_approved, sheet_json FROM characters "
+                "SELECT is_draft, is_approved, post_wizard, sheet_json FROM characters "
                 "WHERE name='Short Form Drafted'"
             ).fetchone()
             assert row is not None
             assert row["is_draft"] == 1, "short-form Submit must stage as a draft"
             assert row["is_approved"] == 0
-            # Sentinel so the roster routes resume back to the detail page
-            # rather than the wizard.
-            assert '"_post_wizard": true' in row["sheet_json"].lower() \
-                   or '"_post_wizard":true' in row["sheet_json"].lower()
+            # post_wizard column (migration 026) flags this draft so the roster
+            # resume link routes to the detail page, not back into the wizard.
+            assert row["post_wizard"] == 1
+            # And routing state must NOT leak back into the sheet blob.
+            assert "_post_wizard" not in (row["sheet_json"] or "")
     finally:
         with get_db() as conn:
             upsert_settings(conn, require_sheet_on_create=1)

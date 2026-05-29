@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-CURRENT_SHEET_VERSION = 1
+CURRENT_SHEET_VERSION = 2
 
 # Sentinel for "legacy sheet" — was missing _schema_version. We treat as v0.
 _VERSION_KEY = "_schema_version"
@@ -43,8 +43,20 @@ def _patch_v0_to_v1(sheet: dict) -> dict:
     return sheet
 
 
+def _patch_v1_to_v2(sheet: dict) -> dict:
+    """v1 → v2: drop the legacy `_post_wizard` routing sentinel. It was a
+    UI/routing flag (does this draft resume on the detail page or back in the
+    wizard?) that never belonged in the character sheet; it now lives in the
+    characters.post_wizard column (migration 026). Idempotent — a no-op on
+    sheets that never carried it."""
+    sheet.pop("_post_wizard", None)
+    sheet[_VERSION_KEY] = 2
+    return sheet
+
+
 _MIGRATIONS: list[tuple[int, Callable[[dict], dict]]] = [
     (0, _patch_v0_to_v1),
+    (1, _patch_v1_to_v2),
 ]
 
 

@@ -458,6 +458,9 @@ def update_character(conn, character_id: int, **fields) -> dict:
         "st_notes",
         # Migration 018 — profile lock + ingrained discipline tracking
         "profile_locked", "ingrained_discipline",
+        # Migration 026 — post-wizard sheet-completion flag (replaces the
+        # old `_post_wizard` sentinel that lived inside sheet_json)
+        "post_wizard",
     }
     # JSON-serialize the in-memoriam blob before persistence
     if "in_memoriam" in fields and isinstance(fields["in_memoriam"], (dict, list)):

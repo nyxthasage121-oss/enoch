@@ -549,12 +549,13 @@ async def character_create(
         sheet.pop("hunger", None)
         sheet.pop("blood_potency", None)
 
-    # Short-form Submit moves the character past the wizard but keeps it
-    # in the draft state so the player can keep editing the sheet on the
-    # detail page. Mark the sheet with a sentinel so the roster's "resume"
-    # link routes them to the detail page (not back into the wizard).
-    if not require_sheet and not as_draft:
-        sheet["_post_wizard"] = True
+    # Short-form Submit moves the character past the wizard but keeps it in
+    # the draft state so the player can keep editing the sheet on the detail
+    # page. `post_wizard` (a real column, migration 026) flags this so the
+    # roster's resume link routes to the detail page, not back into the
+    # wizard. This used to be an `_post_wizard` sentinel inside sheet_json —
+    # routing state doesn't belong in the character blob.
+    post_wizard = 1 if (not require_sheet and not as_draft) else 0
 
     from ..db import update_character
     with get_db() as conn:
@@ -588,6 +589,7 @@ async def character_create(
                 # detail-page "Submit for Review" button flips this.
                 is_draft=1 if (as_draft or not require_sheet) else 0,
                 submission_notes=submission_notes,
+                post_wizard=post_wizard,
             )
             if profile_blurb:
                 update_character(conn, existing["id"], profile_blurb=profile_blurb)
@@ -625,6 +627,7 @@ async def character_create(
             # detail page before the character lands in the staff queue.
             if as_draft or not require_sheet:
                 post_fields["is_draft"] = 1
+            post_fields["post_wizard"] = post_wizard
             update_character(conn, char["id"], **post_fields)
 
     # Optional profile image — wizard only. If the player attached a file,

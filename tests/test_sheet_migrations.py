@@ -80,3 +80,23 @@ def test_enrich_char_applies_migration_to_reads(player):
         ch = get_character(conn, cid)
     assert ch is not None
     assert ch["sheet_json"].get(_VERSION_KEY) == CURRENT_SHEET_VERSION
+
+
+def test_v2_strips_post_wizard_sentinel():
+    """v1 -> v2 removes the legacy `_post_wizard` routing sentinel (it now
+    lives in the characters.post_wizard column). Real sheet data is kept."""
+    sheet = {"strength": 3, "_post_wizard": True, _VERSION_KEY: 1}
+    migrated = migrate_sheet(sheet)
+    assert "_post_wizard" not in migrated
+    assert migrated[_VERSION_KEY] == CURRENT_SHEET_VERSION
+    assert migrated["strength"] == 3
+
+
+def test_v2_strips_post_wizard_from_legacy_sheet():
+    """A legacy (v0) sheet carrying the sentinel is migrated AND stripped in
+    one pass — proves the full chain runs, not just the last hop."""
+    sheet = {"auspex": 2, "_post_wizard": True}  # no version field = v0
+    migrated = migrate_sheet(sheet)
+    assert "_post_wizard" not in migrated
+    assert migrated[_VERSION_KEY] == CURRENT_SHEET_VERSION
+    assert migrated["auspex"] == 2
