@@ -294,27 +294,47 @@ def adjust_xp_manual(
     delta: int,
     note: str,
     staff_id: str,
+    target: str = "total",
 ) -> dict:
-    """Manual XP grant or deduction by staff.  delta > 0 = grant, < 0 = deduct."""
+    """Manual XP adjustment by staff. `delta` is the signed impact on the
+    character's *available* XP (>0 raises available, <0 lowers it).
+
+    target="total" moves earned XP (xp_total) — grant / remove. This is the
+        cap-relevant figure shown as "X / cap".
+    target="spent" moves consumed XP (xp_spent) — refund / add-spend. The
+        earned total is left untouched; available still shifts by `delta`
+        because xp_spent moves by -delta.
+    Both floor the adjusted column at 0. The ledger always records `delta`
+    (the available impact) so the history reads consistently."""
     char = get_character(conn, character_id)
     if char is None:
         raise ValueError(f"Character {character_id} not found")
     if not note.strip():
         raise ValueError("A note is required for manual adjustments.")
-    now       = _now()
-    new_total = max(0, char["xp_total"] + delta)
-    conn.execute(
-        "UPDATE characters SET xp_total=?, updated_at=? WHERE id=?",
-        (new_total, now, character_id),
-    )
+    now = _now()
+    if target == "spent":
+        new_spent = max(0, char["xp_spent"] - delta)
+        conn.execute(
+            "UPDATE characters SET xp_spent=?, updated_at=? WHERE id=?",
+            (new_spent, now, character_id),
+        )
+        audit_before = {"xp_spent": char["xp_spent"]}
+        audit_after  = {"xp_spent": new_spent, "delta": delta, "note": note}
+    else:
+        new_total = max(0, char["xp_total"] + delta)
+        conn.execute(
+            "UPDATE characters SET xp_total=?, updated_at=? WHERE id=?",
+            (new_total, now, character_id),
+        )
+        audit_before = {"xp_total": char["xp_total"]}
+        audit_after  = {"xp_total": new_total, "delta": delta, "note": note}
     conn.execute("""
         INSERT INTO ledger_entries
             (character_id, entry_type, xp_delta, reference_type, note, created_by, created_at)
         VALUES (?, 'adjustment', ?, 'manual', ?, ?, ?)
     """, (character_id, delta, note, staff_id, now))
     write_audit(conn, staff_id, "adjust_xp", "character", character_id,
-                before={"xp_total": char["xp_total"]},
-                after={"xp_total": new_total, "delta": delta, "note": note})
+                before=audit_before, after=audit_after)
     return get_character(conn, character_id)
 
 

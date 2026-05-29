@@ -1964,10 +1964,10 @@ async def admin_settings_save(
 # adjust_xp_manual (signed delta + note prefix), but the SIGN is derived
 # from the action so staff can't typo a refund as a deduction.
 _LEDGER_ACTIONS = {
-    "grant_xp":     {"sign":  1, "label": "Grant XP",      "prefix": "Grant"},
-    "remove_xp":    {"sign": -1, "label": "Remove XP",     "prefix": "Remove"},
-    "refund_spend": {"sign":  1, "label": "Refund Spend",  "prefix": "Refund"},
-    "add_spend":    {"sign": -1, "label": "Add Spend",     "prefix": "Spend"},
+    "grant_xp":     {"sign":  1, "target": "total", "label": "Grant XP",     "prefix": "Grant"},
+    "remove_xp":    {"sign": -1, "target": "total", "label": "Remove XP",    "prefix": "Remove"},
+    "refund_spend": {"sign":  1, "target": "spent", "label": "Refund Spend", "prefix": "Refund"},
+    "add_spend":    {"sign": -1, "target": "spent", "label": "Add Spend",    "prefix": "Spend"},
 }
 
 
@@ -1991,8 +1991,9 @@ async def adjust_character_xp(
             amount = abs(int(form.get("amount") or 0))
         except ValueError:
             amount = 0
-        spec  = _LEDGER_ACTIONS[action]
-        delta = spec["sign"] * amount
+        spec   = _LEDGER_ACTIONS[action]
+        delta  = spec["sign"] * amount
+        target = spec["target"]   # grant/remove -> earned total; refund/add-spend -> spent
         if note:
             note = f"{spec['prefix']}: {note}"
         else:
@@ -2000,7 +2001,8 @@ async def adjust_character_xp(
     else:
         # Legacy path — staff posts a signed delta directly. Used by
         # the admin-level "/admin/adjust-xp" form which still works
-        # the old way.
+        # the old way. Legacy deltas always move the earned total.
+        target = "total"
         try:
             delta = int(form.get("delta") or 0)
         except ValueError:
@@ -2015,7 +2017,7 @@ async def adjust_character_xp(
     else:
         try:
             with get_db() as conn:
-                adjust_xp_manual(conn, character_id, delta, note, user["id"])
+                adjust_xp_manual(conn, character_id, delta, note, user["id"], target=target)
             flash_msg = f"Adjusted XP by {delta:+d}."
         except ValueError as e:
             flash_kind, flash_msg = "error", str(e)
