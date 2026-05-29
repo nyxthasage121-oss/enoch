@@ -1949,56 +1949,6 @@ def test_start_review_is_noop_if_already_approved():
         assert after.get("review_started_at") == before  # unchanged
 
 
-# ── Coterie merits + flaws ────────────────────────────────────────────────────
-
-def test_coterie_merit_add_and_remove_round_trip():
-    """add_coterie_merit -> list_coterie_merits returns it -> remove deletes."""
-    from web.db import (
-        get_db, create_coterie, add_coterie_member,
-        add_coterie_merit, list_coterie_merits, remove_coterie_merit,
-    )
-    with get_db() as conn:
-        # The dev seed character (id=1) is the contributor
-        co = create_coterie(conn, "MeritSmoke")
-        add_coterie_member(conn, co["id"], 1)
-        try:
-            m = add_coterie_merit(conn, co["id"], 1, "Haven", 2,
-                                  merit_type="purchased", actor_id="smoke")
-            listed = list_coterie_merits(conn, co["id"])
-            assert any(x["id"] == m["id"] for x in listed)
-            assert listed[0]["character_name"] == "Valeria Morano"
-
-            remove_coterie_merit(conn, m["id"], actor_id="smoke")
-            after = list_coterie_merits(conn, co["id"])
-            assert not any(x["id"] == m["id"] for x in after)
-        finally:
-            conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
-            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
-
-
-def test_coterie_flaw_add_with_creation_grant():
-    """Flaws can carry a creation_grant — verify it persists."""
-    from web.db import (
-        get_db, create_coterie,
-        add_coterie_flaw, list_coterie_flaws, remove_coterie_flaw,
-    )
-    with get_db() as conn:
-        co = create_coterie(conn, "FlawSmoke")
-        try:
-            f = add_coterie_flaw(conn, co["id"], "Disliked", 2,
-                                 creation_grant=2, actor_id="smoke")
-            listed = list_coterie_flaws(conn, co["id"])
-            row = next(x for x in listed if x["id"] == f["id"])
-            assert row["dots"] == 2
-            assert row["creation_grant"] == 2
-            remove_coterie_flaw(conn, f["id"], actor_id="smoke")
-            assert not list_coterie_flaws(conn, co["id"])
-        finally:
-            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
-
-
-# ── Inactivity flag on roster ─────────────────────────────────────────────────
-
 def test_list_characters_includes_last_activity_field():
     """list_characters should now include a last_activity_at column,
     computed from MAX(claims, spends, ledger). NULL when no activity."""

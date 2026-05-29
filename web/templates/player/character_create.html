@@ -124,10 +124,6 @@
             <span class="text-bone-700 w-20 shrink-0 text-xs">Clan</span>
             <span class="font-garamond text-bone-300 text-xs" x-text="clanLabel && clanLabel()"></span>
           </div>
-          <div class="flex gap-2" x-show="charName.covenant">
-            <span class="text-bone-700 w-20 shrink-0 text-xs">Sect</span>
-            <span class="font-garamond text-bone-300 text-xs" x-text="charName.covenant"></span>
-          </div>
           <div class="flex gap-2" x-show="charName.predator_type">
             <span class="text-bone-700 w-20 shrink-0 text-xs">Predator</span>
             <span class="font-garamond text-bone-300 text-xs" x-text="charName.predator_type"></span>
@@ -1421,22 +1417,8 @@
             <div class="flex gap-2" x-show="charName.character_type === 'revenant'"><span class="text-bone-700 w-24 shrink-0">Family</span><span class="font-garamond text-bone-300" x-text="charName.revenant_family || '—'"></span></div>
             <div class="flex gap-2" x-show="charName.character_type === 'ghoul'"><span class="text-bone-700 w-24 shrink-0">Regnant</span><span class="font-garamond text-bone-300" x-text="charName.ghoul_regnant || '—'"></span></div>
             <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Predator</span><span class="font-garamond text-bone-400" x-text="charName.predator_type || '—'"></span></div>
-            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Covenant</span><span class="font-garamond text-bone-400" x-text="charName.covenant || '—'"></span></div>
-            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Profession</span><span class="font-garamond text-bone-400" x-text="charName.profession || '—'"></span></div>
-            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Pronouns</span><span class="font-garamond text-bone-400" x-text="charName.pronouns || '—'"></span></div>
-            <div class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">True / Apparent</span><span class="font-garamond text-bone-400" x-text="(charName.true_age || '—') + ' / ' + (charName.apparent_age || '—')"></span></div>
           </div>
         </div>
-
-        <template x-if="charName.ambition || charName.desire">
-          <div>
-            <p class="label-gold mb-2 text-[0.75rem]">Drives</p>
-            <div class="space-y-1.5 text-sm">
-              <div x-show="charName.ambition" class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Ambition</span><span class="font-garamond text-bone-300 italic" x-text="charName.ambition"></span></div>
-              <div x-show="charName.desire" class="flex gap-2"><span class="text-bone-700 w-24 shrink-0">Desire</span><span class="font-garamond text-bone-300 italic" x-text="charName.desire"></span></div>
-            </div>
-          </div>
-        </template>
 
         {# Attributes — detail #}
         <div>
