@@ -1797,6 +1797,7 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
     the template can show advance/donate/cancel buttons."""
     from ..db import (
         list_coterie_contributions, COTERIE_NAMED_TRAIT_CAP,
+        member_free_dots_used, CREATION_FREE_DOTS_PER_MEMBER,
     )
     coterie = get_coterie(conn, coterie_id)
     members = list_coterie_members(conn, coterie_id)
@@ -1839,11 +1840,18 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
     # and to surface their donatable merits.
     viewer_member_chars: list[dict] = []
     viewer_donatable: list[dict] = []
+    viewer_free_dots: list[dict] = []
     if viewer_discord_id:
         member_char_ids = {m["character_id"] for m in members}
         for c in list_player_characters(conn, viewer_discord_id):
             if c["id"] in member_char_ids:
                 viewer_member_chars.append(c)
+                _fd_used = member_free_dots_used(conn, coterie_id, c["id"])
+                viewer_free_dots.append({
+                    "char_id": c["id"], "char_name": c["name"],
+                    "used": _fd_used,
+                    "left": max(0, CREATION_FREE_DOTS_PER_MEMBER - _fd_used),
+                })
                 full = get_character(conn, c["id"])
                 sheet = (full or {}).get("sheet_json") or {}
                 # Collect every merit/background/advantage on the sheet
@@ -1885,7 +1893,9 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
             "all_contribs": all_contribs,
             "named_trait_cap": COTERIE_NAMED_TRAIT_CAP,
             "viewer_member_chars": viewer_member_chars,
-            "viewer_donatable": viewer_donatable}
+            "viewer_donatable": viewer_donatable,
+            "viewer_free_dots": viewer_free_dots,
+            "free_dots_per_member": CREATION_FREE_DOTS_PER_MEMBER}
 
 
 def _resolve_member_char(player_chars: list[dict], members: list[dict],
@@ -1965,6 +1975,53 @@ def _coterie_flash_response(request, conn, coterie_id, user_id,
     resp = templates.TemplateResponse(
         request, "player/coterie_detail.html",
         _ctx(request, **ctx),
+    )
+    _toast(resp, flash_msg, flash_kind)
+    return resp
+
+
+@router.post("/coteries/{coterie_id}/free-dots", response_class=HTMLResponse)
+async def submit_coterie_free_dots(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """A member spends some of their free creation dots on a coterie trait —
+    Domain (chasse/lien/portillon) or a named merit/background. No XP; applied
+    directly to the sheet (the coterie is already staff-approved)."""
+    from ..db import commit_free_creation_dots
+    form        = await request.form()
+    char_id     = form_int(form.get("character_id"))
+    target_kind = (form.get("target_kind") or "").strip().lower()
+    target_name = (form.get("target_name") or "").strip() or None
+    dots        = form_int(form.get("dots"), 1, lo=1, hi=2)
+
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+        members      = list_coterie_members(conn, coterie_id)
+        player_chars = list_player_characters(conn, user["id"])
+        actor = _resolve_member_char(player_chars, members, char_id)
+        if actor is None:
+            raise HTTPException(status_code=403)
+
+        flash_kind, flash_msg = "success", "Free dots allocated."
+        try:
+            commit_free_creation_dots(
+                conn, coterie_id=coterie_id, character_id=actor["id"],
+                target_kind=target_kind, target_name=target_name, dots=dots,
+            )
+            label = target_name or target_kind.title()
+            flash_msg = f"{dots} free dot(s) → {label}."
+        except ValueError as e:
+            flash_kind, flash_msg = "error", str(e)
+
+        ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
+
+    resp = templates.TemplateResponse(
+        request, "player/coterie_detail.html", _ctx(request, **ctx),
     )
     _toast(resp, flash_msg, flash_kind)
     return resp

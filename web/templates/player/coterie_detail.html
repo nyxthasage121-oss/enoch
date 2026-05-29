@@ -158,6 +158,55 @@
   </div>
   {% endif %}
 
+  {# ── Free creation dots — each member's no-XP starting allocation ── #}
+  {% if viewer_free_dots %}
+  {% set _free_avail = viewer_free_dots | selectattr('left', 'gt', 0) | list %}
+  {% if _free_avail %}
+  <div class="gilded p-5 mb-6">
+    <p class="label-gold text-xs mb-1">Free Creation Dots</p>
+    <p class="font-garamond text-bone-500 text-xs mb-4 leading-relaxed">
+      Each member starts with {{ free_dots_per_member }} free dots to spend on the coterie —
+      Domain (Chasse / Lien / Portillon, max 3 at creation) or a named merit / background
+      (max {{ named_trait_cap }}). No XP.
+    </p>
+    {% for fd in _free_avail %}
+    <form method="POST" action="/coteries/{{ coterie.id }}/free-dots"
+          class="flex flex-wrap items-end gap-2 py-2 border-t border-ink-800"
+          x-data="{ kind: 'chasse' }">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="character_id" value="{{ fd.char_id }}">
+      <div class="min-w-0 mr-1">
+        <p class="font-cinzel text-xs text-bone-300">{{ fd.char_name }}</p>
+        <p class="font-garamond text-bone-600 text-[0.65rem]">{{ fd.left }} of {{ free_dots_per_member }} left</p>
+      </div>
+      <div>
+        <label class="label-gold block text-[0.6rem] mb-1">Toward</label>
+        <select name="target_kind" x-model="kind" class="text-xs">
+          <option value="chasse">Chasse</option>
+          <option value="lien">Lien</option>
+          <option value="portillon">Portillon</option>
+          <option value="merit">Merit</option>
+          <option value="background">Background</option>
+        </select>
+      </div>
+      <div x-show="kind === 'merit' || kind === 'background'" x-cloak>
+        <label class="label-gold block text-[0.6rem] mb-1">Name</label>
+        <input type="text" name="target_name" maxlength="80"
+               placeholder="e.g. Haven, Allies" class="text-xs">
+      </div>
+      <div>
+        <label class="label-gold block text-[0.6rem] mb-1">Dots</label>
+        <select name="dots" class="text-xs">
+          {% for n in range(1, fd.left + 1) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn-send font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">Allocate</button>
+    </form>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endif %}
+
   {# ── Single-funder spend flows (advance / buy / donate) ──
        One member funds each action — same cost model as a character
        merit (flat 3 XP / dot). Donations cost no XP but flag the

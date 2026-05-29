@@ -2259,6 +2259,81 @@ def add_coterie_contribution(
     return row
 
 
+# ── Free creation dots ─────────────────────────────────────────────────────────
+# At creation each member gets a small pool of free (no-XP) dots they can spend
+# on ANY coterie trait — Domain (chasse/lien/portillon) or a named merit/
+# background. Domain ratings are capped at 3 *at creation* (XP advances can push
+# to 5 later); named traits cap at 3 like every other coterie trait.
+CREATION_FREE_DOTS_PER_MEMBER = 2
+COTERIE_DOMAIN_CREATION_CAP   = 3
+
+
+def member_free_dots_used(conn, coterie_id: int, character_id: int) -> int:
+    """Free creation dots a member has already committed to this coterie."""
+    return conn.execute(
+        "SELECT COALESCE(SUM(dots),0) AS n FROM coterie_contributions "
+        "WHERE coterie_id=? AND character_id=? AND contribution_type='creation_free' "
+        "AND status='active'",
+        (coterie_id, character_id),
+    ).fetchone()["n"]
+
+
+def commit_free_creation_dots(
+    conn,
+    *,
+    coterie_id: int,
+    character_id: int,
+    target_kind: str,
+    target_name: str | None,
+    dots: int,
+) -> dict:
+    """Spend some of a member's free creation dots on a coterie trait. Free
+    dots cost no XP and can go toward Domain (chasse/lien/portillon, capped at
+    3 at creation) or a named merit/background (capped at 3). Each member has
+    CREATION_FREE_DOTS_PER_MEMBER total. Raises ValueError on any breach."""
+    if dots < 1:
+        raise ValueError("Allocate at least 1 dot.")
+    if target_kind not in CONTRIBUTION_TARGET_KINDS or target_kind == "flaw":
+        raise ValueError("Free dots go toward domain, a merit, or a background.")
+    if target_kind in ("merit", "background"):
+        target_name = (target_name or "").strip()
+        if not target_name:
+            raise ValueError("Name the merit or background.")
+    else:
+        target_name = None  # domain ratings aren't named at this layer
+
+    members = list_coterie_members(conn, coterie_id)
+    if not any(m["character_id"] == character_id for m in members):
+        raise ValueError("Character is not a member of this coterie.")
+
+    used = member_free_dots_used(conn, coterie_id, character_id)
+    if used + dots > CREATION_FREE_DOTS_PER_MEMBER:
+        left = CREATION_FREE_DOTS_PER_MEMBER - used
+        raise ValueError(
+            f"Only {max(0, left)} free creation dot(s) left for this character."
+        )
+
+    current = coterie_effective_rating(conn, coterie_id, target_kind, target_name)
+    if target_kind in ("chasse", "lien", "portillon"):
+        if current + dots > COTERIE_DOMAIN_CREATION_CAP:
+            raise ValueError(
+                f"{target_kind.title()} is capped at {COTERIE_DOMAIN_CREATION_CAP} at creation."
+            )
+    elif current + dots > COTERIE_NAMED_TRAIT_CAP:
+        raise ValueError(f"\"{target_name}\" is capped at {COTERIE_NAMED_TRAIT_CAP} dots.")
+
+    return add_coterie_contribution(
+        conn,
+        coterie_id=coterie_id,
+        contribution_type="creation_free",
+        target_kind=target_kind,
+        target_name=target_name,
+        dots=dots,
+        character_id=character_id,
+        note="Free creation dots",
+    )
+
+
 def set_contribution_status(
     conn,
     contribution_id: int,

@@ -2255,6 +2255,53 @@ def test_coterie_proposal_wizard_fields_and_site_link(player):
             conn.commit()
 
 
+def test_free_creation_dots_budget_and_caps(_client):
+    """C2: each member gets 2 free creation dots usable toward anything, with
+    the per-member budget + creation caps (C/L/P max 3, named max 3) enforced."""
+    import pytest as _p
+    from web.db import (get_db, upsert_player, create_coterie, add_coterie_member,
+                        create_character, commit_free_creation_dots,
+                        member_free_dots_used, coterie_effective_rating)
+    with get_db() as conn:
+        upsert_player(conn, discord_id="c2a", username="C2A")
+        upsert_player(conn, discord_id="c2b", username="C2B")
+        a = create_character(conn, discord_id="c2a", name="FreeDotA", clan="brujah")
+        b = create_character(conn, discord_id="c2b", name="FreeDotB", clan="brujah")
+        co = create_coterie(conn, "FreeDotsSmoke")
+        add_coterie_member(conn, co["id"], a["id"])
+        add_coterie_member(conn, co["id"], b["id"])
+        try:
+            # A spends both free dots toward Chasse.
+            commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
+                                      target_kind="chasse", target_name=None, dots=2)
+            assert member_free_dots_used(conn, co["id"], a["id"]) == 2
+            assert coterie_effective_rating(conn, co["id"], "chasse") == 2
+            # A is out of free dots.
+            with _p.raises(ValueError, match="free creation dot"):
+                commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
+                                          target_kind="lien", target_name=None, dots=1)
+            # B brings Chasse to the creation cap of 3.
+            commit_free_creation_dots(conn, coterie_id=co["id"], character_id=b["id"],
+                                      target_kind="chasse", target_name=None, dots=1)
+            assert coterie_effective_rating(conn, co["id"], "chasse") == 3
+            # B's last dot can't push Chasse past 3 at creation...
+            with _p.raises(ValueError, match="capped at 3 at creation"):
+                commit_free_creation_dots(conn, coterie_id=co["id"], character_id=b["id"],
+                                          target_kind="chasse", target_name=None, dots=1)
+            # ...but it can go toward a named merit (anything goes).
+            commit_free_creation_dots(conn, coterie_id=co["id"], character_id=b["id"],
+                                      target_kind="merit", target_name="Haven", dots=1)
+            assert coterie_effective_rating(conn, co["id"], "merit", "Haven") == 1
+            assert member_free_dots_used(conn, co["id"], b["id"]) == 2
+            conn.commit()
+        finally:
+            conn.execute("DELETE FROM coterie_contributions WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
+            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
+            conn.execute("DELETE FROM characters WHERE id IN (?,?)", (a["id"], b["id"]))
+            conn.commit()
+
+
 def test_aurora_visual_layer_wired(player):
     """The aurora CSS + JS bundles should be linked from every page
     via base.html, the SVG LUT filter should be inlined for body { filter: url(#aurora-grade) },
