@@ -109,6 +109,7 @@ SHEET_LIMITS: dict[str, int] = {"humanity": 10, "blood_potency": 5, "hunger": 5}
 # Predator type lineup tuned for NYbN per Steward direction (2026-05):
 #   - Ferryman, Hitcher, Smuggler — removed (not in use for the chronicle)
 #   - Tithe Collector — added (In Memoriam supplement)
+#   - Pursuer, Roadside Killer, Trapdoor — added (Players Guide / LStRR)
 #   - Blood Leech (Core Rulebook) + Tithe Collector — flagged as
 #     restricted via V5_RESTRICTED_PREDATOR_TYPES below. The wizard hides
 #     restricted types from the picker unless the chronicle has unlocked
@@ -118,9 +119,9 @@ SHEET_LIMITS: dict[str, int] = {"humanity": 10, "blood_potency": 5, "hunger": 5}
 #     web/db.py::is_component_allowed.
 V5_PREDATOR_TYPES: list[str] = [
     "Alleycat", "Bagger", "Blood Leech", "Cleaver", "Consensualist",
-    "Extortionist", "Farmer", "Graverobber", "Grim Reaper",
-    "Montero", "Osiris", "Sandman", "Scene Queen",
-    "Siren", "Tithe Collector",
+    "Extortionist", "Farmer", "Graverobber", "Grim Reaper", "Montero",
+    "Osiris", "Pursuer", "Roadside Killer", "Sandman", "Scene Queen",
+    "Siren", "Tithe Collector", "Trapdoor",
 ]
 
 # Predator types that are usually banned in chronicles and require staff
@@ -234,56 +235,62 @@ V5_CLAN_INFO: dict[str, dict[str, str]] = {
 # Each entry lists the mechanical benefits a Predator Type grants at chargen.
 # These are advisory — staff still validates the exact dot/specialty/merit
 # placement during approval. Player chooses among the listed options.
+#
+# Restricted types (Blood Leech, Tithe Collector) are staff opt-in via
+# chronicle_restrictions — the chargen picker hides them unless unlocked.
 V5_PREDATOR_INFO: dict[str, dict[str, str]] = {
     "Alleycat": {
-        "benefits": "+1 Celerity OR Potence. Brawl OR Intimidation specialty. Lose 1 dot of Humanity but gain Criminal Contacts (•).",
+        "benefits": "+1 Celerity OR Potence. Intimidation (Stickups) OR Brawl (Grappling) specialty. Lose 1 Humanity. Gain Criminal Contacts (•••). Feeds by force or threat.",
     },
     "Bagger": {
-        "benefits": "+1 Obfuscate. Larceny OR Streetwise specialty. Gain Iron Gullet merit (•••) or Enemy flaw (••). Can feed on cold/preserved blood.",
+        "benefits": "+1 Obfuscate (Blood Sorcery/Oblivion per clan). Larceny (Lock Picking) OR Streetwise (Black Market) specialty. Gain Iron Gullet (•••) AND an Enemy (••) flaw. Feeds on stored/preserved blood. Not for Ventrue.",
     },
     "Blood Leech": {
-        "benefits": "+1 Celerity OR Protean. Brawl OR Stealth specialty. Lose 2 dots of Humanity. Cannot easily feed on mortals.",
+        "benefits": "Staff opt-in. +1 Celerity OR Protean. Brawl (Kindred) OR Stealth (vs Kindred) specialty. Lose 1 Humanity, +1 Blood Potency. Diablerist OR Shunned (••), plus Prey Exclusion: Mortals (••). Feeds on vampire vitae.",
     },
     "Cleaver": {
-        "benefits": "+1 Dominate OR Animalism. Persuasion OR Subterfuge specialty. Gain Herd (••) drawn from family, but Dark Secret (•) flaw.",
+        "benefits": "+1 Dominate OR Animalism. Persuasion (Gaslighting) OR Subterfuge (Coverups) specialty. Gain Herd (••), but Dark Secret: Cleaver (•). Feeds on their own family/friends.",
     },
     "Consensualist": {
-        "benefits": "+1 Auspex OR Fortitude. Medicine OR Persuasion specialty. Gain Dark Secret (•) and 1 dot of Humanity. Cannot feed without consent.",
+        "benefits": "+1 Auspex OR Fortitude. Medicine (Phlebotomy) OR Persuasion (Vessels) specialty. +1 Humanity. Masquerade Breacher (•) + Prey Exclusion: Non-consenting (•). Only feeds with consent.",
     },
     "Extortionist": {
-        "benefits": "+1 Dominate OR Potence. Intimidation OR Larceny specialty. Gain Contacts (•••) but Enemy flaw (••).",
+        "benefits": "+1 Dominate OR Potence. Intimidation (Coercion) OR Larceny (Security) specialty. 3 dots across Contacts & Resources, but Enemy (••). Feeds in exchange for 'services'.",
     },
     "Farmer": {
-        "benefits": "+1 Animalism OR Protean. Animal Ken OR Survival specialty. Gain Vegan flaw (••). Cannot easily feed on humans; -1 Humanity loss.",
+        "benefits": "+1 Animalism OR Protean. Animal Ken OR Survival (Hunting) specialty. +1 Humanity. Farmer (••) feeding flaw. Feeds on animals. Not for Ventrue or Blood Potency 3+.",
     },
     "Graverobber": {
-        "benefits": "+1 Fortitude OR Oblivion. Occult OR Medicine specialty. Gain Haven (•) at a cemetery, but Iron Gullet (•) required.",
+        "benefits": "+1 Fortitude OR Oblivion. Occult (Grave Rituals) OR Medicine (Cadavers) specialty. Iron Gullet (•••) + Haven (•), but Obvious Predator (••) herd flaw. Feeds on corpses/mourners.",
     },
     "Grim Reaper": {
-        "benefits": "+1 Auspex OR Oblivion. Awareness OR Medicine specialty. Gain 1 Humanity. Can only feed on the dying.",
+        "benefits": "+1 Auspex OR Oblivion. Awareness (Death) OR Larceny (Forgery) specialty. +1 Humanity. Allies/Influence (•) in medicine. Prey Exclusion: Healthy Mortals (•). Feeds on the dying.",
     },
     "Montero": {
-        "benefits": "+1 Dominate OR Obfuscate. Athletics OR Stealth specialty. Gain Allies (•) (hunting party) but Enemy (••) from previous prey.",
+        "benefits": "+1 Dominate OR Obfuscate. Leadership (Hunting Pack) OR Stealth (Stakeout) specialty. Gain Retainers (••). Lose 1 Humanity. Retainers drive prey to the hunter.",
     },
     "Osiris": {
-        "benefits": "+1 Blood Sorcery OR Presence. Occult OR Performance specialty. Gain Fame (••) and Herd (••), but Mythic Flaws.",
+        "benefits": "+1 Blood Sorcery OR Presence. Occult OR Performance specialty. 3 dots across Fame & Herd; 2 dots across Enemies & Mythic flaws. Feeds on fans/followers.",
+    },
+    "Pursuer": {
+        "benefits": "+1 Animalism OR Auspex. Investigation (Profiling) OR Stealth (Shadowing) specialty. Gain Bloodhound (•) merit + Contacts (•). Lose 1 Humanity. Stalks prey before striking.",
+    },
+    "Roadside Killer": {
+        "benefits": "+1 Fortitude OR Protean. Survival (the Road) OR Investigation (Vampire Cant) specialty. +2 dots of migrating Herd. Prey Exclusion: Locals. Always on the move.",
     },
     "Sandman": {
-        "benefits": "+1 Auspex OR Obfuscate. Medicine OR Stealth specialty. Gain Resources (•). Less Humanity loss for clean feeds.",
+        "benefits": "+1 Auspex OR Obfuscate. Medicine (Anesthetics) OR Stealth (Break-in) specialty. Gain Resources (•). Feeds on sleeping mortals.",
     },
     "Scene Queen": {
-        "benefits": "+1 Auspex OR Presence. Etiquette OR Performance specialty. Gain Fame (•) within the scene, but Influence flaw (Disliked) outside it.",
+        "benefits": "+1 Dominate OR Potence. Etiquette/Leadership/Streetwise (a scene) specialty. Fame (•) + Contacts (•). Disliked (•) OR Prey Exclusion (•). Feeds within a subculture.",
     },
     "Siren": {
-        "benefits": "+1 Fortitude OR Presence. Persuasion OR Subterfuge specialty. Gain Beautiful (••) merit but Enemy flaw (•) from spurned partners.",
+        "benefits": "+1 Fortitude OR Presence. Persuasion (Seduction) OR Subterfuge (Seduction) specialty. Beautiful (••) merit, but Enemy (•) from a spurned partner. Feeds under the guise of sex.",
     },
-    # ── Restricted (staff opt-in) ────────────────────────────────────
-    # Tithe Collector — from In Memoriam (V5 Sea of Time supplement).
-    # Power-and-cult-mediated feeding; usually banned because it short-
-    # circuits the normal Hunger economy. Blood Leech (Core Rulebook)
-    # is similarly opt-in for table balance. Staff unlock either per
-    # chronicle via `unlocked_predator_types` in admin settings.
     "Tithe Collector": {
-        "benefits": "+1 Dominate OR Presence. Insight OR Leadership specialty. Gain Mawla (••) within the cult and Status (•) in its hierarchy, but Adversary (•) from outside faiths. Feeds via tithes from the devoted.",
+        "benefits": "Staff opt-in. +1 Dominate OR Presence. Intimidation (Kindred) OR Leadership (Kindred) specialty. 3 dots across Domain & Status, but Adversary (••). Fed by tributes of vessels. (In Memoriam.)",
+    },
+    "Trapdoor": {
+        "benefits": "+1 Protean OR Obfuscate. Persuasion (Marketing) OR Stealth (Ambushes) specialty. Haven (•) + a dot of Retainers/Herd/2nd Haven, but a Creepy/Haunted (•) haven flaw. Lures prey to its lair.",
     },
 }

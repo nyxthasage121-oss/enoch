@@ -2616,6 +2616,17 @@ def test_site_predator_types_exclude_restricted():
     assert set(V5_SITE_PREDATOR_TYPES) == set(V5_PREDATOR_TYPES) - set(V5_RESTRICTED_PREDATOR_TYPES)
 
 
+def test_every_predator_type_has_benefit_info():
+    """Every predator type needs a benefits summary so the chargen panel
+    renders for it, and the three Players-Guide additions are present."""
+    from web.v5_traits import V5_PREDATOR_TYPES, V5_PREDATOR_INFO
+    for pt in V5_PREDATOR_TYPES:
+        assert pt in V5_PREDATOR_INFO, f"{pt} is missing a V5_PREDATOR_INFO entry"
+        assert V5_PREDATOR_INFO[pt].get("benefits"), f"{pt} has empty benefits text"
+    for added in ("Pursuer", "Roadside Killer", "Trapdoor"):
+        assert added in V5_PREDATOR_TYPES, f"{added} should be a selectable predator type"
+
+
 def test_clan_color_utilities_defined_and_used():
     """Clan-color arbitrary Tailwind classes (border-[var(--clan,…)] etc.)
     don't survive the precompiled build, so clan identity must use the
