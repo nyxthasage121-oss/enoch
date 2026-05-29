@@ -572,6 +572,16 @@
       <input type="hidden" name="blood_potency" :value="get('blood_potency')">
       <input type="hidden" name="hunger"        :value="get('hunger')">
 
+      {# Build summary — predator + the spreads chosen during chargen. #}
+      {% set _sheet = char.sheet_json or {} %}
+      {% if char.predator_type or _sheet.skill_spread or _sheet.discipline_spread %}
+      <div class="gilded-inset px-4 py-2.5 border border-ink-700 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+        {% if char.predator_type %}<span><span class="label-gold">Predator</span> <span class="font-garamond text-bone-300">{{ char.predator_type }}</span></span>{% endif %}
+        {% if _sheet.skill_spread %}<span><span class="label-gold">Skill Spread</span> <span class="font-garamond text-bone-300">{{ _sheet.skill_spread | replace('-', ' ') | title }}</span></span>{% endif %}
+        {% if _sheet.discipline_spread %}<span><span class="label-gold">Disc Spread</span> <span class="font-garamond text-bone-300">{{ _sheet.discipline_spread | title }}</span></span>{% endif %}
+      </div>
+      {% endif %}
+
       {# ── Attributes ── #}
       <div class="gilded p-5">
         <p class="label-gold mb-4">Attributes</p>

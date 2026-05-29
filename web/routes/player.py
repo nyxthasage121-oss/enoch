@@ -267,6 +267,9 @@ from ..v5_traits import (
     V5_DISCIPLINES  as _V5_DISCIPLINES,
     V5_CLAN_INFO    as _V5_CLAN_INFO,
     V5_PREDATOR_INFO as _V5_PREDATOR_INFO,
+    V5_SKILL_SPREADS as _V5_SKILL_SPREADS,
+    V5_DISCIPLINE_SPREADS as _V5_DISCIPLINE_SPREADS,
+    PREDATOR_FREE_DISCIPLINE_DOTS as _PREDATOR_FREE_DISCIPLINE_DOTS,
     CLAN_DISCIPLINES as _CLAN_DISCIPLINES,
     SHEET_TRAIT_KEYS as _SHEET_TRAIT_KEYS,
     SHEET_LIMITS    as _SHEET_LIMITS,
@@ -361,6 +364,10 @@ def _wizard_extras() -> dict:
         # human names for skill_*/disc_* keys without re-deriving them in JS.
         "skill_labels":       {k: lbl for _, traits in _V5_SKILLS for k, lbl in traits},
         "disc_labels":        {k: lbl for k, lbl in _V5_DISCIPLINES},
+        # Chargen spreads — the wizard's skill/discipline trackers read these.
+        "skill_spreads":      _V5_SKILL_SPREADS,
+        "discipline_spreads": _V5_DISCIPLINE_SPREADS,
+        "predator_free_disc_dots": _PREDATOR_FREE_DISCIPLINE_DOTS,
         "active_ruleset":     ruleset,
         "tier_budgets":       tier_budgets,
         # Default budget shape (neonate) — Alpine swaps in tier_budgets
@@ -1154,6 +1161,24 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
                     continue
                 cleaned_spec.append({"skill": skill, "name": name})
             sheet["specialties"] = cleaned_spec
+
+    # Chargen build metadata: the spreads the player followed + the resolved
+    # predator picks (provenance — the granted traits themselves already live
+    # in specialties/backgrounds/flaws/disc_* via the blocks above).
+    skill_spread = (form.get("skill_spread") or "").strip()[:40]
+    if skill_spread:
+        sheet["skill_spread"] = skill_spread
+    disc_spread = (form.get("discipline_spread") or "").strip()[:40]
+    if disc_spread:
+        sheet["discipline_spread"] = disc_spread
+    raw = form.get("predator_choices")
+    if raw:
+        try:
+            pc = json.loads(raw)
+            if isinstance(pc, dict):
+                sheet["predator_choices"] = pc
+        except (ValueError, TypeError):
+            pass
 
     return sheet
 

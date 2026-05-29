@@ -26,6 +26,9 @@
        predatorInfo:      {{ (predator_info | default({})) | tojson | forceescape }},
        skillLabels:       {{ (skill_labels | default({})) | tojson | forceescape }},
        discLabels:        {{ (disc_labels | default({})) | tojson | forceescape }},
+       skillSpreads:      {{ (skill_spreads | default({})) | tojson | forceescape }},
+       disciplineSpreads: {{ (discipline_spreads | default({})) | tojson | forceescape }},
+       predatorFreeDiscDots: {{ (predator_free_disc_dots | default(1)) | tojson }},
      })">
 
   {# Back link #}
@@ -1053,6 +1056,37 @@
         </p>
       </div>
 
+      {# Skill distribution — pick a spread; the live tracker guides placement
+         (soft-guidance; staff verifies the exact spread at approval). #}
+      <div class="gilded p-5 mb-5">
+        <div class="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+          <p class="label-gold text-xs">Skill Distribution</p>
+          <template x-if="skillSpread && skillSpreads[skillSpread]">
+            <p class="font-cinzel text-[0.65rem] tracking-widest">
+              <template x-for="[lvl, want] in Object.entries(skillSpreads[skillSpread].levels)" :key="lvl">
+                <span class="ml-2"
+                      :class="(skillCounts[lvl]||0) > want ? 'text-blood-400' : ((skillCounts[lvl]||0) === want ? 'text-gold-400' : 'text-bone-500')">
+                  <span x-text="lvl"></span>·<span x-text="(skillCounts[lvl]||0)"></span>/<span x-text="want"></span>
+                </span>
+              </template>
+            </p>
+          </template>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <template x-for="[slug, spr] in Object.entries(skillSpreads)" :key="slug">
+            <button type="button" @click="skillSpread = slug"
+                    class="gilded-inset px-3 py-3 text-left border transition-all duration-200 hover:border-gold-800"
+                    :class="skillSpread === slug ? 'border-gold-500 bg-ink-900/60' : 'border-ink-800'">
+              <p class="font-cinzel text-sm text-bone-200 tracking-wide" x-text="spr.label"></p>
+              <p class="font-garamond text-[0.7rem] text-bone-500 leading-snug mt-1" x-text="spr.blurb"></p>
+            </button>
+          </template>
+        </div>
+        <p x-show="!skillSpread" x-cloak class="font-garamond text-[0.7rem] text-bone-700 italic mt-2">
+          Pick a distribution, then place your dots to match it.
+        </p>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
         {% for cat, traits in v5_skills %}
         <div class="gilded p-5">
@@ -1109,6 +1143,7 @@
         {% endfor %}
       {% endfor %}
       <input type="hidden" name="specialties" :value="JSON.stringify(specialties)">
+      <input type="hidden" name="skill_spread" :value="skillSpread">
 
       {% include "player/partials/wizard_nav.html" %}
     </div>
@@ -1126,6 +1161,25 @@
           character has learned at each level.
         </p>
       </div>
+
+      {# Discipline spread tracker (Kindred). Target = spread total + the
+         predator's free dot. Soft-guidance; staff verifies at approval. #}
+      <template x-if="charName.character_type === 'kindred' && activeDiscSpread">
+        <div class="gilded-inset px-4 py-3 mb-4 border border-ink-700">
+          <div class="flex items-baseline justify-between gap-2 flex-wrap">
+            <p class="label-gold text-xs">Discipline Spread
+              <span class="text-bone-600 normal-case ml-1" x-text="'· ' + activeDiscSpread.label"></span></p>
+            <p class="font-cinzel text-[0.7rem] tracking-widest"
+               :class="discDotsPlaced > discDotsTarget ? 'text-blood-400' : (discDotsPlaced === discDotsTarget ? 'text-gold-400' : 'text-bone-400')">
+              <span x-text="discDotsPlaced"></span> / <span x-text="discDotsTarget"></span> dots
+            </p>
+          </div>
+          <p class="font-garamond text-[0.7rem] text-bone-600 mt-1">
+            <span x-text="activeDiscSpread.blurb"></span>
+            <span x-show="discDotsTarget > (activeDiscSpread.total || 0)" x-cloak> Includes +1 free dot from your predator type.</span>
+          </p>
+        </div>
+      </template>
 
       {# Character-type hints — quick mechanic reminders for non-Kindred. #}
       <template x-if="charName.character_type === 'ghoul'">
@@ -1240,6 +1294,7 @@
       <input type="hidden" name="{{ key }}" :value="sheet['{{ key }}'] || 0">
       {% endfor %}
       <input type="hidden" name="powers" :value="JSON.stringify(powers)">
+      <input type="hidden" name="discipline_spread" :value="effectiveDiscSpreadSlug">
 
       {% include "player/partials/wizard_nav.html" %}
     </div>
@@ -1768,6 +1823,9 @@
       predatorInfo:      opts.predatorInfo || {},
       skillLabels:       opts.skillLabels || {},
       discLabels:        opts.discLabels || {},
+      skillSpreads:      opts.skillSpreads || {},
+      disciplineSpreads: opts.disciplineSpreads || {},
+      predatorFreeDiscDots: opts.predatorFreeDiscDots || 0,
       // Predator grant picks, keyed by grant index prefixed by kind
       // ('s'=specialty, 'd'=discipline, 'c'=choice, 'p'=pool→{name:dots}).
       // `_predatorDisc` remembers which discipline holds the predator's free
@@ -1775,6 +1833,9 @@
       predatorChoices:   (initial.predator_choices && typeof initial.predator_choices === 'object')
                            ? Object.assign({}, initial.predator_choices) : {},
       _predatorDisc:     null,
+      // Skill / Discipline distribution choices — guidance + live trackers.
+      skillSpread:       initial.skill_spread || '',
+      disciplineSpread:  initial.discipline_spread || '',
       revenantsEnabled:  !!opts.revenantsEnabled,
       revenantFamilies:  opts.revenantFamilies || [],
       // Default ("seed") budget — only used if tierBudgets is missing.
@@ -2049,6 +2110,42 @@
       _pushGrantList(list, name, dots) {
         const arr = this[list];
         if (Array.isArray(arr)) arr.push({ name, dots, src: 'predator' });
+      },
+
+      // ── Skill spread tracker ──────────────────────────────────────────
+      // Count of skills currently at each dot level (for the spread guide).
+      get skillCounts() {
+        const c = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        Object.keys(this.skillLabels).forEach(k => {
+          const v = this.sheet[k] || 0;
+          if (v >= 1 && v <= 5) c[v] += 1;
+        });
+        return c;
+      },
+
+      // ── Discipline spread tracker ─────────────────────────────────────
+      // Ancilla / In Memoriam use im.discipline_spread (focused/strategic);
+      // everyone else uses the standard 2+1 spread.
+      get effectiveDiscSpreadSlug() {
+        if (this.charName.character_tier === 'ancilla' &&
+            this.charName.ancilla_mode === 'in_memoriam') {
+          return this.im.discipline_spread || '';
+        }
+        return 'standard';
+      },
+      get activeDiscSpread() {
+        return this.disciplineSpreads[this.effectiveDiscSpreadSlug] || null;
+      },
+      get discDotsPlaced() {
+        return Object.keys(this.discLabels).reduce((s, k) => s + (this.sheet[k] || 0), 0);
+      },
+      // Target = spread total + predator free dot (when the predator grants one).
+      get discDotsTarget() {
+        const spr = this.activeDiscSpread;
+        const base = spr ? (spr.total || 0) : 0;
+        const info = this.predatorInfo[this.charName.predator_type];
+        const hasFree = !!(info && (info.grants || []).some(g => g.kind === 'discipline'));
+        return base + (hasFree ? this.predatorFreeDiscDots : 0);
       },
 
       // Step navigation

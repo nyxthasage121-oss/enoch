@@ -2674,6 +2674,37 @@ def test_predator_grants_are_well_formed():
         assert sum(lvl * n for lvl, n in spr["levels"].items()) == spr["total"], f"{slug} total mismatch"
 
 
+def test_chargen_persists_spreads_and_predator_picks(player):
+    """The create route stores skill_spread, discipline_spread, and the
+    resolved predator_choices into sheet_json so the build is reflected on
+    the player + staff sheets."""
+    import json as _json
+    from web.db import get_db
+    player.post("/characters/new", data={
+        "_csrf": "dev-csrf-token",
+        "name": "Spread Test",
+        "clan": "brujah",
+        "predator_type": "Alleycat",
+        "touchstones": '["A", "B"]',
+        "skill_spread": "specialist",
+        "discipline_spread": "standard",
+        "predator_choices": _json.dumps({"s0": 1, "d1": "disc_potence"}),
+    }, follow_redirects=False)
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT sheet_json FROM characters WHERE name='Spread Test'"
+            ).fetchone()
+        assert row is not None, "character was not created"
+        sheet = _json.loads(row["sheet_json"] or "{}")
+        assert sheet.get("skill_spread") == "specialist"
+        assert sheet.get("discipline_spread") == "standard"
+        assert sheet.get("predator_choices", {}).get("d1") == "disc_potence"
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE name='Spread Test'")
+
+
 def test_clan_color_utilities_defined_and_used():
     """Clan-color arbitrary Tailwind classes (border-[var(--clan,…)] etc.)
     don't survive the precompiled build, so clan identity must use the

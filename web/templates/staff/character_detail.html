@@ -166,6 +166,16 @@
   <div x-show="tab === 'sheet'" x-cloak class="gilded p-5 mb-6">
     <p class="label-gold mb-4">Character Sheet</p>
 
+    {# Build summary — the spreads the player followed + predator type, so
+       staff can verify the distribution at a glance. #}
+    {% if char.predator_type or sheet.skill_spread or sheet.discipline_spread %}
+    <div class="gilded-inset px-4 py-2.5 mb-4 border border-ink-700 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+      {% if char.predator_type %}<span><span class="label-gold">Predator</span> <span class="font-garamond text-bone-300">{{ char.predator_type }}</span></span>{% endif %}
+      {% if sheet.skill_spread %}<span><span class="label-gold">Skill Spread</span> <span class="font-garamond text-bone-300">{{ sheet.skill_spread | replace('-', ' ') | title }}</span></span>{% endif %}
+      {% if sheet.discipline_spread %}<span><span class="label-gold">Disc Spread</span> <span class="font-garamond text-bone-300">{{ sheet.discipline_spread | title }}</span></span>{% endif %}
+    </div>
+    {% endif %}
+
     <div class="space-y-5">
 
       {# Attributes #}
