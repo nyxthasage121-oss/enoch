@@ -2344,6 +2344,7 @@ def add_coterie_contribution(
 # to 5 later); named traits cap at 3 like every other coterie trait.
 CREATION_FREE_DOTS_PER_MEMBER = 2
 COTERIE_DOMAIN_CREATION_CAP   = 3
+COTERIE_FLAW_BONUS_CAP        = 4   # max extra Adv/Bg dots from flaws (1 per flaw dot)
 
 
 def member_free_dots_used(conn, coterie_id: int, character_id: int) -> int:
@@ -2354,6 +2355,32 @@ def member_free_dots_used(conn, coterie_id: int, character_id: int) -> int:
         "AND status='active'",
         (coterie_id, character_id),
     ).fetchone()["n"]
+
+
+def coterie_flaw_dots(conn, coterie_id: int) -> int:
+    """Total active coterie flaw dots — each grants +1 creation dot."""
+    return coterie_effective_rating(conn, coterie_id, "flaw")
+
+
+def coterie_free_dots_used(conn, coterie_id: int) -> int:
+    """All free creation dots committed to the coterie so far (across members)."""
+    return conn.execute(
+        "SELECT COALESCE(SUM(dots),0) AS n FROM coterie_contributions "
+        "WHERE coterie_id=? AND contribution_type='creation_free' AND status='active'",
+        (coterie_id,),
+    ).fetchone()["n"]
+
+
+def coterie_free_budget(conn, coterie_id: int) -> dict:
+    """Creation-dot budget: 2 per member (base) + 1 per flaw dot (bonus, capped
+    at COTERIE_FLAW_BONUS_CAP). Returns base/bonus/total/used/left/members."""
+    members = list_coterie_members(conn, coterie_id)
+    base  = CREATION_FREE_DOTS_PER_MEMBER * len(members)
+    bonus = min(COTERIE_FLAW_BONUS_CAP, coterie_flaw_dots(conn, coterie_id))
+    used  = coterie_free_dots_used(conn, coterie_id)
+    total = base + bonus
+    return {"base": base, "bonus": bonus, "total": total, "used": used,
+            "left": max(0, total - used), "members": len(members)}
 
 
 def commit_free_creation_dots(
@@ -2367,8 +2394,8 @@ def commit_free_creation_dots(
 ) -> dict:
     """Spend some of a member's free creation dots on a coterie trait. Free
     dots cost no XP and can go toward Domain (chasse/lien/portillon, capped at
-    3 at creation) or a named merit/background (capped at 3). Each member has
-    CREATION_FREE_DOTS_PER_MEMBER total. Raises ValueError on any breach."""
+    3 at creation) or a named merit/background (capped at 3). The coterie pool
+    is 2 per member + 1 per flaw dot (flaw bonus). Raises ValueError on breach."""
     if dots < 1:
         raise ValueError("Allocate at least 1 dot.")
     if target_kind not in CONTRIBUTION_TARGET_KINDS or target_kind == "flaw":
@@ -2388,11 +2415,11 @@ def commit_free_creation_dots(
     if co is None or co["creation_state"] != "forming":
         raise ValueError("Free creation dots are only available while the coterie is forming.")
 
-    used = member_free_dots_used(conn, coterie_id, character_id)
-    if used + dots > CREATION_FREE_DOTS_PER_MEMBER:
-        left = CREATION_FREE_DOTS_PER_MEMBER - used
+    budget = coterie_free_budget(conn, coterie_id)
+    if budget["used"] + dots > budget["total"]:
         raise ValueError(
-            f"Only {max(0, left)} free creation dot(s) left for this character."
+            f"Only {budget['left']} creation dot(s) left "
+            f"({budget['base']} base + {budget['bonus']} flaw bonus)."
         )
 
     current = coterie_effective_rating(conn, coterie_id, target_kind, target_name)
@@ -2413,6 +2440,31 @@ def commit_free_creation_dots(
         dots=dots,
         character_id=character_id,
         note="Free creation dots",
+    )
+
+
+def commit_coterie_flaw(conn, *, coterie_id: int, flaw_name: str, dots: int) -> dict:
+    """Add a coterie flaw during creation (forming). Flaws are coterie-wide;
+    total flaw dots cap at COTERIE_FLAW_BONUS_CAP and each grants +1 Advantage/
+    Background creation dot."""
+    flaw_name = (flaw_name or "").strip()
+    if not flaw_name:
+        raise ValueError("Name the flaw.")
+    if dots < 1:
+        raise ValueError("A flaw is at least 1 dot.")
+    co = get_coterie(conn, coterie_id)
+    if co is None or co["creation_state"] != "forming":
+        raise ValueError("Flaws can only be added while the coterie is forming.")
+    current = coterie_flaw_dots(conn, coterie_id)
+    if current + dots > COTERIE_FLAW_BONUS_CAP:
+        raise ValueError(
+            f"A coterie can take at most {COTERIE_FLAW_BONUS_CAP} flaw dots at creation "
+            f"({COTERIE_FLAW_BONUS_CAP - current} left)."
+        )
+    return add_coterie_contribution(
+        conn, coterie_id=coterie_id, contribution_type="flaw_bonus",
+        target_kind="flaw", target_name=flaw_name, dots=dots,
+        character_id=None, note="Creation flaw",
     )
 
 

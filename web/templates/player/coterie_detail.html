@@ -93,6 +93,21 @@
   </div>
   {% endif %}
 
+  {# ── Coterie Flaws ── #}
+  {% if coterie_flaws %}
+  <div class="gilded p-5 mb-6">
+    <p class="label-gold text-xs mb-3">Coterie Flaws</p>
+    <div class="space-y-1">
+      {% for f in coterie_flaws %}
+      <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
+        <span class="font-cinzel text-xs text-blood-400">{{ f.target_name }}</span>
+        <span class="font-cinzel text-blood-400 text-xs">{{ f.dots }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {# ── Members ── #}
   <div class="gilded p-5 mb-6">
     <p class="label-gold text-xs mb-3">Members</p>
@@ -175,36 +190,44 @@
   </div>
   {% endif %}
 
-  {# ── Free creation dots (only while forming) — any member can assemble the
-       sheet, allocating on behalf of any member; each has a 2-dot pool. ── #}
+  {# ── Coterie creation (forming only) — assemble the sheet: creation dots
+       (2/member + flaw bonus) toward Domain/Advantages/Backgrounds, plus
+       flaws. Any member can fill in the whole sheet. ── #}
   {% if coterie.creation_state == 'forming' and viewer_member_chars %}
   <div class="gilded p-5 mb-6">
-    <p class="label-gold text-xs mb-1">Free Creation Dots</p>
+    <p class="label-gold text-xs mb-1">Coterie Creation</p>
     <p class="font-garamond text-bone-500 text-xs mb-3 leading-relaxed">
-      Each member has {{ free_dots_per_member }} free dots (no XP) — Domain (Chasse / Lien /
-      Portillon, max 3 at creation) or a named merit / background (max {{ named_trait_cap }}).
-      One person can fill in the whole sheet.
+      Spend the creation pool on Domain (Chasse / Lien / Portillon, max 3 at creation) or a
+      named merit / background (max {{ named_trait_cap }}). Each flaw dot you take grants +1
+      Advantage/Background dot — optional, up to 4. One person can fill it all in.
     </p>
 
-    {# Per-member remaining #}
-    <div class="flex flex-wrap gap-1.5 mb-4">
-      {% for fd in coterie_free_dots %}
-      <span class="chip text-[0.6rem] {{ 'text-bone-600 border-ink-700' if fd.left == 0 else 'text-gold-400 border-gold-800' }}">
-        {{ fd.char_name }}: {{ fd.used }}/{{ free_dots_per_member }}
-      </span>
-      {% endfor %}
+    {# Budget panel #}
+    {% if free_budget %}
+    <div class="gilded-inset px-4 py-3 mb-4 border border-ink-700">
+      <p class="font-cinzel text-bone-300 text-xs">
+        Creation dots:
+        <span class="text-gold-400">{{ free_budget.used }} / {{ free_budget.total }}</span> used
+        <span class="text-bone-600 text-[0.65rem]">({{ free_budget.base }} base + {{ free_budget.bonus }} flaw bonus)</span>
+      </p>
+      <div class="flex flex-wrap gap-1.5 mt-2">
+        {% for fd in coterie_free_dots %}
+        <span class="chip text-[0.6rem] text-bone-600 border-ink-700">{{ fd.char_name }}: {{ fd.used }}</span>
+        {% endfor %}
+      </div>
     </div>
+    {% endif %}
 
-    {% set _free_avail = coterie_free_dots | selectattr('left', 'gt', 0) | list %}
-    {% if _free_avail %}
+    {# Allocate a creation dot #}
+    {% if free_budget and free_budget.left > 0 %}
     <form method="POST" action="/coteries/{{ coterie.id }}/free-dots"
-          class="flex flex-wrap items-end gap-2" x-data="{ kind: 'chasse' }">
+          class="flex flex-wrap items-end gap-2 mb-4" x-data="{ kind: 'chasse' }">
       <input type="hidden" name="_csrf" value="{{ csrf_token }}">
       <div>
         <label class="label-gold block text-[0.6rem] mb-1">For</label>
         <select name="character_id" class="text-xs">
-          {% for fd in _free_avail %}
-          <option value="{{ fd.char_id }}">{{ fd.char_name }} ({{ fd.left }} left)</option>
+          {% for m in members %}
+          <option value="{{ m.character_id }}">{{ m.character_name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -227,14 +250,41 @@
         <label class="label-gold block text-[0.6rem] mb-1">Dots</label>
         <select name="dots" class="text-xs">
           <option value="1">1</option>
-          <option value="2">2</option>
+          {% if free_budget.left > 1 %}<option value="2">2</option>{% endif %}
         </select>
       </div>
       <button type="submit" class="btn-send font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">Allocate</button>
     </form>
     {% else %}
-    <p class="font-garamond text-bone-600 text-xs italic">All members have spent their free dots.</p>
+    <p class="font-garamond text-bone-600 text-xs italic mb-4">Creation pool fully spent.</p>
     {% endif %}
+
+    {# Take a flaw — grants +1 Advantage/Background dot each, up to 4 #}
+    {% set _flaw_dots = coterie_flaws | sum(attribute='dots') %}
+    <div class="pt-3 border-t border-ink-800">
+      <p class="label-gold text-[0.7rem] mb-2">Flaws
+        <span class="text-bone-600 normal-case text-[0.6rem] ml-1">{{ _flaw_dots }}/4 dots → +{{ _flaw_dots }} Adv/Bg</span>
+      </p>
+      {% if _flaw_dots < 4 %}
+      <form method="POST" action="/coteries/{{ coterie.id }}/flaws"
+            class="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <div>
+          <label class="label-gold block text-[0.6rem] mb-1">Flaw</label>
+          <input type="text" name="flaw_name" maxlength="80" placeholder="e.g. Adversary" class="text-xs">
+        </div>
+        <div>
+          <label class="label-gold block text-[0.6rem] mb-1">Dots</label>
+          <select name="dots" class="text-xs">
+            {% for n in range(1, (4 - _flaw_dots) + 1) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">Take Flaw</button>
+      </form>
+      {% else %}
+      <p class="font-garamond text-bone-600 text-xs italic">Maximum flaw dots taken.</p>
+      {% endif %}
+    </div>
 
     {# Submit the assembled sheet for staff sign-off #}
     <form method="POST" action="/coteries/{{ coterie.id }}/submit-sheet"

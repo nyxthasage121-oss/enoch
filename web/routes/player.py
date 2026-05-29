@@ -1798,6 +1798,7 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
     from ..db import (
         list_coterie_contributions, COTERIE_NAMED_TRAIT_CAP,
         member_free_dots_used, CREATION_FREE_DOTS_PER_MEMBER,
+        coterie_free_budget,
     )
     coterie = get_coterie(conn, coterie_id)
     members = list_coterie_members(conn, coterie_id)
@@ -1816,6 +1817,10 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
                 "used":      used,
                 "left":      max(0, CREATION_FREE_DOTS_PER_MEMBER - used),
             })
+
+    # Coterie creation budget (forming only): 2/member base + flaw bonus.
+    free_budget = coterie_free_budget(conn, coterie_id) if (
+        coterie and coterie["creation_state"] == "forming") else None
 
     # Single-funder advance costs — what one member pays personally for
     # +1 Chasse/Lien/Portillon. Uses the "Advantage" rule (flat 3/dot)
@@ -1849,6 +1854,8 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
     all_contribs = list_coterie_contributions(
         conn, coterie_id, status=None,
     ) if coterie else []
+
+    coterie_flaws = [c for c in active_contribs if c["target_kind"] == "flaw"]
 
     # Viewer's member chars — for "commit my share" / "cancel" buttons,
     # and to surface their donatable merits.
@@ -1902,7 +1909,9 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
             "viewer_member_chars": viewer_member_chars,
             "viewer_donatable": viewer_donatable,
             "coterie_free_dots": coterie_free_dots,
-            "free_dots_per_member": CREATION_FREE_DOTS_PER_MEMBER}
+            "free_dots_per_member": CREATION_FREE_DOTS_PER_MEMBER,
+            "free_budget": free_budget,
+            "coterie_flaws": coterie_flaws}
 
 
 def _resolve_member_char(player_chars: list[dict], members: list[dict],
@@ -2031,6 +2040,45 @@ async def submit_coterie_free_dots(
         except ValueError as e:
             flash_kind, flash_msg = "error", str(e)
 
+        ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
+
+    resp = templates.TemplateResponse(
+        request, "player/coterie_detail.html", _ctx(request, **ctx),
+    )
+    _toast(resp, flash_msg, flash_kind)
+    return resp
+
+
+@router.post("/coteries/{coterie_id}/flaws", response_class=HTMLResponse)
+async def submit_coterie_flaw(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Add a coterie flaw while forming (any member). Each flaw dot grants +1
+    Advantage/Background creation dot, capped at 4 flaw dots total."""
+    from ..db import commit_coterie_flaw
+    form      = await request.form()
+    flaw_name = (form.get("flaw_name") or "").strip()
+    dots      = form_int(form.get("dots"), 1, lo=1, hi=4)
+
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+        members    = list_coterie_members(conn, coterie_id)
+        member_ids = {m["character_id"] for m in members}
+        owned      = {c["id"] for c in list_player_characters(conn, user["id"])}
+        if not (member_ids & owned):
+            raise HTTPException(status_code=403)
+
+        flash_kind, flash_msg = "success", "Flaw added."
+        try:
+            commit_coterie_flaw(conn, coterie_id=coterie_id, flaw_name=flaw_name, dots=dots)
+            flash_msg = f"Flaw “{flaw_name}” added — +{dots} Advantage/Background dot(s)."
+        except ValueError as e:
+            flash_kind, flash_msg = "error", str(e)
         ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
 
     resp = templates.TemplateResponse(

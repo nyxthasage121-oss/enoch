@@ -2256,12 +2256,12 @@ def test_coterie_proposal_wizard_fields_and_site_link(player):
 
 
 def test_free_creation_dots_budget_and_caps(_client):
-    """C2: each member gets 2 free creation dots usable toward anything, with
-    the per-member budget + creation caps (C/L/P max 3, named max 3) enforced."""
+    """C2/C3b: the coterie creation pool is 2/member + 1 per flaw dot (max 4
+    bonus). Spending is capped at the pool total; C/L/P at 3; named at 3."""
     import pytest as _p
     from web.db import (get_db, upsert_player, create_coterie, add_coterie_member,
-                        create_character, commit_free_creation_dots,
-                        member_free_dots_used, coterie_effective_rating)
+                        create_character, commit_free_creation_dots, commit_coterie_flaw,
+                        coterie_free_budget, coterie_effective_rating)
     with get_db() as conn:
         upsert_player(conn, discord_id="c2a", username="C2A")
         upsert_player(conn, discord_id="c2b", username="C2B")
@@ -2271,28 +2271,33 @@ def test_free_creation_dots_budget_and_caps(_client):
         add_coterie_member(conn, co["id"], a["id"])
         add_coterie_member(conn, co["id"], b["id"])
         try:
-            # A spends both free dots toward Chasse.
+            assert coterie_free_budget(conn, co["id"])["total"] == 4   # 2 members x 2
+            # Bring Chasse to the creation cap of 3 across two members.
             commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
                                       target_kind="chasse", target_name=None, dots=2)
-            assert member_free_dots_used(conn, co["id"], a["id"]) == 2
-            assert coterie_effective_rating(conn, co["id"], "chasse") == 2
-            # A is out of free dots.
-            with _p.raises(ValueError, match="free creation dot"):
-                commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
-                                          target_kind="lien", target_name=None, dots=1)
-            # B brings Chasse to the creation cap of 3.
             commit_free_creation_dots(conn, coterie_id=co["id"], character_id=b["id"],
                                       target_kind="chasse", target_name=None, dots=1)
             assert coterie_effective_rating(conn, co["id"], "chasse") == 3
-            # B's last dot can't push Chasse past 3 at creation...
             with _p.raises(ValueError, match="capped at 3 at creation"):
                 commit_free_creation_dots(conn, coterie_id=co["id"], character_id=b["id"],
                                           target_kind="chasse", target_name=None, dots=1)
-            # ...but it can go toward a named merit (anything goes).
+            # One base dot left -> a merit; pool now exhausted.
             commit_free_creation_dots(conn, coterie_id=co["id"], character_id=b["id"],
                                       target_kind="merit", target_name="Haven", dots=1)
-            assert coterie_effective_rating(conn, co["id"], "merit", "Haven") == 1
-            assert member_free_dots_used(conn, co["id"], b["id"]) == 2
+            assert coterie_free_budget(conn, co["id"])["left"] == 0
+            with _p.raises(ValueError, match="creation dot"):
+                commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
+                                          target_kind="merit", target_name="Library", dots=1)
+            # Take a flaw -> +1 bonus dot -> can spend one more (on a background).
+            commit_coterie_flaw(conn, coterie_id=co["id"], flaw_name="Adversary", dots=1)
+            assert coterie_free_budget(conn, co["id"])["total"] == 5
+            commit_free_creation_dots(conn, coterie_id=co["id"], character_id=a["id"],
+                                      target_kind="background", target_name="Allies", dots=1)
+            assert coterie_effective_rating(conn, co["id"], "background", "Allies") == 1
+            # Flaw dots cap at 4 total.
+            commit_coterie_flaw(conn, coterie_id=co["id"], flaw_name="Hunted", dots=3)
+            with _p.raises(ValueError, match="flaw dots"):
+                commit_coterie_flaw(conn, coterie_id=co["id"], flaw_name="Extra", dots=1)
             conn.commit()
         finally:
             conn.execute("DELETE FROM coterie_contributions WHERE coterie_id=?", (co["id"],))
