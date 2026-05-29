@@ -51,14 +51,14 @@
   },
   "Blood Sorcery Ritual": {
     "level_multiplier": 3,
-    "description": "Ritual level × 3",
-    "min_dots": 1,
+    "description": "Ritual level × 3 (learned at its level, 0 → N)",
+    "min_dots": 0,
     "max_dots": 5
   },
   "Thin-Blood Alchemy Formula": {
     "level_multiplier": 3,
-    "description": "Formula level × 3",
-    "min_dots": 1,
+    "description": "Formula level × 3 (learned at its level, 0 → N)",
+    "min_dots": 0,
     "max_dots": 5
   },
   "Advantage": {

@@ -23,6 +23,9 @@ from web.xp_rules import calculate_cost
     ("Blood Potency",        1, 2, 20),   # 2x10
     ("Humanity",             6, 7, 14),   # 7x2 (single dot)
     ("Blood Sorcery Ritual", 2, 3, 9),    # level x3 (flat per level)
+    ("Blood Sorcery Ritual", 0, 1, 3),    # level 1 from scratch (was unbuyable)
+    ("Blood Sorcery Ritual", 0, 3, 9),    # level 3 from scratch
+    ("Thin-Blood Alchemy Formula", 0, 2, 6),  # level 2 from scratch
 ])
 def test_calculate_cost_matches_house_table(category, cur, new, expected):
     cost, err = calculate_cost(category, cur, new)
@@ -44,3 +47,12 @@ def test_skill_zero_to_one_still_routes_to_new_skill():
     cost, err = calculate_cost("Skill", 0, 1)
     assert err is not None
     assert cost == 0
+
+
+def test_rituals_and_formulas_buyable_from_scratch():
+    """Regression: level_multiplier categories had min_dots=1, making a
+    level-1 ritual unbuyable (current would need to be >=1 AND <1). They're
+    learned 0->N now; cost is level x 3 regardless of 'current'."""
+    assert calculate_cost("Blood Sorcery Ritual", 0, 1) == (3, None)
+    assert calculate_cost("Blood Sorcery Ritual", 0, 5) == (15, None)
+    assert calculate_cost("Thin-Blood Alchemy Formula", 0, 1) == (3, None)
