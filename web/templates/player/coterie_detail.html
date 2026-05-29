@@ -99,7 +99,7 @@
     </div>
   </div>
 
-  {# ── Open proposals (pending + funded, awaiting actions) ── #}
+  {# ── Open proposals (single-funder spends awaiting staff approval) ── #}
   {% set open_spends = spends | selectattr('status', 'in', ['pending', 'funded']) | list %}
   {% if open_spends %}
   {% set viewer_owned_ids = viewer_member_chars | map(attribute='id') | list %}
@@ -110,10 +110,8 @@
     {% for s in open_spends %}
     {% set initiator_id = s.initiated_by | int if (s.initiated_by and s.initiated_by.isdigit()) else 0 %}
     {% set viewer_is_initiator = initiator_id in viewer_owned_ids %}
-    {% set contributions = s.contributions or {} %}
-    {% set committed_ids = contributions.keys() | map('int') | list %}
-    {% set uncommitted_members = members | rejectattr('character_id', 'in', committed_ids) | list %}
-    {% set viewer_uncommitted = viewer_member_chars | rejectattr('id', 'in', committed_ids) | list %}
+    {% set funder_match = members | selectattr('character_id', 'equalto', s.funded_by_character_id) | list %}
+    {% set funder_name = funder_match[0].character_name if funder_match else '' %}
     <div class="gilded p-4 border aurora-beam
                 {{ 'border-gold-800 aurora-pulse' if s.status == 'funded' else 'border-ink-700 aurora-pulse-blood' }}">
 
@@ -128,12 +126,12 @@
           </p>
           <p class="font-cinzel text-[0.55rem] tracking-widest uppercase text-bone-600 mt-0.5">
             {{ (s.spend_category or 'domain') | replace('other', 'special') }}
-            · {{ s.per_member_cost }} XP/member
-            · {{ s.total_cost }} XP total
+            · {{ s.total_cost }} XP
+            {% if funder_name %} · funded by {{ funder_name }}{% endif %}
           </p>
         </div>
         {% if s.status == 'funded' %}
-        <span class="chip text-gold-400 border-gold-700 text-[0.6rem]">Funded</span>
+        <span class="chip text-gold-400 border-gold-700 text-[0.6rem]">Awaiting staff</span>
         {% else %}
         <span class="chip text-mauve-400 border-mauve-800 text-[0.6rem]">Pending</span>
         {% endif %}
@@ -143,62 +141,15 @@
       <p class="font-garamond text-bone-500 text-xs italic mb-3 border-l border-ink-700 pl-3 whitespace-pre-line">{{ s.justification }}</p>
       {% endif %}
 
-      {# Member commit grid #}
-      <div class="mb-3">
-        <p class="label-gold text-[0.7rem] mb-2">
-          Commits
-          <span class="text-bone-700 normal-case ml-1">
-            {{ committed_ids | length }} / {{ members | length }}
-          </span>
-        </p>
-        <div class="flex flex-wrap gap-1.5">
-          {% for m in members %}
-          {% set is_committed = m.character_id in committed_ids %}
-          <span class="chip text-[0.6rem] inline-flex items-center gap-1.5
-                       {{ 'text-gold-400 border-gold-800 bg-gold-900/20' if is_committed else 'text-bone-600 border-ink-700' }}"
-                title="{{ 'Committed' if is_committed else 'Not committed yet' }}">
-            {% if is_committed %}<span class="text-gold-400">✓</span>{% endif %}
-            {{ m.character_name }}
-          </span>
-          {% endfor %}
-        </div>
-      </div>
-
-      {# Action row — commit (own char) + cancel (initiator) #}
-      {% if s.status == 'pending' and viewer_uncommitted %}
-      <form method="POST" action="/coteries/{{ coterie.id }}/spends/{{ s.id }}/commit"
-            class="flex flex-wrap items-center gap-2 pt-3 border-t border-ink-800">
-        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-        {% if viewer_uncommitted | length > 1 %}
-        <select name="character_id" class="text-xs px-2 py-1">
-          {% for c in viewer_uncommitted %}
-          <option value="{{ c.id }}">{{ c.name }}</option>
-          {% endfor %}
-        </select>
-        {% else %}
-        <input type="hidden" name="character_id" value="{{ viewer_uncommitted[0].id }}">
-        <span class="font-garamond text-bone-500 text-xs">
-          Commit as <span class="text-bone-300">{{ viewer_uncommitted[0].name }}</span>
-        </span>
-        {% endif %}
-        <button type="submit" class="btn-send font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
-          Commit {{ s.per_member_cost }} XP
-        </button>
-      </form>
-      {% elif viewer_is_initiator and not viewer_uncommitted %}
-      <p class="font-garamond text-bone-600 text-xs pt-3 border-t border-ink-800 italic">
-        You're committed. Waiting on the rest of the coterie.
-      </p>
-      {% endif %}
-
+      {# The funding member can withdraw before staff approves it #}
       {% if viewer_is_initiator %}
       <form method="POST" action="/coteries/{{ coterie.id }}/spends/{{ s.id }}/cancel"
-            class="mt-2 pt-2 border-t border-ink-800"
-            onsubmit="return confirm('Cancel this proposal? Members who already committed will need to re-allocate.');">
+            class="pt-3 border-t border-ink-800"
+            onsubmit="return confirm('Withdraw this proposal?');">
         <input type="hidden" name="_csrf" value="{{ csrf_token }}">
         <button type="submit"
                 class="font-cinzel tracking-widest text-[0.6rem] text-blood-500 hover:text-blood-400">
-          Cancel Proposal
+          Withdraw Proposal
         </button>
       </form>
       {% endif %}
@@ -207,12 +158,11 @@
   </div>
   {% endif %}
 
-  {# ── NEW single-funder spend flows (advance / buy / donate) ──
-       Replaces the legacy "everyone chips in equally" group-buy form
-       below. One member funds each action — same cost model as a
-       character merit (flat 3 XP / dot). Donations cost no XP but
-       flag the donating character's sheet entry as "shared with this
-       coterie" so both sides show the trait. #}
+  {# ── Single-funder spend flows (advance / buy / donate) ──
+       One member funds each action — same cost model as a character
+       merit (flat 3 XP / dot). Donations cost no XP but flag the
+       donating character's sheet entry as "shared with this coterie"
+       so both sides show the trait. #}
   {% if viewer_member_chars %}
   <div class="space-y-4 mb-6">
 
@@ -450,139 +400,6 @@
   </div>
   {% endif %}
 
-  {# ── Legacy group-buy form ── tucked behind a collapsible so existing
-       spends in flight still work but the default UX is the new flows. #}
-  <details class="mb-6">
-    <summary class="font-cinzel text-bone-700 text-[0.65rem] tracking-widest uppercase cursor-pointer hover:text-bone-500">
-      Legacy: group-buy proposal (all members chip in equally)
-    </summary>
-  <div class="gilded p-5 mt-3" x-data="{ open: false, category: 'domain' }">
-    <button @click="open = !open"
-            class="w-full flex items-center justify-between">
-      <p class="label-gold text-xs">Propose Coterie Spend</p>
-      <span class="font-cinzel text-bone-500 text-xs" x-text="open ? '▲' : '▼'"></span>
-    </button>
-
-    <div x-show="open" x-cloak class="mt-4">
-      {% if spend_errors %}
-      <div class="gilded-inset px-4 py-3 mb-3 border border-blood-900">
-        {% for e in spend_errors %}<p class="font-garamond text-blood-400 text-sm">{{ e }}</p>{% endfor %}
-      </div>
-      {% endif %}
-
-      <form method="POST" action="/coteries/{{ coterie.id }}/spend" class="space-y-4">
-        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-        <input type="hidden" name="spend_category" :value="category">
-
-        {# Category tabs #}
-        <div>
-          <label class="label-gold block mb-2">Category</label>
-          <div class="flex gap-1.5">
-            <template x-for="(opt, idx) in [
-                {key:'domain', label:'Domain'},
-                {key:'merit',  label:'Coterie Merit'},
-                {key:'other',  label:'Other'}
-              ]" :key="opt.key">
-              <button type="button"
-                      @click="category = opt.key"
-                      :class="category === opt.key
-                        ? 'btn-send'
-                        : 'btn-ghost'"
-                      class="font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5"
-                      x-text="opt.label"></button>
-            </template>
-          </div>
-        </div>
-
-        {# Domain selector — only when category is domain #}
-        <div x-show="category === 'domain'" x-cloak>
-          {% if upgrade_costs %}
-          <label class="label-gold block mb-2">Domain Trait</label>
-          <div class="space-y-2">
-            {% for trait_key, uc in upgrade_costs.items() %}
-            <label class="flex items-center gap-3 cursor-pointer gilded-inset px-3 py-2">
-              <input type="radio" name="trait_name" value="{{ trait_key }}"
-                     class="accent-[#8B1A1A]">
-              <div>
-                <span class="font-cinzel text-xs text-bone-200">{{ trait_key | title }}</span>
-                <span class="font-garamond text-bone-600 text-xs ml-2">→ {{ uc.next_dot }} dots</span>
-                <span class="font-cinzel text-gold-500 text-xs ml-2">
-                  {{ uc.per_member }} XP/member ({{ uc.total }} total)
-                </span>
-              </div>
-            </label>
-            {% endfor %}
-          </div>
-          {% else %}
-          <p class="font-garamond text-bone-600 text-xs italic">
-            All domain traits are already at 5 dots. Pick another category instead.
-          </p>
-          {% endif %}
-        </div>
-
-        {# Merit / Other — text + per-member cost #}
-        <div x-show="category !== 'domain'" x-cloak class="space-y-3">
-          <div>
-            <label class="label-gold block mb-2">Trait Name</label>
-            <input type="text" name="trait_name" maxlength="120"
-                   placeholder="e.g. Haven upgrade, Group Resources, Shared Library"
-                   class="w-full text-sm">
-          </div>
-          <div>
-            <label class="label-gold block mb-2">
-              Per-Member XP Cost
-              <span class="text-bone-700 normal-case text-[0.6rem] ml-1">
-                (×{{ members | length }} members = total)
-              </span>
-            </label>
-            <input type="number" name="per_member_cost" min="1" max="50"
-                   placeholder="e.g. 3"
-                   class="w-full text-sm">
-          </div>
-        </div>
-
-        {# Initiator picker — only shows when viewer has multiple member chars #}
-        {% if viewer_member_chars | length > 1 %}
-        <div>
-          <label class="label-gold block mb-2">Propose as</label>
-          <select name="initiator_character_id" class="w-full text-sm">
-            {% for c in viewer_member_chars %}
-            <option value="{{ c.id }}">{{ c.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        {% elif viewer_member_chars %}
-        <input type="hidden" name="initiator_character_id" value="{{ viewer_member_chars[0].id }}">
-        {% endif %}
-
-        {# Justification #}
-        <div>
-          <label class="label-gold block mb-2">
-            Justification
-            <span class="text-bone-700 normal-case text-[0.6rem] ml-1">(optional, visible to staff)</span>
-          </label>
-          <textarea name="justification" rows="2" maxlength="800"
-                    placeholder="Why does the coterie want this? What RP supports it?"
-                    class="w-full text-sm resize-y"></textarea>
-        </div>
-
-        <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
-          Open Proposal
-        </button>
-        <p class="font-garamond text-bone-600 text-xs">
-          You'll auto-commit your own share. Other members commit individually before staff approves.
-        </p>
-      </form>
-    </div>
-  </div>
-  </details>
-
-  {% if spend_success %}
-  <div class="gilded-inset px-4 py-3 mb-4 border border-gold-800">
-    <p class="font-garamond text-gold-400 text-sm">{{ spend_success }}</p>
-  </div>
-  {% endif %}
-
   {# ── Closed history ── #}
   {% set closed_spends = spends | rejectattr('status', 'in', ['pending', 'funded']) | list %}
   {% if closed_spends %}
@@ -595,7 +412,7 @@
         <tr class="border-b border-ink-700">
           <th class="px-4 py-2 text-left label-gold font-normal text-xs">Category</th>
           <th class="px-4 py-2 text-left label-gold font-normal text-xs">Trait</th>
-          <th class="px-4 py-2 text-right label-gold font-normal text-xs">Per Member</th>
+          <th class="px-4 py-2 text-right label-gold font-normal text-xs">Cost</th>
           <th class="px-4 py-2 text-center label-gold font-normal text-xs">Status</th>
           <th class="px-4 py-2 text-left label-gold font-normal text-xs">ST Note</th>
           <th class="px-4 py-2 text-left label-gold font-normal text-xs">Date</th>
@@ -611,7 +428,7 @@
             <span class="text-bone-700 ml-1">{{ s.current_dots }} → {{ s.new_dots }}</span>
             {% endif %}
           </td>
-          <td class="px-4 py-2 font-cinzel text-xs text-gold-400 text-right">{{ s.per_member_cost }} XP</td>
+          <td class="px-4 py-2 font-cinzel text-xs text-gold-400 text-right">{{ s.total_cost }} XP</td>
           <td class="px-4 py-2 text-center">
             {% if s.status == 'approved' %}
             <span class="chip text-gold-400 border-gold-800 text-[0.6rem]">Approved</span>

@@ -59,10 +59,8 @@
     </p>
     <div class="space-y-3">
       {% for s in open_spends %}
-      {% set contributions = s.contributions or {} %}
-      {% set committed_ids = contributions.keys() | map('int') | list %}
-      {% set committed_count = committed_ids | length %}
-      {% set member_count = members | length %}
+      {% set funder_match = members | selectattr('character_id', 'equalto', s.funded_by_character_id) | list %}
+      {% set funder_name = funder_match[0].character_name if funder_match else '' %}
       <div class="gilded p-4 border aurora-beam {{ 'border-gold-800 aurora-pulse' if s.status == 'funded' else 'border-mauve-800 aurora-pulse-blood' }}">
 
         <div class="flex items-start justify-between gap-3 mb-3">
@@ -75,16 +73,14 @@
             </p>
             <p class="font-cinzel text-[0.55rem] tracking-widest uppercase text-bone-600 mt-0.5">
               {{ (s.spend_category or 'domain') | replace('other', 'special') }}
-              · {{ s.per_member_cost }} XP/member
-              · {{ s.total_cost }} XP total
+              · {{ s.total_cost }} XP
+              {% if funder_name %} · funded by {{ funder_name }}{% endif %}
             </p>
           </div>
           {% if s.status == 'funded' %}
           <span class="chip text-gold-400 border-gold-700 text-[0.6rem]">Funded</span>
           {% else %}
-          <span class="chip text-mauve-400 border-mauve-800 text-[0.6rem]">
-            Pending · {{ committed_count }}/{{ member_count }}
-          </span>
+          <span class="chip text-mauve-400 border-mauve-800 text-[0.6rem]">Pending</span>
           {% endif %}
         </div>
 
@@ -92,40 +88,9 @@
         <p class="font-garamond text-bone-500 text-xs italic mb-3 border-l border-ink-700 pl-3 whitespace-pre-line">{{ s.justification }}</p>
         {% endif %}
 
-        {# Commit grid — same as player view #}
-        <div class="mb-3">
-          <p class="label-gold text-[0.7rem] mb-2">Commits</p>
-          <div class="flex flex-wrap gap-1.5">
-            {% for m in members %}
-            {% set is_committed = m.character_id in committed_ids %}
-            <span class="chip text-[0.6rem] inline-flex items-center gap-1.5
-                         {{ 'text-gold-400 border-gold-800 bg-gold-900/20' if is_committed else 'text-bone-600 border-ink-700' }}"
-                  title="{{ 'Committed' if is_committed else 'Not committed yet' }}">
-              {% if is_committed %}<span class="text-gold-400">✓</span>{% endif %}
-              {{ m.character_name }}
-            </span>
-            {% endfor %}
-          </div>
-        </div>
-
         {# Action row #}
         <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-ink-800"
              x-data="{ approving: false, rejecting: false, notes: '' }">
-
-          {% if s.status == 'pending' %}
-          <form hx-post="/staff/coteries/spends/{{ s.id }}/commit-all"
-                hx-target="#coterie-page-anchor"
-                hx-swap="none"
-                hx-on::after-request="if(event.detail.successful) window.location.reload();"
-                class="inline">
-            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-            <button type="submit"
-                    title="Commit every uncommitted member in one shot"
-                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
-              Commit Remaining
-            </button>
-          </form>
-          {% endif %}
 
           <button x-show="!approving && !rejecting" x-cloak
                   @click="approving = true; notes = ''"
@@ -179,7 +144,6 @@
       {% endfor %}
     </div>
   </div>
-  <div id="coterie-page-anchor"></div>
   {% endif %}
 
   {# Closed spend history #}
@@ -193,7 +157,7 @@
           <tr class="border-b border-ink-700">
             <th class="px-4 py-3 text-left label-gold font-normal text-xs">Category</th>
             <th class="px-4 py-3 text-left label-gold font-normal text-xs">Trait</th>
-            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Per Member</th>
+            <th class="px-4 py-3 text-right label-gold font-normal text-xs">Cost</th>
             <th class="px-4 py-3 text-center label-gold font-normal text-xs">Status</th>
             <th class="px-4 py-3 text-left label-gold font-normal text-xs">Note</th>
             <th class="px-4 py-3 text-left label-gold font-normal text-xs">Date</th>
@@ -209,7 +173,7 @@
               <span class="text-bone-700 ml-1">{{ s.current_dots }} → {{ s.new_dots }}</span>
               {% endif %}
             </td>
-            <td class="px-4 py-2.5 font-cinzel text-xs text-gold-400 text-right">{{ s.per_member_cost }} XP</td>
+            <td class="px-4 py-2.5 font-cinzel text-xs text-gold-400 text-right">{{ s.total_cost }} XP</td>
             <td class="px-4 py-2.5 text-center">
               {% if s.status == 'approved' %}
               <span class="chip text-gold-400 border-gold-800 text-[0.6rem]">Approved</span>

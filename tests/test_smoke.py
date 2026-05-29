@@ -2018,150 +2018,125 @@ def test_roster_renders_silent_chip_for_inactive(staff):
     assert "Roster" in r.text
 
 
-def test_coterie_spend_funding_flow_end_to_end(staff):
-    """The full NYbN-style funding flow:
-       create spend (pending) → first commit (still pending) →
-       second commit (status flips to funded) → approve (xp deducted,
-       ledger entries written, status=approved)."""
+def test_coterie_single_funder_spend_approve_deducts_xp(staff):
+    """Single-funder coterie spend — the model that replaced the equal-split
+    group-buy. ONE member funds the whole cost, so the spend is 'funded' on
+    creation (no per-member commit cycle) and staff approval deducts that
+    member's XP and writes a single ledger entry."""
     from web.db import (
         get_db, upsert_player, create_coterie, add_coterie_member, create_character,
-        create_coterie_spend, commit_coterie_contribution,
-        approve_coterie_spend, get_coterie_spend, update_character,
+        create_coterie_single_funder_spend, approve_coterie_spend, get_coterie_spend,
+        update_character,
     )
     with get_db() as conn:
-        # Two characters with enough XP to chip in. list_coterie_members
-        # joins player_profiles so we need both rows.
-        upsert_player(conn, discord_id="500", username="PlayerA")
-        upsert_player(conn, discord_id="501", username="PlayerB")
-        a = create_character(conn, discord_id="500", name="CoSpendA", clan="brujah")
-        b = create_character(conn, discord_id="501", name="CoSpendB", clan="brujah")
-        # update_character doesn't whitelist xp_total — set it directly.
-        conn.execute("UPDATE characters SET xp_total=20 WHERE id IN (?,?)", (a["id"], b["id"]))
+        upsert_player(conn, discord_id="510", username="SoloFunder")
+        a = create_character(conn, discord_id="510", name="SoloFundChar", clan="brujah")
+        conn.execute("UPDATE characters SET xp_total=20 WHERE id=?", (a["id"],))
         update_character(conn, a["id"], is_approved=1)
-        update_character(conn, b["id"], is_approved=1)
-
-        co = create_coterie(conn, "FundFlowSmoke")
+        co = create_coterie(conn, "SoloFundSmoke")
         add_coterie_member(conn, co["id"], a["id"])
-        add_coterie_member(conn, co["id"], b["id"])
-
         try:
-            # Create a merit-category spend — 5 XP/member, no domain dots
-            spend = create_coterie_spend(
-                conn, coterie_id=co["id"], trait_name="Group Library",
-                spend_category="merit", per_member_cost=5,
-                initiated_by=str(a["id"]),
-                justification="We want to share research notes.",
+            spend = create_coterie_single_funder_spend(
+                conn,
+                coterie_id=co["id"],
+                funded_by_character_id=a["id"],
+                contribution_type="paid_xp",
+                target_kind="merit",
+                target_name="Shared Haven",
+                xp_cost=5,
+                justification="One member foots the whole bill.",
             )
-            assert spend["status"] == "pending"
+            # Single funder => funded immediately, awaiting staff (no commits).
+            assert spend["status"] == "funded"
+            assert spend["funded_by_character_id"] == a["id"]
             assert spend["per_member_cost"] == 5
-            assert spend["total_cost"] == 10  # 5 × 2 members
 
-            # First member commits — still pending (1 of 2)
-            result1 = commit_coterie_contribution(conn, spend["id"], a["id"])
-            assert result1["spend"]["status"] == "pending"
-            assert not result1["all_committed"]
-            assert result1["members_remaining"] == [b["id"]]
-
-            # Second member commits — flips to funded
-            result2 = commit_coterie_contribution(conn, spend["id"], b["id"])
-            assert result2["spend"]["status"] == "funded"
-            assert result2["all_committed"]
-
-            # Approve drains XP from each contributor
             approve_coterie_spend(conn, spend["id"], reviewer_id="staff-smoke",
                                   notes="Approved per chronicle policy.")
             after = get_coterie_spend(conn, spend["id"])
             assert after["status"] == "approved"
-            assert after["notes"] == "Approved per chronicle policy."
 
-            char_a = conn.execute("SELECT xp_spent FROM characters WHERE id=?", (a["id"],)).fetchone()
-            char_b = conn.execute("SELECT xp_spent FROM characters WHERE id=?", (b["id"],)).fetchone()
-            assert char_a["xp_spent"] == 5
-            assert char_b["xp_spent"] == 5
+            row = conn.execute("SELECT xp_spent FROM characters WHERE id=?", (a["id"],)).fetchone()
+            assert row["xp_spent"] == 5
 
-            # Ledger has an entry per contributor
             ledger = conn.execute(
                 "SELECT * FROM ledger_entries WHERE reference_type='coterie_spend' "
-                "AND reference_id=? ORDER BY character_id",
-                (spend["id"],)
+                "AND reference_id=?", (spend["id"],)
             ).fetchall()
-            assert len(ledger) == 2
-            assert all(row["xp_delta"] == -5 for row in ledger)
+            assert len(ledger) == 1
+            assert ledger[0]["xp_delta"] == -5
         finally:
-            conn.execute("DELETE FROM ledger_entries WHERE character_id IN (?, ?)",
-                         (a["id"], b["id"]))
-            conn.execute("DELETE FROM coterie_spends WHERE coterie_id=?", (co["id"],))
-            conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
-            conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
-            conn.execute("DELETE FROM characters WHERE id IN (?, ?)", (a["id"], b["id"]))
-
-
-def test_coterie_spend_approve_refuses_pending(staff):
-    """approve_coterie_spend must reject a still-pending spend; staff has
-    to wait for every member to commit (or use commit-all)."""
-    from web.db import (
-        get_db, upsert_player, create_coterie, add_coterie_member, create_character,
-        create_coterie_spend, approve_coterie_spend, update_character,
-    )
-    with get_db() as conn:
-        upsert_player(conn, discord_id="600", username="PlayerC")
-        a = create_character(conn, discord_id="600", name="PendingApproveSmoke", clan="brujah")
-        conn.execute("UPDATE characters SET xp_total=20 WHERE id=?", (a["id"],))
-        update_character(conn, a["id"], is_approved=1)
-        co = create_coterie(conn, "PendingFundSmoke")
-        add_coterie_member(conn, co["id"], a["id"])
-        try:
-            spend = create_coterie_spend(
-                conn, coterie_id=co["id"], trait_name="Stash",
-                spend_category="other", per_member_cost=3,
-                initiated_by=str(a["id"]),
-            )
-            assert spend["status"] == "pending"
-            import pytest as _p
-            with _p.raises(ValueError, match="Funded"):
-                approve_coterie_spend(conn, spend["id"], reviewer_id="staff-smoke")
-        finally:
+            conn.execute("DELETE FROM ledger_entries WHERE character_id=?", (a["id"],))
             conn.execute("DELETE FROM coterie_spends WHERE coterie_id=?", (co["id"],))
             conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
             conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
             conn.execute("DELETE FROM characters WHERE id=?", (a["id"],))
 
 
-def test_coterie_spend_commit_all_funds_in_one_shot(staff):
-    """commit_all_coterie_contributions should commit every eligible
-    member and flip status to 'funded' when everyone qualifies."""
+def test_coterie_pages_render_single_funder_spend(_client):
+    """Render-level regression for the single-funder coterie flow. Both the
+    player coterie detail page and the staff manage page must render a funded
+    single-funder spend (funder name, withdraw / approve) without any of the
+    removed equal-split group-buy machinery (commit grid, commit endpoints,
+    'Commit Remaining' shortcut)."""
     from web.db import (
-        get_db, upsert_player, create_coterie, add_coterie_member, create_character,
-        create_coterie_spend, commit_all_coterie_contributions,
-        update_character,
+        get_db, create_coterie, add_coterie_member,
+        create_coterie_single_funder_spend,
     )
+    DEV_PLAYER_ID = "111111111111111111"
     with get_db() as conn:
-        upsert_player(conn, discord_id="700", username="PlayerD")
-        upsert_player(conn, discord_id="701", username="PlayerE")
-        a = create_character(conn, discord_id="700", name="CommitAllSmokeA", clan="brujah")
-        b = create_character(conn, discord_id="701", name="CommitAllSmokeB", clan="brujah")
-        conn.execute("UPDATE characters SET xp_total=20 WHERE id IN (?,?)", (a["id"], b["id"]))
-        update_character(conn, a["id"], is_approved=1)
-        update_character(conn, b["id"], is_approved=1)
-        co = create_coterie(conn, "CommitAllSmoke")
-        add_coterie_member(conn, co["id"], a["id"])
-        add_coterie_member(conn, co["id"], b["id"])
-        try:
-            spend = create_coterie_spend(
-                conn, coterie_id=co["id"], trait_name="Workshop",
-                spend_category="merit", per_member_cost=4,
-                initiated_by=str(a["id"]),
-            )
-            summary = commit_all_coterie_contributions(conn, spend["id"],
-                                                      reviewer_id="staff-smoke")
-            assert summary["committed_now"] == 2
-            assert summary["all_committed"]
-            assert summary["spend"]["status"] == "funded"
-        finally:
+        row = conn.execute(
+            "SELECT id, xp_total FROM characters "
+            "WHERE discord_id=? AND name='Valeria Morano' LIMIT 1",
+            (DEV_PLAYER_ID,),
+        ).fetchone()
+        assert row is not None, "dev seed character missing"
+        char_id, orig_xp = row["id"], row["xp_total"]
+        # Funder affordability is checked at creation, so guarantee some XP.
+        conn.execute("UPDATE characters SET xp_total=? WHERE id=?", (orig_xp + 10, char_id))
+        co = create_coterie(conn, "RenderSmokeCoterie")
+        add_coterie_member(conn, co["id"], char_id)
+        spend = create_coterie_single_funder_spend(
+            conn,
+            coterie_id=co["id"],
+            funded_by_character_id=char_id,
+            contribution_type="paid_xp",
+            target_kind="merit",
+            target_name="Shared Haven",
+            xp_cost=5,
+            justification="Render-test spend.",
+        )
+    try:
+        # ── Player view (must own a member char to pass the gate) ──
+        _client.cookies.clear()
+        _client.get("/_dev/seed_data", follow_redirects=False)
+        _client.get("/_dev/player", follow_redirects=False)
+        r = _client.get(f"/coteries/{co['id']}")
+        assert r.status_code == 200, r.status_code
+        assert "Open Proposals" in r.text
+        assert "Shared Haven" in r.text
+        assert "Awaiting staff" in r.text
+        assert "Withdraw Proposal" in r.text
+        assert "funded by Valeria Morano" in r.text
+        assert f"/coteries/{co['id']}/spends/{spend['id']}/commit\"" not in r.text
+
+        # ── Staff view (no membership gate) ──
+        _client.cookies.clear()
+        _client.get("/_dev/seed", follow_redirects=False)
+        rs = _client.get(f"/staff/coteries/{co['id']}")
+        assert rs.status_code == 200, rs.status_code
+        assert "Shared Haven" in rs.text
+        assert "Funded" in rs.text
+        assert "Approve" in rs.text
+        assert "funded by Valeria Morano" in rs.text
+        assert "Commit Remaining" not in rs.text
+    finally:
+        with get_db() as conn:
             conn.execute("DELETE FROM coterie_spends WHERE coterie_id=?", (co["id"],))
             conn.execute("DELETE FROM coterie_memberships WHERE coterie_id=?", (co["id"],))
             conn.execute("DELETE FROM coteries WHERE id=?", (co["id"],))
-            conn.execute("DELETE FROM characters WHERE id IN (?, ?)", (a["id"], b["id"]))
+            conn.execute("UPDATE characters SET xp_total=? WHERE id=?", (orig_xp, char_id))
+            conn.commit()
 
 
 def test_aurora_visual_layer_wired(player):

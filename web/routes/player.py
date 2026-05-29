@@ -7,14 +7,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from ..db import (
-    coterie_domain_cost,
     coterie_effective_rating,
-    commit_coterie_contribution,
     create_character,
     create_claim,
     create_coterie_request,
     create_coterie_single_funder_spend,
-    create_coterie_spend,
     create_spend,
     delete_character,
     get_active_period,
@@ -1739,31 +1736,15 @@ async def coterie_detail(
 
 def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = None) -> dict:
     """Shared context for player coterie detail responses. Computes
-    domain upgrade costs, pulls members + spends + contributions, and
-    (when given a viewer) flags which member chars the viewer owns so
-    the template can show commit/cancel buttons + donate options."""
+    single-funder advance costs, pulls members + spends + contributions,
+    and (when given a viewer) flags which member chars the viewer owns so
+    the template can show advance/donate/cancel buttons."""
     from ..db import (
         list_coterie_contributions, COTERIE_NAMED_TRAIT_CAP,
     )
     coterie = get_coterie(conn, coterie_id)
     members = list_coterie_members(conn, coterie_id)
     spends  = list_coterie_spends(conn, coterie_id)
-    n = len(members)
-
-    # Legacy per-member equal-split domain cost — kept so the old
-    # "Propose group-buy" form still renders correctly for in-flight
-    # spends. The new single-funder flow uses _calculate_cost directly.
-    upgrade_costs = {}
-    if n > 0 and coterie:
-        for trait, current_val in [("chasse",    coterie["chasse"]),
-                                    ("lien",      coterie["lien"]),
-                                    ("portillon", coterie["portillon"])]:
-            next_dot = current_val + 1
-            if next_dot <= 5:
-                total, per = coterie_domain_cost(next_dot, n)
-                upgrade_costs[trait] = {"next_dot": next_dot,
-                                        "total": total,
-                                        "per_member": per}
 
     # Single-funder advance costs — what one member pays personally for
     # +1 Chasse/Lien/Portillon. Uses the "Advantage" rule (flat 3/dot)
@@ -1843,7 +1824,6 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
                         })
 
     return {"coterie": coterie, "members": members, "spends": spends,
-            "upgrade_costs": upgrade_costs,
             "advance_costs": advance_costs,
             "active_contribs": active_contribs,
             "all_contribs": all_contribs,
@@ -1867,171 +1847,6 @@ def _resolve_member_char(player_chars: list[dict], members: list[dict],
         if c["id"] in member_char_ids:
             return c
     return None
-
-
-@router.post("/coteries/{coterie_id}/spend", response_class=HTMLResponse)
-async def submit_coterie_spend(
-    request: Request,
-    coterie_id: int,
-    user: dict = Depends(require_auth),
-    _: None = Depends(csrf_protect),
-):
-    """Player-initiated group spend. Defaults to a domain upgrade
-    (auto-computed cost) but accepts spend_category=merit/other with a
-    caller-supplied per-member cost. Spend starts in 'pending' with no
-    contributions recorded — each member commits separately."""
-    form           = await request.form()
-    spend_category = (form.get("spend_category") or "domain").strip().lower()
-    trait_name     = (form.get("trait_name")     or "").strip()
-    justification  = (form.get("justification")  or "").strip() or None
-    initiator_raw  = (form.get("initiator_character_id") or "").strip()
-    initiator_id   = int(initiator_raw) if initiator_raw.isdigit() else 0
-    per_member_raw = (form.get("per_member_cost") or "").strip()
-
-    with get_db() as conn:
-        coterie = get_coterie(conn, coterie_id)
-        if not coterie:
-            raise HTTPException(status_code=404)
-
-        members      = list_coterie_members(conn, coterie_id)
-        player_chars = list_player_characters(conn, user["id"])
-        initiator    = _resolve_member_char(player_chars, members, initiator_id)
-        if initiator is None:
-            raise HTTPException(status_code=403)
-
-        errors: list[str] = []
-
-        # ── Category-specific validation ──────────────────────────────────
-        current_val = 0
-        new_dots    = 0
-        per_cost    = 0
-
-        if spend_category == "domain":
-            if trait_name not in ("chasse", "lien", "portillon"):
-                errors.append("Invalid domain trait.")
-            else:
-                current_val = coterie.get(trait_name, 0)
-                new_dots    = current_val + 1
-                if new_dots > 5:
-                    errors.append(f"{trait_name.title()} is already at maximum (5).")
-                else:
-                    _, per_cost = coterie_domain_cost(new_dots, len(members))
-        elif spend_category in ("merit", "other"):
-            if not trait_name or len(trait_name) > 120:
-                errors.append("Trait name is required (max 120 chars).")
-            try:
-                per_cost = int(per_member_raw)
-                if per_cost <= 0:
-                    errors.append("Per-member XP cost must be greater than zero.")
-            except ValueError:
-                errors.append("Per-member XP cost must be a whole number.")
-        else:
-            errors.append("Unknown spend category.")
-
-        # Block duplicate pending proposals for the same trait
-        if not errors:
-            already_open = any(
-                s["status"] in ("pending", "funded")
-                and s["trait_name"] == trait_name
-                and (s.get("spend_category") or "domain") == spend_category
-                for s in list_coterie_spends(conn, coterie_id)
-            )
-            if already_open:
-                errors.append(f"There is already an open {spend_category} proposal for \"{trait_name}\".")
-
-        # Initiator must be able to afford their own share (sanity check)
-        if not errors:
-            init_char = get_character(conn, initiator["id"])
-            if init_char and (init_char.get("xp_available") or 0) < per_cost:
-                errors.append(
-                    f"{init_char['name']} only has {init_char.get('xp_available') or 0} XP available "
-                    f"(needs {per_cost})."
-                )
-
-        if errors:
-            ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
-            resp = templates.TemplateResponse(
-                request, "player/coterie_detail.html",
-                _ctx(request, **ctx, spend_errors=errors),
-            )
-            _toast(resp, "Please fix the errors below.", "error")
-            return resp
-
-        spend = create_coterie_spend(
-            conn,
-            coterie_id=coterie_id,
-            trait_name=trait_name,
-            spend_category=spend_category,
-            current_dots=current_val,
-            new_dots=new_dots,
-            per_member_cost=per_cost if spend_category != "domain" else None,
-            initiated_by=str(initiator["id"]),
-            justification=justification,
-            contributions={},
-        )
-        # Auto-commit the initiator — they obviously support their own
-        # proposal. Saves a click and matches the old NYbN UX.
-        try:
-            commit_coterie_contribution(conn, spend["id"], initiator["id"])
-        except ValueError:
-            # If the initiator's XP balance shifted between checks (race)
-            # leave the spend pending without their commit; UI will show
-            # them as still owing.
-            pass
-
-        ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
-
-    resp = templates.TemplateResponse(
-        request, "player/coterie_detail.html",
-        _ctx(request, **ctx,
-             spend_success=f"{trait_name} proposal opened — waiting on member commits."),
-    )
-    _toast(resp, f"{trait_name} proposal opened — waiting on member commits.")
-    return resp
-
-
-@router.post("/coteries/{coterie_id}/spends/{spend_id}/commit", response_class=HTMLResponse)
-async def commit_coterie_spend(
-    request: Request,
-    coterie_id: int,
-    spend_id: int,
-    user: dict = Depends(require_auth),
-    _: None = Depends(csrf_protect),
-):
-    """Player commits their character's XP share to a pending spend.
-    The character_id form field picks WHICH of the player's coterie
-    characters is paying (auto-selected when only one applies)."""
-    from ..db import commit_coterie_contribution as _commit
-    form = await request.form()
-    char_raw = (form.get("character_id") or "").strip()
-    char_id  = int(char_raw) if char_raw.isdigit() else 0
-
-    with get_db() as conn:
-        coterie = get_coterie(conn, coterie_id)
-        if not coterie:
-            raise HTTPException(status_code=404)
-        members      = list_coterie_members(conn, coterie_id)
-        player_chars = list_player_characters(conn, user["id"])
-        actor = _resolve_member_char(player_chars, members, char_id)
-        if actor is None:
-            raise HTTPException(status_code=403)
-
-        flash_kind, flash_msg = "success", "Share committed."
-        try:
-            result = _commit(conn, spend_id, actor["id"])
-            if result["all_committed"]:
-                flash_msg = "Share committed — all members in. Spend is now Funded, awaiting staff."
-        except ValueError as e:
-            flash_kind, flash_msg = "error", str(e)
-
-        ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
-
-    resp = templates.TemplateResponse(
-        request, "player/coterie_detail.html",
-        _ctx(request, **ctx),
-    )
-    _toast(resp, flash_msg, flash_kind)
-    return resp
 
 
 @router.post("/coteries/{coterie_id}/spends/{spend_id}/cancel", response_class=HTMLResponse)

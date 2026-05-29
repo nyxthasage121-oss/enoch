@@ -1369,40 +1369,6 @@ async def approve_co_spend(
     return resp
 
 
-@router.post("/coteries/spends/{spend_id}/commit-all", response_class=HTMLResponse)
-async def commit_all_co_spend(
-    request: Request,
-    spend_id: int,
-    user: dict = Depends(require_permission("manage_coterie")),
-    _: None = Depends(csrf_protect),
-):
-    """Staff shortcut: commit every uncommitted member in one go.
-    Members who can't afford it are skipped (their count surfaces
-    in the toast so staff knows to follow up)."""
-    from ..db import commit_all_coterie_contributions
-    err, summary = None, None
-    try:
-        with get_db() as conn:
-            summary = commit_all_coterie_contributions(conn, spend_id, user["id"])
-    except ValueError as e:
-        err = str(e)
-    with get_db() as conn:
-        ctx = _coterie_ctx(conn)
-    resp = templates.TemplateResponse(
-        request, "staff/partials/coterie_spends_table.html", _ctx(request, **ctx)
-    )
-    if err:
-        _toast(resp, err, "error")
-    elif summary:
-        msg = f"Committed {summary['committed_now']} member(s)."
-        if summary["skipped"]:
-            msg += f" {len(summary['skipped'])} skipped (insufficient XP or missing)."
-        if summary["all_committed"]:
-            msg += " Spend is now Funded — ready for approval."
-        _toast(resp, msg, "success" if summary["all_committed"] else "info")
-    return resp
-
-
 @router.post("/coteries/spends/{spend_id}/reject", response_class=HTMLResponse)
 async def reject_co_spend(
     request: Request,

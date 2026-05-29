@@ -9,15 +9,12 @@
           <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Coterie</th>
           <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Category</th>
           <th class="px-4 py-3 text-left  label-gold font-normal text-xs">Trait</th>
-          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Per Member</th>
-          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Commits</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Cost</th>
           <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for s in co_spends %}
-        {% set contributions   = s.contributions or {} %}
-        {% set committed_count = contributions | length %}
         <tr class="border-b border-ink-800"
             x-data="{ rejecting: false, reason: '' }">
           <td class="px-4 py-2.5">
@@ -41,11 +38,7 @@
             {% endif %}
           </td>
           <td class="px-4 py-2.5 font-cinzel text-xs text-gold-400 text-right">
-            {{ s.per_member_cost }} XP
-          </td>
-          <td class="px-4 py-2.5 font-cinzel text-xs text-center"
-              :class="'{{ s.status }}' === 'funded' ? 'text-gold-400' : 'text-bone-500'">
-            {{ committed_count }}
+            {{ s.total_cost }} XP
           </td>
           <td class="px-4 py-2.5 text-right">
             <div x-show="!rejecting" class="flex gap-1 justify-end">
@@ -58,7 +51,7 @@
               </button>
               {% else %}
               <a href="/staff/coteries/{{ s.coterie_id }}"
-                 title="Open coterie to commit on members' behalf"
+                 title="Open coterie to manage this proposal"
                  class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">
                 Manage
               </a>
