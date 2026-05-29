@@ -8,11 +8,10 @@
       <p class="label-gold mb-1">Staff</p>
       <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">
         {% if filter_status == 'pending' %}Spends Queue{% else %}Spends History{% endif %}
-        {% if spends %}
-        <span class="font-cinzel text-xl
+        {# id lets the approve/reject partial update this count out-of-band #}
+        <span id="spends-count" class="font-cinzel text-xl
                      {{ 'text-blood-400' if filter_status == 'pending'
                         else 'text-bone-600' }} ml-3">{{ spends | length }}</span>
-        {% endif %}
       </h1>
     </div>
 

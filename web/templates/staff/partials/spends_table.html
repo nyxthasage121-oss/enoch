@@ -1,4 +1,11 @@
 {# spends_table.html — refreshed by HTMX after approve/reject actions #}
+{# When served as an HTMX action response (oob_count set by the approve/
+   reject routes) also refresh the header count out-of-band. The full-page
+   include never sets oob_count, so there's no duplicate #spends-count id. #}
+{% if oob_count %}
+<span id="spends-count" hx-swap-oob="true"
+      class="font-cinzel text-xl text-blood-400 ml-3">{{ spends | length }}</span>
+{% endif %}
 <div id="spends-table">
   {% if spends %}
   <div class="space-y-4">

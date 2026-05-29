@@ -391,7 +391,8 @@ async def do_approve_spend(
         s["revalidation"] = revalidate_spend(s)
 
     resp = templates.TemplateResponse(
-        request, "staff/partials/spends_table.html", _ctx(request, spends=spends)
+        request, "staff/partials/spends_table.html",
+        _ctx(request, spends=spends, oob_count=True),
     )
     _toast(resp, err or "Spend approved.", "error" if err else "success")
     return resp
@@ -421,7 +422,8 @@ async def do_reject_spend(
         s["revalidation"] = revalidate_spend(s)
 
     resp = templates.TemplateResponse(
-        request, "staff/partials/spends_table.html", _ctx(request, spends=spends)
+        request, "staff/partials/spends_table.html",
+        _ctx(request, spends=spends, oob_count=True),
     )
     _toast(resp, err or "Spend rejected.", "error" if err else "info")
     return resp
