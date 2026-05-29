@@ -853,14 +853,8 @@
           </template>
         </div>
 
-        {# Sire — Kindred only. Mortals have parents, Ghouls have a regnant,
-           Revenants have family elders rather than a sire in the V5 sense. #}
-        <div x-show="charName.character_type === 'kindred'" x-cloak>
-          <label class="label-gold block mb-2">Sire
-            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span></label>
-          <input type="text" name="sire" maxlength="80" x-model="charName.sire"
-                 placeholder="Name of sire, if known…" class="w-full">
-        </div>
+        {# Sire is set post-creation in the About My Character panel, not during
+           chargen (staff direction 2026-05) — it's editable any time there. #}
 
       </div>
 

@@ -626,7 +626,10 @@ async def do_approve_char(
             "kind": "error" if err else "success",
             "message": err or "Character approved.",
         }]
-        return RedirectResponse(url=f"/staff/characters/{character_id}", status_code=303)
+        # Pop back to the roster after a detail-page approval — staff asked to
+        # land on the list (where the just-approved char now shows as Active)
+        # rather than staying on the individual sheet.
+        return RedirectResponse(url="/staff/characters", status_code=303)
 
     with get_db() as conn:
         all_chars = list_characters(conn)

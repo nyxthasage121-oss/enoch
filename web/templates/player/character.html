@@ -158,6 +158,49 @@
         {% endif %}
       </div>
 
+      {# ── Profile image — avatar + management, relocated into About ── #}
+      <div class="flex items-center gap-4 mb-5">
+        <div class="aurora-portrait w-20 h-20 shrink-0">
+          <div class="w-full h-full border border-[var(--clan,theme(colors.ink.700))]
+                      bg-ink-900 flex items-center justify-center overflow-hidden">
+            {% if char.profile_image_url %}
+            <img src="{{ char.profile_image_url }}" alt="" class="w-full h-full object-cover"
+                 style="filter: url(#aurora-portrait-warm);">
+            {% else %}
+            <span class="font-cinzel text-3xl text-[var(--clan,theme(colors.gold.400))]">{{ char.name[0] | upper }}</span>
+            {% endif %}
+          </div>
+        </div>
+        {% if not _about_locked %}
+        {# Upload/replace + remove live in their own forms (multipart, separate
+           from the narrative /about form), shown only while editing. #}
+        <div x-show="editing" x-cloak class="flex-1 min-w-0">
+          <form method="post" action="/characters/{{ char.id }}/image"
+                enctype="multipart/form-data" class="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <div class="flex-1 min-w-[11rem]">
+              <label class="label-gold block mb-1 text-[0.7rem]">
+                {% if char.profile_image_url %}Replace image{% else %}Upload image{% endif %}
+                <span class="text-bone-700 normal-case text-[0.6rem]">JPG/PNG/WebP/GIF ≤ 2 MB</span>
+              </label>
+              <input type="file" name="image"
+                     accept="image/jpeg,image/png,image/webp,image/gif" required class="w-full text-xs">
+            </div>
+            <button type="submit" class="btn-send font-cinzel tracking-widest text-[0.65rem] px-3 py-1.5">Upload</button>
+          </form>
+          {% if char.profile_image_url %}
+          <form method="post" action="/characters/{{ char.id }}/image/delete" class="mt-2">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button type="submit"
+                    class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1 border-blood-900 text-blood-500 hover:text-blood-400">
+              Remove image
+            </button>
+          </form>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
       {# ── View mode ── #}
       <div x-show="!editing">
         {% if char.profile_blurb %}
@@ -539,15 +582,17 @@
             {% for key, label in traits %}
             <div class="flex items-center justify-between py-1.5 border-b border-ink-800 last:border-0">
               <span class="font-garamond text-sm text-bone-300">{{ label }}</span>
-              <div class="flex gap-1">
+              <div class="flex items-center gap-1">
                 {% for n in range(1, 6) %}
                 <button type="button" @click="toggleDot('{{ key }}', {{ n }})"
                         class="w-3 h-3 rounded-full border transition-colors"
                         :class="get('{{ key }}') >= {{ n }}
-                          ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
-                          : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                          ? 'pip-on'
+                          : 'pip-off'">
                 </button>
                 {% endfor %}
+                <span class="ml-2 w-3 text-right font-cinzel text-xs text-gold-400 tabular-nums"
+                      x-text="get('{{ key }}') || 0"></span>
               </div>
             </div>
             {% endfor %}
@@ -577,10 +622,12 @@
                   <button type="button" @click="toggleDot('{{ key }}', {{ n }})"
                           class="w-3 h-3 rounded-full border transition-colors"
                           :class="get('{{ key }}') >= {{ n }}
-                            ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
-                            : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                            ? 'pip-on'
+                            : 'pip-off'">
                   </button>
                   {% endfor %}
+                  <span class="ml-1.5 w-3 text-right font-cinzel text-xs text-gold-400 tabular-nums"
+                        x-text="get('{{ key }}') || 0"></span>
                   <button type="button" @click="startAdding('{{ key }}')"
                           class="ml-1 w-4 h-4 rounded-full border border-bone-700 text-bone-700 hover:text-gold-400 hover:border-gold-700 text-[0.6rem] leading-none flex items-center justify-center opacity-0 group-hover/skill:opacity-100 focus:opacity-100 transition-opacity"
                           :class="addingFor === '{{ key }}' ? 'opacity-100' : ''"
@@ -661,15 +708,17 @@
               <span class="font-cinzel text-[0.5rem] tracking-[0.2em] text-gold-500 uppercase">Clan</span>
               {% endif %}
             </div>
-            <div class="flex gap-1">
+            <div class="flex items-center gap-1">
               {% for n in range(1, 6) %}
               <button type="button" @click="toggleDot('{{ key }}', {{ n }})"
                       class="w-3 h-3 rounded-full border transition-colors"
                       :class="get('{{ key }}') >= {{ n }}
-                        ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
-                        : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                        ? 'pip-on'
+                        : 'pip-off'">
               </button>
               {% endfor %}
+              <span class="ml-2 w-3 text-right font-cinzel text-xs text-gold-400 tabular-nums"
+                    x-text="get('{{ key }}') || 0"></span>
             </div>
           </div>
           {% endfor %}
@@ -694,8 +743,8 @@
                     <button type="button" @click="m.dots = m.dots === n ? n - 1 : n"
                             class="w-3 h-3 rounded-full border transition-colors"
                             :class="m.dots >= n
-                              ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
-                              : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                              ? 'pip-on'
+                              : 'pip-off'">
                     </button>
                   </template>
                 </div>
@@ -735,7 +784,7 @@
                             class="w-3 h-3 rounded-full border transition-colors"
                             :class="f.dots >= n
                               ? 'bg-blood-bright border-blood-bright'
-                              : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                              : 'pip-off'">
                     </button>
                   </template>
                 </div>
@@ -789,8 +838,8 @@
                 <button type="button" @click="r.level = r.level === n ? n - 1 : n"
                         class="w-3 h-3 rounded-full border transition-colors"
                         :class="r.level >= n
-                          ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
-                          : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                          ? 'pip-on'
+                          : 'pip-off'">
                 </button>
               </template>
               <button type="button" @click="rituals.splice(idx, 1)"
@@ -837,8 +886,8 @@
                 <button type="button" @click="c.level = c.level === n ? n - 1 : n"
                         class="w-3 h-3 rounded-full border transition-colors"
                         :class="c.level >= n
-                          ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
-                          : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                          ? 'pip-on'
+                          : 'pip-off'">
                 </button>
               </template>
               <button type="button" @click="ceremonies.splice(idx, 1)"
@@ -885,8 +934,8 @@
                 <button type="button" @click="f.level = f.level === n ? n - 1 : n"
                         class="w-3 h-3 rounded-full border transition-colors"
                         :class="f.level >= n
-                          ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
-                          : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                          ? 'pip-on'
+                          : 'pip-off'">
                 </button>
               </template>
               <button type="button" @click="formulae.splice(idx, 1)"
@@ -921,15 +970,17 @@
           {% for key, label, max_dots in [('humanity','Humanity',10),('blood_potency','Blood Potency',5),('hunger','Hunger',5)] %}
           <div class="flex items-center justify-between py-1">
             <span class="font-garamond text-sm text-bone-300">{{ label }}</span>
-            <div class="flex gap-1 flex-wrap">
+            <div class="flex items-center gap-1 flex-wrap">
               {% for n in range(1, max_dots + 1) %}
               <button type="button" @click="toggleDot('{{ key }}', {{ n }})"
                       class="w-3 h-3 rounded-full border transition-colors"
                       :class="get('{{ key }}') >= {{ n }}
-                        ? 'bg-[var(--clan,theme(colors.gold.500))] border-[var(--clan,theme(colors.gold.500))]'
-                        : 'bg-transparent border-bone-700 hover:border-bone-500'">
+                        ? 'pip-on'
+                        : 'pip-off'">
               </button>
               {% endfor %}
+              <span class="ml-2 w-3 text-right font-cinzel text-xs text-gold-400 tabular-nums"
+                    x-text="get('{{ key }}') || 0"></span>
             </div>
           </div>
           {% endfor %}

@@ -2563,6 +2563,45 @@ def test_chargen_revenant_select_required_is_conditional():
     )
 
 
+def test_sheet_pips_use_reliable_utility_classes():
+    """Regression guard — the character sheet's rating pips must use the
+    hand-rolled .pip-on/.pip-off utilities (codex.css), NOT a Tailwind
+    arbitrary class like bg-[var(--clan,…)]. The precompiled tailwind.css
+    drops arbitrary values, so the arbitrary class rendered every filled
+    pip transparent and made ratings unreadable."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    sheet = (root / "web" / "templates" / "player" / "character.html").read_text(encoding="utf-8")
+    codex = (root / "web" / "static" / "css" / "codex.css").read_text(encoding="utf-8")
+    assert "pip-on" in sheet and "pip-off" in sheet, "sheet pips should use .pip-on/.pip-off"
+    assert "bg-[var(--clan,theme(colors.gold.500))]" not in sheet, (
+        "Sheet pips must not use the arbitrary bg-[var(--clan,…)] class — "
+        "it isn't compiled into tailwind.css, so filled pips render blank."
+    )
+    assert ".pip-on" in codex and ".pip-off" in codex, "codex.css must define the pip utilities"
+
+
+def test_chargen_has_no_sire_field():
+    """Sire is collected in the About My Character panel, not during chargen
+    (staff direction 2026-05). The wizard must not render a sire input."""
+    from pathlib import Path
+    tpl = (Path(__file__).resolve().parents[1]
+           / "web" / "templates" / "player" / "character_create.html").read_text(encoding="utf-8")
+    assert 'name="sire"' not in tpl, "chargen should not have a Sire input — it's set in About."
+
+
+def test_about_section_hosts_profile_image_form():
+    """Profile-image management (avatar + upload/remove) was relocated into
+    the About My Character section on the character page, reusing the
+    existing /image routes."""
+    from pathlib import Path
+    tpl = (Path(__file__).resolve().parents[1]
+           / "web" / "templates" / "player" / "character.html").read_text(encoding="utf-8")
+    assert "/image" in tpl and 'name="image"' in tpl, (
+        "About section should host the profile-image upload form."
+    )
+
+
 def test_aurora_landing_renders_atmosphere(_client):
     """Unauthenticated landing page renders the static aurora-layer
     backdrop (CSS-only halo, no WebGL motion) so the landing remains
@@ -3596,8 +3635,9 @@ def test_staff_pending_queue_excludes_drafts(staff):
 
 def test_staff_approve_via_plain_form_redirects(player, staff):
     """The detail-page Approve button is a plain form post (no HX-Request
-    header). The server must redirect back to the detail page rather
-    than dumping the roster partial."""
+    header). The server must redirect to the roster (staff asked to pop
+    back to the list after approving) rather than staying on the detail
+    page or dumping the roster partial."""
     from web.db import get_db
     # Use the full-wizard mode so the character lands directly in the
     # staff queue (no Submit-for-Review step needed).
@@ -3619,7 +3659,9 @@ def test_staff_approve_via_plain_form_redirects(player, staff):
                        data={"_csrf": "dev-csrf-token"},
                        follow_redirects=False)
         assert r.status_code == 303, "must redirect on plain form post"
-        assert r.headers.get("location", "").endswith(f"/staff/characters/{cid}")
+        loc = r.headers.get("location", "")
+        assert loc.endswith("/staff/characters"), f"should pop back to the roster, got {loc!r}"
+        assert not loc.endswith(f"/characters/{cid}"), "should not stay on the detail page"
         with get_db() as conn:
             row = conn.execute(
                 "SELECT is_approved FROM characters WHERE id=?", (cid,)

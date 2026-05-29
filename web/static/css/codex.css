@@ -882,6 +882,23 @@ body.landing-page > div > main { padding: 0; }
   to { width: var(--xp-target, 0%); }
 }
 
+/* ── Character-sheet rating pips ────────────────────────────────────
+   Filled pips use the live clan accent. We can't rely on Tailwind
+   arbitrary classes (bg-[var(--clan,…)]) for this — the precompiled
+   tailwind.css drops arbitrary values, which left every filled pip
+   transparent and made sheet ratings unreadable. These hand-rolled
+   utilities always ship. */
+.pip-on {
+  background-color: var(--clan, #d4a94d);
+  border-color: var(--clan, #d4a94d);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--clan, #d4a94d) 45%, transparent);
+}
+.pip-off {
+  background-color: transparent;
+  border-color: #6b6058;
+}
+.pip-off:hover { border-color: #b08a3e; }
+
 /* ── Dashboard pending-pulse ────────────────────────────────────── */
 @keyframes pendingPulse {
   0%, 100% { box-shadow:
