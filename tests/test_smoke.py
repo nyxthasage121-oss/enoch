@@ -2503,6 +2503,38 @@ def test_aurora_visual_layer_wired(player):
     assert 'id="aurora-grade"' in r.text
 
 
+def test_aurora_sparkle_host_stays_interactive():
+    """Regression guard — this exact bug has bitten three times (chargen
+    clan buttons, staff claim approve/reject, staff spend approve/reject).
+
+    `.aurora-sparkle-host` wraps REAL interactive controls, and CSS
+    `pointer-events` is inherited, so a `pointer-events: none` on the host
+    silently disables every nested button — their HTMX/Alpine clicks never
+    fire. The decorative injected `.aurora-spark` children opt out of
+    hit-testing on their own, so the host itself must stay interactive."""
+    import re
+    from pathlib import Path
+    css = (Path(__file__).resolve().parents[1]
+           / "web" / "static" / "css" / "aurora.css").read_text(encoding="utf-8")
+    # Strip CSS comments so explanatory prose that *mentions* the property
+    # (like the warning comment guarding this very rule) can't trip the check.
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+
+    host = re.search(r"\.aurora-sparkle-host\s*\{([^}]*)\}", css)
+    assert host, ".aurora-sparkle-host rule not found in aurora.css"
+    assert "pointer-events" not in host.group(1), (
+        "`.aurora-sparkle-host` must stay interactive — pointer-events is "
+        "inherited and kills nested buttons (claims/spends approve+reject)."
+    )
+
+    spark = re.search(r"\.aurora-spark\s*\{([^}]*)\}", css)
+    assert spark, ".aurora-spark rule not found in aurora.css"
+    assert re.search(r"pointer-events\s*:\s*none", spark.group(1)), (
+        "`.aurora-spark` particles must keep pointer-events:none so the "
+        "decorative sparks never intercept clicks."
+    )
+
+
 def test_aurora_landing_renders_atmosphere(_client):
     """Unauthenticated landing page renders the static aurora-layer
     backdrop (CSS-only halo, no WebGL motion) so the landing remains

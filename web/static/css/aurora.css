@@ -191,8 +191,14 @@ body {
  * (aurora.js) injects child spans on demand.
  * ───────────────────────────────────────────────────────────── */
 .aurora-sparkle-host {
+  /* The host MUST stay interactive. `pointer-events` is inherited, so
+     setting it to `none` here silently disables every real control
+     nested inside the host (buttons, links) — it bit the chargen clan
+     buttons and the staff claim/spend approve+reject buttons, where
+     clicks never reached HTMX/Alpine. The decorative injected sparks
+     opt out of hit-testing on their own via `.aurora-spark` below, so
+     the host does not need it. Do not re-add pointer-events here. */
   position: relative;
-  pointer-events: none;
 }
 .aurora-spark {
   position: absolute;
