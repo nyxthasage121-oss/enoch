@@ -5,7 +5,6 @@ Three-tier resolution from web/deps.py::is_settings_admin:
   2. player_profiles.settings_admin = 1
   3. Otherwise: 403
 """
-import os
 import pytest
 
 
@@ -91,7 +90,7 @@ def test_admin_settings_post_blocks_non_admin(staff):
 def test_env_override_grants_access(monkeypatch, _client):
     """ENOCH_SETTINGS_ADMIN_IDS env var must grant access even when the
     DB flag is off. Used for emergency bootstrap / locked-out scenarios."""
-    from web.db import get_db, set_settings_admin, upsert_player
+    from web.db import get_db, upsert_player
     # Create a non-staff user and log them in via the dev seed path.
     with get_db() as conn:
         upsert_player(conn, discord_id="env-override", username="EnvOverride")

@@ -224,7 +224,11 @@ async def callback(
     # Pull the assigned Enoch staff role (if any) into the session so
     # require_permission can gate without hitting the DB on every request.
     if is_staff:
-        from ..db import get_db, get_staff_role
+        # NB: get_db is already imported at module top — do NOT re-import it
+        # here. A function-local `import get_db` would make the name local to
+        # this whole function and turn the earlier upsert call (above) into an
+        # UnboundLocalError, silently killing the player-profile upsert.
+        from ..db import get_staff_role
         with get_db() as conn:
             role = get_staff_role(conn, user_id)
         request.session["staff_role"] = role or ""

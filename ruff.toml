@@ -1,0 +1,24 @@
+# Ruff config for Enoch.
+#
+# Philosophy: lint for *real problems*, not stylistic choices this
+# codebase makes on purpose. The pyflakes ("F") rules — unused imports,
+# unused variables, undefined names, references-before-assignment — are
+# the high-value ones and stay on. The stylistic "E7" rules below are
+# intentionally ignored: the code uses compact one-liners and short
+# loop variables deliberately, and churning them buys nothing.
+#
+# Run:  python -m ruff check .
+# Fix:  python -m ruff check . --fix   (only safe fixes)
+
+# .venv312 is this project's venv name and isn't in ruff's default
+# exclude list, so name it explicitly or ruff will lint dependencies.
+exclude = [".venv312"]
+
+[lint]
+# Default selection is E4/E7/E9 + F. Keep all of F.
+extend-ignore = [
+    "E701",  # multiple statements on one line (colon)   — deliberate
+    "E702",  # multiple statements on one line (semicolon) — deliberate
+    "E741",  # ambiguous variable name (l/I/O)             — tolerated
+    "E402",  # module import not at top                    — lazy imports
+]

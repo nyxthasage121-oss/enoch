@@ -60,7 +60,6 @@ from ..db import (
     sweep_retirements,
     toggle_hunting_site,
     update_character,
-    update_coterie,
     update_criterion,
     update_hunting_site,
 )
@@ -534,14 +533,13 @@ _INACTIVE_THRESHOLD_DAYS = 28   # 4 weeks
 
 @router.get("/characters", response_class=HTMLResponse)
 async def roster(request: Request, user: dict = Depends(require_staff)):
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timezone
     with get_db() as conn:
         all_chars = list_characters(conn)
 
     # Flag active characters that haven't earned/spent XP recently. We
     # ignore pending/retired/dead — those are expected to be quiet.
     now = datetime.now(timezone.utc)
-    threshold = now - timedelta(days=_INACTIVE_THRESHOLD_DAYS)
     for c in all_chars:
         ts = c.get("last_activity_at")
         if c["status"] == "active" and c["is_approved"]:
@@ -1743,7 +1741,7 @@ async def set_role_route(
         request.session["flash"] = [{"kind": "error", "message": str(e)}]
         return RedirectResponse(url="/staff/admin#staff", status_code=303)
 
-    msg = f"Role cleared." if role is None else f"Role set to {role}."
+    msg = "Role cleared." if role is None else f"Role set to {role}."
     request.session["flash"] = [{"kind": "success", "message": msg}]
     return RedirectResponse(url="/staff/admin#staff", status_code=303)
 
@@ -1788,7 +1786,6 @@ async def admin_settings_save(
     XP rules without explicit grant — even if they have manage_settings
     permission. Lead STs get the grant automatically via migration 024."""
     from ..db import upsert_settings
-    import json as _json
 
     form = await request.form()
 
@@ -2128,7 +2125,6 @@ async def create_site_route(
     user: dict = Depends(require_permission("manage_site")),
     _: None = Depends(csrf_protect),
 ):
-    from ..v5_traits import V5_PREDATOR_TYPES
     form          = await request.form()
     name          = (form.get("name") or "").strip()
     borough       = (form.get("borough") or "").strip()

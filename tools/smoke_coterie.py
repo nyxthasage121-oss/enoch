@@ -123,7 +123,6 @@ def main():
     with TestClient(app) as client:
         # Player session for Alice's owner
         with get_db() as conn:
-            from web.db import upsert_player
             # The dev preview login route sets a fixed discord_id; we
             # need our test player on the session. Use the OAuth path or
             # set the session directly via _dev/player and then override.
@@ -259,7 +258,6 @@ def main():
         # ── 4) Inactivity sweep: flip Alice to inactive, contributions suspend ──
         with get_db() as conn:
             chasse_active = coterie_effective_rating(conn, coterie_id, "chasse")
-            haven_active = coterie_effective_rating(conn, coterie_id, "background", "Haven")
             suspended = suspend_member_contributions(conn, alice_id, actor_id="smoke")
             conn.commit()
             check("inactivity: returns affected coterie list",

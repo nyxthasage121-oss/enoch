@@ -490,14 +490,10 @@ def test_period_helpers_partition_by_time():
     from web.db import (
         get_db,
         create_period,
-        set_period_active,
-        close_period,
         list_upcoming_periods,
         list_recent_closed_periods,
     )
     with get_db() as conn:
-        # Snapshot existing rows so we can isolate the ones this test creates.
-        existing = {r["id"] for r in conn.execute("SELECT id FROM play_periods").fetchall()}
         # Future-scheduled
         future = create_period(
             conn, label="SmokeFuture", period_type="night", phase="full",
@@ -2302,9 +2298,6 @@ def test_map_quick_import_rolls_back_layer_on_bad_payload(staff):
     left dangling — the route deletes it so staff can retry cleanly."""
     from web.db import get_db, list_map_layers
     staff.get("/_dev/seed", follow_redirects=False)
-    before = {l["name"] for l in list_map_layers(
-        next(iter([get_db().__enter__()])), include_staff_only=True, active_only=False
-    )} if False else None  # placeholder for clarity; real check below
 
     r = staff.post(
         "/staff/map/quick-import",
@@ -2460,7 +2453,7 @@ def test_list_characters_near_cap_helper():
     """list_characters_near_cap returns approved+active rows within
     threshold_xp of cap, with an xp_to_cap column for sorting."""
     from web.db import (
-        get_db, create_character, update_character, list_characters_near_cap,
+        get_db, create_character, list_characters_near_cap,
         upsert_player,
     )
     with get_db() as conn:
@@ -2627,7 +2620,7 @@ def test_active_ruleset_in_memoriam_forces_ancilla_to_im(staff, player):
     character submitted with ancilla_mode='standard' should be coerced
     to 'in_memoriam' on save — the chronicle setting wins."""
     import json as _j
-    from web.db import get_db, upsert_settings, get_character
+    from web.db import get_db, upsert_settings
 
     # Flip the chronicle into IM mode
     with get_db() as conn:
@@ -2835,7 +2828,6 @@ def test_period_schedule_stamp_generates_periods(_client):
     runs first (the schedule tests don't otherwise touch HTTP)."""
     from web.db import (
         get_db, create_period_schedule, stamp_periods_from_schedule,
-        list_periods,
     )
     with get_db() as conn:
         # Clean slate — wipe any pre-existing rows for this anchor
@@ -3208,7 +3200,7 @@ def test_staff_detail_renders_touchstones(staff):
     they were not in the staff sheet section before this fix. We seed
     the character via DB so the test doesn't depend on the wizard's
     touchstone validation path."""
-    from web.db import get_db, create_character, update_character
+    from web.db import get_db, create_character
     touchstones = [
         {"name": "Marie Devereaux", "conviction": "Protect the powerless"},
         {"name": "Father Cesare",   "conviction": "Never lie"},

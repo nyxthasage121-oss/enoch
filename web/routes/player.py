@@ -7,7 +7,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from ..db import (
-    add_coterie_member,
     coterie_domain_cost,
     coterie_effective_rating,
     commit_coterie_contribution,
@@ -38,7 +37,6 @@ from ..db import (
     list_recent_closed_periods,
     list_spends_for_character,
     list_upcoming_periods,
-    recent_coterie_advance_in_period,
     sweep_retirements,
     update_character,
     validate_coterie_advance,
@@ -1733,8 +1731,7 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
     (when given a viewer) flags which member chars the viewer owns so
     the template can show commit/cancel buttons + donate options."""
     from ..db import (
-        list_coterie_contributions, coterie_effective_rating,
-        COTERIE_NAMED_TRAIT_CAP,
+        list_coterie_contributions, COTERIE_NAMED_TRAIT_CAP,
     )
     coterie = get_coterie(conn, coterie_id)
     members = list_coterie_members(conn, coterie_id)
@@ -2041,7 +2038,6 @@ async def cancel_coterie_spend_route(
         coterie = get_coterie(conn, coterie_id)
         if not coterie:
             raise HTTPException(status_code=404)
-        members      = list_coterie_members(conn, coterie_id)
         player_chars = list_player_characters(conn, user["id"])
 
         spend = get_coterie_spend(conn, spend_id)
