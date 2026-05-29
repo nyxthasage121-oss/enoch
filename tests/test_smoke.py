@@ -1301,11 +1301,11 @@ def test_start_character_review_locks_player_sheet_edit(staff, player):
 
 
 def test_approved_character_sheet_edit_unlocked_despite_review_flag(staff, player):
-    """approve_character intentionally leaves review_started_at set, but the
+    """approve_character clears review_started_at on approval; and the
     sheet-save lock is gated on `not is_approved AND review_started_at`, so an
-    approved character is editable again. Guards against the lock being
-    'simplified' to review_started_at-only — which would freeze every
-    approved character's sheet for good."""
+    approved character is editable regardless. Guards both the clear-on-approve
+    and the is_approved short-circuit — so the lock can't be 'simplified' to
+    review_started_at-only and freeze every approved sheet."""
     import json as _j
     r = player.post(
         "/characters/new",
@@ -1329,7 +1329,7 @@ def test_approved_character_sheet_edit_unlocked_despite_review_flag(staff, playe
                 "SELECT is_approved, review_started_at FROM characters WHERE id=?", (cid,)
             ).fetchone()
             assert row["is_approved"] == 1
-            assert row["review_started_at"] is not None  # intentionally lingers
+            assert row["review_started_at"] is None  # approve clears the review flag
         # Player edits the sheet on the now-approved character — must persist.
         rr = player.post(
             f"/characters/{cid}/sheet",
@@ -1341,8 +1341,29 @@ def test_approved_character_sheet_edit_unlocked_despite_review_flag(staff, playe
             sj = _j.loads(conn.execute(
                 "SELECT sheet_json FROM characters WHERE id=?", (cid,)
             ).fetchone()["sheet_json"])
-        assert sj.get("attr_strength") == 4, \
-            "approved sheet must stay editable despite the lingering review flag"
+        assert sj.get("attr_strength") == 4, "approved sheet must be editable"
+
+        # Belt-and-suspenders: even if the review flag is somehow set on an
+        # approved row, the lock's `not is_approved` short-circuit keeps the
+        # sheet editable — the safety doesn't depend solely on the clear.
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE characters SET review_started_at='2026-01-01T00:00:00Z' WHERE id=?",
+                (cid,),
+            )
+            conn.commit()
+        rr2 = player.post(
+            f"/characters/{cid}/sheet",
+            data={"_csrf": "dev-csrf-token", "attr_strength": "5"},
+            follow_redirects=False,
+        )
+        assert rr2.status_code == 303
+        with get_db() as conn:
+            sj2 = _j.loads(conn.execute(
+                "SELECT sheet_json FROM characters WHERE id=?", (cid,)
+            ).fetchone()["sheet_json"])
+        assert sj2.get("attr_strength") == 5, \
+            "approved sheet must stay editable even with the review flag forced on"
     finally:
         with get_db() as conn:
             conn.execute("DELETE FROM characters WHERE id=?", (cid,))

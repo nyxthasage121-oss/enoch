@@ -482,7 +482,8 @@ def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
     now = _now()
     conn.execute("""
         UPDATE characters
-        SET is_approved=1, status='active', approved_by=?, approved_at=?, updated_at=?
+        SET is_approved=1, status='active', approved_by=?, approved_at=?, updated_at=?,
+            review_started_at=NULL, review_started_by=NULL
         WHERE id=?
     """, (reviewer_id, now, now, character_id))
     char = get_character(conn, character_id)

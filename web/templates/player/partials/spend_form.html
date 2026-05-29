@@ -89,9 +89,11 @@
              class="w-full">
     </div>
 
-    {# Dots — current + new #}
-    <div class="grid grid-cols-2 gap-4" x-show="category" x-cloak>
-      <div>
+    {# Dots — current + new. Rituals/formulas are flat-per-level, so the
+       "current" field hides and "new" becomes the ritual/formula level. #}
+    <div class="grid gap-4" :class="isLevelBased ? 'grid-cols-1' : 'grid-cols-2'"
+         x-show="category" x-cloak>
+      <div x-show="!isLevelBased">
         <label class="label-gold block mb-2" for="spend-current">Current Dots</label>
         <input id="spend-current"
                type="number"
@@ -105,7 +107,8 @@
                min="0" max="9">
       </div>
       <div>
-        <label class="label-gold block mb-2" for="spend-new">New Dots</label>
+        <label class="label-gold block mb-2" for="spend-new"
+               x-text="isLevelBased ? 'Level' : 'New Dots'">New Dots</label>
         <input id="spend-new"
                type="number"
                name="new_dots"
@@ -189,6 +192,13 @@ function spendForm(rules, humanityConditions) {
     humanityConditions: humanityConditions,
     checkedHC:    humanityConditions.map(() => false),
 
+    init() {
+      // Rituals/formulas are flat-per-level — "current dots" is meaningless
+      // (cost is level x multiplier). Zero it whenever such a category is
+      // picked so the hidden field submits 0 and a level-1 (0->1) validates.
+      this.$watch('category', () => { if (this.isLevelBased) this.currentDots = 0; });
+    },
+
     get rule() { return this.rules[this.category] || null; },
 
     get ruleDescription() { return this.rule ? this.rule.description : ''; },
@@ -200,6 +210,7 @@ function spendForm(rules, humanityConditions) {
     get isNewSkill()  { return this.category === 'New Skill'; },
     get isHumanity()  { return this.category === 'Humanity'; },
     get isIngrained() { return this.category === 'Ingrained Discipline'; },
+    get isLevelBased() { return !!(this.rule && this.rule.level_multiplier !== undefined); },
 
     get computedCost() {
       const rule = this.rule;
