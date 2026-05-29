@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}Enoch{% endblock %}</title>
-  <link rel="icon" type="image/svg+xml" href="/static/images/EnochLogo.svg">
+  {# Tab icon uses the purpose-built 32x32 monogram (crisp at favicon
+     sizes); EnochLogo.svg stays on the OG/Twitter tags below where the
+     extra detail helps the unfurl. #}
+  <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
 
   {# ── Social / OG meta — Discord, Twitter, etc. unfurls ── #}
   <meta property="og:site_name" content="Enoch">
