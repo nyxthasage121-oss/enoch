@@ -68,24 +68,28 @@
        (Nature / Memoriam / Blood / etc.) but click jumps numeric step.
   #}
   <div class="wizard-tracker">
+    {# Each step carries a plain-language hint (3rd tuple slot) surfaced as a
+       hover title, since the NYbN-flavored labels (Curse, Legacy, Soul, Vow…)
+       aren't self-explanatory. Keeps the strip clean per Steward direction. #}
     {% set step_nav = [
-      (1,  'Nature'),
-      (2,  'Memoriam'),
-      (3,  'Blood'),
-      (4,  'Hunt'),
-      (5,  'Story'),
-      (6,  'Flesh'),
-      (7,  'Skill'),
-      (8,  'Legacy'),
-      (9,  'Curse'),
-      (10, 'Lore'),
-      (11, 'Soul'),
-      (12, 'Vow'),
+      (1,  'Nature',   'Type & tier'),
+      (2,  'Memoriam', 'Era history'),
+      (3,  'Blood',    'Clan'),
+      (4,  'Hunt',     'Predator type'),
+      (5,  'Story',    'Background'),
+      (6,  'Flesh',    'Attributes'),
+      (7,  'Skill',    'Skills'),
+      (8,  'Legacy',   'Merits & Flaws'),
+      (9,  'Curse',    'Disciplines'),
+      (10, 'Lore',     'Rituals & ceremonies'),
+      (11, 'Soul',     'Touchstones'),
+      (12, 'Vow',      'Review & submit'),
     ] %}
-    {% for n, label in step_nav %}
+    {% for n, label, hint in step_nav %}
     <button type="button"
             x-show="!_isStepHidden({{ n }})"
             @click="goStep({{ n }})"
+            title="{{ label }} — {{ hint }}"
             class="wizard-tracker-step"
             :class="step === {{ n }} ? 'is-current' : (step > {{ n }} ? 'is-done' : 'is-future')">
       <span class="wizard-tracker-bubble" x-text="visibleStepIndex({{ n }})"></span>
@@ -2005,6 +2009,11 @@
           if (this.charName.ancilla_mode !== 'in_memoriam') return true;
           return false;
         }
+        // Clan (Blood, step 3) is Kindred-only. Mortals/ghouls/revenants have
+        // no clan — ghouls have a regnant, revenants a family, both set on
+        // Nature — so skip the clan picker entirely (canAdvanceBlood already
+        // lets them pass, but no reason to show an irrelevant step).
+        if (n === 3 && t !== 'kindred') return true;
         if (t === 'mortal' && (n === 9 || n === 10)) return true;
         if (n === 10 && !this._hasRitualDiscipline()) return true;
         return false;
