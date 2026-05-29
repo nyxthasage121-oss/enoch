@@ -11,13 +11,13 @@ import pytest
 @pytest.fixture(autouse=True)
 def _env(_client):
     from web.db import get_db, upsert_settings
-    def _set(v):
+    def _reset():
         with get_db() as conn:
-            upsert_settings(conn, xp_cap_enabled=v)
+            upsert_settings(conn, xp_cap_enabled=1, xp_cap_amount=350)
             conn.commit()
-    _set(1)            # start each test cap-on (the default)
+    _reset()           # start each test cap-on at the default amount
     yield
-    _set(1)            # restore so the toggle never leaks to other tests
+    _reset()           # restore so neither the toggle nor the amount leaks
 
 
 def _char_near_cap(conn):
@@ -73,5 +73,25 @@ def test_cap_disabled_awards_full_and_no_retirement():
             c = get_character(conn, cid)
             assert c["xp_total"] == cap + 40, "no cap -> full 50 awarded (was cap-10)"
             assert c["retirement_eligible_at"] is None, "no cap -> no auto-retirement"
+        finally:
+            _cleanup(conn, cid, clid)
+
+
+def test_cap_amount_is_configurable():
+    """Enforcement uses the chronicle-wide xp_cap_amount, not a hardcoded 350,
+    so a shared chronicle can set its own cap."""
+    from web.db import get_db, create_character, approve_claim, get_character, upsert_settings
+    with get_db() as conn:
+        upsert_settings(conn, xp_cap_enabled=1, xp_cap_amount=200)
+        ch = create_character(conn, discord_id="cap-test", name="Cap Amount", clan="brujah")
+        cid = ch["id"]
+        conn.execute("UPDATE characters SET xp_total=190 WHERE id=?", (cid,))   # 10 under the 200 cap
+        clid = _pending_claim(conn, cid, 50)
+        conn.commit()
+        try:
+            approve_claim(conn, clid, "staff")
+            c = get_character(conn, cid)
+            assert c["xp_total"] == 200, "should cap at the chronicle amount (200), awarding 10 of 50"
+            assert c["retirement_eligible_at"] is not None
         finally:
             _cleanup(conn, cid, clid)

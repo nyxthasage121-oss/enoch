@@ -379,19 +379,24 @@ def list_characters_near_cap(conn, threshold_xp: int = 30) -> list[dict]:
     """Approved + active characters within `threshold_xp` of their cap.
     Sorted closest-first so the dashboard tile + roster filter both
     surface the same urgent rows. Excludes already-retired characters
-    so they don't trip the warning."""
+    so they don't trip the warning. Uses the chronicle-wide cap amount and
+    returns nothing when the cap is disabled (nobody is "near" a cap)."""
+    settings = get_settings(conn)
+    if not bool((settings or {}).get("xp_cap_enabled", 1)):
+        return []
+    cap_amount = int((settings or {}).get("xp_cap_amount", 350) or 350)
     return conn.execute(
         """
         SELECT c.*, pp.username AS player_username,
-               (c.xp_cap - c.xp_total) AS xp_to_cap
+               (? - c.xp_total) AS xp_to_cap
         FROM characters c
         LEFT JOIN player_profiles pp ON pp.discord_id = c.discord_id
         WHERE c.is_approved = 1
           AND c.status = 'active'
-          AND (c.xp_cap - c.xp_total) BETWEEN 0 AND ?
+          AND (? - c.xp_total) BETWEEN 0 AND ?
         ORDER BY xp_to_cap ASC, c.name
         """,
-        (threshold_xp,),
+        (cap_amount, cap_amount, threshold_xp),
     ).fetchall()
 
 
@@ -650,8 +655,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "unlocked_predator_types",
         # Auto period-generation toggle (migration 025)
         "auto_create_periods_enabled",
-        # XP cap on/off toggle (migration 027)
-        "xp_cap_enabled",
+        # XP cap on/off toggle (migration 027) + amount (migration 028)
+        "xp_cap_enabled", "xp_cap_amount",
     }
     # Validate ruleset before persisting — guard against typo'd POSTs.
     if "active_ruleset" in kwargs and kwargs["active_ruleset"] not in RULESETS:
@@ -1410,10 +1415,11 @@ def approve_claim(conn, claim_id: int, reviewer_id: str) -> dict:
     # (default) award up to the per-character cap and open the retirement
     # window on first hit; when disabled award the full claim and never
     # auto-trigger retirement from the cap.
-    settings = get_settings(conn)
-    cap_on   = bool((settings or {}).get("xp_cap_enabled", 1))
+    settings   = get_settings(conn)
+    cap_on     = bool((settings or {}).get("xp_cap_enabled", 1))
+    cap_amount = int((settings or {}).get("xp_cap_amount", 350) or 350)
     if cap_on:
-        cap_room = max(0, char["xp_cap"] - char["xp_total"])
+        cap_room = max(0, cap_amount - char["xp_total"])
         awarded  = min(claim["xp_claimed"], cap_room)
     else:
         awarded  = claim["xp_claimed"]
@@ -1426,7 +1432,7 @@ def approve_claim(conn, claim_id: int, reviewer_id: str) -> dict:
     if awarded > 0:
         new_total    = char["xp_total"] + awarded
         retirement   = char.get("retirement_eligible_at")
-        if cap_on and new_total >= char["xp_cap"] and not retirement:
+        if cap_on and new_total >= cap_amount and not retirement:
             retirement = now
         conn.execute("""
             UPDATE characters SET xp_total=?, retirement_eligible_at=?, updated_at=?

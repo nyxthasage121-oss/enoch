@@ -2564,9 +2564,12 @@ def test_list_characters_near_cap_helper():
     threshold_xp of cap, with an xp_to_cap column for sorting."""
     from web.db import (
         get_db, create_character, list_characters_near_cap,
-        upsert_player,
+        upsert_player, upsert_settings,
     )
     with get_db() as conn:
+        # near-cap only applies when the cap is on; pin the amount so the
+        # xp_to_cap math is deterministic regardless of other tests' settings.
+        upsert_settings(conn, xp_cap_enabled=1, xp_cap_amount=350)
         upsert_player(conn, discord_id="9001", username="NearCapSmoke")
         c = create_character(conn, discord_id="9001",
                              name="NearCapSmoke", clan="brujah")

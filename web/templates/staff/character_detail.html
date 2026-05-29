@@ -124,14 +124,14 @@
       <div class="flex justify-between items-center mb-1.5">
         <span class="font-cinzel text-[0.6rem] text-bone-600 tracking-[0.2em] uppercase">XP</span>
         <span class="font-cinzel text-[0.65rem] text-bone-500">
-          <span x-data="counter(0, {{ char.xp_total }})" x-text="value"></span>{% if xp_cap_enabled %} / {{ char.xp_cap }}{% else %} total{% endif %}
+          <span x-data="counter(0, {{ char.xp_total }})" x-text="value"></span>{% if xp_cap_enabled %} / {{ xp_cap_amount }}{% else %} total{% endif %}
           <span class="text-gold-500 ml-2">
             <span x-data="counter(0, {{ char.xp_available }}, 700)" x-text="value"></span> available
           </span>
         </span>
       </div>
       {% if xp_cap_enabled %}
-      {% set pct = [(char.xp_total / char.xp_cap * 100)|int, 100]|min %}
+      {% set pct = [(char.xp_total / xp_cap_amount * 100)|int, 100]|min %}
       <div class="h-0.5 bg-ink-800 w-full overflow-hidden">
         <div class="xp-fill-anim" style="--xp-target: {{ pct }}%"></div>
       </div>

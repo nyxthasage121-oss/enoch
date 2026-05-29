@@ -1832,6 +1832,7 @@ async def admin_settings_save(
     payload: dict = {
         "require_sheet_on_create":   1 if form.get("require_sheet_on_create") == "on" else 0,
         "xp_cap_enabled":            1 if form.get("xp_cap_enabled") == "on" else 0,
+        "xp_cap_amount":             max(1, int(form.get("xp_cap_amount") or 350)),
         # Old binary flag stays in sync with the new selector so anything
         # still reading it doesn't break.
         "use_homebrew_rules":        1 if active_ruleset == "homebrew" else 0,

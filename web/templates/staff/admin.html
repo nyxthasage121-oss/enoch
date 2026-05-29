@@ -113,6 +113,16 @@
           </div>
         </label>
 
+        <div class="pl-7">
+          <label class="label-gold block mb-1.5 text-[0.7rem]">XP cap amount</label>
+          <input type="number" name="xp_cap_amount" min="1" max="9999"
+                 value="{{ _cs.get('xp_cap_amount', 350) }}"
+                 class="w-28 text-sm py-1 px-2">
+          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
+            The XP each character can reach (used only when the cap above is enforced).
+          </p>
+        </div>
+
         <div class="divider-gold"></div>
 
         {# Ruleset selector — two-way Standard vs Homebrew. The In

@@ -134,17 +134,17 @@ def static_url(rel_path: str) -> str:
     return f"/static/{rel_path}?v={fp}"
 
 
-def _xp_cap_enabled() -> bool:
-    """Whether the chronicle enforces the XP cap (migration 027). Read per
-    render so an admin toggle takes effect immediately; defaults to True
-    (cap on) if settings can't be read."""
+def _xp_cap_settings() -> tuple[bool, int]:
+    """(enabled, amount) for the chronicle XP cap (migrations 027/028). Read
+    per render so an admin change takes effect immediately; safe defaults
+    (on, 350) if settings can't be read."""
     try:
         from .db import get_db, get_settings
         with get_db() as conn:
-            s = get_settings(conn)
-        return bool((s or {}).get("xp_cap_enabled", 1))
+            s = get_settings(conn) or {}
+        return bool(s.get("xp_cap_enabled", 1)), int(s.get("xp_cap_amount", 350) or 350)
     except Exception:
-        return True
+        return True, 350
 
 
 def _ctx(request: Request, **extra) -> dict:
@@ -152,6 +152,7 @@ def _ctx(request: Request, **extra) -> dict:
     user = request.session.get("user")
     flash = request.session.pop("flash", [])
     raw_role = request.session.get("staff_role") or ""
+    cap_enabled, cap_amount = _xp_cap_settings()
     return {
         "request": request,
         "current_user": user,
@@ -162,7 +163,8 @@ def _ctx(request: Request, **extra) -> dict:
         "flash_messages": flash,
         "dev_preview": settings.DEV_PREVIEW,
         "static_url": static_url,
-        "xp_cap_enabled": _xp_cap_enabled(),
+        "xp_cap_enabled": cap_enabled,
+        "xp_cap_amount": cap_amount,
         **extra,
     }
 
