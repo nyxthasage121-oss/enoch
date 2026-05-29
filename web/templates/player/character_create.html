@@ -162,21 +162,18 @@
             <span x-show="budgets.homebrew" class="text-bone-700 normal-case ml-1">(homebrew)</span>
           </p>
           <ul class="space-y-1.5 text-xs font-cinzel tracking-wide">
-            {% for key, label in [
-              ('merits',      'Merits'),
-              ('advantages',  'Advantages'),
-              ('backgrounds', 'Backgrounds'),
-            ] %}
+            {# Merits, Backgrounds and Advantages are one V5 "Advantages"
+               pool — track them combined, not as three separate budgets.
+               Predator-granted dots are free (budgetUsed excludes them). #}
             <li class="flex items-center justify-between gap-2">
-              <span class="text-bone-500">{{ label }}</span>
-              <span :class="budgetUsed.{{ key }} > budgets.{{ key }}
+              <span class="text-bone-500">Advantages</span>
+              <span :class="(budgetUsed.merits + budgetUsed.advantages + budgetUsed.backgrounds) > (budgets.merits + budgets.advantages + budgets.backgrounds)
                               ? 'text-blood-400 aurora-pulse-blood inline-block rounded px-1' : 'text-gold-400'">
-                <span x-text="budgetUsed.{{ key }}"></span>
+                <span x-text="budgetUsed.merits + budgetUsed.advantages + budgetUsed.backgrounds"></span>
                 <span class="text-bone-700">/</span>
-                <span x-text="budgets.{{ key }}"></span>
+                <span x-text="budgets.merits + budgets.advantages + budgets.backgrounds"></span>
               </span>
             </li>
-            {% endfor %}
             <li class="flex items-center justify-between gap-2">
               <span class="text-bone-500">Flaws</span>
               <span :class="budgetUsed.flaws > budgets.flaw_cap
@@ -1051,7 +1048,7 @@
       <div class="mb-6">
         <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Skill</h1>
         <p class="font-garamond text-bone-500 text-sm leading-relaxed">
-          27 skills across three pillars. Tap the <span class="text-gold-500">+</span>
+          27 skills across three pillars. Tap <span class="text-gold-500">+ Spec</span>
           beside any skill to record a specialty (e.g. "Insight · Reading Faces").
         </p>
       </div>
@@ -1099,7 +1096,8 @@
                   <span class="font-garamond text-sm text-bone-300 truncate">{{ label }}</span>
                   <button type="button"
                           @click="startAddingSpec('{{ key }}')"
-                          class="text-bone-700 hover:text-gold-400 text-[0.65rem] leading-none">+</button>
+                          title="Add a specialty"
+                          class="shrink-0 inline-flex items-center px-1.5 py-0.5 border border-ink-600 text-bone-500 hover:text-gold-400 hover:border-gold-700 text-[0.5rem] font-cinzel tracking-widest uppercase leading-none transition-colors">+ Spec</button>
                 </div>
                 {% set tplkey = key %}
                 {% include "player/partials/wizard_pips.html" %}
@@ -1273,17 +1271,23 @@
                           class="text-bone-700 hover:text-blood-400 text-xs">×</button>
                 </div>
               </template>
-              <div class="flex items-center gap-2 mt-1 ml-2">
-                <input type="number" min="1" :max="sheet[disc.key] || 1"
-                       x-model.number="newPowerLevel[disc.key]"
-                       class="text-xs py-1 px-1.5 w-12 text-center">
-                <input type="text" maxlength="80"
-                       :placeholder="'Power name… (' + disc.label + ')'"
-                       x-model="newPowerName[disc.key]"
-                       @keydown.enter.prevent="addPower(disc.key)"
-                       class="text-xs py-1 px-2 flex-1">
+              <div class="flex items-end gap-2 mt-2 ml-2">
+                <div class="w-16 shrink-0">
+                  <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">Level</label>
+                  <input type="number" min="1" :max="sheet[disc.key] || 1"
+                         x-model.number="newPowerLevel[disc.key]"
+                         class="text-sm py-1.5 px-2 w-full text-center">
+                </div>
+                <div class="flex-1 min-w-0">
+                  <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">Power name</label>
+                  <input type="text" maxlength="80"
+                         :placeholder="'e.g. a ' + disc.label + ' power…'"
+                         x-model="newPowerName[disc.key]"
+                         @keydown.enter.prevent="addPower(disc.key)"
+                         class="text-sm py-1.5 px-2 w-full">
+                </div>
                 <button type="button" @click="addPower(disc.key)"
-                        class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
+                        class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5 shrink-0">Add</button>
               </div>
             </div>
           </template>
@@ -1734,38 +1738,8 @@
         At least 2 touchstones are required before submitting (you currently have <span x-text="touchstones.length"></span>).
       </p>
 
-      {# Profile image — optional file upload, processed server-side after create #}
-      <div class="gilded p-5 mb-5">
-        <label class="label-gold block mb-2" for="wizard-image-upload">
-          Profile Image
-          <span class="text-bone-700 font-sans normal-case text-[0.6rem]">(optional)</span>
-        </label>
-        <p class="font-garamond text-bone-500 text-xs mb-3 leading-relaxed">
-          Visible to other players on your character's IC profile.
-          JPG, PNG, WebP, or GIF up to 2 MB. You can also add or replace this later from the character page.
-        </p>
-        <div class="flex items-start gap-4">
-          <div x-show="imagePreview" x-cloak
-               class="w-24 h-24 shrink-0 border border-clan bg-ink-900 overflow-hidden">
-            <img :src="imagePreview" alt="Preview" class="w-full h-full object-cover">
-          </div>
-          <div class="flex-1 min-w-0">
-            <input id="wizard-image-upload"
-                   type="file"
-                   name="profile_image"
-                   accept="image/jpeg,image/png,image/webp,image/gif"
-                   @change="onImageSelected($event)"
-                   class="w-full text-xs">
-            <p x-show="imageError" x-cloak x-text="imageError"
-               class="font-garamond text-[0.7rem] text-blood-400 italic mt-2"></p>
-            <button x-show="imagePreview" x-cloak
-                    type="button" @click="clearImage()"
-                    class="font-cinzel tracking-widest text-[0.6rem] text-blood-500 hover:text-blood-400 mt-2">
-              Remove
-            </button>
-          </div>
-        </div>
-      </div>
+      {# Profile image is set on the character page (About My Character) after
+         creation, not in chargen — so the wizard form stays text-only. #}
 
       {# Submission notes — free-text "anything for the ST" before submit #}
       <div class="gilded p-5 mb-5">

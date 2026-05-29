@@ -14,15 +14,21 @@
   </div>
 </template>
 
-<div class="flex items-center gap-2 mt-3"
+<div class="flex items-end gap-2 mt-3"
      x-data="{ name: '', level: 1 }">
-  <input type="number" min="1" max="5" x-model.number="level"
-         class="text-xs py-1 px-1.5 w-12 text-center">
-  <input type="text" maxlength="80" x-model="name"
-         placeholder="{{ _label | capitalize }} name…"
-         @keydown.enter.prevent="addToLeveledList('{{ _list }}', name, level); name=''; level=1;"
-         class="text-xs py-1 px-2 flex-1">
+  <div class="w-16 shrink-0">
+    <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">Level</label>
+    <input type="number" min="1" max="5" x-model.number="level"
+           class="text-sm py-1.5 px-2 w-full text-center">
+  </div>
+  <div class="flex-1 min-w-0">
+    <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">{{ _label | capitalize }} name</label>
+    <input type="text" maxlength="80" x-model="name"
+           placeholder="Add a {{ _label }}…"
+           @keydown.enter.prevent="addToLeveledList('{{ _list }}', name, level); name=''; level=1;"
+           class="text-sm py-1.5 px-2 w-full">
+  </div>
   <button type="button"
           @click="addToLeveledList('{{ _list }}', name, level); name=''; level=1;"
-          class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
+          class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5 shrink-0">Add</button>
 </div>
