@@ -786,6 +786,13 @@ async def character_resume_draft(
         "apparent_age":     char.get("apparent_age"),
         "pronouns":         char.get("pronouns") or "",
         "backstory":        char.get("backstory") or "",
+        # Chargen build picks — the wizard reads these at the TOP level of
+        # initialForm (not nested in sheet), so surface them here or the
+        # predator-grant pickers / spread selections come back blank and the
+        # player has to re-choose everything on the Hunt step.
+        "predator_choices":  sheet.get("predator_choices") or {},
+        "skill_spread":      sheet.get("skill_spread") or "",
+        "discipline_spread": sheet.get("discipline_spread") or "",
         # Sheet data — wizard reads these from initialForm.sheet
         "sheet":            sheet,
     }
@@ -1110,7 +1117,14 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
                 rating = int(it.get(rating_field, 0))
             except (ValueError, TypeError):
                 rating = 0
-            cleaned.append({"name": name, rating_field: max(0, min(5, rating))})
+            entry = {"name": name, rating_field: max(0, min(5, rating))}
+            # Preserve provenance (e.g. src='predator') so resume-draft can
+            # tell auto-granted entries from player-added ones and reconcile
+            # them instead of duplicating.
+            src = str(it.get("src", "")).strip()[:20]
+            if src:
+                entry["src"] = src
+            cleaned.append(entry)
         sheet[list_key] = cleaned
 
     # Discipline powers — {discipline: 'disc_auspex', name: 'Heightened Senses', level: 1}
@@ -1208,7 +1222,11 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
                 name  = str(it.get("name", "")).strip()[:80]
                 if not skill or not name or skill not in valid_skills:
                     continue
-                cleaned_spec.append({"skill": skill, "name": name})
+                spec = {"skill": skill, "name": name}
+                src = str(it.get("src", "")).strip()[:20]
+                if src:
+                    spec["src"] = src
+                cleaned_spec.append(spec)
             sheet["specialties"] = cleaned_spec
 
     # Chargen build metadata: the spreads the player followed + the resolved

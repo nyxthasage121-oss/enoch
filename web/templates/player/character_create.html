@@ -163,10 +163,49 @@
             <span x-show="budgets.homebrew" class="text-bone-700 normal-case ml-1">(homebrew)</span>
           </p>
           <ul class="space-y-1.5 text-xs font-cinzel tracking-wide">
+            {# ── Trait spreads — base allocation vs the V5 target. Bought
+               (Starting-XP) dots are excluded so buying doesn't read as
+               "over" the spread. #}
+            <li class="flex items-center justify-between gap-2">
+              <span class="text-bone-500">Attributes</span>
+              <span :class="attrSpreadDots > attrDotsTarget ? 'text-blood-400'
+                              : (attrSpreadDots === attrDotsTarget ? 'text-gold-400' : 'text-bone-400')">
+                <span x-text="attrSpreadDots"></span>
+                <span class="text-bone-700">/</span>
+                <span x-text="attrDotsTarget"></span>
+              </span>
+            </li>
+            <li class="flex items-center justify-between gap-2">
+              <span class="text-bone-500">Skills</span>
+              <span :class="skillDotsTarget && skillSpreadDots > skillDotsTarget ? 'text-blood-400'
+                              : (skillDotsTarget && skillSpreadDots === skillDotsTarget ? 'text-gold-400' : 'text-bone-400')">
+                <span x-text="skillSpreadDots"></span>
+                <span class="text-bone-700">/</span>
+                <span x-text="skillDotsTarget || '—'"></span>
+              </span>
+            </li>
+            <li class="flex items-center justify-between gap-2">
+              <span class="text-bone-500">Specialties
+                <span class="text-bone-700 normal-case">(free)</span></span>
+              <span :class="specialties.length >= freeSpecialtyCount ? 'text-gold-400' : 'text-bone-400'">
+                <span x-text="specialties.length"></span>
+                <span class="text-bone-700">/</span>
+                <span x-text="freeSpecialtyCount"></span>
+              </span>
+            </li>
+            <li class="flex items-center justify-between gap-2" x-show="hasVampireMechanics()" x-cloak>
+              <span class="text-bone-500">Disciplines</span>
+              <span :class="discDotsPlaced > discDotsTarget ? 'text-blood-400'
+                              : (discDotsPlaced === discDotsTarget ? 'text-gold-400' : 'text-bone-400')">
+                <span x-text="discDotsPlaced"></span>
+                <span class="text-bone-700">/</span>
+                <span x-text="discDotsTarget"></span>
+              </span>
+            </li>
             {# Merits, Backgrounds and Advantages are one V5 "Advantages"
                pool — track them combined, not as three separate budgets.
                Predator-granted dots are free (budgetUsed excludes them). #}
-            <li class="flex items-center justify-between gap-2">
+            <li class="flex items-center justify-between gap-2 pt-1.5 border-t border-ink-800">
               <span class="text-bone-500">Advantages</span>
               <span :class="(budgetUsed.merits + budgetUsed.advantages + budgetUsed.backgrounds) > (budgets.merits + budgets.advantages + budgets.backgrounds)
                               ? 'text-blood-400 aurora-pulse-blood inline-block rounded px-1' : 'text-gold-400'">
@@ -1569,10 +1608,10 @@
                 :class="boughtDots('{{ key }}') === 0 ? 'opacity-25 cursor-not-allowed' : 'hover:border-gold-700 text-bone-300'"
                 title="Refund a bought dot"
                 class="w-6 h-6 border border-ink-600 text-bone-500 text-sm leading-none">−</button>
-        <button type="button" @click="buyTrait('{{ cat }}', '{{ key }}', '{{ label }}')"
-                :disabled="!canBuy('{{ cat }}', '{{ key }}')"
-                :class="canBuy('{{ cat }}', '{{ key }}') ? 'hover:border-gold-700 text-bone-300' : 'opacity-25 cursor-not-allowed'"
-                title="Buy the next dot"
+        <button type="button" @click="buyTrait('{{ cat }}', '{{ key }}', '{{ label }}', 4)"
+                :disabled="!canBuy('{{ cat }}', '{{ key }}', 4)"
+                :class="canBuy('{{ cat }}', '{{ key }}', 4) ? 'hover:border-gold-700 text-bone-300' : 'opacity-25 cursor-not-allowed'"
+                title="Buy the next dot (chargen caps traits at 4)"
                 class="inline-flex items-center gap-0.5 px-2 h-6 border border-ink-600 text-bone-500 text-[0.6rem] font-cinzel tracking-widest leading-none">
           +<span class="text-gold-500" x-text="nextDotCost('{{ cat }}', '{{ key }}')"></span>
         </button>
@@ -2068,6 +2107,23 @@
       // tier so the Blood step's number inputs aren't blank. The player
       // can still override after the fact — this just removes the "wait,
       // what BP do I start at?" friction.
+      // Alpine lifecycle — runs once after the component mounts. On a
+      // resumed draft the predator-granted entries are already folded into
+      // the seeded arrays (now tagged src:'predator') and the free
+      // discipline dot is already folded into its disc value. We just need
+      // to remember WHICH discipline holds that free dot so a later
+      // re-pick reverses it cleanly instead of stacking a second dot.
+      init() {
+        const info = this.predatorInfo[this.charName.predator_type];
+        if (info && Array.isArray(info.grants)) {
+          info.grants.forEach((g, gi) => {
+            if (g.kind === 'discipline') {
+              const disc = this.predatorChoices['d' + gi];
+              if (disc) this._predatorDisc = disc;
+            }
+          });
+        }
+      },
       applyTierBloodDefaults() {
         const t    = this.charName.character_type;
         const tier = this.charName.character_tier || 'neonate';
@@ -2574,6 +2630,28 @@
         }
         return total;
       },
+      // ── Budget-sidebar trait targets ──────────────────────────────────
+      // V5 standard Attribute spread: 1@4 + 3@3 + 4@2 + 1@1 = 22 dots.
+      get attrDotsTarget() { return 22; },
+      // Skill target = the chosen spread's dot total (0 until one is picked).
+      get skillDotsTarget() {
+        const spr = this.skillSpreads[this.skillSpread];
+        if (!spr || !spr.levels) return 0;
+        return Object.entries(spr.levels)
+          .reduce((s, [lvl, n]) => s + (Number(lvl) * Number(n)), 0);
+      },
+      // V5: every character gets ONE free specialty, plus a free specialty
+      // in each of Academics / Science / Craft / Performance they rate.
+      get freeSpecialtyCount() {
+        let n = 1;
+        ['skill_academics', 'skill_science', 'skill_craft', 'skill_performance']
+          .forEach(k => { if ((this.sheet[k] || 0) > 0) n += 1; });
+        return n;
+      },
+      // Spread-only dot counts (exclude Starting-XP purchases) so the
+      // budget trackers measure the base allocation, not bought dots.
+      get attrSpreadDots()  { return this.sumAttrs()  - this.xpBuys.filter(b => b.cat === 'attr').length; },
+      get skillSpreadDots() { return this.sumSkills() - this.xpBuys.filter(b => b.cat === 'skill').length; },
 
       // Form submit safety — make sure hidden inputs reflect Alpine state.
       // Alpine bindings already do this, but a defensive sync on submit

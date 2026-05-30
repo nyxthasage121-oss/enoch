@@ -2708,6 +2708,86 @@ def test_chargen_persists_spreads_and_predator_picks(player):
             conn.execute("DELETE FROM characters WHERE name='Spread Test'")
 
 
+def test_resume_draft_restores_predator_picks_and_src_tags(player):
+    """Regression for the draft-resume advantage-duplication bug. Saving a
+    draft with predator-granted entries then resuming must:
+      (1) preserve the src='predator' provenance tag on rated-list entries +
+          specialties so the wizard dedupes instead of duplicating, and
+      (2) surface predator_choices at the TOP level of initialForm so the
+          Hunt-step pickers come back filled, not blank (which previously
+          forced a re-pick that stacked a second copy of each grant)."""
+    import json as _json
+    from web.db import get_db
+    player.post("/characters/new", data={
+        "_csrf": "dev-csrf-token", "name": "Resume Pred", "clan": "brujah",
+        "predator_type": "Alleycat", "as_draft": "1",
+        "advantages": _json.dumps([
+            {"name": "Criminal Contacts", "dots": 3, "src": "predator"},
+            {"name": "Resources", "dots": 1},
+        ]),
+        "specialties": _json.dumps([
+            {"skill": "skill_streetwise", "name": "Black Market", "src": "predator"},
+        ]),
+        "predator_choices": _json.dumps({"s0": 1, "d1": "disc_potence"}),
+        "skill_spread": "specialist", "discipline_spread": "standard",
+    }, follow_redirects=False)
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT id, sheet_json FROM characters WHERE name='Resume Pred'"
+            ).fetchone()
+        assert row is not None, "draft was not created"
+        char_id = row["id"]
+        sheet = _json.loads(row["sheet_json"] or "{}")
+        # (1) src tag survived the persist round-trip on both lists.
+        assert any(a.get("name") == "Criminal Contacts" and a.get("src") == "predator"
+                   for a in sheet.get("advantages", [])), "advantage src tag dropped"
+        assert any(s.get("src") == "predator"
+                   for s in sheet.get("specialties", [])), "specialty src tag dropped"
+        # (2) resume surfaces the picks where the wizard reads them
+        # (initialForm.predator_choices, top-level — not nested in sheet).
+        rr = player.get(f"/characters/{char_id}/resume-draft")
+        assert rr.status_code == 200
+        i = rr.text.find("predator_choices")
+        assert i != -1 and "disc_potence" in rr.text[i:i + 160], \
+            "predator picks not restored at top level of initialForm"
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE name='Resume Pred'")
+
+
+def test_sidebar_has_portal_switcher_for_staff(staff):
+    """Staff belong to both portals — the sidebar shows a Player/Staff
+    Portal switcher so they can jump between them from either side."""
+    r = staff.get("/staff")
+    assert r.status_code == 200
+    assert "Player Portal" in r.text and "Staff Portal" in r.text
+
+
+def test_sidebar_hides_portal_switcher_for_plain_player(player):
+    """Plain players only have the player portal — no Staff Portal button."""
+    r = player.get("/characters")
+    assert r.status_code == 200
+    assert "Staff Portal" not in r.text
+
+
+def test_chargen_budget_sidebar_has_trait_trackers(player):
+    """The chargen budget sidebar tracks attributes / skills / specialties /
+    disciplines against their spread targets (not just the dot pools)."""
+    r = player.get("/characters/new")
+    assert r.status_code == 200
+    for token in ("attrSpreadDots", "skillSpreadDots", "freeSpecialtyCount"):
+        assert token in r.text, f"missing budget tracker: {token}"
+
+
+def test_chargen_advance_caps_buys_at_four(player):
+    """At chargen you cannot buy a 5th dot — the Advance step passes max=4
+    to canBuy/buyTrait so every purchasable trait caps at 4."""
+    r = player.get("/characters/new")
+    assert r.status_code == 200
+    assert "canBuy('attr', 'attr_strength', 4)" in r.text
+
+
 def test_chargen_persists_starting_xp_allocation(player):
     """The Advancement step's purchases (ledger + totals) persist into
     sheet_json so the build shows on the player + staff sheets."""

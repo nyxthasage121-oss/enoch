@@ -152,6 +152,30 @@
         </a>
       </div>
 
+      {# ── Portal switcher — staff belong to BOTH the player and staff
+         portals, so give them one persistent control to jump between the
+         two rather than scanning for the right section. Hidden for plain
+         players (they only have the player portal). #}
+      {% if is_staff %}
+      {% set _in_staff = request.url.path.startswith('/staff') %}
+      <div class="px-3 pt-3 pb-1">
+        <div class="grid grid-cols-2 gap-1.5">
+          <a href="/characters"
+             class="text-center font-cinzel text-[0.6rem] tracking-[0.2em] uppercase py-2 border transition-colors
+                    {{ 'border-ink-700 text-bone-500 hover:border-gold-800 hover:text-gold-400' if _in_staff
+                       else 'border-gold-700 text-gold-400 bg-ink-900/60' }}">
+            Player Portal
+          </a>
+          <a href="/staff"
+             class="text-center font-cinzel text-[0.6rem] tracking-[0.2em] uppercase py-2 border transition-colors
+                    {{ 'border-gold-700 text-gold-400 bg-ink-900/60' if _in_staff
+                       else 'border-ink-700 text-bone-500 hover:border-gold-800 hover:text-gold-400' }}">
+            Staff Portal
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
       {# Navigation #}
       <div class="flex-1 px-2 py-3 space-y-0.5">
         {% if current_user %}
