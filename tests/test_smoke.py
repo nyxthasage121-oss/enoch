@@ -2896,6 +2896,66 @@ def test_creation_xp_posts_single_clean_ledger_entry(player):
             conn.commit()
 
 
+def test_standard_clan_bane_flaws_maps_nosferatu():
+    """The standard-bane chargen-flaw lookup maps Nosferatu → Repulsive (2)."""
+    from web.routes.player import _standard_clan_bane_flaws
+    m = _standard_clan_bane_flaws()
+    assert m.get("nosferatu") == {"name": "Repulsive", "dots": 2}
+
+
+def test_chargen_passes_clan_bane_flaws(player):
+    """The wizard receives the standard-bane chargen flaws so it can auto-apply
+    them (Nosferatu → Repulsive)."""
+    r = player.get("/characters/new")
+    assert r.status_code == 200
+    assert "clanBaneFlaws" in r.text and "Repulsive" in r.text
+
+
+def test_nosferatu_standard_bane_grants_repulsive(player):
+    """Nosferatu's standard Bane auto-grants a free Repulsive (2) flaw tagged
+    src='clan_bane' — applied server-side even if the form omits it."""
+    import json as _json
+    from web.db import get_db
+    # Post WITHOUT any flaws to prove the server-side safety net applies it.
+    player.post("/characters/new", data={
+        "_csrf": "dev-csrf-token", "name": "Nos Bane", "clan": "nosferatu",
+        "touchstones": '["A", "B"]',
+    }, follow_redirects=False)
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT sheet_json FROM characters WHERE name='Nos Bane'").fetchone()
+        assert row is not None
+        flaws = _json.loads(row["sheet_json"] or "{}").get("flaws", [])
+        assert any(f.get("name") == "Repulsive" and f.get("dots") == 2
+                   and f.get("src") == "clan_bane" for f in flaws), \
+            "Nosferatu did not get the auto Repulsive clan-bane flaw"
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE name='Nos Bane'")
+            conn.commit()
+
+
+def test_non_nosferatu_has_no_auto_bane_flaw(player):
+    """A clan without a standard-Bane chargen flaw (e.g. Brujah) gets none."""
+    import json as _json
+    from web.db import get_db
+    player.post("/characters/new", data={
+        "_csrf": "dev-csrf-token", "name": "Bru NoBane", "clan": "brujah",
+        "touchstones": '["A", "B"]',
+    }, follow_redirects=False)
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT sheet_json FROM characters WHERE name='Bru NoBane'").fetchone()
+        flaws = _json.loads(row["sheet_json"] or "{}").get("flaws", [])
+        assert not any(f.get("src") == "clan_bane" for f in flaws)
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE name='Bru NoBane'")
+            conn.commit()
+
+
 def test_chargen_error_rerender_with_image_does_not_500(player):
     """A validation error on chargen must re-render the wizard (200), not
     500. The multipart form carries a profile_image UploadFile that isn't

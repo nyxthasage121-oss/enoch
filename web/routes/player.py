@@ -299,7 +299,16 @@ _CLANS = [
 from ..v5_traits import (
     V5_PREDATOR_TYPES as _PREDATOR_TYPES,
     V5_RESTRICTED_PREDATOR_TYPES as _RESTRICTED_PREDATOR_TYPES,
+    V5_CLAN_BANE_FLAWS as _V5_CLAN_BANE_FLAWS,
 )
+
+
+def _standard_clan_bane_flaws() -> dict[str, dict]:
+    """Standard-bane chargen flaws keyed by clan slug (JSON-safe for the
+    wizard). Active bane defaults to standard everywhere; the per-clan
+    variant swap will override this when configured."""
+    return {clan: flaw for (clan, bane), flaw in _V5_CLAN_BANE_FLAWS.items()
+            if bane == "standard"}
 
 
 def _available_predator_types() -> list[str]:
@@ -379,6 +388,8 @@ def _wizard_extras() -> dict:
         "revenants_enabled":  bool(s.get("revenants_enabled", 0)),
         "revenant_families":  s.get("revenant_families") or [],
         "clan_info":          _V5_CLAN_INFO,
+        # Standard-bane chargen flaws (e.g. Nosferatu → Repulsive ••, free).
+        "clan_bane_flaws":    _standard_clan_bane_flaws(),
         "predator_info":      _V5_PREDATOR_INFO,
         # Label lookups so the wizard's predator-grant pickers can render
         # human names for skill_*/disc_* keys without re-deriving them in JS.
@@ -619,6 +630,17 @@ async def character_create(
                 trait = g.get("trait")
                 if trait in ("humanity", "blood_potency") and trait in sheet:
                     sheet[trait] = max(0, min(10, int(sheet[trait]) + int(g.get("delta", 0))))
+
+    # Apply the clan's standard-Bane chargen flaw (e.g. Nosferatu → Repulsive
+    # ••) server-side too, so it lands even if the form omits it. Free —
+    # tagged src='clan_bane' so the budget + sheets treat it as auto-granted.
+    # (Active bane defaults to standard; the variant swap will key off it.)
+    _bane_flaw = _V5_CLAN_BANE_FLAWS.get((clan, "standard")) if (require_sheet or as_draft) else None
+    if _bane_flaw:
+        _flaws = sheet.setdefault("flaws", [])
+        if not any(isinstance(f, dict) and f.get("src") == "clan_bane" for f in _flaws):
+            _flaws.append({"name": _bane_flaw["name"], "dots": _bane_flaw["dots"],
+                           "src": "clan_bane"})
 
     # Short-form Submit moves the character past the wizard but keeps it in
     # the draft state so the player can keep editing the sheet on the detail

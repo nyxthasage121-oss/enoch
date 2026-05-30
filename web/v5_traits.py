@@ -231,6 +231,44 @@ V5_CLAN_INFO: dict[str, dict[str, str]] = {
 }
 
 
+# ── Clan Bane chargen flaws ─────────────────────────────────────────────────
+# A few clan Banes manifest at character creation as an auto-granted, FREE flaw
+# (it does not count against the flaw budget). Nosferatu's Repulsiveness is the
+# canonical case — every Nosferatu carries the Repulsive flaw (2 dots). Keyed by
+# (clan slug, active bane: 'standard' | 'variant'). Most Banes are runtime
+# mechanical effects and grant no chargen flaw, so they're simply absent here.
+V5_CLAN_BANE_FLAWS: dict[tuple[str, str], dict] = {
+    ("nosferatu", "standard"): {"name": "Repulsive", "dots": 2},
+    # Nosferatu's variant Bane (Infestation) replaces the appearance Bane, so a
+    # Nosferatu on the variant is "not necessarily deformed" → no Repulsive flaw.
+}
+
+
+# ── Alternate clan Banes (V5 Players Guide, "Clan Bane Variants" pp. 56-59) ──
+# A chronicle may swap a clan's standard Bane for its variant, applied CLAN-WIDE
+# (a lineage trait, not a personal quirk). Default everywhere is the standard
+# Bane. Stored as {name, effect}; the app tracks which Bane is active per clan
+# and shows its effect text. Variant effects key off Bane Severity (tracked per
+# character) — the app surfaces the rule, not the dice math. Caitiff and
+# Thin-Blood have no clan Bane variant.
+V5_CLAN_BANE_VARIANTS: dict[str, dict[str, str]] = {
+    "banu-haqim": {"name": "Noxious Blood", "effect": "Their vitae is poison to mortals — a mortal who drinks it takes Aggravated damage equal to Bane Severity per Rouse Check's worth ingested, and it cannot heal mortal injuries. Makes Banu Haqim ghouls rare."},
+    "brujah":     {"name": "Violence", "effect": "On a messy critical on any Skill test outside combat, the Brujah deals damage (physical or mental) equal to Bane Severity to the subject, in addition to other Hunger results — Aggravated unless a point of Willpower is spent to make it Superficial."},
+    "gangrel":    {"name": "Survival Instincts", "effect": "Subtract dice equal to Bane Severity from any roll to resist Terror Frenzy (never below one die)."},
+    "hecata":     {"name": "Decay", "effect": "Havens and assets rot around them. Gain Flaw dots equal to Bane Severity split among Retainer, Haven, and Resources; buying those Advantages costs extra XP equal to Bane Severity, and buying off the Flaws costs twice the Background dots."},
+    "lasombra":   {"name": "Callousness", "effect": "Deduct dice equal to Bane Severity from any Remorse roll (never below one die)."},
+    "malkavian":  {"name": "Unnatural Manifestations", "effect": "Using a Discipline power spooks nearby mortals — non-Intimidation social tests with them suffer a penalty equal to Bane Severity for the scene (not Masquerade-breaking); other vampires instantly recognize the Malkavian as Kindred."},
+    "ministry":   {"name": "Cold-Blooded", "effect": "Can use Blush of Life only after recently feeding from a living vessel, and doing so takes Rouse Checks equal to Bane Severity instead of one."},
+    "nosferatu":  {"name": "Infestation", "effect": "Their haven is always infested (penalty of 2 + Bane Severity to concentration-requiring activity by anyone); any scene in an enclosed location imposes a penalty equal to Bane Severity, and controlling the vermin with Animalism takes a like penalty. Replaces the appearance Bane — the Nosferatu is not necessarily deformed."},
+    "ravnos":     {"name": "Unbirth Name", "effect": "Anyone who speaks the Ravnos's unbirth name to their face gains a bonus equal to Bane Severity to resist the Ravnos's Disciplines, and the Ravnos takes an equal penalty to resist that speaker's supernatural powers."},
+    "salubri":    {"name": "Asceticism", "effect": "When Hunger is below 3, suffer a penalty equal to Bane Severity to all Discipline dice pools (in addition to the third-eye effect)."},
+    "toreador":   {"name": "Agonizing Empathy", "effect": "When their feeding damages a mortal, the Toreador suffers similar (usually Aggravated) damage in return, capped at Bane Severity per feeding."},
+    "tremere":    {"name": "Stolen Blood", "effect": "A Blood Surge requires Rouse Checks equal to Bane Severity; if those would raise Hunger to 5+, they may back off the Surge or perform it and hit Hunger 5."},
+    "tzimisce":   {"name": "Cursed Courtesy", "effect": "To enter an inhabited residence uninvited, must spend Willpower equal to Bane Severity and suffer a like Discipline-pool penalty during the stay. Cannot also take the Folkloric Block Flaw."},
+    "ventrue":    {"name": "Hierarchy", "effect": "Suffer a Discipline-pool penalty equal to Bane Severity when using powers on a vampire of lower generation, and must spend Willpower equal to Bane Severity to directly attack one."},
+}
+
+
 # ── Predator Type benefit summaries (paraphrased V5 RAW) ────────────────────
 # Each entry lists the mechanical benefits a Predator Type grants at chargen.
 # These are advisory — staff still validates the exact dot/specialty/merit

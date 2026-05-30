@@ -24,6 +24,7 @@
        activeRuleset:     {{ (active_ruleset | default('standard')) | tojson | forceescape }},
        clanInfo:          {{ (clan_info | default({})) | tojson | forceescape }},
        predatorInfo:      {{ (predator_info | default({})) | tojson | forceescape }},
+       clanBaneFlaws:     {{ (clan_bane_flaws | default({})) | tojson | forceescape }},
        skillLabels:       {{ (skill_labels | default({})) | tojson | forceescape }},
        discLabels:        {{ (disc_labels | default({})) | tojson | forceescape }},
        skillSpreads:      {{ (skill_spreads | default({})) | tojson | forceescape }},
@@ -468,6 +469,9 @@
                           } else if (charName.clan === 'thin-blood') {
                             charName.clan = '';
                           }
+                          // Clan may have changed (thin-blood pin/unpin) — keep
+                          // the clan Bane flaw in sync.
+                          resolveClanBane();
                           // Auto-seed Blood Potency + Humanity from the
                           // Sea of Time table for the new tier.
                           applyTierBloodDefaults();">
@@ -807,7 +811,7 @@
                   :class="charName.clan === '{{ slug }}'
                     ? 'clan-selected'
                     : 'border-ink-800 hover:bg-ink-900/40'"
-                  @click="charName.clan = '{{ slug }}';
+                  @click="charName.clan = '{{ slug }}'; resolveClanBane();
                           if (window.Aurora) window.Aurora.sparkles($el, 18);">
             <span x-show="charName.clan === '{{ slug }}'" x-cloak
                   class="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-ink-950 font-bold text-xs"
@@ -1461,16 +1465,26 @@
           </template>
           <template x-for="(f, idx) in flaws" :key="'f'+idx">
             <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
-              <span class="font-garamond text-xs text-blood-300 flex-1 truncate" x-text="f.name"></span>
+              <span class="font-garamond text-xs text-blood-300 flex-1 truncate min-w-0">
+                <span x-text="f.name"></span>
+                <span x-show="f.src === 'clan_bane'"
+                      class="text-[0.5rem] font-cinzel tracking-widest uppercase text-mauve-400 ml-1">Clan Bane</span>
+                <span x-show="f.src === 'predator'"
+                      class="text-[0.5rem] font-cinzel tracking-widest uppercase text-gold-600 ml-1">Predator</span>
+              </span>
               <div class="flex gap-0.5">
                 <template x-for="n in 5">
-                  <button type="button" @click="f.dots = (f.dots === n ? n - 1 : n)"
+                  {# Auto-granted flaws (clan Bane / predator) have fixed dots. #}
+                  <button type="button" @click="if (!f.src) f.dots = (f.dots === n ? n - 1 : n)"
                           class="w-2.5 h-2.5 rounded-full border transition-colors"
-                          :class="f.dots >= n ? 'bg-blood-bright border-blood-bright' : 'border-bone-700'"></button>
+                          :class="(f.dots >= n ? 'bg-blood-bright border-blood-bright' : 'border-bone-700')
+                                  + (f.src ? ' opacity-60 cursor-default' : '')"></button>
                 </template>
               </div>
-              <button type="button" @click="flaws.splice(idx, 1)"
+              <button type="button" x-show="!f.src" @click="flaws.splice(idx, 1)"
                       class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+              <span x-show="f.src" class="text-bone-800 text-xs ml-1 w-3 text-center"
+                    title="Auto-granted — managed for you">&#128274;</span>
             </div>
           </template>
           <div class="flex items-center gap-2 mt-3">
@@ -1953,6 +1967,8 @@
       clanDisciplines:   opts.clanDisciplines || {},
       clanInfo:          opts.clanInfo || {},
       predatorInfo:      opts.predatorInfo || {},
+      // Standard-bane chargen flaws keyed by clan (e.g. nosferatu → Repulsive ••).
+      clanBaneFlaws:     opts.clanBaneFlaws || {},
       skillLabels:       opts.skillLabels || {},
       discLabels:        opts.discLabels || {},
       skillSpreads:      opts.skillSpreads || {},
@@ -2144,6 +2160,20 @@
             }
           });
         }
+        // Reconcile the clan Bane flaw on load (resumed drafts already carry
+        // it tagged src:'clan_bane'; this strips + re-applies so it's exactly
+        // once and matches the current clan).
+        this.resolveClanBane();
+      },
+      // ── Clan Bane chargen flaw ────────────────────────────────────────
+      // Some clan Banes manifest as a free, auto-granted flaw at creation
+      // (Nosferatu → Repulsive ••). Idempotent: strip any prior clan-bane
+      // flaw, then apply the one for the current clan. Free — budgetUsed
+      // excludes src-tagged entries. Re-run whenever the clan changes.
+      resolveClanBane() {
+        this.flaws = (this.flaws || []).filter(f => f.src !== 'clan_bane');
+        const f = this.clanBaneFlaws[this.charName.clan];
+        if (f) this.flaws.push({ name: f.name, dots: f.dots, src: 'clan_bane' });
       },
       applyTierBloodDefaults() {
         const t    = this.charName.character_type;
@@ -2772,10 +2802,11 @@
 
       // Live budget usage — sum dot allocations for the sidebar.
       get budgetUsed() {
-        // Predator-granted dots are free in V5 — they don't eat the player's
-        // merit/advantage/background/flaw pools, so exclude src:'predator'.
+        // Granted dots are free in V5 — predator grants AND clan-Bane flaws
+        // (e.g. Nosferatu's Repulsive ••) don't eat the player's merit/
+        // advantage/background/flaw pools, so exclude any src-tagged entry.
         const sum = list => list
-          .filter(x => x.src !== 'predator')
+          .filter(x => !x.src)
           .reduce((acc, x) => acc + (x.dots || 0), 0);
         return {
           merits:      sum(this.merits),
