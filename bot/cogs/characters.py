@@ -414,15 +414,34 @@ def _build_sheet_embed(char: dict) -> discord.Embed:
             inline=False,
         )
 
-    # Merits & Flaws
-    merits = [m for m in (sheet.get("merits") or []) if isinstance(m, dict) and m.get("name")]
-    flaws  = [f for f in (sheet.get("flaws")  or []) if isinstance(f, dict) and f.get("name")]
-    if merits:
-        body = "\n".join(f"{_dots(m.get('dots', 0))} {m['name']}" for m in merits)
-        e.add_field(name="Merits", value=f"```\n{body}\n```", inline=True)
+    # Advantages (Merits / Advantages / Backgrounds are one pool here) & Flaws
+    advs = [a for key in ("merits", "advantages", "backgrounds")
+            for a in (sheet.get(key) or [])
+            if isinstance(a, dict) and a.get("name")]
+    flaws = [f for f in (sheet.get("flaws") or [])
+             if isinstance(f, dict) and f.get("name")]
+    if advs:
+        body = "\n".join(f"{_dots(a.get('dots', 0))} {a['name']}" for a in advs)
+        e.add_field(name="Advantages", value=f"```\n{body}\n```", inline=True)
     if flaws:
         body = "\n".join(f"{_dots(f.get('dots', 0))} {f['name']}" for f in flaws)
         e.add_field(name="Flaws", value=f"```\n{body}\n```", inline=True)
+
+    # Learned Discipline powers + Blood Sorcery / Oblivion / Alchemy rites.
+    powers = [p for p in (sheet.get("powers") or [])
+              if isinstance(p, dict) and p.get("name")]
+    if powers:
+        body = "\n".join(f"L{p.get('level', 1)} {p['name']}" for p in powers)
+        e.add_field(name="Powers", value=f"```\n{body}\n```", inline=False)
+    rites = []
+    for key, tag in (("rituals", "Ritual"), ("ceremonies", "Ceremony"),
+                     ("formulae", "Formula")):
+        for it in (sheet.get(key) or []):
+            if isinstance(it, dict) and it.get("name"):
+                rites.append(f"L{it.get('level', 1)} {it['name']} · {tag}")
+    if rites:
+        e.add_field(name="Rituals & Rites",
+                    value="```\n" + "\n".join(rites) + "\n```", inline=False)
 
     # Core traits — Health / Willpower tracks + Humanity / BP / Hunger.
     health_max = (sheet.get("attr_stamina", 0) or 0) + 3

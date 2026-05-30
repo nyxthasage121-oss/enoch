@@ -53,8 +53,8 @@ def test_embed_structure_full_sheet():
     assert any(n.startswith("Skills") for n in field_names)
     # Disciplines only show non-zero
     assert "Disciplines" in field_names
-    # Merits + Flaws
-    assert "Merits" in field_names
+    # Advantages (merits/advantages/backgrounds pooled) + Flaws
+    assert "Advantages" in field_names
     assert "Flaws"  in field_names
     # Core always present
     assert "Core" in field_names
@@ -94,6 +94,31 @@ def test_embed_shows_health_and_willpower_tracks():
     assert "□□□▨▨✖" in core
     # Willpower = Composure 2 + Resolve 3 = 5 boxes; 1 superficial → 4 healthy.
     assert "□□□□▨" in core
+
+
+def test_embed_pools_advantages_and_lists_powers_and_rites():
+    char = {
+        "id": 1, "name": "Tarik", "clan": "tremere",
+        "xp_total": 0, "xp_cap": 350, "xp_available": 0,
+        "sheet_json": {
+            "merits":      [{"name": "Beautiful", "dots": 1}],
+            "advantages":  [{"name": "Allies", "dots": 2}],
+            "backgrounds": [{"name": "Resources", "dots": 3}],
+            "powers":      [{"discipline": "disc_auspex", "name": "Heightened Senses",
+                             "level": 1}],
+            "rituals":     [{"name": "Wake with Evening's Freshness", "level": 1}],
+        },
+    }
+    e = _build_sheet_embed(char)
+    fields = {f.name: f.value for f in e.fields}
+    # All three advantage lists pooled under one "Advantages" field.
+    assert "Advantages" in fields
+    adv = fields["Advantages"]
+    assert "Beautiful" in adv and "Allies" in adv and "Resources" in adv
+    # Powers + rites surfaced.
+    assert "Heightened Senses" in fields.get("Powers", "")
+    assert "Wake with Evening's Freshness" in fields.get("Rituals & Rites", "")
+    assert "Ritual" in fields.get("Rituals & Rites", "")
 
 
 def test_embed_handles_empty_sheet():
