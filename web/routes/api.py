@@ -99,6 +99,16 @@ class DamageDeltaIn(BaseModel):
     source: str | None = None       # optional label for audit (e.g. "dice:bot")
 
 
+class MacroIn(BaseModel):
+    """A named roll macro saved on a character's sheet for the dice bot.
+
+    ``expression`` is a pool string (e.g. "strength + brawl"). Pass it empty /
+    null to delete the macro.
+    """
+    name:       str = Field(..., min_length=1, max_length=40)
+    expression: str | None = None
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @router.get("/health")
@@ -286,6 +296,35 @@ async def apply_state_delta(character_id: int, body: DamageDeltaIn):
         )
 
     return {"character_id": character_id, "state": result}
+
+
+@router.post("/characters/{character_id}/macros", dependencies=[Depends(_require_bot)])
+async def set_macro(character_id: int, body: MacroIn):
+    """Save or delete a named roll macro on a character's sheet — the dice bot
+    uses these for `/roll <name>`. Pass an empty expression to delete. Capped
+    at 25 macros per character."""
+    name = body.name.strip()[:40]
+    if not name:
+        raise HTTPException(status_code=400, detail="Macro name required")
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        sheet = dict(char.get("sheet_json") or {})
+        macros = dict(sheet.get("macros") or {})
+        expr = (body.expression or "").strip()
+        if expr:
+            if name not in macros and len(macros) >= 25:
+                raise HTTPException(status_code=400, detail="Macro limit reached (25)")
+            macros[name] = expr[:120]
+        else:
+            macros.pop(name, None)
+        if macros:
+            sheet["macros"] = macros
+        else:
+            sheet.pop("macros", None)
+        update_character(conn, character_id, sheet_json=sheet)
+    return {"character_id": character_id, "macros": macros}
 
 
 class HuntLogIn(BaseModel):

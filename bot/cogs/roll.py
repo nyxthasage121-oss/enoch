@@ -11,11 +11,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from ..api import get_character, get_player_characters, apply_state_delta
+from ..api import (
+    get_character, get_player_characters, apply_state_delta, set_macro,
+)
 from ..roll import (
     build_trait_index, resolve_pool, apply_specialty, roll_pool,
-    reroll_failures, rouse_check, blood_surge_bonus, OUTCOME_LABELS,
-    MESSY_CRITICAL, BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE, RollResult,
+    reroll_failures, rouse_check, blood_surge_bonus, mend_amount,
+    willpower_recovery, OUTCOME_LABELS, MESSY_CRITICAL, BESTIAL_FAILURE,
+    TOTAL_FAILURE, FAILURE, RollResult,
 )
 from .characters import _ATTRIBUTES, _SKILLS_BY_CAT, _DISCIPLINES
 
@@ -154,7 +157,22 @@ def _looks_numeric(expr: str) -> bool:
     return expr.strip().isdigit()
 
 
+def _sheet_of(full: dict) -> dict:
+    """Pull a parsed sheet_json dict off a character payload."""
+    sheet = full.get("sheet_json") or {}
+    if isinstance(sheet, str):
+        import json
+        try:
+            sheet = json.loads(sheet)
+        except Exception:
+            sheet = {}
+    return sheet
+
+
 class RollCog(commands.Cog):
+    macro = app_commands.Group(
+        name="macro", description="Saved roll pools — use them with /roll <name>")
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
@@ -200,7 +218,7 @@ class RollCog(commands.Cog):
         description="Roll a V5 dice pool — a number or traits like 'strength + brawl'.",
     )
     @app_commands.describe(
-        pool="Number (5) or traits (e.g. strength + brawl + 1)",
+        pool="Number (5), traits (strength + brawl), or a saved macro name",
         difficulty="Successes needed (optional)",
         hunger="Override Hunger dice (defaults to your character's Hunger)",
         specialty="Add a +1 specialty die (pick one of your character's specialties)",
@@ -267,13 +285,12 @@ class RollCog(commands.Cog):
             await interaction.followup.send("❌ Could not load your sheet. Try again shortly.")
             return
 
-        sheet = full.get("sheet_json") or {}
-        if isinstance(sheet, str):
-            import json
-            try:
-                sheet = json.loads(sheet)
-            except Exception:
-                sheet = {}
+        sheet = _sheet_of(full)
+
+        # Expand a saved macro name into its stored pool expression.
+        macros = sheet.get("macros") or {}
+        if pool.strip() in macros:
+            pool = macros[pool.strip()]
 
         # Resolve the pool: a bare number rolls as-is; traits resolve from sheet.
         if _looks_numeric(pool):
@@ -356,6 +373,173 @@ class RollCog(commands.Cog):
         if gained > 0 and new_hunger is None:
             foot += " · update your Hunger on the tracker"
         e.set_footer(text=foot)
+        await interaction.followup.send(embed=e)
+
+    # ── Saved macros ─────────────────────────────────────────────────────────
+
+    @macro.command(name="save", description="Save a named roll pool")
+    @app_commands.describe(
+        name="What to call it (e.g. frenzy)",
+        pool="Pool expression, e.g. strength + brawl",
+        character="Which character (only if you have more than one)",
+    )
+    async def macro_save(self, interaction: discord.Interaction, name: str,
+                         pool: str, character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            await set_macro(char["id"], name.strip(), pool.strip())
+        except Exception as exc:
+            log.warning("macro save failed for %s: %s", char.get("id"), exc)
+            await interaction.followup.send("❌ Could not save the macro.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            f"Saved **{name.strip()}** = `{pool.strip()}` for {char['name']}. "
+            f"Roll it with `/roll {name.strip()}`.", ephemeral=True)
+
+    @macro.command(name="list", description="List your saved roll pools")
+    @app_commands.describe(character="Which character (only if you have more than one)")
+    async def macro_list(self, interaction: discord.Interaction,
+                         character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            await interaction.followup.send("❌ Could not load your sheet.", ephemeral=True)
+            return
+        macros = _sheet_of(full).get("macros") or {}
+        if not macros:
+            await interaction.followup.send(
+                f"{char['name']} has no saved macros. Save one with `/macro save`.",
+                ephemeral=True)
+            return
+        lines = "\n".join(f"• **{k}** = `{v}`" for k, v in sorted(macros.items()))
+        e = discord.Embed(title=f"Macros · {char['name']}", description=lines,
+                          color=_GOLD)
+        await interaction.followup.send(embed=e, ephemeral=True)
+
+    @macro.command(name="delete", description="Delete a saved roll pool")
+    @app_commands.describe(name="Macro to delete",
+                           character="Which character (only if you have more than one)")
+    async def macro_delete(self, interaction: discord.Interaction, name: str,
+                           character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            await set_macro(char["id"], name.strip(), None)
+        except Exception:
+            await interaction.followup.send("❌ Could not delete the macro.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            f"Deleted **{name.strip()}** (if it existed).", ephemeral=True)
+
+    # ── Nightly routine ──────────────────────────────────────────────────────
+
+    @app_commands.command(
+        name="wake",
+        description="Wake for the night: a Rouse Check + Willpower recovery.")
+    @app_commands.describe(character="Which character (only if you have more than one)")
+    async def wake(self, interaction: discord.Interaction,
+                   character: str | None = None) -> None:
+        await interaction.response.defer()
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>` to wake.")
+            return
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            await interaction.followup.send("❌ Could not load your sheet.")
+            return
+        sheet = _sheet_of(full)
+        rolls, gained = rouse_check(1)
+        recovery = willpower_recovery(sheet.get("attr_composure", 0),
+                                      sheet.get("attr_resolve", 0))
+        cur_wp = int(sheet.get("damage_willpower_sup", 0) or 0)
+        new_hunger = min(5, int(sheet.get("hunger", 0) or 0) + gained)
+        new_wp = max(0, cur_wp - recovery)
+        try:
+            resp = await apply_state_delta(
+                char["id"], hunger=gained, damage_willpower_sup=-recovery,
+                source="dice:wake")
+            st = resp.get("state", {})
+            new_hunger = st.get("hunger", new_hunger)
+            new_wp = st.get("damage_willpower_sup", new_wp)
+        except Exception as exc:
+            log.warning("wake write-back failed for %s: %s", char.get("id"), exc)
+        healed = max(0, cur_wp - new_wp)
+        e = discord.Embed(title=f"🌙 {char['name']} wakes",
+                          color=_GOLD if gained == 0 else _BLOOD)
+        e.add_field(name="Waking Rouse",
+                    value=f"{_fmt_dice(rolls)} → " +
+                          (f"+{gained} Hunger ({new_hunger}/5)" if gained
+                           else "no Hunger gained"),
+                    inline=False)
+        e.add_field(name="Willpower",
+                    value=(f"Recovered {healed} Superficial "
+                           f"(higher of Composure/Resolve = {recovery})"
+                           if recovery else "—"),
+                    inline=False)
+        await interaction.followup.send(embed=e)
+
+    @app_commands.command(
+        name="mend",
+        description="Mend Superficial Health — a Rouse Check, by Blood Potency.")
+    @app_commands.describe(character="Which character (only if you have more than one)")
+    async def mend(self, interaction: discord.Interaction,
+                   character: str | None = None) -> None:
+        await interaction.response.defer()
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>` to mend.")
+            return
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            await interaction.followup.send("❌ Could not load your sheet.")
+            return
+        sheet = _sheet_of(full)
+        amount = mend_amount(sheet.get("blood_potency", 0))
+        rolls, gained = rouse_check(1)
+        cur_h = int(sheet.get("damage_health_sup", 0) or 0)
+        new_hunger = min(5, int(sheet.get("hunger", 0) or 0) + gained)
+        new_h = max(0, cur_h - amount)
+        try:
+            resp = await apply_state_delta(
+                char["id"], hunger=gained, damage_health_sup=-amount,
+                source="dice:mend")
+            st = resp.get("state", {})
+            new_hunger = st.get("hunger", new_hunger)
+            new_h = st.get("damage_health_sup", new_h)
+        except Exception as exc:
+            log.warning("mend write-back failed for %s: %s", char.get("id"), exc)
+        healed = max(0, cur_h - new_h)
+        e = discord.Embed(title=f"🩹 {char['name']} mends",
+                          color=_GOLD if gained == 0 else _BLOOD)
+        e.add_field(name="Mend",
+                    value=f"Healed {healed} Superficial Health "
+                          f"(Blood Potency mend = {amount})",
+                    inline=False)
+        e.add_field(name="Rouse",
+                    value=f"{_fmt_dice(rolls)} → " +
+                          (f"+{gained} Hunger ({new_hunger}/5)" if gained
+                           else "no Hunger gained"),
+                    inline=False)
         await interaction.followup.send(embed=e)
 
     async def _pick_character(self, interaction: discord.Interaction,

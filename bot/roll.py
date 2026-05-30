@@ -184,6 +184,24 @@ def blood_surge_bonus(blood_potency: int) -> int:
     return 1 + (bp + 1) // 2
 
 
+# Superficial Health mended per Rouse Check, by Blood Potency (Corebook p.216):
+# 1 at BP 0-1, 2 at 2-3, 3 at 4-7, 4 at 8-9, 5 at 10.
+_MEND_BY_BP = {0: 1, 1: 1, 2: 2, 3: 2, 4: 3, 5: 3, 6: 3, 7: 3, 8: 4, 9: 4, 10: 5}
+
+
+def mend_amount(blood_potency: int) -> int:
+    """Superficial Health a vampire mends per Rouse Check at this Blood
+    Potency (V5 Corebook p.216 / 'Mending Damage' p.126)."""
+    bp = max(0, min(int(blood_potency or 0), 10))
+    return _MEND_BY_BP[bp]
+
+
+def willpower_recovery(composure: int, resolve: int) -> int:
+    """Superficial Willpower regained on waking — the higher of Composure or
+    Resolve (V5 Corebook)."""
+    return max(0, int(composure or 0), int(resolve or 0))
+
+
 def resolve_pool(expression: str, sheet: dict,
                  trait_index: dict[str, str]) -> tuple[int, list[tuple[str, int]], list[str]]:
     """Parse a pool expression into a total dice count.

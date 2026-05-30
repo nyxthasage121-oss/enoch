@@ -65,14 +65,33 @@ async def get_character(character_id: int) -> dict:
 
 
 async def apply_state_delta(character_id: int, *, hunger: int = 0,
+                            damage_health_sup: int = 0,
+                            damage_willpower_sup: int = 0,
                             source: str | None = None) -> dict:
-    """Push a delta to a character's tracked state (Hunger/damage/Humanity)
-    back to the sheet. Returns ``{character_id, state}`` with the new clamped
-    values. Used by the dice roller to keep Hunger live after Rouse Checks."""
+    """Push a delta to a character's tracked state (Hunger / Health /
+    Willpower) back to the sheet. Returns ``{character_id, state}`` with the
+    new clamped values. Used by the dice roller for Rouse/wake/mend."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         r = await client.post(
             f"{_base()}/api/characters/{character_id}/state",
-            json={"hunger": hunger, "source": source},
+            json={"hunger": hunger,
+                  "damage_health_sup": damage_health_sup,
+                  "damage_willpower_sup": damage_willpower_sup,
+                  "source": source},
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def set_macro(character_id: int, name: str,
+                    expression: str | None) -> dict:
+    """Save (or delete, with an empty expression) a named roll macro on a
+    character's sheet. Returns ``{character_id, macros}``."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/characters/{character_id}/macros",
+            json={"name": name, "expression": expression},
             headers=_headers(),
         )
         r.raise_for_status()

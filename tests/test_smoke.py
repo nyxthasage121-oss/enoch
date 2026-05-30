@@ -419,6 +419,43 @@ def test_dice_bot_state_endpoint(_client):
     assert r.status_code == 401
 
 
+def test_macro_api_set_overwrite_delete(_client):
+    """The bot can save, overwrite, and delete named roll macros on a
+    character's sheet (sheet_json.macros), guarded by the bot token."""
+    import json as _json
+    from web.db import get_db
+    with get_db() as conn:
+        conn.execute("UPDATE characters SET sheet_json='{}' WHERE id=1")
+        conn.commit()
+    headers = {"Authorization": "Bearer smoke-test-token"}
+    # save
+    r = _client.post("/api/characters/1/macros",
+                     json={"name": "frenzy", "expression": "strength + brawl"},
+                     headers=headers)
+    assert r.status_code == 200
+    assert r.json()["macros"]["frenzy"] == "strength + brawl"
+    # overwrite + persist
+    r = _client.post("/api/characters/1/macros",
+                     json={"name": "frenzy", "expression": "stamina + resolve"},
+                     headers=headers)
+    assert r.json()["macros"]["frenzy"] == "stamina + resolve"
+    with get_db() as conn:
+        sheet = _json.loads(conn.execute(
+            "SELECT sheet_json FROM characters WHERE id=1").fetchone()["sheet_json"])
+    assert sheet["macros"]["frenzy"] == "stamina + resolve"
+    # delete via empty expression
+    r = _client.post("/api/characters/1/macros",
+                     json={"name": "frenzy", "expression": ""}, headers=headers)
+    assert "frenzy" not in r.json()["macros"]
+    # auth
+    r = _client.post("/api/characters/1/macros",
+                     json={"name": "x", "expression": "5"})
+    assert r.status_code == 401
+    with get_db() as conn:
+        conn.execute("UPDATE characters SET sheet_json='{}' WHERE id=1")
+        conn.commit()
+
+
 def test_coterie_api_endpoint(_client):
     """GET /api/characters/{id}/coterie returns the coterie + members."""
     from web.db import get_db, create_coterie, add_coterie_member
