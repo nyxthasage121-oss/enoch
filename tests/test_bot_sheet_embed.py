@@ -76,6 +76,26 @@ def test_embed_marks_clan_disciplines():
     assert "Auspex (clan)" not in disc_field.value
 
 
+def test_embed_shows_health_and_willpower_tracks():
+    char = {
+        "id": 1, "name": "Marcus", "clan": "ventrue",
+        "xp_total": 0, "xp_cap": 350, "xp_available": 0,
+        "sheet_json": {
+            "attr_stamina": 3, "attr_composure": 2, "attr_resolve": 3,
+            "damage_health_sup": 2, "damage_health_agg": 1,
+            "damage_willpower_sup": 1,
+            "humanity": 7, "blood_potency": 1, "hunger": 2,
+        },
+    }
+    e = _build_sheet_embed(char)
+    core = next(f for f in e.fields if f.name == "Core").value
+    assert "Health" in core and "Willpower" in core
+    # Health = Stamina 3 + 3 = 6 boxes; 2 superficial + 1 aggravated → 3 healthy.
+    assert "□□□▨▨✖" in core
+    # Willpower = Composure 2 + Resolve 3 = 5 boxes; 1 superficial → 4 healthy.
+    assert "□□□□▨" in core
+
+
 def test_embed_handles_empty_sheet():
     char = {
         "id": 1, "name": "Pending Kindred", "clan": "malkavian",

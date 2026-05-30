@@ -115,6 +115,16 @@ def _dots(rating: int, max_dots: int = 5) -> str:
     return "●" * rating + "○" * (max_dots - rating)
 
 
+def _track(max_boxes: int, superficial: int, aggravated: int) -> str:
+    """Render a Health/Willpower track: □ healthy, ▨ superficial, ✖ aggravated.
+    Aggravated and superficial are clamped to the box count."""
+    max_boxes = max(0, int(max_boxes or 0))
+    agg = max(0, min(int(aggravated or 0), max_boxes))
+    sup = max(0, min(int(superficial or 0), max_boxes - agg))
+    healthy = max_boxes - agg - sup
+    return ("□" * healthy + "▨" * sup + "✖" * agg) or "—"
+
+
 def _format_traits(sheet: dict, traits: list[tuple[str, str]],
                    skip_zero: bool = False, max_dots: int = 5) -> str:
     """Build a code-block list of '<dots> Label' for an embed field."""
@@ -414,8 +424,12 @@ def _build_sheet_embed(char: dict) -> discord.Embed:
         body = "\n".join(f"{_dots(f.get('dots', 0))} {f['name']}" for f in flaws)
         e.add_field(name="Flaws", value=f"```\n{body}\n```", inline=True)
 
-    # Core traits — Humanity / BP / Hunger
+    # Core traits — Health / Willpower tracks + Humanity / BP / Hunger.
+    health_max = (sheet.get("attr_stamina", 0) or 0) + 3
+    wp_max = (sheet.get("attr_composure", 0) or 0) + (sheet.get("attr_resolve", 0) or 0)
     core = (
+        f"Health        {_track(health_max, sheet.get('damage_health_sup', 0), sheet.get('damage_health_agg', 0))}\n"
+        f"Willpower     {_track(wp_max, sheet.get('damage_willpower_sup', 0), sheet.get('damage_willpower_agg', 0))}\n"
         f"Humanity      {_dots(sheet.get('humanity', 0), 10)}\n"
         f"Blood Potency {_dots(sheet.get('blood_potency', 0))}\n"
         f"Hunger        {_dots(sheet.get('hunger', 0))}"
