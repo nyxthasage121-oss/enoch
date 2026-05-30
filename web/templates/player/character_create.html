@@ -88,7 +88,8 @@
       (9,  'Curse',    'Disciplines'),
       (10, 'Lore',     'Rituals & ceremonies'),
       (11, 'Soul',     'Touchstones'),
-      (12, 'Vow',      'Review & submit'),
+      (12, 'Advance',  'Spend Starting XP'),
+      (13, 'Vow',      'Review & submit'),
     ] %}
     {% for n, label, hint in step_nav %}
     <button type="button"
@@ -1555,9 +1556,106 @@
     </div>
 
     {# ═══════════════════════════════════════════════════
+       STEP — ADVANCE: spend Starting XP with live V5 cost math
+       ═══════════════════════════════════════════════════ #}
+    {% macro xp_buy_row(cat, key, label) %}
+    <div class="flex items-center justify-between gap-2 py-1 border-b border-ink-800 last:border-0">
+      <span class="font-garamond text-sm {{ '' }}"
+            :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-bone-200' : 'text-bone-400'">{{ label }}</span>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <span class="font-cinzel text-xs text-gold-400 w-3 text-center" x-text="sheet['{{ key }}'] || 0"></span>
+        <button type="button" @click="refundTrait('{{ key }}')"
+                :disabled="boughtDots('{{ key }}') === 0"
+                :class="boughtDots('{{ key }}') === 0 ? 'opacity-25 cursor-not-allowed' : 'hover:border-gold-700 text-bone-300'"
+                title="Refund a bought dot"
+                class="w-6 h-6 border border-ink-600 text-bone-500 text-sm leading-none">−</button>
+        <button type="button" @click="buyTrait('{{ cat }}', '{{ key }}', '{{ label }}')"
+                :disabled="!canBuy('{{ cat }}', '{{ key }}')"
+                :class="canBuy('{{ cat }}', '{{ key }}') ? 'hover:border-gold-700 text-bone-300' : 'opacity-25 cursor-not-allowed'"
+                title="Buy the next dot"
+                class="inline-flex items-center gap-0.5 px-2 h-6 border border-ink-600 text-bone-500 text-[0.6rem] font-cinzel tracking-widest leading-none">
+          +<span class="text-gold-500" x-text="nextDotCost('{{ cat }}', '{{ key }}')"></span>
+        </button>
+      </div>
+    </div>
+    {% endmacro %}
+
+    <div x-show="step === 12" x-cloak>
+      <div class="mb-6">
+        <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Advancement</h1>
+        <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+          Spend your Starting XP to raise traits beyond your spread. V5 costs:
+          Attribute ×5, Skill ×3, Discipline ×5 in-clan / ×7 out-of-clan per new
+          dot. Optional — staff confirms the final build at approval.
+        </p>
+      </div>
+
+      {# XP pool tracker #}
+      <div class="gilded-inset px-5 py-4 mb-5 border border-ink-700 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Starting XP spent</p>
+          <p class="font-cinzel text-2xl">
+            <span :class="xpRemaining < 0 ? 'text-blood-400' : 'text-gold-400'" x-text="xpSpent"></span>
+            <span class="text-bone-700 text-sm"> / </span>
+            <span class="text-bone-400 text-lg" x-text="xpPool"></span>
+          </p>
+        </div>
+        <p class="font-cinzel text-sm tracking-widest"
+           :class="xpRemaining < 0 ? 'text-blood-400' : 'text-bone-400'">
+          <span x-text="xpRemaining"></span> remaining
+        </p>
+      </div>
+
+      {# Attributes ×5 #}
+      <div class="gilded p-5 mb-4">
+        <p class="label-gold mb-3 text-xs">Attributes <span class="text-bone-700 normal-case ml-1">×5 / dot</span></p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+          {% for cat, traits in v5_attributes %}
+          <div>
+            <p class="font-cinzel text-[0.5rem] tracking-[0.25em] text-bone-700 uppercase mb-1">{{ cat }}</p>
+            {% for key, label in traits %}{{ xp_buy_row('attr', key, label) }}{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Skills ×3 #}
+      <div class="gilded p-5 mb-4">
+        <p class="label-gold mb-3 text-xs">Skills <span class="text-bone-700 normal-case ml-1">×3 / dot</span></p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+          {% for cat, traits in v5_skills %}
+          <div>
+            <p class="font-cinzel text-[0.5rem] tracking-[0.25em] text-bone-700 uppercase mb-1">{{ cat }}</p>
+            {% for key, label in traits %}{{ xp_buy_row('skill', key, label) }}{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Disciplines — cost depends on in-clan #}
+      <div class="gilded p-5 mb-5" x-show="hasVampireMechanics()" x-cloak>
+        <p class="label-gold mb-3 text-xs">Disciplines
+          <span class="text-bone-700 normal-case ml-1">×5 in-clan · ×7 out-of-clan</span></p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+          {% for key, label in v5_disciplines %}{{ xp_buy_row('disc', key, label) }}{% endfor %}
+        </div>
+      </div>
+
+      <p x-show="xpRemaining < 0" x-cloak class="font-garamond text-[0.75rem] text-blood-400 italic mb-3">
+        You've overspent your Starting XP by <span x-text="-xpRemaining"></span> — refund a dot before submitting.
+      </p>
+
+      <input type="hidden" name="xp_buys"  :value="JSON.stringify(xpBuys)">
+      <input type="hidden" name="xp_spent" :value="xpSpent">
+      <input type="hidden" name="xp_pool"  :value="xpPool">
+
+      {% include "player/partials/wizard_nav.html" %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════
        STEP 10 — VOW: Review + Submit
        ═══════════════════════════════════════════════════ #}
-    <div x-show="step === 12" x-cloak>
+    <div x-show="step === 13" x-cloak>
       <div class="mb-6">
         <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Vow</h1>
         <p class="font-garamond text-bone-500 text-sm leading-relaxed">
@@ -1754,7 +1852,7 @@
       </div>
 
       <div class="flex items-center justify-between">
-        <button type="button" @click="goStep(11)"
+        <button type="button" @click="goStep(12)"
                 class="btn-ghost font-cinzel tracking-widest text-xs">Back</button>
         <div class="flex gap-2">
           <button type="button" @click="saveAsDraft($event)"
@@ -1918,6 +2016,8 @@
       sheet:       Object.assign({}, seededSheet),
       specialties: seededSheet.specialties || [],
       powers:      seededSheet.powers      || [],
+      // Starting-XP purchases — one entry per bought dot {cat,key,label,cost}.
+      xpBuys:      Array.isArray(seededSheet.xp_buys) ? seededSheet.xp_buys : [],
       merits:      seededSheet.merits      || [],
       advantages:  seededSheet.advantages  || [],
       backgrounds: seededSheet.backgrounds || [],
@@ -2091,7 +2191,8 @@
       get skillCounts() {
         const c = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
         Object.keys(this.skillLabels).forEach(k => {
-          const v = this.sheet[k] || 0;
+          // Spread tracker counts spread dots only — exclude XP-bought dots.
+          const v = (this.sheet[k] || 0) - this.boughtDots(k);
           if (v >= 1 && v <= 5) c[v] += 1;
         });
         return c;
@@ -2111,7 +2212,9 @@
         return this.disciplineSpreads[this.effectiveDiscSpreadSlug] || null;
       },
       get discDotsPlaced() {
-        return Object.keys(this.discLabels).reduce((s, k) => s + (this.sheet[k] || 0), 0);
+        // Spread total only — exclude XP-bought dots.
+        return Object.keys(this.discLabels).reduce(
+          (s, k) => s + Math.max(0, (this.sheet[k] || 0) - this.boughtDots(k)), 0);
       },
       // Target = spread total + predator free dot (when the predator grants one).
       get discDotsTarget() {
@@ -2120,6 +2223,52 @@
         const info = this.predatorInfo[this.charName.predator_type];
         const hasFree = !!(info && (info.grants || []).some(g => g.kind === 'discipline'));
         return base + (hasFree ? this.predatorFreeDiscDots : 0);
+      },
+
+      // ── Starting-XP allocator (live V5 cost math) ─────────────────────
+      get xpPool() {
+        const ct = this.charName.character_type, tier = this.charName.character_tier;
+        if (ct === 'kindred' && tier === 'ancilla') {
+          if (this.charName.ancilla_mode === 'in_memoriam') return this.imTotals.totalXp;
+          return (this.budgets.starting_xp || 0) + 35;
+        }
+        return this.budgets.starting_xp || 0;
+      },
+      get xpSpent() { return this.xpBuys.reduce((s, b) => s + (b.cost || 0), 0); },
+      get xpRemaining() { return this.xpPool - this.xpSpent; },
+      // V5 dot costs: Attribute ×5, Skill ×3, in-clan Discipline ×5,
+      // out-of-clan ×7, Caitiff / Thin-Blood ×6.
+      discCostMult(key) {
+        if (this.isInClan(key)) return 5;
+        const clan = this.charName.clan;
+        return (clan === 'caitiff' || clan === 'thin-blood') ? 6 : 7;
+      },
+      nextDotCost(cat, key) {
+        const next = (this.sheet[key] || 0) + 1;
+        if (cat === 'attr')  return next * 5;
+        if (cat === 'skill') return next * 3;
+        if (cat === 'disc')  return next * this.discCostMult(key);
+        return next * 3;
+      },
+      boughtDots(key) { return this.xpBuys.filter(b => b.key === key).length; },
+      canBuy(cat, key, max) {
+        if ((this.sheet[key] || 0) >= (max || 5)) return false;
+        return this.nextDotCost(cat, key) <= this.xpRemaining;
+      },
+      buyTrait(cat, key, label, max) {
+        if (!this.canBuy(cat, key, max)) return;
+        const cost = this.nextDotCost(cat, key);
+        this.sheet[key] = (this.sheet[key] || 0) + 1;
+        this.xpBuys.push({ cat, key, label, cost });
+      },
+      refundTrait(key) {
+        let idx = -1;
+        for (let i = this.xpBuys.length - 1; i >= 0; i--) {
+          if (this.xpBuys[i].key === key) { idx = i; break; }
+        }
+        if (idx < 0) return;
+        this.sheet[key] = Math.max(0, (this.sheet[key] || 0) - 1);
+        this.xpBuys.splice(idx, 1);
       },
 
       // Step navigation
@@ -2249,11 +2398,11 @@
       goStep(n) {
         const dir = (n > this.step) ? 1 : -1;
         // Skip hidden steps in the direction of motion. Clamp to valid range.
-        while (this._isStepHidden(n) && n >= 1 && n <= 12) {
+        while (this._isStepHidden(n) && n >= 1 && n <= 13) {
           n = n + dir;
         }
         if (n < 1)  n = 1;
-        if (n > 12) n = 12;
+        if (n > 13) n = 13;
         this.step = n;
         window.scrollTo({ top: 0, behavior: 'smooth' });
       },

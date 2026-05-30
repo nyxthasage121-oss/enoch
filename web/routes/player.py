@@ -1229,6 +1229,23 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
         except (ValueError, TypeError):
             pass
 
+    # Starting-XP allocator: the bought dots are already folded into the trait
+    # values above; keep the purchase ledger + totals for staff review.
+    raw = form.get("xp_buys")
+    if raw:
+        try:
+            buys = json.loads(raw)
+            if isinstance(buys, list):
+                sheet["xp_buys"] = buys
+        except (ValueError, TypeError):
+            pass
+    xp_spent = form_int(form.get("xp_spent"))
+    if xp_spent:
+        sheet["xp_spent"] = xp_spent
+    xp_pool = form_int(form.get("xp_pool"))
+    if xp_pool:
+        sheet["starting_xp_pool"] = xp_pool
+
     return sheet
 
 

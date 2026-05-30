@@ -2708,6 +2708,37 @@ def test_chargen_persists_spreads_and_predator_picks(player):
             conn.execute("DELETE FROM characters WHERE name='Spread Test'")
 
 
+def test_chargen_persists_starting_xp_allocation(player):
+    """The Advancement step's purchases (ledger + totals) persist into
+    sheet_json so the build shows on the player + staff sheets."""
+    import json as _json
+    from web.db import get_db
+    buys = [
+        {"cat": "attr", "key": "attr_strength", "label": "Strength", "cost": 5},
+        {"cat": "disc", "key": "disc_celerity", "label": "Celerity", "cost": 5},
+    ]
+    player.post("/characters/new", data={
+        "_csrf": "dev-csrf-token", "name": "XP Persist", "clan": "brujah",
+        "touchstones": '["A", "B"]',
+        "xp_buys": _json.dumps(buys), "xp_spent": "10", "xp_pool": "75",
+        "attr_strength": "1", "disc_celerity": "1",
+    }, follow_redirects=False)
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT sheet_json FROM characters WHERE name='XP Persist'"
+            ).fetchone()
+        assert row is not None, "character was not created"
+        sheet = _json.loads(row["sheet_json"] or "{}")
+        assert sheet.get("xp_spent") == 10
+        assert sheet.get("starting_xp_pool") == 75
+        assert len(sheet.get("xp_buys", [])) == 2
+        assert sheet.get("attr_strength") == 1 and sheet.get("disc_celerity") == 1
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE name='XP Persist'")
+
+
 def test_chargen_error_rerender_with_image_does_not_500(player):
     """A validation error on chargen must re-render the wizard (200), not
     500. The multipart form carries a profile_image UploadFile that isn't
