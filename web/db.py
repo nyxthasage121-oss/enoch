@@ -524,6 +524,23 @@ def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
         WHERE id=?
     """, (reviewer_id, now, now, character_id))
     char = get_character(conn, character_id)
+    # Record the Character Creation (CC) XP spend as ONE clean ledger entry —
+    # the per-trait breakdown stays in sheet_json for staff; the ledger just
+    # notes the lump spend so the XP history isn't cluttered. Posted once,
+    # when the character first goes active (guarded against re-approval).
+    _sheet = char.get("sheet_json") if isinstance(char.get("sheet_json"), dict) else {}
+    try:
+        _cc_spent = int(_sheet.get("xp_spent") or 0)
+    except (TypeError, ValueError):
+        _cc_spent = 0
+    if _cc_spent > 0:
+        _exists = conn.execute(
+            "SELECT 1 FROM ledger_entries WHERE character_id=? AND entry_type='creation' LIMIT 1",
+            (character_id,),
+        ).fetchone()
+        if not _exists:
+            append_ledger_entry(conn, character_id, "creation", -_cc_spent, reviewer_id,
+                                note="Character Creation XP")
     write_audit(conn, reviewer_id, "approve_character", "character", character_id,
                 after={"is_approved": 1, "status": "active"})
     enqueue_bot(conn, "character_approved", {

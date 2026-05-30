@@ -243,14 +243,19 @@
              x-cloak>
           <p class="label-gold mb-2 text-[0.75rem]">Starting XP</p>
           <p class="font-cinzel text-gold-400 text-lg">
+            {# Standard Ancilla get the +35 Sea-of-Time bonus on top of the
+               base XP. Under homebrew the configured XP is authoritative —
+               no bonus is layered on. #}
             <span x-text="charName.character_type === 'kindred'
                            && charName.character_tier === 'ancilla'
                            && charName.ancilla_mode === 'standard'
+                           && !budgets.homebrew
                            ? budgets.starting_xp + 35
                            : budgets.starting_xp"></span>
             <span x-show="charName.character_type === 'kindred'
                           && charName.character_tier === 'ancilla'
-                          && charName.ancilla_mode === 'standard'"
+                          && charName.ancilla_mode === 'standard'
+                          && !budgets.homebrew"
                   class="text-bone-700 text-[0.65rem] ml-1">(Ancilla +35)</span>
           </p>
           <p class="font-garamond text-bone-700 text-[0.65rem] italic mt-1">
@@ -2302,7 +2307,11 @@
         const ct = this.charName.character_type, tier = this.charName.character_tier;
         if (ct === 'kindred' && tier === 'ancilla') {
           if (this.charName.ancilla_mode === 'in_memoriam') return this.imTotals.totalXp;
-          return (this.budgets.starting_xp || 0) + 35;
+          // Standard Ancilla get the +35 Sea-of-Time bonus on top of the base
+          // XP. Under homebrew the configured Ancilla XP is the exact total —
+          // no bonus layered on.
+          const base = this.budgets.starting_xp || 0;
+          return this.budgets.homebrew ? base : base + 35;
         }
         return this.budgets.starting_xp || 0;
       },

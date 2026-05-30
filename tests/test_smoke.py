@@ -2860,6 +2860,42 @@ def test_chargen_persists_starting_xp_allocation(player):
             conn.execute("DELETE FROM characters WHERE name='XP Persist'")
 
 
+def test_creation_xp_posts_single_clean_ledger_entry(player):
+    """Approving a character with Starting-XP (CC) spends posts ONE clean
+    ledger entry — the lump CC-XP spend with its amount, not a per-trait
+    breakdown — and re-approval doesn't double-post it."""
+    import json as _json
+    from web.db import (get_db, upsert_player, create_character,
+                        approve_character, get_ledger, delete_character)
+    with get_db() as conn:
+        upsert_player(conn, discord_id="555000555000555000", username="CCLedger")
+        ch = create_character(conn, discord_id="555000555000555000",
+                              name="CC Ledger Probe", clan="brujah")
+        conn.execute("UPDATE characters SET sheet_json=? WHERE id=?",
+                     (_json.dumps({"xp_spent": 40, "starting_xp_pool": 75}), ch["id"]))
+        conn.commit()
+    try:
+        with get_db() as conn:
+            approve_character(conn, ch["id"], reviewer_id="999999999999999999")
+            conn.commit()
+            creation = [e for e in get_ledger(conn, ch["id"])
+                        if e["entry_type"] == "creation"]
+        assert len(creation) == 1, "expected exactly one CC-XP ledger entry"
+        assert creation[0]["xp_delta"] == -40
+        assert "Creation" in (creation[0]["note"] or "")
+        # Re-approval must not duplicate the entry.
+        with get_db() as conn:
+            approve_character(conn, ch["id"], reviewer_id="999999999999999999")
+            conn.commit()
+            again = [e for e in get_ledger(conn, ch["id"])
+                     if e["entry_type"] == "creation"]
+        assert len(again) == 1, "re-approval double-posted the CC-XP entry"
+    finally:
+        with get_db() as conn:
+            delete_character(conn, ch["id"])
+            conn.commit()
+
+
 def test_chargen_error_rerender_with_image_does_not_500(player):
     """A validation error on chargen must re-render the wizard (200), not
     500. The multipart form carries a profile_image UploadFile that isn't
