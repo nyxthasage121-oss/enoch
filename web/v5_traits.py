@@ -302,6 +302,27 @@ V5_CLAN_BANE_VARIANTS: dict[str, dict[str, str]] = {
 }
 
 
+def active_clan_bane(clan: str | None, bane_choice: str | None = "standard") -> dict | None:
+    """Resolve a character's active clan Bane (standard or chosen variant) to a
+    {name, effect, variant} dict for display on the sheets. Returns None for
+    archetypes with no clan Bane (e.g. mortals, or an unknown clan)."""
+    info = V5_CLAN_INFO.get(clan or "")
+    if not info:
+        return None
+    if bane_choice == "variant" and clan in V5_CLAN_BANE_VARIANTS:
+        v = V5_CLAN_BANE_VARIANTS[clan]
+        return {"name": v["name"], "effect": v["effect"], "variant": True}
+    # Standard Bane text in V5_CLAN_INFO reads "Name — effect …"; split it so
+    # the sheet can show a bold name + the effect, falling back gracefully.
+    bane = info.get("bane", "")
+    name, sep, effect = bane.partition("—")
+    return {
+        "name": (name.strip() if sep else info.get("name", clan)),
+        "effect": (effect.strip() if sep else bane),
+        "variant": False,
+    }
+
+
 # ── Predator Type benefit summaries (paraphrased V5 RAW) ────────────────────
 # Each entry lists the mechanical benefits a Predator Type grants at chargen.
 # These are advisory — staff still validates the exact dot/specialty/merit

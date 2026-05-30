@@ -303,6 +303,7 @@ from ..v5_traits import (
     V5_CLAN_BANE_FLAW_POOLS as _V5_CLAN_BANE_FLAW_POOLS,
     V5_CLAN_BANE_VARIANTS as _V5_CLAN_BANE_VARIANTS,
     bane_severity_for_bp as _bane_severity_for_bp,
+    active_clan_bane as _active_clan_bane,
 )
 
 
@@ -1545,6 +1546,8 @@ async def character_detail(
             v5_attributes=_V5_ATTRIBUTES,
             v5_skills=_V5_SKILLS,
             v5_disciplines=_V5_DISCIPLINES,
+            active_bane=_active_clan_bane(
+                char.get("clan"), (char.get("sheet_json") or {}).get("bane_choice")),
             clan_disciplines=set(_CLAN_DISCIPLINES.get(char["clan"], [])),
         ),
     )

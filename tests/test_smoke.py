@@ -638,6 +638,52 @@ def test_coterie_request_approval_enqueues_bot_event():
         conn.execute("DELETE FROM coterie_requests WHERE id=?", (req["id"],))
 
 
+def test_coterie_request_approval_creates_coterie_with_members(_client):
+    """Backfill: approving a coterie proposal request creates the coterie,
+    links the request to it, and adds the proposed members (the bot-event
+    test only checks the notification, not the lifecycle)."""
+    from web.db import (get_db, upsert_player, create_character,
+                        create_coterie_request, approve_coterie_request)
+    with get_db() as conn:
+        upsert_player(conn, discord_id="820820820", username="CotReqA")
+        upsert_player(conn, discord_id="821821821", username="CotReqB")
+        a = create_character(conn, discord_id="820820820", name="CotReq A", clan="brujah")
+        b = create_character(conn, discord_id="821821821", name="CotReq B", clan="ventrue")
+        req = create_coterie_request(
+            conn, requested_by="820820820", proposed_name="Backfill Accord",
+            member_ids=[a["id"], b["id"]], note="qa")
+        try:
+            approve_coterie_request(conn, req["id"], reviewer_id="staff-smoke")
+            conn.commit()
+            row = conn.execute(
+                "SELECT status, coterie_id FROM coterie_requests WHERE id=?",
+                (req["id"],)).fetchone()
+            assert row["status"] == "approved"
+            cid = row["coterie_id"]
+            assert cid is not None, "approved request did not create a coterie"
+            cot = conn.execute(
+                "SELECT name FROM coteries WHERE id=?", (cid,)).fetchone()
+            assert cot["name"] == "Backfill Accord"
+            members = {r["character_id"] for r in conn.execute(
+                "SELECT character_id FROM coterie_memberships WHERE coterie_id=?",
+                (cid,)).fetchall()}
+            assert members == {a["id"], b["id"]}
+        finally:
+            row = conn.execute(
+                "SELECT coterie_id FROM coterie_requests WHERE id=?",
+                (req["id"],)).fetchone()
+            cid = row["coterie_id"] if row else None
+            if cid:
+                for t in ("coterie_memberships", "coterie_contributions",
+                          "coterie_merits", "coterie_flaws", "coterie_spends"):
+                    conn.execute(f"DELETE FROM {t} WHERE coterie_id=?", (cid,))
+                conn.execute("DELETE FROM coteries WHERE id=?", (cid,))
+            conn.execute("DELETE FROM coterie_requests WHERE id=?", (req["id"],))
+            conn.execute("DELETE FROM bot_outbox WHERE command LIKE 'coterie_%'")
+            conn.execute("DELETE FROM characters WHERE id IN (?, ?)", (a["id"], b["id"]))
+            conn.commit()
+
+
 def test_coterie_request_rejection_enqueues_bot_event():
     from web.db import (
         get_db, create_coterie_request, reject_coterie_request, get_character,
@@ -1486,6 +1532,33 @@ def test_player_hunting_sites_directory_renders(player):
     r = player.get("/hunting-sites")
     assert r.status_code == 200
     assert "Hunting Sites" in r.text
+
+
+def test_hunting_sites_shows_predator_specific_dc(player):
+    """Backfill: the hunting-sites directory highlights the DC for the
+    selected character's predator type. Selects the char explicitly so the
+    highlight is deterministic regardless of how many chars the player has."""
+    from web.db import get_db, create_hunting_site
+    with get_db() as conn:
+        ch = conn.execute(
+            "SELECT id, predator_type FROM characters "
+            "WHERE discord_id='111111111111111111' AND is_approved=1 "
+            "ORDER BY id LIMIT 1").fetchone()
+        assert ch is not None, "seed character for player 1 missing"
+        create_hunting_site(
+            conn, name="Backfill Feeding Ground", borough="Manhattan",
+            blood_quality=2, predator_dcs={ch["predator_type"]: 7})
+        conn.commit()
+    try:
+        r = player.get(f"/hunting-sites?character_id={ch['id']}")
+        assert r.status_code == 200
+        i = r.text.find("Backfill Feeding Ground")
+        assert i != -1, "site did not render"
+        assert "7" in r.text[i:i + 600], "predator-specific DC (7) not on the site card"
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM hunting_sites WHERE name='Backfill Feeding Ground'")
+            conn.commit()
 
 
 def test_player_hunt_log_post_creates_row(player):
@@ -3121,6 +3194,28 @@ def test_hecata_decay_pool_honors_player_allocation(player):
         with get_db() as conn:
             conn.execute("DELETE FROM characters WHERE name='Hec Alloc'")
             conn.commit()
+
+
+def test_active_clan_bane_helper_resolves_standard_and_variant():
+    """active_clan_bane resolves the standard vs chosen-variant Bane and
+    returns None for archetypes without a clan Bane."""
+    from web.v5_traits import active_clan_bane
+    std = active_clan_bane("nosferatu", "standard")
+    assert std and std["name"] == "Repulsiveness" and std["variant"] is False
+    var = active_clan_bane("ventrue", "variant")
+    assert var and var["name"] == "Hierarchy" and var["variant"] is True
+    assert active_clan_bane("", "standard") is None
+
+
+def test_staff_sheet_shows_active_clan_bane_effect(staff):
+    """The staff character sheet surfaces the active clan Bane's name + the
+    mechanical effect text (not just the build-summary one-liner)."""
+    # Seed character id 1 (Valeria) is Brujah → standard Bane 'Volatile temper'.
+    r = staff.get("/staff/characters/1")
+    assert r.status_code == 200
+    assert "Clan Bane" in r.text
+    assert "Volatile temper" in r.text
+    assert "fury frenzy" in r.text
 
 
 def test_chargen_error_rerender_with_image_does_not_500(player):

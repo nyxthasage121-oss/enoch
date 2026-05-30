@@ -439,6 +439,7 @@ async def char_detail(
 ):
     from ..v5_traits import (
         V5_ATTRIBUTES, V5_SKILLS, V5_DISCIPLINES, CLAN_DISCIPLINES,
+        active_clan_bane,
     )
     with get_db() as conn:
         char   = get_character(conn, character_id)
@@ -452,6 +453,8 @@ async def char_detail(
         _ctx(request, char=char, claims=claims, spends=spends, ledger=ledger,
              v5_attributes=V5_ATTRIBUTES, v5_skills=V5_SKILLS,
              v5_disciplines=V5_DISCIPLINES,
+             active_bane=active_clan_bane(
+                 char.get("clan"), (char.get("sheet_json") or {}).get("bane_choice")),
              clan_disciplines=set(CLAN_DISCIPLINES.get(char["clan"], []))),
     )
 
@@ -520,9 +523,12 @@ async def char_edit(
         spends = list_spends_for_character(conn, character_id)
         ledger = get_ledger(conn, character_id, limit=50)
 
+    from ..v5_traits import active_clan_bane
     resp = templates.TemplateResponse(
         request, "staff/character_detail.html",
         _ctx(request, char=char, claims=claims, spends=spends, ledger=ledger,
+             active_bane=active_clan_bane(
+                 char.get("clan"), (char.get("sheet_json") or {}).get("bane_choice")),
              edit_error=err, edit_success=(not err)),
     )
     _toast(resp, err or "Character updated.", "error" if err else "success")

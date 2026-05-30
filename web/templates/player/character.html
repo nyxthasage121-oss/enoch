@@ -586,6 +586,18 @@
       </div>
       {% endif %}
 
+      {# Active clan Bane — name + its mechanical effect (standard or the
+         chronicle's chosen variant). #}
+      {% if active_bane %}
+      <div class="gilded-inset px-4 py-3 border-l-2 {{ 'border-mauve-700' if active_bane.variant else 'border-blood-900' }}">
+        <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">
+          Clan Bane{% if active_bane.variant %} <span class="text-mauve-400">· Variant</span>{% endif %}
+        </p>
+        <p class="font-garamond text-sm text-bone-200">{{ active_bane.name }}</p>
+        <p class="font-garamond text-xs text-bone-500 leading-snug mt-0.5">{{ active_bane.effect }}</p>
+      </div>
+      {% endif %}
+
       {# ── Attributes ── #}
       <div class="gilded p-5">
         <p class="label-gold mb-4">Attributes</p>
