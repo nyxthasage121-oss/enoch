@@ -17,8 +17,8 @@ from ..api import (
 from ..roll import (
     build_trait_index, resolve_pool, apply_specialty, roll_pool,
     reroll_failures, rouse_check, blood_surge_bonus, mend_amount,
-    willpower_recovery, OUTCOME_LABELS, MESSY_CRITICAL, BESTIAL_FAILURE,
-    TOTAL_FAILURE, FAILURE, RollResult,
+    willpower_recovery, bane_severity, OUTCOME_LABELS, MESSY_CRITICAL,
+    BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE, RollResult,
 )
 from .characters import _ATTRIBUTES, _SKILLS_BY_CAT, _DISCIPLINES
 
@@ -540,6 +540,54 @@ class RollCog(commands.Cog):
                           (f"+{gained} Hunger ({new_hunger}/5)" if gained
                            else "no Hunger gained"),
                     inline=False)
+        await interaction.followup.send(embed=e)
+
+    @app_commands.command(
+        name="blush",
+        description="Blush of Life — a Rouse Check to pass for human this scene.")
+    @app_commands.describe(character="Which character (only if you have more than one)")
+    async def blush(self, interaction: discord.Interaction,
+                    character: str | None = None) -> None:
+        await interaction.response.defer()
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>` to blush.")
+            return
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            await interaction.followup.send("❌ Could not load your sheet.")
+            return
+        sheet = _sheet_of(full)
+        # Ministry on the "Cold-Blooded" variant Bane: Blush costs Rouse Checks
+        # equal to Bane Severity (min 1) and needs recent feeding.
+        cold_blooded = ((char.get("clan") or "").lower() == "ministry"
+                        and sheet.get("bane_choice") == "variant")
+        count = (max(1, bane_severity(sheet.get("blood_potency", 0)))
+                 if cold_blooded else 1)
+        rolls, gained = rouse_check(count)
+        new_hunger = min(5, int(sheet.get("hunger", 0) or 0) + gained)
+        if gained > 0:
+            try:
+                resp = await apply_state_delta(char["id"], hunger=gained,
+                                               source="dice:blush")
+                new_hunger = resp.get("state", {}).get("hunger", new_hunger)
+            except Exception as exc:
+                log.warning("blush write-back failed for %s: %s", char.get("id"), exc)
+        e = discord.Embed(
+            title=f"🌹 Blush of Life · {char['name']}",
+            description=f"{char['name']} flushes with borrowed warmth — "
+                        "passing for human this scene.",
+            color=_GOLD if gained == 0 else _BLOOD)
+        e.add_field(
+            name=f"Rouse ×{count}" if count > 1 else "Rouse",
+            value=f"{_fmt_dice(rolls)} → " +
+                  (f"+{gained} Hunger ({new_hunger}/5)" if gained
+                   else "no Hunger gained"),
+            inline=False)
+        if cold_blooded:
+            e.set_footer(text="Cold-Blooded: requires recent feeding from a living vessel")
         await interaction.followup.send(embed=e)
 
     async def _pick_character(self, interaction: discord.Interaction,

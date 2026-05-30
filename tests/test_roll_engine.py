@@ -15,6 +15,7 @@ os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 from bot.roll import (  # noqa: E402
     classify, roll_pool, build_trait_index, resolve_pool, apply_specialty,
     reroll_failures, rouse_check, blood_surge_bonus, mend_amount, willpower_recovery,
+    bane_severity,
     CRITICAL, MESSY_CRITICAL, SUCCESS, FAILURE,
     TOTAL_FAILURE, BESTIAL_FAILURE,
 )
@@ -320,3 +321,14 @@ def test_willpower_recovery_is_higher_of_composure_resolve():
     assert willpower_recovery(2, 3) == 3
     assert willpower_recovery(4, 1) == 4
     assert willpower_recovery(0, 0) == 0
+
+
+def test_bane_severity_by_blood_potency():
+    # 0 at BP0, 1 at 1-3, 2 at 4-5, 3 at 6-7, 4 at 8-9, 5 at 10.
+    assert bane_severity(0) == 0
+    assert bane_severity(1) == 1
+    assert bane_severity(3) == 1
+    assert bane_severity(4) == 2
+    assert bane_severity(6) == 3
+    assert bane_severity(8) == 4
+    assert bane_severity(10) == 5

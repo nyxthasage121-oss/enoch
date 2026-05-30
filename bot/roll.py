@@ -202,6 +202,24 @@ def willpower_recovery(composure: int, resolve: int) -> int:
     return max(0, int(composure or 0), int(resolve or 0))
 
 
+def bane_severity(blood_potency: int) -> int:
+    """V5 Bane Severity for a Blood Potency (Corebook p.216): 0 at BP0, 1 at
+    1-3, 2 at 4-5, 3 at 6-7, 4 at 8-9, 5 at 10. Mirrors the web's
+    bane_severity_for_bp so the bot stays independent."""
+    bp = max(0, min(int(blood_potency or 0), 10))
+    if bp <= 0:
+        return 0
+    if bp <= 3:
+        return 1
+    if bp <= 5:
+        return 2
+    if bp <= 7:
+        return 3
+    if bp <= 9:
+        return 4
+    return 5
+
+
 def resolve_pool(expression: str, sheet: dict,
                  trait_index: dict[str, str]) -> tuple[int, list[tuple[str, int]], list[str]]:
     """Parse a pool expression into a total dice count.
