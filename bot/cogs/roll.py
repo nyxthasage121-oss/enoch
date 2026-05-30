@@ -13,11 +13,13 @@ from discord.ext import commands
 
 from ..api import (
     get_character, get_player_characters, apply_state_delta, set_macro,
+    get_character_coterie, list_hunting_sites, log_hunt,
 )
 from ..roll import (
     build_trait_index, resolve_pool, apply_specialty, roll_pool,
     reroll_failures, rouse_check, blood_surge_bonus, mend_amount,
     willpower_recovery, bane_severity, frenzy_pool, remorse_pool,
+    hunt_outcome, hunt_slake,
     OUTCOME_LABELS, MESSY_CRITICAL, BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE,
     RollResult,
 )
@@ -170,6 +172,95 @@ def _sheet_of(full: dict) -> dict:
     return sheet
 
 
+# ── Hunting ──────────────────────────────────────────────────────────────────
+
+# Difficulty for a feeding roll when a site lists no DC for the predator type.
+_DEFAULT_HUNT_DC = 2
+
+# hunt-log outcome → (icon, headline). Mirrors the chronicle's site-log labels.
+_HUNT_HEADLINE = {
+    "clean":           ("✦",  "Clean feed — quiet, no fuss"),
+    "messy_critical":  ("🩸", "Messy Critical — loud and showy"),
+    "success":         ("◆",  "Success — a solid hit"),
+    "bestial_failure": ("🐺", "Bestial Failure — the Beast slips loose"),
+}
+_HUNT_MISS = ("✕", "No prey found — you go hungry tonight")
+_HUNT_WINS = {"clean", "success", "messy_critical"}
+
+
+def _find_site(sites: list[dict], token: str) -> dict | None:
+    """Resolve a `/hunt site:` value — an id (from the picker) or a name."""
+    token = (token or "").strip()
+    if token.isdigit():
+        sid = int(token)
+        hit = next((s for s in sites if s.get("id") == sid), None)
+        if hit:
+            return hit
+    low = token.lower()
+    if not low:
+        return None
+    return (next((s for s in sites if (s.get("name") or "").lower() == low), None)
+            or next((s for s in sites if low in (s.get("name") or "").lower()), None))
+
+
+def _hunt_dc(site: dict, predator: str, owns: bool,
+             override: int | None) -> tuple[int, int | None, bool]:
+    """Difficulty for this character's feeding roll. Returns
+    ``(dc_used, base_dc_or_None, defaulted)``. A staff override wins; otherwise
+    the site's DC for the predator type, Chasse-reduced only when the hunter's
+    own coterie controls the site. Falls back to a standard DC if the site
+    lists none for this predator."""
+    base = (site.get("predator_dcs") or {}).get(predator)
+    eff = (site.get("effective_dcs") or {}).get(predator)
+    if override is not None:
+        return max(1, int(override)), (int(base) if base is not None else None), False
+    if base is None:
+        return _DEFAULT_HUNT_DC, None, True
+    dc = eff if (owns and eff is not None) else base
+    return int(dc), int(base), False
+
+
+def build_hunt_embed(result: RollResult, *, character: str, site: str,
+                     outcome: str | None, slaked: int, new_hunger: int,
+                     pool_parts=None, unknown=None, predator: str | None = None,
+                     blood_quality: int = 1, chasse_note: str | None = None,
+                     defaulted_dc: bool = False) -> discord.Embed:
+    """Render a feeding roll as an embed (offline-testable)."""
+    icon, headline = _HUNT_HEADLINE.get(outcome, _HUNT_MISS)
+    win = outcome in _HUNT_WINS
+    color = _GOLD if (win and outcome != MESSY_CRITICAL) else _BLOOD
+    e = discord.Embed(title=f"🦇 {character} hunts · {site}",
+                      description=f"**{headline}**", color=color)
+    e.add_field(name="Dice", value=_fmt_dice(result.normal_dice), inline=False)
+    if result.hunger:
+        e.add_field(name="Hunger", value=_fmt_dice(result.hunger_dice, hunger=True),
+                    inline=False)
+    succ = f"{result.successes} success" + ("" if result.successes == 1 else "es")
+    succ += f"  vs DC {result.difficulty}  ·  margin {result.margin:+d}"
+    e.add_field(name="Result", value=succ, inline=False)
+    if not win:
+        fed = "No blood taken — Hunger unchanged."
+    elif slaked > 0:
+        fed = f"Slaked {slaked} Hunger → **{new_hunger}/5**"
+    else:
+        fed = f"Already sated — fed, but no Hunger to slake (**{new_hunger}/5**)"
+    e.add_field(name="Fed", value=fed, inline=False)
+
+    foot = []
+    if pool_parts:
+        foot.append("Pool: " + " + ".join(f"{lbl} {val}" for lbl, val in pool_parts)
+                    + f" = {result.pool}d")
+    foot.append(f"Blood quality {blood_quality}")
+    if chasse_note:
+        foot.append(chasse_note)
+    if defaulted_dc and predator:
+        foot.append(f"no DC set for {predator} — used {result.difficulty}")
+    if unknown:
+        foot.append("Unknown: " + ", ".join(unknown))
+    e.set_footer(text="   ".join(foot))
+    return e
+
+
 class RollCog(commands.Cog):
     macro = app_commands.Group(
         name="macro", description="Saved roll pools — use them with /roll <name>")
@@ -210,6 +301,28 @@ class RollCog(commands.Cog):
             if cur and cur not in label.lower():
                 continue
             out.append(app_commands.Choice(name=label[:100], value=f"{sk}:{nm}"[:100]))
+            if len(out) >= 25:
+                break
+        return out
+
+    async def _site_autocomplete(
+        self, interaction: discord.Interaction, current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """Suggest active hunting sites for `/hunt`. Choice value is the site
+        id; label is 'Name · Borough'."""
+        try:
+            sites = await list_hunting_sites()
+        except Exception:
+            return []
+        cur = (current or "").lower()
+        out: list[app_commands.Choice[str]] = []
+        for s in sites:
+            label = s.get("name") or ""
+            if s.get("borough"):
+                label = f"{label} · {s['borough']}"
+            if cur and cur not in label.lower():
+                continue
+            out.append(app_commands.Choice(name=label[:100], value=str(s["id"])))
             if len(out) >= 25:
                 break
         return out
@@ -375,6 +488,99 @@ class RollCog(commands.Cog):
             foot += " · update your Hunger on the tracker"
         e.set_footer(text=foot)
         await interaction.followup.send(embed=e)
+
+    # ── Hunting ──────────────────────────────────────────────────────────────
+
+    @app_commands.command(
+        name="hunt",
+        description="Feed at a hunting site — roll vs its difficulty and slake Hunger.")
+    @app_commands.describe(
+        site="Where to hunt (pick a site)",
+        pool="Your hunting pool — traits like 'wits + streetwise' or a number",
+        difficulty="Override the site's difficulty for your predator type",
+        character="Which character (only if you have more than one)",
+        note="Optional note for the chronicle's site log",
+    )
+    @app_commands.autocomplete(site=_site_autocomplete)
+    async def hunt(self, interaction: discord.Interaction, site: str,
+                   pool: str = "wits + survival", difficulty: int | None = None,
+                   character: str | None = None, note: str | None = None) -> None:
+        await interaction.response.defer()
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>` to hunt.")
+            return
+        try:
+            sites = await list_hunting_sites()
+        except Exception as exc:
+            log.warning("hunt: list_hunting_sites failed: %s", exc)
+            await interaction.followup.send(
+                "❌ Could not load hunting sites. Try again shortly.")
+            return
+        site_obj = _find_site(sites, site)
+        if not site_obj:
+            await interaction.followup.send(
+                f"No hunting site matching **{site}**. Run `/hunt` and pick from the list.")
+            return
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            await interaction.followup.send("❌ Could not load your sheet.")
+            return
+        sheet = _sheet_of(full)
+        predator = (full.get("predator_type") or "").strip()
+
+        # Chasse only eases feeding for the controlling coterie's own members.
+        owns = False
+        if site_obj.get("coterie_id"):
+            try:
+                co = await get_character_coterie(char["id"])
+                owns = bool(co and (co.get("coterie") or {}).get("id")
+                            == site_obj["coterie_id"])
+            except Exception:
+                owns = False
+
+        dc, base_dc, defaulted = _hunt_dc(site_obj, predator, owns, difficulty)
+        chasse_note = None
+        if owns and not defaulted and base_dc is not None and dc < base_dc:
+            chasse_note = f"Chasse −{base_dc - dc} (your domain)"
+
+        # Resolve the hunting pool from the sheet (a number rolls as-is).
+        if _looks_numeric(pool):
+            total, parts, unknown = int(pool), [(pool, int(pool))], []
+        else:
+            total, parts, unknown = resolve_pool(pool, sheet, _TRAIT_INDEX)
+
+        eff_hunger = int(sheet.get("hunger", 0) or 0)
+        result = roll_pool(total, eff_hunger, dc)
+        outcome = hunt_outcome(result)
+        slake = hunt_slake(result, site_obj.get("blood_quality", 1))
+
+        # Slake Hunger on a feed, then log the outcome to the site's feed.
+        new_hunger = max(0, eff_hunger - slake)
+        if slake > 0:
+            try:
+                resp = await apply_state_delta(char["id"], hunger=-slake,
+                                               source="dice:hunt")
+                new_hunger = resp.get("state", {}).get("hunger", new_hunger)
+            except Exception as exc:
+                log.warning("hunt: hunger write-back failed for %s: %s",
+                            char["id"], exc)
+        actual = max(0, eff_hunger - new_hunger)
+        if outcome:
+            try:
+                await log_hunt(site_obj["id"], char["id"], outcome, note or "")
+            except Exception as exc:
+                log.warning("hunt: log_hunt failed for %s: %s", char["id"], exc)
+
+        embed = build_hunt_embed(
+            result, character=full["name"], site=site_obj.get("name", "site"),
+            outcome=outcome, slaked=actual, new_hunger=new_hunger,
+            pool_parts=parts, unknown=unknown, predator=predator,
+            blood_quality=site_obj.get("blood_quality", 1),
+            chasse_note=chasse_note, defaulted_dc=defaulted)
+        await interaction.followup.send(embed=embed)
 
     # ── Saved macros ─────────────────────────────────────────────────────────
 

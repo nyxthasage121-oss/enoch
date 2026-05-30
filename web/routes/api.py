@@ -32,6 +32,7 @@ from ..db import (
     list_characters,
     list_claims_for_character,
     list_coterie_members,
+    list_hunting_sites,
     list_player_characters,
     list_spends_for_character,
     upsert_player,
@@ -325,6 +326,33 @@ async def set_macro(character_id: int, body: MacroIn):
             sheet.pop("macros", None)
         update_character(conn, character_id, sheet_json=sheet)
     return {"character_id": character_id, "macros": macros}
+
+
+@router.get("/sites", dependencies=[Depends(_require_bot)])
+async def bot_list_sites():
+    """Active hunting sites — for the bot's `/hunt` site picker. Each site
+    carries its base ``predator_dcs`` (keyed by predator-type name), the
+    Chasse-reduced ``effective_dcs``, the controlling ``coterie_id``, and
+    ``blood_quality`` so the bot can resolve a feeding roll's difficulty and
+    how much Hunger a feed slakes."""
+    with get_db() as conn:
+        sites = list_hunting_sites(conn, active_only=True)
+    return {
+        "sites": [
+            {
+                "id":            s["id"],
+                "name":          s["name"],
+                "borough":       s.get("borough"),
+                "blood_quality": s.get("blood_quality", 1),
+                "predator_dcs":  s.get("predator_dcs") or {},
+                "effective_dcs": s.get("effective_dcs") or {},
+                "coterie_id":    s.get("coterie_id"),
+                "chasse_reduction": s.get("chasse_reduction", 0),
+                "controlling_coterie": s.get("controlling_coterie"),
+            }
+            for s in sites
+        ]
+    }
 
 
 class HuntLogIn(BaseModel):

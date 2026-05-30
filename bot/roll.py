@@ -236,6 +236,36 @@ def bane_severity(blood_potency: int) -> int:
     return 5
 
 
+# ── Hunting (feeding rolls) ──────────────────────────────────────────────────
+
+# A feeding roll's V5 outcome → the chronicle's hunt-log bucket. A plain
+# failure (missed the difficulty, no Hunger 1) turned up no prey worth logging.
+_HUNT_OUTCOME = {
+    CRITICAL:        "clean",            # quiet, efficient feed
+    MESSY_CRITICAL:  "messy_critical",   # fed, but loud and showy
+    SUCCESS:         "success",          # a solid hit
+    BESTIAL_FAILURE: "bestial_failure",  # the Beast slipped its leash
+}
+
+
+def hunt_outcome(result: RollResult) -> str | None:
+    """Map a feeding-roll result to the chronicle's hunt-log outcome
+    (clean | success | messy_critical | bestial_failure), or ``None`` for a
+    plain failure that turned up no prey (nothing to log)."""
+    return _HUNT_OUTCOME.get(result.outcome)
+
+
+def hunt_slake(result: RollResult, blood_quality: int = 1) -> int:
+    """Hunger slaked by a feed. A non-bestial win slakes ``1 + margin`` (so a
+    bigger win — including a critical's bonus successes — feeds more), capped at
+    the site's blood quality (1-5): thin vessels at poor sites can't slake much.
+    A bestial failure or a plain miss slakes nothing."""
+    bq = max(1, min(5, int(blood_quality or 1)))
+    if not result.is_win:
+        return 0
+    return max(1, min(bq, 1 + max(0, result.margin)))
+
+
 def resolve_pool(expression: str, sheet: dict,
                  trait_index: dict[str, str]) -> tuple[int, list[tuple[str, int]], list[str]]:
     """Parse a pool expression into a total dice count.

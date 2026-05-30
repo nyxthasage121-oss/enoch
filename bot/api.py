@@ -113,6 +113,31 @@ async def get_character_coterie(character_id: int) -> dict | None:
         return r.json()
 
 
+# ── Hunting ─────────────────────────────────────────────────────────────────--
+
+async def list_hunting_sites() -> list[dict]:
+    """All active hunting sites with their DCs, blood quality, and controlling
+    coterie — for the `/hunt` site picker."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.get(f"{_base()}/api/sites", headers=_headers())
+        r.raise_for_status()
+        return r.json()["sites"]
+
+
+async def log_hunt(site_id: int, character_id: int, outcome: str,
+                   note: str = "") -> dict:
+    """Record a feeding outcome at a site in the chronicle's activity feed.
+    ``outcome`` is one of clean | success | messy_critical | bestial_failure."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/sites/{site_id}/hunt",
+            json={"character_id": character_id, "outcome": outcome, "note": note},
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+
 # ── Outbox ────────────────────────────────────────────────────────────────────
 
 async def drain_outbox(limit: int = 20) -> list[dict]:

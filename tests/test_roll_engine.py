@@ -15,7 +15,7 @@ os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 from bot.roll import (  # noqa: E402
     classify, roll_pool, build_trait_index, resolve_pool, apply_specialty,
     reroll_failures, rouse_check, blood_surge_bonus, mend_amount, willpower_recovery,
-    bane_severity, frenzy_pool, remorse_pool,
+    bane_severity, frenzy_pool, remorse_pool, hunt_outcome, hunt_slake,
     CRITICAL, MESSY_CRITICAL, SUCCESS, FAILURE,
     TOTAL_FAILURE, BESTIAL_FAILURE,
 )
@@ -347,3 +347,70 @@ def test_remorse_pool_unstained_empty_humanity_boxes():
     assert remorse_pool(7, 2) == 1
     assert remorse_pool(7, 5) == 1   # all empties stained → minimum 1
     assert remorse_pool(5, 1) == 4
+
+
+# ── Hunting (feeding rolls) ──────────────────────────────────────────────────
+
+def test_hunt_outcome_maps_each_roll_outcome():
+    # Critical → clean; messy critical → messy; plain win → success.
+    assert hunt_outcome(classify([10, 10], [], difficulty=2)) == "clean"
+    assert hunt_outcome(classify([10], [10], difficulty=2)) == "messy_critical"
+    assert hunt_outcome(classify([8, 7], [], difficulty=1)) == "success"
+    # Bestial failure (a 1 on a Hunger die on a loss) → bestial_failure.
+    assert hunt_outcome(classify([3, 2], [1], difficulty=3)) == "bestial_failure"
+
+
+def test_hunt_outcome_plain_failure_is_not_logged():
+    # A plain miss (no Hunger 1) turned up no prey → nothing to log.
+    assert hunt_outcome(classify([5, 4], [3], difficulty=3)) is None
+    assert hunt_outcome(classify([2, 2], [], difficulty=2)) is None
+
+
+def test_hunt_slake_scales_with_margin_capped_by_blood_quality():
+    # Bare win (margin 0) slakes 1.
+    assert hunt_slake(classify([8], [], difficulty=1), blood_quality=5) == 1
+    # Margin 2 → slakes 3, but a poor site (quality 2) caps it at 2.
+    big = classify([8, 7, 6, 9], [], difficulty=2)   # 4 succ vs 2 → margin 2
+    assert big.margin == 2
+    assert hunt_slake(big, blood_quality=5) == 3
+    assert hunt_slake(big, blood_quality=2) == 2
+
+
+def test_hunt_slake_zero_on_failure_and_bestial():
+    assert hunt_slake(classify([5, 4], [3], difficulty=3), blood_quality=5) == 0
+    assert hunt_slake(classify([3], [1], difficulty=3), blood_quality=5) == 0
+
+
+def test_build_hunt_embed_clean_feed():
+    from bot.cogs.roll import build_hunt_embed
+    res = classify([8, 7], [], difficulty=1)   # success
+    e = build_hunt_embed(res, character="Valeria", site="The Velvet Rope",
+                         outcome="success", slaked=1, new_hunger=2,
+                         pool_parts=[("Manipulation", 3), ("Subterfuge", 2)],
+                         blood_quality=3)
+    assert "Valeria hunts" in e.title and "Velvet Rope" in e.title
+    fed = next(f for f in e.fields if f.name == "Fed").value
+    assert "Slaked 1 Hunger" in fed and "2/5" in fed
+    assert "Blood quality 3" in e.footer.text
+
+
+def test_build_hunt_embed_miss_takes_no_blood():
+    from bot.cogs.roll import build_hunt_embed
+    res = classify([5, 4], [3], difficulty=3)   # plain failure
+    e = build_hunt_embed(res, character="Marcus", site="Back Alley",
+                         outcome=None, slaked=0, new_hunger=3)
+    fed = next(f for f in e.fields if f.name == "Fed").value
+    assert "No blood taken" in fed
+
+
+def test_hunt_dc_helper_chasse_and_default():
+    from bot.cogs.roll import _hunt_dc
+    site = {"predator_dcs": {"Siren": 3}, "effective_dcs": {"Siren": 2}}
+    # Owner gets the Chasse-reduced DC; outsider gets the base.
+    assert _hunt_dc(site, "Siren", owns=True, override=None) == (2, 3, False)
+    assert _hunt_dc(site, "Siren", owns=False, override=None) == (3, 3, False)
+    # A staff override always wins.
+    assert _hunt_dc(site, "Siren", owns=True, override=5) == (5, 3, False)
+    # No DC for this predator type → the standard default, flagged.
+    dc, base, defaulted = _hunt_dc(site, "Alleycat", owns=False, override=None)
+    assert base is None and defaulted is True and dc == 2

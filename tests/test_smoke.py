@@ -1668,6 +1668,34 @@ def test_bot_api_log_hunt_rejects_unknown_outcome(_client):
             conn.execute("DELETE FROM hunting_sites WHERE id=?", (site["id"],))
 
 
+def test_bot_api_list_sites_returns_dcs_for_hunt_picker(_client):
+    """GET /api/sites (bot auth) lists active sites with the data the bot's
+    /hunt command needs: base + Chasse-effective DCs, blood quality, and the
+    controlling coterie."""
+    from web.db import get_db, create_hunting_site
+    with get_db() as conn:
+        site = create_hunting_site(
+            conn, name="Sites List Smoke", borough="Bronx",
+            blood_quality=4, predator_dcs={"Siren": 3, "Alleycat": 2})
+    try:
+        # Requires the bearer token.
+        assert _client.get("/api/sites").status_code in (401, 403)
+        r = _client.get("/api/sites",
+                        headers={"Authorization": "Bearer smoke-test-token"})
+        assert r.status_code == 200, r.text
+        sites = r.json()["sites"]
+        mine = next((s for s in sites if s["id"] == site["id"]), None)
+        assert mine is not None
+        assert mine["blood_quality"] == 4
+        assert mine["predator_dcs"]["Siren"] == 3
+        # No controlling coterie → effective DCs equal the base DCs.
+        assert mine["effective_dcs"]["Siren"] == 3
+        assert mine["coterie_id"] is None
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM hunting_sites WHERE id=?", (site["id"],))
+
+
 def test_require_sheet_toggle_changes_wizard_render(staff, player):
     """When require_sheet_on_create is OFF, the wizard collapses to the
     basics steps and the short-form Submit CTA shows. When ON, the full
