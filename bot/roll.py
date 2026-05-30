@@ -182,10 +182,20 @@ def resolve_pool(expression: str, sheet: dict,
 
     Tokens are separated by ``+`` and may be either a (possibly negative)
     integer modifier or a trait name resolved from the sheet via
-    ``trait_index``. Returns ``(pool, parts, unknown)`` where ``parts`` is a
-    list of ``(label, value)`` for display and ``unknown`` lists any tokens
-    that didn't resolve.
+    ``trait_index``. A trait token may carry a ``.specialty`` suffix (e.g.
+    ``brawl.grappling``) which adds the V5 +1 specialty die when the character
+    actually has that specialty for the skill. Returns ``(pool, parts,
+    unknown)`` where ``parts`` is a list of ``(label, value)`` for display and
+    ``unknown`` lists any tokens (or unowned specialties) that didn't apply.
     """
+    # Index the character's specialties by skill key for the +1 specialty die.
+    spec_by_key: dict[str, set[str]] = {}
+    for s in (sheet.get("specialties") or []):
+        if isinstance(s, dict) and s.get("skill"):
+            name = (s.get("name") or "").strip().lower()
+            if name:
+                spec_by_key.setdefault(s["skill"], set()).add(name)
+
     pool = 0
     parts: list[tuple[str, int]] = []
     unknown: list[str] = []
@@ -199,11 +209,24 @@ def resolve_pool(expression: str, sheet: dict,
             pool += val
             parts.append((f"{'+' if val >= 0 else ''}{val}", val))
             continue
-        key = trait_index.get(tok.lower())
+        # Optional `trait.specialty` notation → +1 die when the character
+        # actually has that specialty for the skill (V5 specialty bonus).
+        base, sep, spec_name = tok.partition(".")
+        base = base.strip()
+        spec_name = spec_name.strip()
+        key = trait_index.get(base.lower())
         if key is None:
             unknown.append(tok)
             continue
         val = int(sheet.get(key, 0) or 0)
         pool += val
-        parts.append((tok.title(), val))
+        parts.append((base.title(), val))
+        if sep and spec_name:
+            if spec_name.lower() in spec_by_key.get(key, set()):
+                pool += 1
+                parts.append((f"{spec_name.title()} (spec)", 1))
+            else:
+                # Claimed a specialty the character doesn't have — flag it,
+                # don't grant the die.
+                unknown.append(f"{base}.{spec_name}?")
     return max(0, pool), parts, unknown

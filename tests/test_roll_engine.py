@@ -159,6 +159,24 @@ def test_resolve_pool_handles_multiword_and_missing_dots():
     assert pool == 0 and unknown == []
 
 
+def test_resolve_pool_adds_specialty_die_when_owned():
+    idx = build_trait_index([("attr_strength", "Strength")], [("skill_brawl", "Brawl")])
+    sheet = {"attr_strength": 3, "skill_brawl": 2,
+             "specialties": [{"skill": "skill_brawl", "name": "Grappling"}]}
+    pool, parts, unknown = resolve_pool("strength + brawl.grappling", sheet, idx)
+    assert pool == 6   # 3 + 2 + 1 specialty die
+    assert unknown == []
+    assert any("spec" in lbl.lower() for lbl, _ in parts)
+
+
+def test_resolve_pool_specialty_not_owned_flagged_no_die():
+    idx = build_trait_index([("skill_brawl", "Brawl")])
+    sheet = {"skill_brawl": 2, "specialties": []}
+    pool, _parts, unknown = resolve_pool("brawl.kickboxing", sheet, idx)
+    assert pool == 2   # no +1 — character lacks that specialty
+    assert any("kickboxing" in u.lower() for u in unknown)
+
+
 # ── Roll cog: trait index + embed builder (offline) ──────────────────────────
 
 def test_roll_cog_trait_index_resolves_real_traits():

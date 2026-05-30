@@ -157,7 +157,7 @@ class RollCog(commands.Cog):
         description="Roll a V5 dice pool — a number or traits like 'strength + brawl'.",
     )
     @app_commands.describe(
-        pool="A number (e.g. 5) or trait expression (e.g. strength + brawl + 1)",
+        pool="Number (5) or traits (strength + brawl). Add a specialty die with brawl.grappling",
         difficulty="Successes needed (optional)",
         hunger="Override Hunger dice (defaults to your character's Hunger)",
         character="Which character (only if you have more than one)",
