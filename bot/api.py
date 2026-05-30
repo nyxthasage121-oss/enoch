@@ -114,6 +114,21 @@ async def set_condition(character_id: int, name: str, *, note: str | None = None
         return r.json()
 
 
+async def set_bond(character_id: int, regnant: str, *, level: int | None = None,
+                   delta: int | None = None) -> dict:
+    """Set (``level``) or adjust (``delta``, +1 per drink) a blood bond toward
+    a regnant. The result is clamped 0-3; 0 clears it. Returns
+    ``{character_id, bonds}``."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/characters/{character_id}/bonds",
+            json={"regnant": regnant, "level": level, "delta": delta},
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+
 async def get_character_coterie(character_id: int) -> dict | None:
     """Fetch coterie info for a character. Returns None if not in a coterie."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:

@@ -118,6 +118,15 @@ class ConditionIn(BaseModel):
     active: bool = True
 
 
+class BondIn(BaseModel):
+    """A blood bond this character holds toward a ``regnant`` (1-3 dots; 3 is
+    a full bond). Pass ``delta`` for a relative change (e.g. +1 per drink) or
+    ``level`` to set it absolutely. A resulting level of 0 clears the bond."""
+    regnant: str = Field(..., min_length=1, max_length=60)
+    level:   int | None = None
+    delta:   int | None = None
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @router.get("/health")
@@ -367,6 +376,46 @@ async def set_condition(character_id: int, body: ConditionIn):
             sheet.pop("conditions", None)
         update_character(conn, character_id, sheet_json=sheet)
     return {"character_id": character_id, "conditions": conditions}
+
+
+@router.post("/characters/{character_id}/bonds", dependencies=[Depends(_require_bot)])
+async def set_bond(character_id: int, body: BondIn):
+    """Set or adjust a blood bond this character holds toward a regnant (the
+    bot's `/bond` command). ``delta`` adjusts relatively (a drink is +1),
+    ``level`` sets absolutely; the result is clamped to 0-3 and a 0 clears the
+    bond. Matched case-insensitively by regnant; capped at 25."""
+    regnant = body.regnant.strip()[:60]
+    if not regnant:
+        raise HTTPException(status_code=400, detail="Regnant name required")
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        sheet = dict(char.get("sheet_json") or {})
+        bonds = [b for b in (sheet.get("bonds") or [])
+                 if isinstance(b, dict) and b.get("regnant")]
+        low = regnant.lower()
+        existing = next((b for b in bonds
+                         if b["regnant"].strip().lower() == low), None)
+        current = int(existing.get("level", 0)) if existing else 0
+        if body.delta is not None:
+            new_level = current + int(body.delta)
+        elif body.level is not None:
+            new_level = int(body.level)
+        else:
+            new_level = current
+        new_level = max(0, min(3, new_level))
+        bonds = [b for b in bonds if b["regnant"].strip().lower() != low]
+        if new_level > 0:
+            if len(bonds) >= 25:
+                raise HTTPException(status_code=400, detail="Bond limit reached (25)")
+            bonds.append({"regnant": regnant, "level": new_level})
+        if bonds:
+            sheet["bonds"] = bonds
+        else:
+            sheet.pop("bonds", None)
+        update_character(conn, character_id, sheet_json=sheet)
+    return {"character_id": character_id, "bonds": bonds}
 
 
 @router.get("/sites", dependencies=[Depends(_require_bot)])

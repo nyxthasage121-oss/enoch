@@ -11,7 +11,7 @@ os.environ.setdefault("STAFF_ROLE_IDS",   "")
 os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 
 from bot.cogs.characters import (  # noqa: E402
-    _build_sheet_embed, _dots, _conditions_embed,
+    _build_sheet_embed, _dots, _conditions_embed, _bonds_embed,
 )
 
 
@@ -161,6 +161,36 @@ def test_conditions_embed_helper_renders_and_footers():
     e2 = _conditions_embed("Marcus", [], highlight="Staked", added=False)
     assert "No active conditions" in e2.description
     assert e2.footer.text == "Cleared: Staked"
+
+
+def test_embed_shows_blood_bonds_when_present():
+    char = {
+        "id": 1, "name": "Cecile", "clan": "toreador",
+        "xp_total": 0, "xp_cap": 350, "xp_available": 0,
+        "sheet_json": {
+            "bonds": [
+                {"regnant": "Prince Antoine", "level": 3},
+                {"regnant": "Sire Marguerite", "level": 1},
+            ],
+        },
+    }
+    e = _build_sheet_embed(char)
+    bonds = next((f for f in e.fields if f.name == "Blood Bonds"), None)
+    assert bonds is not None
+    assert "Prince Antoine" in bonds.value and "Sire Marguerite" in bonds.value
+    # Full bond (3) renders three filled dots and sorts first.
+    assert bonds.value.index("Antoine") < bonds.value.index("Marguerite")
+    assert "●●●" in bonds.value
+
+
+def test_bonds_embed_helper_full_and_empty():
+    e = _bonds_embed("Cecile", [{"regnant": "Antoine", "level": 3}],
+                     note="Drank from Antoine — bond now 3/3.")
+    assert "Antoine" in e.description
+    assert "full bond" in e.description
+    assert e.footer.text.startswith("Drank from Antoine")
+    e2 = _bonds_embed("Cecile", [])
+    assert "No blood bonds" in e2.description
 
 
 def test_embed_handles_empty_sheet():

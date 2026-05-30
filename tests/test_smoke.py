@@ -498,6 +498,46 @@ def test_condition_api_add_clear_and_auth(_client):
         conn.commit()
 
 
+def test_bond_api_drink_set_clear_and_clamp(_client):
+    """The bot can deepen (delta), set, and clear a blood bond toward a
+    regnant on sheet_json.bonds, clamped to 0-3, guarded by the bot token."""
+    import json as _json
+    from web.db import get_db
+    with get_db() as conn:
+        conn.execute("UPDATE characters SET sheet_json='{}' WHERE id=1")
+        conn.commit()
+    headers = {"Authorization": "Bearer smoke-test-token"}
+    # drink three times → full bond, clamped at 3
+    for expected in (1, 2, 3):
+        r = _client.post("/api/characters/1/bonds",
+                         json={"regnant": "Prince Antoine", "delta": 1},
+                         headers=headers)
+        assert r.status_code == 200, r.text
+        assert r.json()["bonds"][0]["level"] == expected
+    r = _client.post("/api/characters/1/bonds",
+                     json={"regnant": "Prince Antoine", "delta": 1}, headers=headers)
+    assert r.json()["bonds"][0]["level"] == 3   # clamped
+    # case-insensitive match — a second regnant set absolutely
+    r = _client.post("/api/characters/1/bonds",
+                     json={"regnant": "Sire Marguerite", "level": 2}, headers=headers)
+    by = {b["regnant"]: b["level"] for b in r.json()["bonds"]}
+    assert by == {"Prince Antoine": 3, "Sire Marguerite": 2}
+    with get_db() as conn:
+        sheet = _json.loads(conn.execute(
+            "SELECT sheet_json FROM characters WHERE id=1").fetchone()["sheet_json"])
+    assert {b["regnant"] for b in sheet["bonds"]} == {"Prince Antoine", "Sire Marguerite"}
+    # set level 0 clears the bond
+    r = _client.post("/api/characters/1/bonds",
+                     json={"regnant": "prince antoine", "level": 0}, headers=headers)
+    assert [b["regnant"] for b in r.json()["bonds"]] == ["Sire Marguerite"]
+    # auth required
+    assert _client.post("/api/characters/1/bonds",
+                        json={"regnant": "x", "delta": 1}).status_code == 401
+    with get_db() as conn:
+        conn.execute("UPDATE characters SET sheet_json='{}' WHERE id=1")
+        conn.commit()
+
+
 def test_coterie_api_endpoint(_client):
     """GET /api/characters/{id}/coterie returns the coterie + members."""
     from web.db import get_db, create_coterie, add_coterie_member

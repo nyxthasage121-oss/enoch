@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from ..api import (
-    get_character, get_player_characters, upsert_player, set_condition,
+    get_character, get_player_characters, upsert_player, set_condition, set_bond,
 )
 from ..config import settings
 
@@ -481,6 +481,141 @@ class CharactersCog(commands.Cog):
         await interaction.followup.send(
             embed=_conditions_embed(char["name"], conds), ephemeral=True)
 
+    # ── /bond (drink / set / clear / list) ────────────────────────────────────
+
+    bond = app_commands.Group(
+        name="bond",
+        description="Track blood bonds this character holds toward regnants")
+
+    async def _bond_regnant_autocomplete(
+        self, interaction: discord.Interaction, current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """Suggest the character's CURRENT regnants (for re-drinking/clearing)."""
+        char = await self._one_character(
+            interaction, getattr(interaction.namespace, "character", None))
+        if not char:
+            return []
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            return []
+        cur = (current or "").lower()
+        out: list[app_commands.Choice[str]] = []
+        for b in (_parse_sheet(full).get("bonds") or []):
+            if not isinstance(b, dict):
+                continue
+            nm = (b.get("regnant") or "").strip()
+            if not nm or (cur and cur not in nm.lower()):
+                continue
+            lvl = int(b.get("level", 0) or 0)
+            out.append(app_commands.Choice(name=f"{nm} ({lvl}/3)"[:100], value=nm[:100]))
+            if len(out) >= 25:
+                break
+        return out
+
+    @bond.command(name="drink",
+                  description="Drink from a regnant — deepen the bond by one (toward 3)")
+    @app_commands.describe(
+        regnant="Whose blood you drank (a vampire's name)",
+        character="Which character (only if you have more than one)")
+    @app_commands.autocomplete(regnant=_bond_regnant_autocomplete)
+    async def bond_drink(self, interaction: discord.Interaction, regnant: str,
+                         character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._one_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            resp = await set_bond(char["id"], regnant.strip(), delta=1)
+        except Exception as exc:
+            log.warning("bond drink failed for %s: %s", char.get("id"), exc)
+            await interaction.followup.send(
+                "❌ Could not update bonds.", ephemeral=True)
+            return
+        bonds = resp.get("bonds") or []
+        lvl = next((int(b.get("level", 0)) for b in bonds
+                    if b.get("regnant", "").strip().lower() == regnant.strip().lower()),
+                   0)
+        note = (f"Drank from {regnant.strip()} — bond now **{lvl}/3**"
+                + (" · **fully bound**." if lvl >= 3 else "."))
+        await interaction.followup.send(
+            embed=_bonds_embed(char["name"], bonds, note=note), ephemeral=True)
+
+    @bond.command(name="set", description="Set a bond's level directly (0 clears it)")
+    @app_commands.describe(
+        regnant="The regnant's name",
+        level="Bond strength 0-3 (0 removes the bond)",
+        character="Which character (only if you have more than one)")
+    @app_commands.autocomplete(regnant=_bond_regnant_autocomplete)
+    async def bond_set(self, interaction: discord.Interaction, regnant: str,
+                       level: app_commands.Range[int, 0, 3],
+                       character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._one_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            resp = await set_bond(char["id"], regnant.strip(), level=int(level))
+        except Exception as exc:
+            log.warning("bond set failed for %s: %s", char.get("id"), exc)
+            await interaction.followup.send(
+                "❌ Could not update bonds.", ephemeral=True)
+            return
+        note = (f"Cleared the bond to {regnant.strip()}." if level == 0
+                else f"Set the bond to {regnant.strip()} at **{level}/3**.")
+        await interaction.followup.send(
+            embed=_bonds_embed(char["name"], resp.get("bonds") or [], note=note),
+            ephemeral=True)
+
+    @bond.command(name="clear", description="Remove a blood bond entirely")
+    @app_commands.describe(
+        regnant="The regnant to break the bond with",
+        character="Which character (only if you have more than one)")
+    @app_commands.autocomplete(regnant=_bond_regnant_autocomplete)
+    async def bond_clear(self, interaction: discord.Interaction, regnant: str,
+                         character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._one_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            resp = await set_bond(char["id"], regnant.strip(), level=0)
+        except Exception as exc:
+            log.warning("bond clear failed for %s: %s", char.get("id"), exc)
+            await interaction.followup.send(
+                "❌ Could not update bonds.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            embed=_bonds_embed(char["name"], resp.get("bonds") or [],
+                               note=f"Broke the bond to {regnant.strip()}."),
+            ephemeral=True)
+
+    @bond.command(name="list", description="List this character's blood bonds")
+    @app_commands.describe(character="Which character (only if you have more than one)")
+    async def bond_list(self, interaction: discord.Interaction,
+                        character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._one_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            await interaction.followup.send(
+                "❌ Could not load the sheet.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            embed=_bonds_embed(char["name"], _parse_sheet(full).get("bonds") or []),
+            ephemeral=True)
+
 
 def _parse_sheet(char: dict) -> dict:
     """Pull a parsed sheet_json dict off a character payload."""
@@ -511,6 +646,27 @@ def _conditions_embed(char_name: str, conditions: list, *,
         e.set_footer(text=f"Added: {highlight}")
     elif highlight and added is False:
         e.set_footer(text=f"Cleared: {highlight}")
+    return e
+
+
+def _bonds_embed(char_name: str, bonds: list, *,
+                 note: str | None = None) -> discord.Embed:
+    """Render a character's blood bonds (dots out of 3; 3 is a full bond)."""
+    clean = [b for b in bonds if isinstance(b, dict) and b.get("regnant")]
+    if clean:
+        clean.sort(key=lambda b: -int(b.get("level", 0) or 0))
+        lines = []
+        for b in clean:
+            lvl = max(0, min(3, int(b.get("level", 0) or 0)))
+            full = "  · full bond" if lvl >= 3 else ""
+            lines.append(f"{_dots(lvl, 3)} **{b['regnant']}**{full}")
+        body = "\n".join(lines)
+    else:
+        body = "_No blood bonds._"
+    e = discord.Embed(title=f"🩸 Blood Bonds · {char_name}", description=body,
+                      color=_BLOOD)
+    if note:
+        e.set_footer(text=note)
     return e
 
 
@@ -636,6 +792,16 @@ def _build_sheet_embed(char: dict) -> discord.Embed:
             f"• {c['name']}" + (f" — {c['note']}" if c.get("note") else "")
             for c in conditions)
         e.add_field(name="Conditions", value=body, inline=False)
+
+    # Blood bonds (set via /bond) — dots out of 3; only when present.
+    bonds = [b for b in (sheet.get("bonds") or [])
+             if isinstance(b, dict) and b.get("regnant")]
+    if bonds:
+        bonds = sorted(bonds, key=lambda b: -int(b.get("level", 0) or 0))
+        body = "\n".join(
+            f"{_dots(max(0, min(3, int(b.get('level', 0) or 0))), 3)} {b['regnant']}"
+            for b in bonds)
+        e.add_field(name="Blood Bonds", value=f"```\n{body}\n```", inline=False)
 
     # Footer with XP totals
     xp_total = char.get("xp_total", 0)
