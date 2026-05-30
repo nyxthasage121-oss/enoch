@@ -2023,6 +2023,78 @@ def test_coterie_single_funder_spend_approve_deducts_xp(staff):
             conn.execute("DELETE FROM characters WHERE id=?", (a["id"],))
 
 
+def test_character_spend_approval_deducts_xp_and_raises_trait(staff):
+    """A plain (non-coterie) character spend, once approved, deducts the
+    verified cost from xp_spent, auto-raises the trait dot on the sheet, and
+    writes one negative ledger entry. Regression for the core spend path."""
+    from web.db import (get_db, upsert_player, create_character, update_character,
+                        create_spend, approve_spend, get_character)
+    with get_db() as conn:
+        upsert_player(conn, discord_id="710710710", username="SpendQA")
+        ch = create_character(conn, discord_id="710710710",
+                              name="SpendQA Char", clan="ventrue")
+        conn.execute("UPDATE characters SET xp_total=20 WHERE id=?", (ch["id"],))
+        update_character(conn, ch["id"], is_approved=1)
+        try:
+            sp = create_spend(conn, character_id=ch["id"], category="Clan Discipline",
+                              trait_name="Dominate", current_dots=0, new_dots=1,
+                              verified_cost=5)
+            conn.commit()
+            approve_spend(conn, sp["id"], reviewer_id="staff-smoke")
+            conn.commit()
+            c = get_character(conn, ch["id"])
+            assert c["xp_spent"] == 5 and c["xp_available"] == 15
+            assert (c["sheet_json"] or {}).get("disc_dominate") == 1
+            led = conn.execute(
+                "SELECT entry_type, xp_delta FROM ledger_entries WHERE character_id=?",
+                (ch["id"],)).fetchall()
+            assert any(e["entry_type"] == "spend" and e["xp_delta"] == -5 for e in led)
+        finally:
+            conn.execute("DELETE FROM ledger_entries WHERE character_id=?", (ch["id"],))
+            conn.execute("DELETE FROM spend_requests WHERE character_id=?", (ch["id"],))
+            conn.execute("DELETE FROM characters WHERE id=?", (ch["id"],))
+            conn.commit()
+
+
+def test_claim_approval_grants_xp_to_total(staff):
+    """Approving an XP claim grants its total to xp_total (earned XP) and
+    writes an 'earn' ledger entry. Regression for the claim-grant path."""
+    from web.db import (get_db, upsert_player, create_character, update_character,
+                        create_period, set_period_active, close_period,
+                        create_claim, approve_claim, get_character)
+    with get_db() as conn:
+        upsert_player(conn, discord_id="711711711", username="ClaimQA")
+        ch = create_character(conn, discord_id="711711711",
+                              name="ClaimQA Char", clan="brujah")
+        update_character(conn, ch["id"], is_approved=1)
+        p = create_period(conn, label="QA Claim Period", period_type="night",
+                          phase="full", opens_at="2026-05-01T00:00:00Z",
+                          closes_at="2026-06-30T00:00:00Z", created_by="staff-smoke")
+        set_period_active(conn, p["id"])
+        try:
+            claim = create_claim(
+                conn, character_id=ch["id"], play_period_id=p["id"],
+                claimed_criteria=[{"criteria_id": 1, "label": "Posting",
+                                   "xp_value_at_submission": 3}],
+                rp_links=["https://example.com/rp"])
+            conn.commit()
+            approve_claim(conn, claim["id"], reviewer_id="staff-smoke")
+            conn.commit()
+            c = get_character(conn, ch["id"])
+            assert c["xp_total"] == 3
+            led = conn.execute(
+                "SELECT entry_type, xp_delta FROM ledger_entries WHERE character_id=?",
+                (ch["id"],)).fetchall()
+            assert any(e["entry_type"] == "earn" and e["xp_delta"] == 3 for e in led)
+        finally:
+            conn.execute("DELETE FROM ledger_entries WHERE character_id=?", (ch["id"],))
+            conn.execute("DELETE FROM xp_claims WHERE character_id=?", (ch["id"],))
+            conn.execute("DELETE FROM characters WHERE id=?", (ch["id"],))
+            close_period(conn, p["id"])
+            conn.execute("DELETE FROM play_periods WHERE id=?", (p["id"],))
+            conn.commit()
+
+
 def test_coterie_pages_render_single_funder_spend(_client):
     """Render-level regression for the single-funder coterie flow. Both the
     player coterie detail page and the staff manage page must render a funded
