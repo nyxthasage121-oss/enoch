@@ -23,6 +23,7 @@ _COGS = [
     "bot.cogs.characters",
     "bot.cogs.coteries",
     "bot.cogs.roll",
+    "bot.cogs.timeskip",
 ]
 
 

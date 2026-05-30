@@ -35,6 +35,7 @@ from ..db import (
     list_hunting_sites,
     list_player_characters,
     list_spends_for_character,
+    list_upcoming_periods,
     upsert_player,
     write_audit,
     update_character,
@@ -564,9 +565,13 @@ async def roster(clan: str | None = None):
 @router.get("/period/active", dependencies=[Depends(_require_bot)])
 async def active_period():
     """
-    Current open XP period — bot checks this before allowing /claim commands.
-    Returns { active: false, period: null } when no window is open.
+    Current open play period (the chronicle's "timeskip") — the bot checks
+    this before allowing /claim commands and renders it for /timeskip.
+    Returns { active: false, period: null } when no window is open, plus the
+    next few `upcoming` periods so the bot can show what's on deck.
     """
     with get_db() as conn:
         period = get_active_period(conn)
-    return {"active": period is not None, "period": period}
+        upcoming = list_upcoming_periods(conn, limit=3)
+    return {"active": period is not None, "period": period,
+            "upcoming": [dict(p) for p in upcoming]}

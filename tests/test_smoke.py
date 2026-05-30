@@ -698,6 +698,49 @@ def test_upcoming_excludes_active_period():
             conn.execute("DELETE FROM play_periods WHERE id=?", (p["id"],))
 
 
+def test_bot_api_active_period_includes_upcoming(_client):
+    """GET /api/period/active (bot auth) returns the active period plus the
+    next `upcoming` periods — the data /timeskip renders."""
+    from web.db import (
+        get_db, create_period, set_period_active, close_period,
+        get_active_period,
+    )
+    headers = {"Authorization": "Bearer smoke-test-token"}
+    # Snapshot any active period so we can restore it (set_period_active
+    # deactivates all others).
+    with get_db() as conn:
+        prior = get_active_period(conn)
+        prior_id = prior["id"] if prior else None
+        active = create_period(
+            conn, label="TimeskipActiveSmoke", period_type="night", phase="full",
+            opens_at="2026-05-29T20:00:00Z", closes_at="2099-05-31T04:00:00Z",
+            created_by="smoke-test")
+        set_period_active(conn, active["id"])
+        nxt = create_period(
+            conn, label="TimeskipUpcomingSmoke", period_type="night", phase="full",
+            opens_at="2099-06-12T20:00:00Z", closes_at="2099-06-13T04:00:00Z",
+            created_by="smoke-test")
+    try:
+        # Requires the bearer token.
+        assert _client.get("/api/period/active").status_code in (401, 403)
+        r = _client.get("/api/period/active", headers=headers)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["active"] is True
+        assert body["period"]["label"] == "TimeskipActiveSmoke"
+        labels = {p["label"] for p in body["upcoming"]}
+        assert "TimeskipUpcomingSmoke" in labels
+        # The active period is never listed as upcoming.
+        assert "TimeskipActiveSmoke" not in labels
+    finally:
+        with get_db() as conn:
+            close_period(conn, active["id"])
+            conn.execute("DELETE FROM play_periods WHERE id IN (?, ?)",
+                         (active["id"], nxt["id"]))
+            if prior_id:
+                set_period_active(conn, prior_id)
+
+
 def test_staff_dashboard_renders_calendar_widget(staff):
     r = staff.get("/staff/")
     assert r.status_code == 200
