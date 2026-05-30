@@ -508,7 +508,7 @@ class CharactersCog(commands.Cog):
             if not nm or (cur and cur not in nm.lower()):
                 continue
             lvl = int(b.get("level", 0) or 0)
-            out.append(app_commands.Choice(name=f"{nm} ({lvl}/3)"[:100], value=nm[:100]))
+            out.append(app_commands.Choice(name=f"{nm} ({lvl}/6)"[:100], value=nm[:100]))
             if len(out) >= 25:
                 break
         return out
@@ -538,19 +538,20 @@ class CharactersCog(commands.Cog):
         lvl = next((int(b.get("level", 0)) for b in bonds
                     if b.get("regnant", "").strip().lower() == regnant.strip().lower()),
                    0)
-        note = (f"Drank from {regnant.strip()} — bond now **{lvl}/3**"
-                + (" · **fully bound**." if lvl >= 3 else "."))
+        status = _bond_status(lvl)
+        suffix = f" · **{status}**" if status else ""
+        note = f"Drank from {regnant.strip()} — bond now **{lvl}/6**{suffix}."
         await interaction.followup.send(
             embed=_bonds_embed(char["name"], bonds, note=note), ephemeral=True)
 
     @bond.command(name="set", description="Set a bond's level directly (0 clears it)")
     @app_commands.describe(
         regnant="The regnant's name",
-        level="Bond strength 0-3 (0 removes the bond)",
+        level="Bond strength 0-6 (3 = full bond, 6 = max; 0 removes it)",
         character="Which character (only if you have more than one)")
     @app_commands.autocomplete(regnant=_bond_regnant_autocomplete)
     async def bond_set(self, interaction: discord.Interaction, regnant: str,
-                       level: app_commands.Range[int, 0, 3],
+                       level: app_commands.Range[int, 0, 6],
                        character: str | None = None) -> None:
         await interaction.response.defer(ephemeral=True)
         char = await self._one_character(interaction, character)
@@ -566,7 +567,7 @@ class CharactersCog(commands.Cog):
                 "❌ Could not update bonds.", ephemeral=True)
             return
         note = (f"Cleared the bond to {regnant.strip()}." if level == 0
-                else f"Set the bond to {regnant.strip()} at **{level}/3**.")
+                else f"Set the bond to {regnant.strip()} at **{level}/6**.")
         await interaction.followup.send(
             embed=_bonds_embed(char["name"], resp.get("bonds") or [], note=note),
             ephemeral=True)
@@ -649,17 +650,29 @@ def _conditions_embed(char_name: str, conditions: list, *,
     return e
 
 
+def _bond_status(level: int) -> str:
+    """Short status for a bond level on the NYbN 1-6 scale: 3 dots is a full
+    bond (3 drinks on separate nights within a year); 6 is the maximum."""
+    if level >= 6:
+        return "maximum bond"
+    if level >= 3:
+        return "fully bonded"
+    return ""
+
+
 def _bonds_embed(char_name: str, bonds: list, *,
                  note: str | None = None) -> discord.Embed:
-    """Render a character's blood bonds (dots out of 3; 3 is a full bond)."""
+    """Render a character's blood bonds (dots out of 6; 3 is a full bond,
+    6 is the max)."""
     clean = [b for b in bonds if isinstance(b, dict) and b.get("regnant")]
     if clean:
         clean.sort(key=lambda b: -int(b.get("level", 0) or 0))
         lines = []
         for b in clean:
-            lvl = max(0, min(3, int(b.get("level", 0) or 0)))
-            full = "  · full bond" if lvl >= 3 else ""
-            lines.append(f"{_dots(lvl, 3)} **{b['regnant']}**{full}")
+            lvl = max(0, min(6, int(b.get("level", 0) or 0)))
+            status = _bond_status(lvl)
+            tag = f"  · {status}" if status else ""
+            lines.append(f"{_dots(lvl, 6)} **{b['regnant']}**{tag}")
         body = "\n".join(lines)
     else:
         body = "_No blood bonds._"
@@ -799,7 +812,7 @@ def _build_sheet_embed(char: dict) -> discord.Embed:
     if bonds:
         bonds = sorted(bonds, key=lambda b: -int(b.get("level", 0) or 0))
         body = "\n".join(
-            f"{_dots(max(0, min(3, int(b.get('level', 0) or 0))), 3)} {b['regnant']}"
+            f"{_dots(max(0, min(6, int(b.get('level', 0) or 0))), 6)} {b['regnant']}"
             for b in bonds)
         e.add_field(name="Blood Bonds", value=f"```\n{body}\n```", inline=False)
 

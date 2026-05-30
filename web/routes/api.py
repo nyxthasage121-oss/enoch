@@ -120,9 +120,10 @@ class ConditionIn(BaseModel):
 
 
 class BondIn(BaseModel):
-    """A blood bond this character holds toward a ``regnant`` (1-3 dots; 3 is
-    a full bond). Pass ``delta`` for a relative change (e.g. +1 per drink) or
-    ``level`` to set it absolutely. A resulting level of 0 clears the bond."""
+    """A blood bond this character holds toward a ``regnant`` (1-6 dots; 3 is a
+    full bond — 3 drinks on separate nights within a year — and 6 is the max).
+    Pass ``delta`` for a relative change (e.g. +1 per drink) or ``level`` to set
+    it absolutely. A resulting level of 0 clears the bond."""
     regnant: str = Field(..., min_length=1, max_length=60)
     level:   int | None = None
     delta:   int | None = None
@@ -383,8 +384,9 @@ async def set_condition(character_id: int, body: ConditionIn):
 async def set_bond(character_id: int, body: BondIn):
     """Set or adjust a blood bond this character holds toward a regnant (the
     bot's `/bond` command). ``delta`` adjusts relatively (a drink is +1),
-    ``level`` sets absolutely; the result is clamped to 0-3 and a 0 clears the
-    bond. Matched case-insensitively by regnant; capped at 25."""
+    ``level`` sets absolutely; the result is clamped to 0-6 (3 = full bond, 6 =
+    max) and a 0 clears the bond. Matched case-insensitively by regnant;
+    capped at 25 regnants."""
     regnant = body.regnant.strip()[:60]
     if not regnant:
         raise HTTPException(status_code=400, detail="Regnant name required")
@@ -405,7 +407,7 @@ async def set_bond(character_id: int, body: BondIn):
             new_level = int(body.level)
         else:
             new_level = current
-        new_level = max(0, min(3, new_level))
+        new_level = max(0, min(6, new_level))
         bonds = [b for b in bonds if b["regnant"].strip().lower() != low]
         if new_level > 0:
             if len(bonds) >= 25:

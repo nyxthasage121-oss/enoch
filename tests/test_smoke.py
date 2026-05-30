@@ -500,28 +500,35 @@ def test_condition_api_add_clear_and_auth(_client):
 
 def test_bond_api_drink_set_clear_and_clamp(_client):
     """The bot can deepen (delta), set, and clear a blood bond toward a
-    regnant on sheet_json.bonds, clamped to 0-3, guarded by the bot token."""
+    regnant on sheet_json.bonds. NYbN scale: 3 drinks = full bond, max 6;
+    clamped to 0-6, guarded by the bot token."""
     import json as _json
     from web.db import get_db
     with get_db() as conn:
         conn.execute("UPDATE characters SET sheet_json='{}' WHERE id=1")
         conn.commit()
     headers = {"Authorization": "Bearer smoke-test-token"}
-    # drink three times → full bond, clamped at 3
-    for expected in (1, 2, 3):
+    # a drink deepens the bond one level per night, up to the max of 6
+    for expected in (1, 2, 3, 4, 5, 6):
         r = _client.post("/api/characters/1/bonds",
                          json={"regnant": "Prince Antoine", "delta": 1},
                          headers=headers)
         assert r.status_code == 200, r.text
         assert r.json()["bonds"][0]["level"] == expected
+    # a seventh drink stays clamped at 6
     r = _client.post("/api/characters/1/bonds",
                      json={"regnant": "Prince Antoine", "delta": 1}, headers=headers)
-    assert r.json()["bonds"][0]["level"] == 3   # clamped
-    # case-insensitive match — a second regnant set absolutely
+    assert r.json()["bonds"][0]["level"] == 6
+    # a second regnant set absolutely (full bond at 3); case-insensitive
     r = _client.post("/api/characters/1/bonds",
-                     json={"regnant": "Sire Marguerite", "level": 2}, headers=headers)
+                     json={"regnant": "Sire Marguerite", "level": 3}, headers=headers)
     by = {b["regnant"]: b["level"] for b in r.json()["bonds"]}
-    assert by == {"Prince Antoine": 3, "Sire Marguerite": 2}
+    assert by == {"Prince Antoine": 6, "Sire Marguerite": 3}
+    # an out-of-range set is clamped to the 0-6 max
+    r = _client.post("/api/characters/1/bonds",
+                     json={"regnant": "Sire Marguerite", "level": 9}, headers=headers)
+    assert next(b["level"] for b in r.json()["bonds"]
+                if b["regnant"] == "Sire Marguerite") == 6
     with get_db() as conn:
         sheet = _json.loads(conn.execute(
             "SELECT sheet_json FROM characters WHERE id=1").fetchone()["sheet_json"])

@@ -169,26 +169,37 @@ def test_embed_shows_blood_bonds_when_present():
         "xp_total": 0, "xp_cap": 350, "xp_available": 0,
         "sheet_json": {
             "bonds": [
-                {"regnant": "Prince Antoine", "level": 3},
-                {"regnant": "Sire Marguerite", "level": 1},
+                {"regnant": "Prince Antoine", "level": 6},
+                {"regnant": "Sire Marguerite", "level": 3},
+                {"regnant": "An Acquaintance", "level": 1},
             ],
         },
     }
     e = _build_sheet_embed(char)
     bonds = next((f for f in e.fields if f.name == "Blood Bonds"), None)
     assert bonds is not None
-    assert "Prince Antoine" in bonds.value and "Sire Marguerite" in bonds.value
-    # Full bond (3) renders three filled dots and sorts first.
-    assert bonds.value.index("Antoine") < bonds.value.index("Marguerite")
-    assert "●●●" in bonds.value
+    assert all(n in bonds.value
+               for n in ("Prince Antoine", "Sire Marguerite", "An Acquaintance"))
+    # Sorted by level desc; a max bond (6) renders six filled dots out of six.
+    assert (bonds.value.index("Antoine") < bonds.value.index("Marguerite")
+            < bonds.value.index("Acquaintance"))
+    assert "●●●●●●" in bonds.value
 
 
-def test_bonds_embed_helper_full_and_empty():
+def test_bonds_embed_helper_full_max_and_empty():
+    # Level 3 is a full bond.
     e = _bonds_embed("Cecile", [{"regnant": "Antoine", "level": 3}],
-                     note="Drank from Antoine — bond now 3/3.")
+                     note="Drank from Antoine — bond now 3/6 · fully bonded.")
     assert "Antoine" in e.description
-    assert "full bond" in e.description
+    assert "fully bonded" in e.description
     assert e.footer.text.startswith("Drank from Antoine")
+    # Level 6 is the maximum bond.
+    e_max = _bonds_embed("Cecile", [{"regnant": "Antoine", "level": 6}])
+    assert "maximum bond" in e_max.description
+    # Level 1-2 is a partial bond (no status tag).
+    e_partial = _bonds_embed("Cecile", [{"regnant": "Antoine", "level": 2}])
+    assert "fully bonded" not in e_partial.description
+    assert "maximum bond" not in e_partial.description
     e2 = _bonds_embed("Cecile", [])
     assert "No blood bonds" in e2.description
 
