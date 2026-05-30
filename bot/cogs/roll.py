@@ -13,9 +13,9 @@ from discord.ext import commands
 
 from ..api import get_character, get_player_characters, apply_state_delta
 from ..roll import (
-    build_trait_index, resolve_pool, roll_pool, reroll_failures, rouse_check,
-    OUTCOME_LABELS, MESSY_CRITICAL, BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE,
-    RollResult,
+    build_trait_index, resolve_pool, apply_specialty, roll_pool,
+    reroll_failures, rouse_check, OUTCOME_LABELS, MESSY_CRITICAL,
+    BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE, RollResult,
 )
 from .characters import _ATTRIBUTES, _SKILLS_BY_CAT, _DISCIPLINES
 
@@ -31,6 +31,8 @@ _TRAIT_INDEX = build_trait_index(
     [pair for traits in _SKILLS_BY_CAT.values() for pair in traits],
     _DISCIPLINES,
 )
+# skill key → label, for the specialty picker display.
+_SKILL_LABEL = {k: lbl for traits in _SKILLS_BY_CAT.values() for k, lbl in traits}
 
 # Outcome → icon for the result headline.
 _OUTCOME_ICON = {
@@ -152,22 +154,62 @@ class RollCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
+    async def _specialty_autocomplete(
+        self, interaction: discord.Interaction, current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """Suggest the invoking player's character specialties for the +1
+        specialty die. Each choice value is shaped 'skill_key:Name'."""
+        char = await self._pick_character(
+            interaction, getattr(interaction.namespace, "character", None))
+        if not char:
+            return []
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            return []
+        sheet = full.get("sheet_json") or {}
+        if isinstance(sheet, str):
+            import json
+            try:
+                sheet = json.loads(sheet)
+            except Exception:
+                sheet = {}
+        cur = (current or "").lower()
+        out: list[app_commands.Choice[str]] = []
+        for s in (sheet.get("specialties") or []):
+            if not isinstance(s, dict):
+                continue
+            nm = (s.get("name") or "").strip()
+            sk = s.get("skill") or ""
+            if not nm:
+                continue
+            label = f"{_SKILL_LABEL.get(sk, sk.replace('skill_', '').title())} · {nm}"
+            if cur and cur not in label.lower():
+                continue
+            out.append(app_commands.Choice(name=label[:100], value=f"{sk}:{nm}"[:100]))
+            if len(out) >= 25:
+                break
+        return out
+
     @app_commands.command(
         name="roll",
         description="Roll a V5 dice pool — a number or traits like 'strength + brawl'.",
     )
     @app_commands.describe(
-        pool="Number (5) or traits (strength + brawl). Add a specialty die with brawl.grappling",
+        pool="Number (5) or traits (e.g. strength + brawl + 1)",
         difficulty="Successes needed (optional)",
         hunger="Override Hunger dice (defaults to your character's Hunger)",
+        specialty="Add a +1 specialty die (pick one of your character's specialties)",
         character="Which character (only if you have more than one)",
     )
+    @app_commands.autocomplete(specialty=_specialty_autocomplete)
     async def roll(
         self,
         interaction: discord.Interaction,
         pool: str,
         difficulty: int = 0,
         hunger: int | None = None,
+        specialty: str | None = None,
         character: str | None = None,
     ) -> None:
         await interaction.response.defer()
@@ -231,6 +273,10 @@ class RollCog(commands.Cog):
             total, parts, unknown = int(pool), [(pool, int(pool))], []
         else:
             total, parts, unknown = resolve_pool(pool, sheet, _TRAIT_INDEX)
+
+        # +1 specialty die when the player picked one their character owns.
+        total, parts, unknown = apply_specialty(
+            total, parts, unknown, specialty, sheet.get("specialties"))
 
         eff_hunger = hunger if hunger is not None else int(sheet.get("hunger", 0) or 0)
         result = roll_pool(total, eff_hunger, difficulty)

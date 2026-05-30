@@ -13,7 +13,7 @@ os.environ.setdefault("STAFF_ROLE_IDS", "")
 os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 
 from bot.roll import (  # noqa: E402
-    classify, roll_pool, build_trait_index, resolve_pool,
+    classify, roll_pool, build_trait_index, resolve_pool, apply_specialty,
     reroll_failures, rouse_check,
     CRITICAL, MESSY_CRITICAL, SUCCESS, FAILURE,
     TOTAL_FAILURE, BESTIAL_FAILURE,
@@ -159,22 +159,30 @@ def test_resolve_pool_handles_multiword_and_missing_dots():
     assert pool == 0 and unknown == []
 
 
-def test_resolve_pool_adds_specialty_die_when_owned():
-    idx = build_trait_index([("attr_strength", "Strength")], [("skill_brawl", "Brawl")])
-    sheet = {"attr_strength": 3, "skill_brawl": 2,
-             "specialties": [{"skill": "skill_brawl", "name": "Grappling"}]}
-    pool, parts, unknown = resolve_pool("strength + brawl.grappling", sheet, idx)
-    assert pool == 6   # 3 + 2 + 1 specialty die
+def test_apply_specialty_adds_die_when_owned():
+    specs = [{"skill": "skill_brawl", "name": "Grappling"}]
+    pool, parts, unknown = apply_specialty(5, [("Brawl", 2)], [],
+                                           "skill_brawl:Grappling", specs)
+    assert pool == 6
     assert unknown == []
     assert any("spec" in lbl.lower() for lbl, _ in parts)
 
 
-def test_resolve_pool_specialty_not_owned_flagged_no_die():
-    idx = build_trait_index([("skill_brawl", "Brawl")])
-    sheet = {"skill_brawl": 2, "specialties": []}
-    pool, _parts, unknown = resolve_pool("brawl.kickboxing", sheet, idx)
-    assert pool == 2   # no +1 — character lacks that specialty
+def test_apply_specialty_matches_bare_name():
+    specs = [{"skill": "skill_brawl", "name": "Grappling"}]
+    pool, _parts, unknown = apply_specialty(5, [], [], "Grappling", specs)
+    assert pool == 6 and unknown == []
+
+
+def test_apply_specialty_unowned_flagged_no_die():
+    pool, _parts, unknown = apply_specialty(5, [], [], "skill_brawl:Kickboxing", [])
+    assert pool == 5
     assert any("kickboxing" in u.lower() for u in unknown)
+
+
+def test_apply_specialty_none_is_noop():
+    pool, parts, unknown = apply_specialty(5, [("Brawl", 2)], [], None, [])
+    assert pool == 5 and parts == [("Brawl", 2)] and unknown == []
 
 
 # ── Roll cog: trait index + embed builder (offline) ──────────────────────────
@@ -205,6 +213,38 @@ def test_build_roll_embed_flags_unknown_traits():
     e = build_roll_embed(res, title="Test", pool_parts=[("Strength", 3)],
                          unknown=["bogus"])
     assert "Unknown: bogus" in e.footer.text
+
+
+def test_specialty_autocomplete_lists_and_filters_owned(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    import bot.cogs.roll as rollcog
+
+    async def fake_chars(_discord_id):
+        return [{"id": 7, "name": "Valeria", "is_approved": True}]
+
+    async def fake_char(_cid):
+        return {"id": 7, "name": "Valeria", "sheet_json": {"specialties": [
+            {"skill": "skill_brawl", "name": "Grappling"},
+            {"skill": "skill_academics", "name": "Occult Lore"},
+        ]}}
+
+    monkeypatch.setattr(rollcog, "get_player_characters", fake_chars)
+    monkeypatch.setattr(rollcog, "get_character", fake_char)
+
+    cog = rollcog.RollCog(bot=None)
+    interaction = SimpleNamespace(user=SimpleNamespace(id=111),
+                                  namespace=SimpleNamespace(character=None))
+
+    everything = asyncio.run(cog._specialty_autocomplete(interaction, ""))
+    values = {c.value for c in everything}
+    assert "skill_brawl:Grappling" in values
+    assert "skill_academics:Occult Lore" in values
+    assert any("Brawl" in c.name and "Grappling" in c.name for c in everything)
+
+    # Typed text filters the suggestions.
+    filtered = asyncio.run(cog._specialty_autocomplete(interaction, "grap"))
+    assert [c.value for c in filtered] == ["skill_brawl:Grappling"]
 
 
 # ── Willpower reroll + Rouse check ───────────────────────────────────────────
