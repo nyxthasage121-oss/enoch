@@ -11,7 +11,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from ..api import get_character, get_player_characters
+from ..api import get_character, get_player_characters, apply_state_delta
 from ..roll import (
     build_trait_index, resolve_pool, roll_pool, reroll_failures, rouse_check,
     OUTCOME_LABELS, MESSY_CRITICAL, BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE,
@@ -239,23 +239,63 @@ class RollCog(commands.Cog):
 
     @app_commands.command(
         name="rouse",
-        description="Make a Rouse Check — test whether you gain Hunger.",
+        description="Make a Rouse Check — test for Hunger gain (updates your sheet).",
     )
-    @app_commands.describe(count="How many Rouse Checks (e.g. a level-2 power costs 2)")
-    async def rouse(self, interaction: discord.Interaction, count: int = 1) -> None:
+    @app_commands.describe(
+        count="How many Rouse Checks (e.g. a level-2 power costs 2)",
+        character="Which character (only if you have more than one)",
+    )
+    async def rouse(self, interaction: discord.Interaction, count: int = 1,
+                    character: str | None = None) -> None:
         await interaction.response.defer()
         rolls, gained = rouse_check(count)
+
+        # Resolve the player's character so we can apply the Hunger gain live.
+        char = await self._pick_character(interaction, character)
+
+        new_hunger = None
+        if char and gained > 0:
+            try:
+                resp = await apply_state_delta(char["id"], hunger=gained,
+                                               source="dice:rouse")
+                new_hunger = resp.get("state", {}).get("hunger")
+            except Exception as exc:
+                log.warning("rouse: hunger write-back failed for %s: %s",
+                            char.get("id"), exc)
+
         color = _GOLD if gained == 0 else _BLOOD
+        if gained == 0:
+            desc = "**No Hunger gained.**"
+        elif new_hunger is not None:
+            desc = f"**+{gained} Hunger** → now **{new_hunger}/5**"
+        else:
+            desc = f"**+{gained} Hunger.**"
         e = discord.Embed(
-            title="🩸 Rouse Check",
-            description=("**No Hunger gained.**" if gained == 0
-                         else f"**+{gained} Hunger.**"),
-            color=color,
-        )
+            title=f"🩸 Rouse Check{f' · {char['name']}' if char else ''}",
+            description=desc, color=color)
         e.add_field(name="Dice", value=_fmt_dice(sorted(rolls, reverse=True)),
                     inline=False)
-        e.set_footer(text="6+ avoids Hunger · 1-5 gains 1 · update your Hunger on the tracker")
+        foot = "6+ avoids Hunger · 1-5 gains 1"
+        if gained > 0 and new_hunger is None:
+            foot += " · update your Hunger on the tracker"
+        e.set_footer(text=foot)
         await interaction.followup.send(embed=e)
+
+    async def _pick_character(self, interaction: discord.Interaction,
+                              name: str | None) -> dict | None:
+        """Resolve the invoking player's approved character by name, or their
+        only one. Returns None silently when it can't pick (the caller decides
+        whether that's fatal)."""
+        try:
+            chars = await get_player_characters(str(interaction.user.id))
+        except Exception as exc:
+            log.warning("_pick_character failed for %s: %s", interaction.user.id, exc)
+            return None
+        active = [c for c in chars if c.get("is_approved")]
+        if name:
+            return next((c for c in active
+                         if c["name"].lower() == name.strip().lower()), None)
+        return active[0] if len(active) == 1 else None
 
 
 async def setup(bot: commands.Bot) -> None:
