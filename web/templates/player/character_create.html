@@ -25,6 +25,7 @@
        clanInfo:          {{ (clan_info | default({})) | tojson | forceescape }},
        predatorInfo:      {{ (predator_info | default({})) | tojson | forceescape }},
        clanBaneFlaws:     {{ (clan_bane_flaws | default({})) | tojson | forceescape }},
+       clanBaneFlawPools: {{ (clan_bane_flaw_pools | default({})) | tojson | forceescape }},
        clanBaneVariants:  {{ (clan_bane_variants | default({})) | tojson | forceescape }},
        skillLabels:       {{ (skill_labels | default({})) | tojson | forceescape }},
        discLabels:        {{ (disc_labels | default({})) | tojson | forceescape }},
@@ -812,7 +813,7 @@
                   :class="charName.clan === '{{ slug }}'
                     ? 'clan-selected'
                     : 'border-ink-800 hover:bg-ink-900/40'"
-                  @click="charName.clan = '{{ slug }}'; baneChoice = 'standard'; resolveClanBane();
+                  @click="charName.clan = '{{ slug }}'; baneChoice = 'standard'; baneFlawPool = {}; resolveClanBane();
                           if (window.Aurora) window.Aurora.sparkles($el, 18);">
             <span x-show="charName.clan === '{{ slug }}'" x-cloak
                   class="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-ink-950 font-bold text-xs"
@@ -868,6 +869,38 @@
                   <p class="font-garamond text-xs text-bone-400 leading-snug"
                      x-text="clanInfo[charName.clan].bane"></p>
                 </template>
+                {# Pool bane (Hecata Decay) — distribute Bane Severity Flaw dots
+                   among the named Flaws. Auto-pre-filled; free (excluded from
+                   the flaw budget). #}
+                <template x-if="activeBanePool()">
+                  <div class="mt-2 gilded-inset px-3 py-2 border border-mauve-800/60">
+                    <p class="font-cinzel text-[0.5rem] tracking-widest uppercase text-mauve-400 mb-1.5">
+                      Decay — distribute <span x-text="banePoolTarget"></span> flaw dot<span x-show="banePoolTarget !== 1">s</span>
+                      <span class="text-bone-700 normal-case">(Bane Severity, free)</span>
+                      <span class="ml-1" :class="banePoolUsed === banePoolTarget ? 'text-gold-400' : 'text-blood-400'">
+                        <span x-text="banePoolUsed"></span>/<span x-text="banePoolTarget"></span>
+                      </span>
+                    </p>
+                    <div class="space-y-1">
+                      <template x-for="opt in activeBanePool().options" :key="opt">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="font-garamond text-xs text-bone-300" x-text="opt"></span>
+                          <div class="flex items-center gap-1.5">
+                            <button type="button" @click="banePoolDec(opt)"
+                                    :disabled="banePoolDots(opt) === 0"
+                                    :class="banePoolDots(opt) === 0 ? 'opacity-25 cursor-not-allowed' : 'hover:border-gold-700 text-bone-300'"
+                                    class="w-5 h-5 border border-ink-600 text-bone-500 text-sm leading-none">−</button>
+                            <span class="font-cinzel text-xs text-gold-400 w-3 text-center" x-text="banePoolDots(opt)"></span>
+                            <button type="button" @click="banePoolInc(opt)"
+                                    :disabled="banePoolUsed >= banePoolTarget"
+                                    :class="banePoolUsed >= banePoolTarget ? 'opacity-25 cursor-not-allowed' : 'hover:border-gold-700 text-bone-300'"
+                                    class="w-5 h-5 border border-ink-600 text-bone-500 text-sm leading-none">+</button>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
               </div>
               <div>
                 <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Compulsion</p>
@@ -878,6 +911,7 @@
           </div>
         </template>
         <input type="hidden" name="bane_choice" :value="baneChoice">
+        <input type="hidden" name="bane_flaw_pool" :value="JSON.stringify(baneFlawPool)">
       </div>
 
       <div class="flex items-center justify-end gap-3 mt-8">
@@ -2003,6 +2037,12 @@
       // Variant Bane name/effect per clan (the player may pick it at clan
       // selection instead of the standard Bane).
       clanBaneVariants:  opts.clanBaneVariants || {},
+      // Bane flaw POOLS keyed by clan+choice (e.g. Hecata variant Decay →
+      // distribute Bane Severity dots among Retainer/Haven/Resources).
+      clanBaneFlawPools: opts.clanBaneFlawPools || {},
+      // Player's distribution of the active pool, name → dots.
+      baneFlawPool:      (initial.bane_flaw_pool && typeof initial.bane_flaw_pool === 'object')
+                           ? Object.assign({}, initial.bane_flaw_pool) : {},
       // Which Bane the character uses — 'standard' (default) or 'variant'.
       baneChoice:        (initial.bane_choice === 'variant') ? 'variant' : 'standard',
       skillLabels:       opts.skillLabels || {},
@@ -2198,7 +2238,10 @@
         }
         // Reconcile the clan Bane flaw on load (resumed drafts already carry
         // it tagged src:'clan_bane'; this strips + re-applies so it's exactly
-        // once and matches the current clan).
+        // once and matches the current clan). Top up a pool Bane (Hecata
+        // Decay) to Bane Severity if a resumed draft under-allocated.
+        const _pool = this.activeBanePool();
+        if (_pool) this._ensureBanePoolFilled(_pool);
         this.resolveClanBane();
       },
       // ── Clan Bane chargen flaw ────────────────────────────────────────
@@ -2214,13 +2257,70 @@
         if (!perClan) return null;
         return perClan[this.baneChoice] || null;
       },
+      // Pool bane (e.g. Hecata Decay): distribute Bane Severity Flaw dots.
+      activeBanePool() {
+        const perClan = this.clanBaneFlawPools[this.charName.clan];
+        if (!perClan) return null;
+        return perClan[this.baneChoice] || null;
+      },
+      // V5 Blood Potency → Bane Severity (Corebook p.216).
+      get baneSeverity() {
+        const bp = this.sheet.blood_potency || 0;
+        if (bp <= 0) return 0;
+        if (bp <= 3) return 1;
+        if (bp <= 5) return 2;
+        if (bp <= 7) return 3;
+        if (bp <= 9) return 4;
+        return 5;
+      },
+      get banePoolTarget() { return this.activeBanePool() ? this.baneSeverity : 0; },
+      get banePoolUsed() {
+        return Object.values(this.baneFlawPool || {}).reduce((s, n) => s + (n || 0), 0);
+      },
+      banePoolDots(name) { return (this.baneFlawPool || {})[name] || 0; },
+      banePoolInc(name) {
+        if (this.banePoolUsed >= this.banePoolTarget) return;
+        this.baneFlawPool[name] = (this.baneFlawPool[name] || 0) + 1;
+        this.resolveClanBane();
+      },
+      banePoolDec(name) {
+        this.baneFlawPool[name] = Math.max(0, (this.baneFlawPool[name] || 0) - 1);
+        this.resolveClanBane();
+      },
+      // Pre-fill the pool to Bane Severity (default into the first option) so
+      // the effect "auto-applies"; trim overflow if Severity dropped.
+      _ensureBanePoolFilled(pool) {
+        const target = this.baneSeverity;
+        let used = this.banePoolUsed;
+        if (used > target) {
+          for (let i = pool.options.length - 1; i >= 0 && used > target; i--) {
+            const nm = pool.options[i];
+            const take = Math.min(this.baneFlawPool[nm] || 0, used - target);
+            this.baneFlawPool[nm] = (this.baneFlawPool[nm] || 0) - take;
+            used -= take;
+          }
+        } else if (used < target && pool.options.length) {
+          const nm = pool.options[0];
+          this.baneFlawPool[nm] = (this.baneFlawPool[nm] || 0) + (target - used);
+        }
+      },
       resolveClanBane() {
         this.flaws = (this.flaws || []).filter(f => f.src !== 'clan_bane');
         const f = this.activeBaneFlaw();
         if (f) this.flaws.push({ name: f.name, dots: f.dots, src: 'clan_bane' });
+        const pool = this.activeBanePool();
+        if (pool) {
+          pool.options.forEach(name => {
+            const d = this.baneFlawPool[name] || 0;
+            if (d > 0) this.flaws.push({ name, dots: d, src: 'clan_bane' });
+          });
+        }
       },
       pickBane(choice) {
         this.baneChoice = (choice === 'variant') ? 'variant' : 'standard';
+        const pool = this.activeBanePool();
+        if (pool) this._ensureBanePoolFilled(pool);
+        else this.baneFlawPool = {};
         this.resolveClanBane();
       },
       applyTierBloodDefaults() {

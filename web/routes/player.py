@@ -300,7 +300,9 @@ from ..v5_traits import (
     V5_PREDATOR_TYPES as _PREDATOR_TYPES,
     V5_RESTRICTED_PREDATOR_TYPES as _RESTRICTED_PREDATOR_TYPES,
     V5_CLAN_BANE_FLAWS as _V5_CLAN_BANE_FLAWS,
+    V5_CLAN_BANE_FLAW_POOLS as _V5_CLAN_BANE_FLAW_POOLS,
     V5_CLAN_BANE_VARIANTS as _V5_CLAN_BANE_VARIANTS,
+    bane_severity_for_bp as _bane_severity_for_bp,
 )
 
 
@@ -315,9 +317,24 @@ def _clan_bane_flaws() -> dict[str, dict]:
     return out
 
 
+def _clan_bane_flaw_pools() -> dict[str, dict]:
+    """Per-clan Bane flaw POOLS keyed by active Bane, e.g.
+    {'hecata': {'variant': {'options': ['Retainer', 'Haven', 'Resources']}}}.
+    The dots distributed equal the character's Bane Severity."""
+    out: dict[str, dict] = {}
+    for (clan, bane), spec in _V5_CLAN_BANE_FLAW_POOLS.items():
+        out.setdefault(clan, {})[bane] = spec
+    return out
+
+
 def _clan_bane_flaw_for(clan: str, choice: str) -> dict | None:
     """The chargen flaw a clan's active Bane grants (None for most)."""
     return _V5_CLAN_BANE_FLAWS.get((clan, choice if choice in ("standard", "variant") else "standard"))
+
+
+def _clan_bane_flaw_pool_for(clan: str, choice: str) -> dict | None:
+    """The chargen flaw-pool a clan's active Bane grants (None for most)."""
+    return _V5_CLAN_BANE_FLAW_POOLS.get((clan, choice if choice in ("standard", "variant") else "standard"))
 
 
 def _available_predator_types() -> list[str]:
@@ -401,6 +418,7 @@ def _wizard_extras() -> dict:
         # → Repulsive ••, free) + the variant Bane name/effect the player can
         # pick at clan selection.
         "clan_bane_flaws":    _clan_bane_flaws(),
+        "clan_bane_flaw_pools": _clan_bane_flaw_pools(),
         "clan_bane_variants": _V5_CLAN_BANE_VARIANTS,
         "predator_info":      _V5_PREDATOR_INFO,
         # Label lookups so the wizard's predator-grant pickers can render
@@ -669,6 +687,37 @@ async def character_create(
         if _bane_flaw:
             _flaws.append({"name": _bane_flaw["name"], "dots": _bane_flaw["dots"],
                            "src": "clan_bane"})
+        # Pool bane (e.g. Hecata Decay): distribute Bane Severity Flaw dots
+        # among the named Flaws — free, auto-applied. Honors the player's
+        # allocation and auto-fills any unspent dots into the first option so
+        # the effect always lands.
+        _pool = _clan_bane_flaw_pool_for(clan, _bane_choice)
+        if _pool:
+            _sev = _bane_severity_for_bp(sheet.get("blood_potency"))
+            try:
+                _alloc = json.loads(form.get("bane_flaw_pool") or "{}")
+            except (ValueError, TypeError):
+                _alloc = {}
+            _alloc = _alloc if isinstance(_alloc, dict) else {}
+            _cleaned_pool: dict[str, int] = {}
+            _total = 0
+            for _name in _pool["options"]:
+                try:
+                    _d = max(0, int(_alloc.get(_name, 0)))
+                except (TypeError, ValueError):
+                    _d = 0
+                _d = min(_d, max(0, _sev - _total))   # don't exceed the pool
+                if _d > 0:
+                    _cleaned_pool[_name] = _d
+                    _total += _d
+            if _total < _sev and _pool["options"]:    # auto-fill the remainder
+                _first = _pool["options"][0]
+                _cleaned_pool[_first] = _cleaned_pool.get(_first, 0) + (_sev - _total)
+            for _name, _d in _cleaned_pool.items():
+                _flaws.append({"name": _name, "dots": min(5, _d), "src": "clan_bane"})
+            sheet["bane_flaw_pool"] = _cleaned_pool
+        else:
+            sheet.pop("bane_flaw_pool", None)
 
     # Short-form Submit moves the character past the wizard but keeps it in
     # the draft state so the player can keep editing the sheet on the detail
@@ -844,6 +893,7 @@ async def character_resume_draft(
         "skill_spread":      sheet.get("skill_spread") or "",
         "discipline_spread": sheet.get("discipline_spread") or "",
         "bane_choice":       sheet.get("bane_choice") or "standard",
+        "bane_flaw_pool":    sheet.get("bane_flaw_pool") or {},
         # Sheet data — wizard reads these from initialForm.sheet
         "sheet":            sheet,
     }

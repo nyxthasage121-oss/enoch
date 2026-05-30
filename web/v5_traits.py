@@ -244,6 +244,39 @@ V5_CLAN_BANE_FLAWS: dict[tuple[str, str], dict] = {
 }
 
 
+# Clan Banes that grant a POOL of chargen Flaw dots scaled by Bane Severity,
+# distributed among named Flaws (vs the single fixed flaw above). The Hecata
+# variant "Decay" rots their holdings: gain Flaw dots equal to Bane Severity
+# split among Retainer / Haven / Resources. Keyed by (clan, active bane); the
+# dots are free (src='clan_bane') and computed from the character's Blood
+# Potency at runtime.
+V5_CLAN_BANE_FLAW_POOLS: dict[tuple[str, str], dict] = {
+    ("hecata", "variant"): {
+        "options": ["Retainer", "Haven", "Resources"],
+    },
+}
+
+
+# V5 Blood Potency → Bane Severity (Corebook p.216). Used to size Bane-scaled
+# chargen effects like the Hecata Decay flaw pool.
+def bane_severity_for_bp(bp) -> int:
+    try:
+        bp = int(bp or 0)
+    except (TypeError, ValueError):
+        bp = 0
+    if bp <= 0:
+        return 0
+    if bp <= 3:
+        return 1
+    if bp <= 5:
+        return 2
+    if bp <= 7:
+        return 3
+    if bp <= 9:
+        return 4
+    return 5
+
+
 # ── Alternate clan Banes (V5 Players Guide, "Clan Bane Variants" pp. 56-59) ──
 # A chronicle may swap a clan's standard Bane for its variant, applied CLAN-WIDE
 # (a lineage trait, not a personal quirk). Default everywhere is the standard

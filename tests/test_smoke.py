@@ -2988,6 +2988,69 @@ def test_non_nosferatu_has_no_auto_bane_flaw(player):
             conn.commit()
 
 
+def test_bane_severity_from_blood_potency():
+    """Bane Severity scales with Blood Potency (V5 Corebook p.216)."""
+    from web.v5_traits import bane_severity_for_bp
+    assert bane_severity_for_bp(0) == 0
+    assert bane_severity_for_bp(1) == 1
+    assert bane_severity_for_bp(3) == 1
+    assert bane_severity_for_bp(4) == 2
+    assert bane_severity_for_bp(7) == 3
+    assert bane_severity_for_bp(10) == 5
+
+
+def test_hecata_variant_bane_auto_applies_decay_pool(player):
+    """Hecata's variant Bane (Decay) auto-applies Bane-Severity Flaw dots among
+    Retainer/Haven/Resources (free). An empty pool triggers the server
+    auto-fill so the effect always lands."""
+    import json as _json
+    from web.db import get_db
+    player.post("/characters/new", data={
+        "_csrf": "dev-csrf-token", "name": "Hec Decay", "clan": "hecata",
+        "touchstones": '["A", "B"]', "bane_choice": "variant",
+        "bane_flaw_pool": "{}",   # empty → server auto-fills Bane Severity dots
+    }, follow_redirects=False)
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT sheet_json FROM characters WHERE name='Hec Decay'").fetchone()
+        assert row is not None
+        sheet = _json.loads(row["sheet_json"] or "{}")
+        assert sheet.get("bane_choice") == "variant"
+        assert sheet.get("bane_variant_name") == "Decay"
+        # Neonate BP 1 → Bane Severity 1 → one free Decay Flaw dot.
+        decay = [f for f in sheet.get("flaws", []) if f.get("src") == "clan_bane"]
+        assert sum(f.get("dots", 0) for f in decay) == 1
+        assert all(f["name"] in ("Retainer", "Haven", "Resources") for f in decay)
+        assert sheet.get("bane_flaw_pool")  # allocation persisted for resume
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE name='Hec Decay'")
+            conn.commit()
+
+
+def test_hecata_decay_pool_honors_player_allocation(player):
+    """A posted Decay distribution is honored (not overridden by auto-fill)."""
+    import json as _json
+    from web.db import get_db
+    player.post("/characters/new", data={
+        "_csrf": "dev-csrf-token", "name": "Hec Alloc", "clan": "hecata",
+        "touchstones": '["A", "B"]', "bane_choice": "variant",
+        "bane_flaw_pool": _json.dumps({"Haven": 1}),
+    }, follow_redirects=False)
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT sheet_json FROM characters WHERE name='Hec Alloc'").fetchone()
+        sheet = _json.loads(row["sheet_json"] or "{}")
+        decay = [f for f in sheet.get("flaws", []) if f.get("src") == "clan_bane"]
+        assert len(decay) == 1 and decay[0]["name"] == "Haven" and decay[0]["dots"] == 1
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE name='Hec Alloc'")
+            conn.commit()
+
+
 def test_chargen_error_rerender_with_image_does_not_500(player):
     """A validation error on chargen must re-render the wizard (200), not
     500. The multipart form carries a profile_image UploadFile that isn't
