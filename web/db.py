@@ -617,7 +617,9 @@ _TIER_DEFAULTS = {
     # Merits/Flaws at approval — they don't eat the standard pool.
     "thinblood": {"xp": 60,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
     "neonate":   {"xp": 75,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
-    "ancilla":   {"xp": 110, "merits": 3, "advantages": 3, "backgrounds": 3, "flaw_cap": 4},
+    # NYbN house rule: standard Ancilla take 3 Flaw dots (one of which must be
+    # Archaic — enforced as chargen guidance + verified by staff at approval).
+    "ancilla":   {"xp": 110, "merits": 3, "advantages": 3, "backgrounds": 3, "flaw_cap": 3},
 }
 
 

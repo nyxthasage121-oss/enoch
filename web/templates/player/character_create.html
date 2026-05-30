@@ -1091,6 +1091,12 @@
           27 skills across three pillars. Tap <span class="text-gold-500">+ Spec</span>
           beside any skill to record a specialty (e.g. "Insight · Reading Faces").
         </p>
+        <p class="font-garamond text-bone-600 text-[0.8rem] leading-relaxed mt-2 gilded-inset px-3 py-2">
+          You get <span class="text-gold-400">one free specialty</span>, plus a free
+          specialty in <span class="text-bone-300">Academics, Science, Craft,</span> and
+          <span class="text-bone-300">Performance</span> for each you put a dot in. The
+          sidebar tracks your free allotment (<span class="text-gold-400" x-text="specialties.length"></span>/<span x-text="freeSpecialtyCount"></span>).
+        </p>
       </div>
 
       {# Skill distribution — pick a spread; the live tracker guides placement
@@ -1438,6 +1444,16 @@
         {# Flaws #}
         <div class="gilded p-5">
           <p class="label-gold mb-3 text-xs">Flaws</p>
+          {# Standard-Ancilla house rule: one flaw must be Archaic. #}
+          <template x-if="charName.character_type === 'kindred'
+                          && charName.character_tier === 'ancilla'
+                          && charName.ancilla_mode !== 'in_memoriam'">
+            <p class="font-garamond text-[0.78rem] text-mauve-300 italic mb-3 gilded-inset px-3 py-2">
+              As an Ancilla, one of your flaws must be
+              <span class="text-mauve-200">Archaic</span> — a habit or limitation
+              carried over from your older nights.
+            </p>
+          </template>
           <template x-for="(f, idx) in flaws" :key="'f'+idx">
             <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
               <span class="font-garamond text-xs text-blood-300 flex-1 truncate" x-text="f.name"></span>

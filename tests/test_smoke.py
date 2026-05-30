@@ -2756,6 +2756,33 @@ def test_resume_draft_restores_predator_picks_and_src_tags(player):
             conn.execute("DELETE FROM characters WHERE name='Resume Pred'")
 
 
+def test_homebrew_tier_budget_reaches_chargen(player):
+    """Regression for 'homebrew ruleset not working': a per-tier homebrew
+    override saved in the admin must flow through to the chargen wizard's
+    budget seed (Starting XP, combined Advantages pool, flaw cap)."""
+    from web.db import get_db, upsert_settings
+    with get_db() as conn:
+        upsert_settings(
+            conn, actor_id="test", active_ruleset="homebrew",
+            homebrew_tier_budgets={"neonate": {
+                "xp": 99, "merits": 4, "advantages": 4, "backgrounds": 4,
+                "merits_advantages_backgrounds": 12, "flaw_cap": 5}},
+        )
+        conn.commit()
+    try:
+        r = player.get("/characters/new")
+        assert r.status_code == 200
+        # The wizard's default (neonate) budget seed is tojson+forceescaped,
+        # so the homebrew XP renders as starting_xp&#34;: 99.
+        assert "starting_xp&#34;: 99" in r.text, "homebrew Starting XP not in wizard budget"
+        assert "&#34;homebrew&#34;: true" in r.text
+    finally:
+        with get_db() as conn:
+            upsert_settings(conn, actor_id="test",
+                            active_ruleset="standard", homebrew_tier_budgets={})
+            conn.commit()
+
+
 def test_safe_image_return_validates_next():
     """The image routes only honor a `next` that is the character's own
     sheet or edit page; foreign or mismatched targets fall back to the
