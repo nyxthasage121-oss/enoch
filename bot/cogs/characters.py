@@ -5,7 +5,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from ..api import get_character, get_player_characters, upsert_player
+from ..api import (
+    get_character, get_player_characters, upsert_player, set_condition,
+)
 from ..config import settings
 
 log = logging.getLogger(__name__)
@@ -13,6 +15,14 @@ log = logging.getLogger(__name__)
 _GOLD  = 0xC8A85B
 _BLOOD = 0x8B1A1A
 _MAUVE = 0x7e4ac9
+
+# Common V5 statuses suggested by the /condition add autocomplete. Players can
+# still type a custom condition — this is a convenience list, not a whitelist.
+_COMMON_CONDITIONS = [
+    "Torpor", "In Frenzy", "Terror Frenzy", "Hunger Frenzy", "On Fire",
+    "Staked", "In Daysleep", "Blush of Life", "Hidden", "Hunted",
+    "Grappled", "Impaired", "Drained", "Sunlight Exposure", "Diablerie Mark",
+]
 
 
 def _web(path: str) -> str:
@@ -340,6 +350,169 @@ class CharactersCog(commands.Cog):
 
         await interaction.followup.send(embed=_build_sheet_embed(char), ephemeral=True)
 
+    # ── /condition (add / clear / list) ───────────────────────────────────────
+
+    condition = app_commands.Group(
+        name="condition",
+        description="Track transient statuses on a character (torpor, frenzy, …)")
+
+    async def _one_character(self, interaction: discord.Interaction,
+                             name: str | None) -> dict | None:
+        """Resolve the invoking player's approved character by name, or their
+        only one. Returns None when it can't pick."""
+        try:
+            chars = await get_player_characters(str(interaction.user.id))
+        except Exception as exc:
+            log.warning("_one_character failed for %s: %s", interaction.user.id, exc)
+            return None
+        active = [c for c in chars if c.get("is_approved")]
+        if name:
+            return next((c for c in active
+                         if c["name"].lower() == name.strip().lower()), None)
+        return active[0] if len(active) == 1 else None
+
+    async def _condition_add_autocomplete(
+        self, interaction: discord.Interaction, current: str,
+    ) -> list[app_commands.Choice[str]]:
+        cur = (current or "").lower()
+        out: list[app_commands.Choice[str]] = []
+        for nm in _COMMON_CONDITIONS:
+            if cur and cur not in nm.lower():
+                continue
+            out.append(app_commands.Choice(name=nm, value=nm))
+        return out
+
+    async def _condition_clear_autocomplete(
+        self, interaction: discord.Interaction, current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """Suggest the character's CURRENT conditions for clearing."""
+        char = await self._one_character(
+            interaction, getattr(interaction.namespace, "character", None))
+        if not char:
+            return []
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            return []
+        sheet = _parse_sheet(full)
+        cur = (current or "").lower()
+        out: list[app_commands.Choice[str]] = []
+        for c in (sheet.get("conditions") or []):
+            if not isinstance(c, dict):
+                continue
+            nm = (c.get("name") or "").strip()
+            if not nm or (cur and cur not in nm.lower()):
+                continue
+            out.append(app_commands.Choice(name=nm[:100], value=nm[:100]))
+            if len(out) >= 25:
+                break
+        return out
+
+    @condition.command(name="add", description="Add a status/condition to a character")
+    @app_commands.describe(
+        name="Condition (torpor, on fire, staked, …)",
+        note="Optional detail (e.g. 'until staff wakes')",
+        character="Which character (only if you have more than one)")
+    @app_commands.autocomplete(name=_condition_add_autocomplete)
+    async def condition_add(self, interaction: discord.Interaction, name: str,
+                            note: str | None = None,
+                            character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._one_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            resp = await set_condition(char["id"], name.strip(), note=note,
+                                       active=True)
+        except Exception as exc:
+            log.warning("condition add failed for %s: %s", char.get("id"), exc)
+            await interaction.followup.send(
+                "❌ Could not update conditions.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            embed=_conditions_embed(char["name"], resp.get("conditions") or [],
+                                    highlight=name.strip(), added=True),
+            ephemeral=True)
+
+    @condition.command(name="clear", description="Clear a status/condition from a character")
+    @app_commands.describe(
+        name="Condition to clear",
+        character="Which character (only if you have more than one)")
+    @app_commands.autocomplete(name=_condition_clear_autocomplete)
+    async def condition_clear(self, interaction: discord.Interaction, name: str,
+                              character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._one_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            resp = await set_condition(char["id"], name.strip(), active=False)
+        except Exception as exc:
+            log.warning("condition clear failed for %s: %s", char.get("id"), exc)
+            await interaction.followup.send(
+                "❌ Could not update conditions.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            embed=_conditions_embed(char["name"], resp.get("conditions") or [],
+                                    highlight=name.strip(), added=False),
+            ephemeral=True)
+
+    @condition.command(name="list", description="List a character's active conditions")
+    @app_commands.describe(character="Which character (only if you have more than one)")
+    async def condition_list(self, interaction: discord.Interaction,
+                             character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._one_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            await interaction.followup.send(
+                "❌ Could not load the sheet.", ephemeral=True)
+            return
+        conds = _parse_sheet(full).get("conditions") or []
+        await interaction.followup.send(
+            embed=_conditions_embed(char["name"], conds), ephemeral=True)
+
+
+def _parse_sheet(char: dict) -> dict:
+    """Pull a parsed sheet_json dict off a character payload."""
+    sheet = char.get("sheet_json") or {}
+    if isinstance(sheet, str):
+        import json
+        try:
+            sheet = json.loads(sheet)
+        except Exception:
+            sheet = {}
+    return sheet
+
+
+def _conditions_embed(char_name: str, conditions: list, *,
+                      highlight: str | None = None,
+                      added: bool | None = None) -> discord.Embed:
+    """Render a character's active conditions."""
+    clean = [c for c in conditions if isinstance(c, dict) and c.get("name")]
+    if clean:
+        body = "\n".join(
+            f"• **{c['name']}**" + (f" — {c['note']}" if c.get("note") else "")
+            for c in clean)
+    else:
+        body = "_No active conditions._"
+    e = discord.Embed(title=f"🌫️ Conditions · {char_name}", description=body,
+                      color=_MAUVE)
+    if highlight and added is True:
+        e.set_footer(text=f"Added: {highlight}")
+    elif highlight and added is False:
+        e.set_footer(text=f"Cleared: {highlight}")
+    return e
+
 
 def _build_sheet_embed(char: dict) -> discord.Embed:
     """Render a character's sheet as a Discord embed."""
@@ -454,6 +627,15 @@ def _build_sheet_embed(char: dict) -> discord.Embed:
         f"Hunger        {_dots(sheet.get('hunger', 0))}"
     )
     e.add_field(name="Core", value=f"```\n{core}\n```", inline=False)
+
+    # Transient conditions (set via /condition) — only when present.
+    conditions = [c for c in (sheet.get("conditions") or [])
+                  if isinstance(c, dict) and c.get("name")]
+    if conditions:
+        body = "\n".join(
+            f"• {c['name']}" + (f" — {c['note']}" if c.get("note") else "")
+            for c in conditions)
+        e.add_field(name="Conditions", value=body, inline=False)
 
     # Footer with XP totals
     xp_total = char.get("xp_total", 0)

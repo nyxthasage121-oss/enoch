@@ -100,6 +100,20 @@ async def set_macro(character_id: int, name: str,
         return r.json()
 
 
+async def set_condition(character_id: int, name: str, *, note: str | None = None,
+                        active: bool = True) -> dict:
+    """Add (``active=True``) or clear (``active=False``) a transient condition
+    on a character's sheet. Returns ``{character_id, conditions}``."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/characters/{character_id}/conditions",
+            json={"name": name, "note": note, "active": active},
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+
 async def get_character_coterie(character_id: int) -> dict | None:
     """Fetch coterie info for a character. Returns None if not in a coterie."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:

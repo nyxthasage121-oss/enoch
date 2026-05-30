@@ -110,6 +110,14 @@ class MacroIn(BaseModel):
     expression: str | None = None
 
 
+class ConditionIn(BaseModel):
+    """A transient status/condition on a character (torpor, on fire, in
+    frenzy, staked, …). ``active=False`` clears the named condition."""
+    name:   str = Field(..., min_length=1, max_length=40)
+    note:   str | None = None
+    active: bool = True
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @router.get("/health")
@@ -326,6 +334,39 @@ async def set_macro(character_id: int, body: MacroIn):
             sheet.pop("macros", None)
         update_character(conn, character_id, sheet_json=sheet)
     return {"character_id": character_id, "macros": macros}
+
+
+@router.post("/characters/{character_id}/conditions", dependencies=[Depends(_require_bot)])
+async def set_condition(character_id: int, body: ConditionIn):
+    """Add or clear a transient condition on a character's sheet (the bot's
+    `/condition` command). ``active=False`` removes the named condition.
+    Matched case-insensitively by name; capped at 25."""
+    name = body.name.strip()[:40]
+    if not name:
+        raise HTTPException(status_code=400, detail="Condition name required")
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        sheet = dict(char.get("sheet_json") or {})
+        conditions = [c for c in (sheet.get("conditions") or [])
+                      if isinstance(c, dict) and c.get("name")]
+        low = name.lower()
+        conditions = [c for c in conditions if c["name"].strip().lower() != low]
+        if body.active:
+            if len(conditions) >= 25:
+                raise HTTPException(status_code=400,
+                                    detail="Condition limit reached (25)")
+            entry = {"name": name}
+            if (body.note or "").strip():
+                entry["note"] = body.note.strip()[:120]
+            conditions.append(entry)
+        if conditions:
+            sheet["conditions"] = conditions
+        else:
+            sheet.pop("conditions", None)
+        update_character(conn, character_id, sheet_json=sheet)
+    return {"character_id": character_id, "conditions": conditions}
 
 
 @router.get("/sites", dependencies=[Depends(_require_bot)])

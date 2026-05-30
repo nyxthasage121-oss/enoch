@@ -10,7 +10,9 @@ os.environ.setdefault("DISCORD_GUILD_ID", "0")
 os.environ.setdefault("STAFF_ROLE_IDS",   "")
 os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 
-from bot.cogs.characters import _build_sheet_embed, _dots   # noqa: E402
+from bot.cogs.characters import (  # noqa: E402
+    _build_sheet_embed, _dots, _conditions_embed,
+)
 
 
 def test_dots_render():
@@ -119,6 +121,46 @@ def test_embed_pools_advantages_and_lists_powers_and_rites():
     assert "Heightened Senses" in fields.get("Powers", "")
     assert "Wake with Evening's Freshness" in fields.get("Rituals & Rites", "")
     assert "Ritual" in fields.get("Rituals & Rites", "")
+
+
+def test_embed_shows_conditions_when_present():
+    char = {
+        "id": 1, "name": "Lucian", "clan": "gangrel",
+        "xp_total": 0, "xp_cap": 350, "xp_available": 0,
+        "sheet_json": {
+            "conditions": [
+                {"name": "Torpor", "note": "until staff wakes"},
+                {"name": "On Fire"},
+            ],
+        },
+    }
+    e = _build_sheet_embed(char)
+    cond = next((f for f in e.fields if f.name == "Conditions"), None)
+    assert cond is not None
+    assert "Torpor" in cond.value and "until staff wakes" in cond.value
+    assert "On Fire" in cond.value
+
+
+def test_embed_omits_conditions_when_absent():
+    char = {
+        "id": 1, "name": "Pending", "clan": "malkavian",
+        "xp_total": 0, "xp_cap": 350, "xp_available": 0,
+        "sheet_json": {},
+    }
+    e = _build_sheet_embed(char)
+    assert "Conditions" not in [f.name for f in e.fields]
+
+
+def test_conditions_embed_helper_renders_and_footers():
+    e = _conditions_embed("Marcus", [{"name": "Staked"}], highlight="Staked",
+                          added=True)
+    assert "Marcus" in e.title
+    assert "Staked" in e.description
+    assert e.footer.text == "Added: Staked"
+    # Empty list shows a placeholder, clear footer.
+    e2 = _conditions_embed("Marcus", [], highlight="Staked", added=False)
+    assert "No active conditions" in e2.description
+    assert e2.footer.text == "Cleared: Staked"
 
 
 def test_embed_handles_empty_sheet():

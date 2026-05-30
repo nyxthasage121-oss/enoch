@@ -456,6 +456,48 @@ def test_macro_api_set_overwrite_delete(_client):
         conn.commit()
 
 
+def test_condition_api_add_clear_and_auth(_client):
+    """The bot can add and clear transient conditions on a character's sheet
+    (sheet_json.conditions), guarded by the bot token. Adding the same name
+    twice replaces it (case-insensitive) rather than duplicating."""
+    import json as _json
+    from web.db import get_db
+    with get_db() as conn:
+        conn.execute("UPDATE characters SET sheet_json='{}' WHERE id=1")
+        conn.commit()
+    headers = {"Authorization": "Bearer smoke-test-token"}
+    # add with a note
+    r = _client.post("/api/characters/1/conditions",
+                     json={"name": "Torpor", "note": "until staff wakes"},
+                     headers=headers)
+    assert r.status_code == 200, r.text
+    conds = r.json()["conditions"]
+    assert conds == [{"name": "Torpor", "note": "until staff wakes"}]
+    # re-add same name (case-insensitive) replaces, no duplicate; the new
+    # spelling wins and the note resets.
+    r = _client.post("/api/characters/1/conditions",
+                     json={"name": "torpor"}, headers=headers)
+    assert [c["name"] for c in r.json()["conditions"]] == ["torpor"]
+    assert "note" not in r.json()["conditions"][0]
+    # add a second condition, then persist check
+    _client.post("/api/characters/1/conditions",
+                 json={"name": "On Fire"}, headers=headers)
+    with get_db() as conn:
+        sheet = _json.loads(conn.execute(
+            "SELECT sheet_json FROM characters WHERE id=1").fetchone()["sheet_json"])
+    assert {c["name"] for c in sheet["conditions"]} == {"torpor", "On Fire"}
+    # clear one
+    r = _client.post("/api/characters/1/conditions",
+                     json={"name": "Torpor", "active": False}, headers=headers)
+    assert [c["name"] for c in r.json()["conditions"]] == ["On Fire"]
+    # auth required
+    assert _client.post("/api/characters/1/conditions",
+                        json={"name": "x"}).status_code == 401
+    with get_db() as conn:
+        conn.execute("UPDATE characters SET sheet_json='{}' WHERE id=1")
+        conn.commit()
+
+
 def test_coterie_api_endpoint(_client):
     """GET /api/characters/{id}/coterie returns the coterie + members."""
     from web.db import get_db, create_coterie, add_coterie_member
