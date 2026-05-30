@@ -2896,19 +2896,51 @@ def test_creation_xp_posts_single_clean_ledger_entry(player):
             conn.commit()
 
 
-def test_standard_clan_bane_flaws_maps_nosferatu():
-    """The standard-bane chargen-flaw lookup maps Nosferatu → Repulsive (2)."""
-    from web.routes.player import _standard_clan_bane_flaws
-    m = _standard_clan_bane_flaws()
-    assert m.get("nosferatu") == {"name": "Repulsive", "dots": 2}
+def test_clan_bane_flaws_maps_nosferatu_standard():
+    """The chargen-flaw lookup maps Nosferatu's standard Bane → Repulsive (2),
+    keyed by bane choice so the variant (Infestation) grants none."""
+    from web.routes.player import _clan_bane_flaws, _clan_bane_flaw_for
+    m = _clan_bane_flaws()
+    assert m.get("nosferatu", {}).get("standard") == {"name": "Repulsive", "dots": 2}
+    assert _clan_bane_flaw_for("nosferatu", "standard") == {"name": "Repulsive", "dots": 2}
+    assert _clan_bane_flaw_for("nosferatu", "variant") is None
+    assert _clan_bane_flaw_for("brujah", "standard") is None
 
 
 def test_chargen_passes_clan_bane_flaws(player):
-    """The wizard receives the standard-bane chargen flaws so it can auto-apply
-    them (Nosferatu → Repulsive)."""
+    """The wizard receives the standard-bane chargen flaws + the variant Bane
+    data so it can auto-apply the flaw and offer the standard/variant picker."""
     r = player.get("/characters/new")
     assert r.status_code == 200
     assert "clanBaneFlaws" in r.text and "Repulsive" in r.text
+    assert "clanBaneVariants" in r.text and "Infestation" in r.text
+
+
+def test_nosferatu_variant_bane_grants_no_flaw(player):
+    """Choosing Nosferatu's variant Bane (Infestation) grants NO Repulsive
+    flaw, persists bane_choice='variant' + the variant name, and strips any
+    stale clan-bane flaw left in the form."""
+    import json as _json
+    from web.db import get_db
+    player.post("/characters/new", data={
+        "_csrf": "dev-csrf-token", "name": "Nos Var", "clan": "nosferatu",
+        "touchstones": '["A", "B"]', "bane_choice": "variant",
+        "flaws": _json.dumps([{"name": "Repulsive", "dots": 2, "src": "clan_bane"}]),
+    }, follow_redirects=False)
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT sheet_json FROM characters WHERE name='Nos Var'").fetchone()
+        assert row is not None
+        sheet = _json.loads(row["sheet_json"] or "{}")
+        assert sheet.get("bane_choice") == "variant"
+        assert sheet.get("bane_variant_name") == "Infestation"
+        assert not any(f.get("src") == "clan_bane" for f in sheet.get("flaws", [])), \
+            "variant Bane should not grant a clan-bane flaw"
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE name='Nos Var'")
+            conn.commit()
 
 
 def test_nosferatu_standard_bane_grants_repulsive(player):

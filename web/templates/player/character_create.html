@@ -25,6 +25,7 @@
        clanInfo:          {{ (clan_info | default({})) | tojson | forceescape }},
        predatorInfo:      {{ (predator_info | default({})) | tojson | forceescape }},
        clanBaneFlaws:     {{ (clan_bane_flaws | default({})) | tojson | forceescape }},
+       clanBaneVariants:  {{ (clan_bane_variants | default({})) | tojson | forceescape }},
        skillLabels:       {{ (skill_labels | default({})) | tojson | forceescape }},
        discLabels:        {{ (disc_labels | default({})) | tojson | forceescape }},
        skillSpreads:      {{ (skill_spreads | default({})) | tojson | forceescape }},
@@ -469,9 +470,9 @@
                           } else if (charName.clan === 'thin-blood') {
                             charName.clan = '';
                           }
-                          // Clan may have changed (thin-blood pin/unpin) — keep
-                          // the clan Bane flaw in sync.
-                          resolveClanBane();
+                          // Clan may have changed (thin-blood pin/unpin) — reset
+                          // the Bane choice + keep the clan Bane flaw in sync.
+                          baneChoice = 'standard'; resolveClanBane();
                           // Auto-seed Blood Potency + Humanity from the
                           // Sea of Time table for the new tier.
                           applyTierBloodDefaults();">
@@ -811,7 +812,7 @@
                   :class="charName.clan === '{{ slug }}'
                     ? 'clan-selected'
                     : 'border-ink-800 hover:bg-ink-900/40'"
-                  @click="charName.clan = '{{ slug }}'; resolveClanBane();
+                  @click="charName.clan = '{{ slug }}'; baneChoice = 'standard'; resolveClanBane();
                           if (window.Aurora) window.Aurora.sparkles($el, 18);">
             <span x-show="charName.clan === '{{ slug }}'" x-cloak
                   class="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-ink-950 font-bold text-xs"
@@ -837,8 +838,36 @@
             <div class="space-y-2">
               <div>
                 <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Bane</p>
-                <p class="font-garamond text-xs text-bone-400 leading-snug"
-                   x-text="clanInfo[charName.clan].bane"></p>
+                {# Clans with an alternate Bane (V5 Players Guide) let the player
+                   pick which Bane their character carries — default standard.
+                   The choice drives any auto-granted Bane flaw (e.g. Nosferatu
+                   standard → Repulsive ••; the Infestation variant → none). #}
+                <template x-if="hasBaneVariant()">
+                  <div class="space-y-1.5">
+                    <button type="button" @click="pickBane('standard')"
+                            class="w-full text-left gilded-inset px-3 py-2 border transition-colors"
+                            :class="baneChoice === 'standard' ? 'border-gold-600 bg-ink-900/60' : 'border-ink-700 hover:border-gold-800'">
+                      <span class="font-cinzel text-[0.55rem] tracking-widest uppercase"
+                            :class="baneChoice === 'standard' ? 'text-gold-400' : 'text-bone-600'">Standard Bane</span>
+                      <p class="font-garamond text-xs text-bone-400 leading-snug mt-0.5"
+                         x-text="clanInfo[charName.clan].bane"></p>
+                    </button>
+                    <button type="button" @click="pickBane('variant')"
+                            class="w-full text-left gilded-inset px-3 py-2 border transition-colors"
+                            :class="baneChoice === 'variant' ? 'border-gold-600 bg-ink-900/60' : 'border-ink-700 hover:border-gold-800'">
+                      <span class="font-cinzel text-[0.55rem] tracking-widest uppercase"
+                            :class="baneChoice === 'variant' ? 'text-gold-400' : 'text-bone-600'">
+                        Variant — <span x-text="clanBaneVariants[charName.clan].name"></span>
+                      </span>
+                      <p class="font-garamond text-xs text-bone-400 leading-snug mt-0.5"
+                         x-text="clanBaneVariants[charName.clan].effect"></p>
+                    </button>
+                  </div>
+                </template>
+                <template x-if="!hasBaneVariant()">
+                  <p class="font-garamond text-xs text-bone-400 leading-snug"
+                     x-text="clanInfo[charName.clan].bane"></p>
+                </template>
               </div>
               <div>
                 <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Compulsion</p>
@@ -848,6 +877,7 @@
             </div>
           </div>
         </template>
+        <input type="hidden" name="bane_choice" :value="baneChoice">
       </div>
 
       <div class="flex items-center justify-end gap-3 mt-8">
@@ -1967,8 +1997,14 @@
       clanDisciplines:   opts.clanDisciplines || {},
       clanInfo:          opts.clanInfo || {},
       predatorInfo:      opts.predatorInfo || {},
-      // Standard-bane chargen flaws keyed by clan (e.g. nosferatu → Repulsive ••).
+      // Per-clan chargen Bane flaws keyed by choice, e.g.
+      // { nosferatu: { standard: {name:'Repulsive', dots:2} } }.
       clanBaneFlaws:     opts.clanBaneFlaws || {},
+      // Variant Bane name/effect per clan (the player may pick it at clan
+      // selection instead of the standard Bane).
+      clanBaneVariants:  opts.clanBaneVariants || {},
+      // Which Bane the character uses — 'standard' (default) or 'variant'.
+      baneChoice:        (initial.bane_choice === 'variant') ? 'variant' : 'standard',
       skillLabels:       opts.skillLabels || {},
       discLabels:        opts.discLabels || {},
       skillSpreads:      opts.skillSpreads || {},
@@ -2167,13 +2203,25 @@
       },
       // ── Clan Bane chargen flaw ────────────────────────────────────────
       // Some clan Banes manifest as a free, auto-granted flaw at creation
-      // (Nosferatu → Repulsive ••). Idempotent: strip any prior clan-bane
-      // flaw, then apply the one for the current clan. Free — budgetUsed
-      // excludes src-tagged entries. Re-run whenever the clan changes.
+      // (Nosferatu standard → Repulsive ••). The player picks standard vs
+      // variant at clan selection; the active choice drives the flaw (the
+      // Nosferatu variant Infestation grants none). Idempotent: strip any
+      // prior clan-bane flaw, then apply the active one. Free — budgetUsed
+      // excludes src-tagged entries. Re-run on clan or Bane-choice change.
+      hasBaneVariant(clan) { return !!this.clanBaneVariants[clan || this.charName.clan]; },
+      activeBaneFlaw() {
+        const perClan = this.clanBaneFlaws[this.charName.clan];
+        if (!perClan) return null;
+        return perClan[this.baneChoice] || null;
+      },
       resolveClanBane() {
         this.flaws = (this.flaws || []).filter(f => f.src !== 'clan_bane');
-        const f = this.clanBaneFlaws[this.charName.clan];
+        const f = this.activeBaneFlaw();
         if (f) this.flaws.push({ name: f.name, dots: f.dots, src: 'clan_bane' });
+      },
+      pickBane(choice) {
+        this.baneChoice = (choice === 'variant') ? 'variant' : 'standard';
+        this.resolveClanBane();
       },
       applyTierBloodDefaults() {
         const t    = this.charName.character_type;
