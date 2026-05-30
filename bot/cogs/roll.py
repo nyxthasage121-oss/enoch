@@ -14,8 +14,8 @@ from discord.ext import commands
 from ..api import get_character, get_player_characters, apply_state_delta
 from ..roll import (
     build_trait_index, resolve_pool, apply_specialty, roll_pool,
-    reroll_failures, rouse_check, OUTCOME_LABELS, MESSY_CRITICAL,
-    BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE, RollResult,
+    reroll_failures, rouse_check, blood_surge_bonus, OUTCOME_LABELS,
+    MESSY_CRITICAL, BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE, RollResult,
 )
 from .characters import _ATTRIBUTES, _SKILLS_BY_CAT, _DISCIPLINES
 
@@ -63,7 +63,8 @@ def _fmt_dice(dice: list[int], *, hunger: bool = False) -> str:
 
 def build_roll_embed(result: RollResult, *, title: str,
                      pool_parts: list[tuple[str, int]] | None = None,
-                     unknown: list[str] | None = None) -> discord.Embed:
+                     unknown: list[str] | None = None,
+                     note: str | None = None) -> discord.Embed:
     """Render a roll result as a Discord embed (offline-testable)."""
     color = _BLOOD if (result.outcome in (MESSY_CRITICAL, BESTIAL_FAILURE)
                        or not result.is_win) else _GOLD
@@ -75,6 +76,8 @@ def build_roll_embed(result: RollResult, *, title: str,
         color=color,
     )
 
+    if note:
+        e.add_field(name="Blood Surge", value=note, inline=False)
     e.add_field(name="Dice", value=_fmt_dice(result.normal_dice), inline=False)
     if result.hunger:
         e.add_field(name="Hunger", value=_fmt_dice(result.hunger_dice, hunger=True),
@@ -133,11 +136,12 @@ class WillpowerRerollView(discord.ui.View):
 
 
 async def _reply_roll(interaction: discord.Interaction, result: RollResult, *,
-                      title: str, pool_parts=None, unknown=None) -> None:
+                      title: str, pool_parts=None, unknown=None,
+                      note: str | None = None) -> None:
     """Send a roll result, attaching the Willpower-reroll button when there are
     regular failures worth rerolling."""
     embed = build_roll_embed(result, title=title, pool_parts=pool_parts,
-                             unknown=unknown)
+                             unknown=unknown, note=note)
     view = None
     if any(d < 6 for d in result.normal_dice):
         view = WillpowerRerollView(result, title=title, pool_parts=pool_parts,
@@ -200,6 +204,7 @@ class RollCog(commands.Cog):
         difficulty="Successes needed (optional)",
         hunger="Override Hunger dice (defaults to your character's Hunger)",
         specialty="Add a +1 specialty die (pick one of your character's specialties)",
+        surge="Blood Surge: spend a Rouse Check to add dice (scales with Blood Potency)",
         character="Which character (only if you have more than one)",
     )
     @app_commands.autocomplete(specialty=_specialty_autocomplete)
@@ -210,12 +215,14 @@ class RollCog(commands.Cog):
         difficulty: int = 0,
         hunger: int | None = None,
         specialty: str | None = None,
+        surge: bool = False,
         character: str | None = None,
     ) -> None:
         await interaction.response.defer()
 
-        # A bare numeric pool with an explicit Hunger needs no character lookup.
-        if _looks_numeric(pool) and hunger is not None:
+        # A bare numeric pool with an explicit Hunger needs no character lookup
+        # (unless surging — that needs Blood Potency + the live Hunger).
+        if _looks_numeric(pool) and hunger is not None and not surge:
             await _reply_roll(interaction, roll_pool(int(pool), hunger, difficulty),
                               title=f"Roll · {pool}d")
             return
@@ -241,7 +248,7 @@ class RollCog(commands.Cog):
                 return
         elif len(active) == 1:
             char = active[0]
-        elif _looks_numeric(pool):
+        elif _looks_numeric(pool) and not surge:
             # Raw numeric roll, no character context needed.
             await _reply_roll(interaction, roll_pool(int(pool), hunger or 0, difficulty),
                               title=f"Roll · {pool}d")
@@ -279,9 +286,33 @@ class RollCog(commands.Cog):
             total, parts, unknown, specialty, sheet.get("specialties"))
 
         eff_hunger = hunger if hunger is not None else int(sheet.get("hunger", 0) or 0)
+
+        # Blood Surge — add dice by Blood Potency at the cost of a Rouse Check.
+        # The Rouse may raise Hunger, which both feeds this roll's Hunger dice
+        # and persists to the sheet.
+        surge_note = None
+        if surge:
+            bonus = blood_surge_bonus(sheet.get("blood_potency", 0))
+            total += bonus
+            parts = parts + [("Blood Surge", bonus)]
+            rolls, gained = rouse_check(1)
+            new_hunger = min(5, eff_hunger + gained)
+            if gained > 0:
+                try:
+                    resp = await apply_state_delta(char["id"], hunger=gained,
+                                                   source="dice:surge")
+                    new_hunger = resp.get("state", {}).get("hunger", new_hunger)
+                except Exception as exc:
+                    log.warning("surge: hunger write-back failed for %s: %s",
+                                char["id"], exc)
+            eff_hunger = new_hunger
+            rouse_txt = (f"+{gained} Hunger → {new_hunger}/5" if gained
+                         else "no Hunger gained")
+            surge_note = f"+{bonus} dice · Rouse {_fmt_dice(rolls)} → {rouse_txt}"
+
         result = roll_pool(total, eff_hunger, difficulty)
         await _reply_roll(interaction, result, title=full["name"],
-                          pool_parts=parts, unknown=unknown)
+                          pool_parts=parts, unknown=unknown, note=surge_note)
 
     @app_commands.command(
         name="rouse",

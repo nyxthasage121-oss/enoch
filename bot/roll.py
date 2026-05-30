@@ -176,6 +176,14 @@ def rouse_check(count: int = 1,
     return rolls, gained
 
 
+def blood_surge_bonus(blood_potency: int) -> int:
+    """V5 Blood Surge dice bonus for a Blood Potency (Corebook p.216):
+    +1 at BP 0, +2 at 1-2, +3 at 3-4, +4 at 5-6, +5 at 7-8, +6 at 9-10. A
+    Surge also costs a Rouse Check (rolled separately)."""
+    bp = max(0, min(int(blood_potency or 0), 10))
+    return 1 + (bp + 1) // 2
+
+
 def resolve_pool(expression: str, sheet: dict,
                  trait_index: dict[str, str]) -> tuple[int, list[tuple[str, int]], list[str]]:
     """Parse a pool expression into a total dice count.

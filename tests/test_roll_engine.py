@@ -14,7 +14,7 @@ os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 
 from bot.roll import (  # noqa: E402
     classify, roll_pool, build_trait_index, resolve_pool, apply_specialty,
-    reroll_failures, rouse_check,
+    reroll_failures, rouse_check, blood_surge_bonus,
     CRITICAL, MESSY_CRITICAL, SUCCESS, FAILURE,
     TOTAL_FAILURE, BESTIAL_FAILURE,
 )
@@ -215,6 +215,15 @@ def test_build_roll_embed_flags_unknown_traits():
     assert "Unknown: bogus" in e.footer.text
 
 
+def test_build_roll_embed_shows_blood_surge_note():
+    from bot.cogs.roll import build_roll_embed
+    res = classify([8, 7, 6], [], difficulty=2)
+    e = build_roll_embed(res, title="Valeria",
+                         note="+3 dice · Rouse 4 → +1 Hunger → 2/5")
+    surge = next((f for f in e.fields if f.name == "Blood Surge"), None)
+    assert surge is not None and "+3 dice" in surge.value
+
+
 def test_specialty_autocomplete_lists_and_filters_owned(monkeypatch):
     import asyncio
     from types import SimpleNamespace
@@ -280,3 +289,16 @@ def test_rouse_check_single_die_by_default():
     rolls, gained = rouse_check(rng=random.Random(5))
     assert len(rolls) == 1
     assert gained in (0, 1)
+
+
+def test_blood_surge_bonus_by_blood_potency():
+    # +1 at BP0, +2 at 1-2, +3 at 3-4, +4 at 5-6, +5 at 7-8, +6 at 9-10.
+    assert blood_surge_bonus(0) == 1
+    assert blood_surge_bonus(1) == 2
+    assert blood_surge_bonus(2) == 2
+    assert blood_surge_bonus(3) == 3
+    assert blood_surge_bonus(4) == 3
+    assert blood_surge_bonus(5) == 4
+    assert blood_surge_bonus(7) == 5
+    assert blood_surge_bonus(9) == 6
+    assert blood_surge_bonus(10) == 6
