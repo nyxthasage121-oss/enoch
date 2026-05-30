@@ -13,8 +13,9 @@ from discord.ext import commands
 
 from ..api import get_character, get_player_characters
 from ..roll import (
-    build_trait_index, resolve_pool, roll_pool, OUTCOME_LABELS,
-    MESSY_CRITICAL, BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE, RollResult,
+    build_trait_index, resolve_pool, roll_pool, reroll_failures, rouse_check,
+    OUTCOME_LABELS, MESSY_CRITICAL, BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE,
+    RollResult,
 )
 from .characters import _ATTRIBUTES, _SKILLS_BY_CAT, _DISCIPLINES
 
@@ -95,6 +96,53 @@ def build_roll_embed(result: RollResult, *, title: str,
     return e
 
 
+class WillpowerRerollView(discord.ui.View):
+    """A one-shot "Reroll (Willpower)" button on a roll result. Rerolls up to
+    three regular (non-Hunger) failures for the original roller only."""
+
+    def __init__(self, result: RollResult, *, title: str,
+                 pool_parts=None, unknown=None, user_id: int, timeout: float = 120):
+        super().__init__(timeout=timeout)
+        self._result = result
+        self._title = title
+        self._pool_parts = pool_parts
+        self._unknown = unknown
+        self._user_id = user_id
+
+    @discord.ui.button(label="Reroll (Willpower)", style=discord.ButtonStyle.secondary)
+    async def reroll(self, interaction: discord.Interaction,
+                     button: discord.ui.Button) -> None:
+        if interaction.user.id != self._user_id:
+            await interaction.response.send_message(
+                "Only the original roller can spend Willpower on this roll.",
+                ephemeral=True)
+            return
+        new_result, n = reroll_failures(
+            self._result.normal_dice, self._result.hunger_dice,
+            self._result.difficulty)
+        button.disabled = True   # Willpower reroll is once per roll
+        embed = build_roll_embed(
+            new_result, title=f"{self._title} · Willpower reroll",
+            pool_parts=self._pool_parts, unknown=self._unknown)
+        note = f"Rerolled {n} die{'s' if n != 1 else ''} with Willpower"
+        base = embed.footer.text or ""
+        embed.set_footer(text=(base + "   " if base else "") + note)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+
+async def _reply_roll(interaction: discord.Interaction, result: RollResult, *,
+                      title: str, pool_parts=None, unknown=None) -> None:
+    """Send a roll result, attaching the Willpower-reroll button when there are
+    regular failures worth rerolling."""
+    embed = build_roll_embed(result, title=title, pool_parts=pool_parts,
+                             unknown=unknown)
+    view = None
+    if any(d < 6 for d in result.normal_dice):
+        view = WillpowerRerollView(result, title=title, pool_parts=pool_parts,
+                                   unknown=unknown, user_id=interaction.user.id)
+    await interaction.followup.send(embed=embed, view=view)
+
+
 def _looks_numeric(expr: str) -> bool:
     """True when the whole pool expression is a single non-negative integer."""
     return expr.strip().isdigit()
@@ -126,9 +174,8 @@ class RollCog(commands.Cog):
 
         # A bare numeric pool with an explicit Hunger needs no character lookup.
         if _looks_numeric(pool) and hunger is not None:
-            result = roll_pool(int(pool), hunger, difficulty)
-            await interaction.followup.send(
-                embed=build_roll_embed(result, title=f"Roll · {pool}d"))
+            await _reply_roll(interaction, roll_pool(int(pool), hunger, difficulty),
+                              title=f"Roll · {pool}d")
             return
 
         # Otherwise resolve the invoking player's character for traits + Hunger.
@@ -154,9 +201,8 @@ class RollCog(commands.Cog):
             char = active[0]
         elif _looks_numeric(pool):
             # Raw numeric roll, no character context needed.
-            result = roll_pool(int(pool), hunger or 0, difficulty)
-            await interaction.followup.send(
-                embed=build_roll_embed(result, title=f"Roll · {pool}d"))
+            await _reply_roll(interaction, roll_pool(int(pool), hunger or 0, difficulty),
+                              title=f"Roll · {pool}d")
             return
         else:
             names = ", ".join(f"`{c['name']}`" for c in active) or "(none)"
@@ -188,9 +234,28 @@ class RollCog(commands.Cog):
 
         eff_hunger = hunger if hunger is not None else int(sheet.get("hunger", 0) or 0)
         result = roll_pool(total, eff_hunger, difficulty)
-        await interaction.followup.send(
-            embed=build_roll_embed(result, title=full["name"],
-                                   pool_parts=parts, unknown=unknown))
+        await _reply_roll(interaction, result, title=full["name"],
+                          pool_parts=parts, unknown=unknown)
+
+    @app_commands.command(
+        name="rouse",
+        description="Make a Rouse Check — test whether you gain Hunger.",
+    )
+    @app_commands.describe(count="How many Rouse Checks (e.g. a level-2 power costs 2)")
+    async def rouse(self, interaction: discord.Interaction, count: int = 1) -> None:
+        await interaction.response.defer()
+        rolls, gained = rouse_check(count)
+        color = _GOLD if gained == 0 else _BLOOD
+        e = discord.Embed(
+            title="🩸 Rouse Check",
+            description=("**No Hunger gained.**" if gained == 0
+                         else f"**+{gained} Hunger.**"),
+            color=color,
+        )
+        e.add_field(name="Dice", value=_fmt_dice(sorted(rolls, reverse=True)),
+                    inline=False)
+        e.set_footer(text="6+ avoids Hunger · 1-5 gains 1 · update your Hunger on the tracker")
+        await interaction.followup.send(embed=e)
 
 
 async def setup(bot: commands.Bot) -> None:

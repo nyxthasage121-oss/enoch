@@ -14,6 +14,7 @@ os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 
 from bot.roll import (  # noqa: E402
     classify, roll_pool, build_trait_index, resolve_pool,
+    reroll_failures, rouse_check,
     CRITICAL, MESSY_CRITICAL, SUCCESS, FAILURE,
     TOTAL_FAILURE, BESTIAL_FAILURE,
 )
@@ -186,3 +187,38 @@ def test_build_roll_embed_flags_unknown_traits():
     e = build_roll_embed(res, title="Test", pool_parts=[("Strength", 3)],
                          unknown=["bogus"])
     assert "Unknown: bogus" in e.footer.text
+
+
+# ── Willpower reroll + Rouse check ───────────────────────────────────────────
+
+def test_reroll_failures_keeps_successes_and_rerolls_failures():
+    # [8,5,4] normal — 8 is a success, 5 and 4 are failures.
+    res, n = reroll_failures([8, 5, 4], [3], difficulty=0, count=3,
+                             rng=random.Random(1))
+    assert n == 2            # only the two failures were rerolled
+    assert 8 in res.normal_dice   # the success survives
+
+
+def test_reroll_failures_respects_count_cap():
+    res, n = reroll_failures([1, 2, 3, 4], [], difficulty=0, count=3,
+                             rng=random.Random(1))
+    assert n == 3           # 4 failures, capped to 3
+
+
+def test_reroll_failures_noop_when_all_succeed():
+    res, n = reroll_failures([8, 9, 10], [], difficulty=0, count=3,
+                             rng=random.Random(1))
+    assert n == 0
+    assert res.normal_dice == [10, 9, 8]
+
+
+def test_rouse_check_counts_hunger_gain():
+    rolls, gained = rouse_check(3, rng=random.Random(2))
+    assert len(rolls) == 3
+    assert gained == sum(1 for d in rolls if d < 6)
+
+
+def test_rouse_check_single_die_by_default():
+    rolls, gained = rouse_check(rng=random.Random(5))
+    assert len(rolls) == 1
+    assert gained in (0, 1)

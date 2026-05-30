@@ -146,6 +146,36 @@ def build_trait_index(*trait_lists: list[tuple[str, str]]) -> dict[str, str]:
     return index
 
 
+def reroll_failures(normal_dice: list[int], hunger_dice: list[int],
+                    difficulty: int = 0, count: int = 3,
+                    rng: random.Random | None = None) -> tuple[RollResult, int]:
+    """V5 Willpower reroll: reroll up to ``count`` regular (non-Hunger) dice
+    that are failures (showing < 6). Hunger dice are never rerolled and
+    successes are kept (rerolling a failure can only help). Returns the new
+    ``RollResult`` and the number of dice actually rerolled."""
+    r = rng or random
+    count = max(0, int(count))
+    normal = list(normal_dice)
+    # Failures, lowest first (all equivalent in expectation; deterministic).
+    failures = sorted((i for i, d in enumerate(normal) if d < 6),
+                      key=lambda i: normal[i])
+    chosen = failures[:count]
+    for i in chosen:
+        normal[i] = r.randint(1, 10)
+    return classify(normal, list(hunger_dice), difficulty), len(chosen)
+
+
+def rouse_check(count: int = 1,
+                rng: random.Random | None = None) -> tuple[list[int], int]:
+    """Roll ``count`` Rouse Check dice. Each die showing 6+ avoids a Hunger
+    gain; 1-5 gains 1 Hunger. Returns ``(rolls, hunger_gained)``."""
+    r = rng or random
+    count = max(1, min(int(count), 5))
+    rolls = [r.randint(1, 10) for _ in range(count)]
+    gained = sum(1 for d in rolls if d < 6)
+    return rolls, gained
+
+
 def resolve_pool(expression: str, sheet: dict,
                  trait_index: dict[str, str]) -> tuple[int, list[tuple[str, int]], list[str]]:
     """Parse a pool expression into a total dice count.
