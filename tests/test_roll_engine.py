@@ -15,7 +15,7 @@ os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 from bot.roll import (  # noqa: E402
     classify, roll_pool, build_trait_index, resolve_pool, apply_specialty,
     reroll_failures, rouse_check, blood_surge_bonus, mend_amount, willpower_recovery,
-    bane_severity,
+    bane_severity, frenzy_pool, remorse_pool,
     CRITICAL, MESSY_CRITICAL, SUCCESS, FAILURE,
     TOTAL_FAILURE, BESTIAL_FAILURE,
 )
@@ -332,3 +332,18 @@ def test_bane_severity_by_blood_potency():
     assert bane_severity(6) == 3
     assert bane_severity(8) == 4
     assert bane_severity(10) == 5
+
+
+def test_frenzy_pool_is_current_willpower():
+    # Resolve 3 + Composure 2 = 5 Willpower, minus 1 sup + 1 agg damage = 3.
+    assert frenzy_pool(3, 2) == 5
+    assert frenzy_pool(3, 2, willpower_sup=1, willpower_agg=1) == 3
+    assert frenzy_pool(1, 1, willpower_sup=5) == 0   # floored at 0
+
+
+def test_remorse_pool_unstained_empty_humanity_boxes():
+    # Humanity 7 → 3 empty; minus Stains.
+    assert remorse_pool(7, 1) == 2
+    assert remorse_pool(7, 2) == 1
+    assert remorse_pool(7, 5) == 1   # all empties stained → minimum 1
+    assert remorse_pool(5, 1) == 4

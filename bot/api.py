@@ -66,17 +66,19 @@ async def get_character(character_id: int) -> dict:
 
 async def apply_state_delta(character_id: int, *, hunger: int = 0,
                             damage_health_sup: int = 0,
-                            damage_willpower_sup: int = 0,
+                            damage_willpower_sup: int = 0, humanity: int = 0,
                             source: str | None = None) -> dict:
     """Push a delta to a character's tracked state (Hunger / Health /
-    Willpower) back to the sheet. Returns ``{character_id, state}`` with the
-    new clamped values. Used by the dice roller for Rouse/wake/mend."""
+    Willpower / Humanity) back to the sheet. Returns ``{character_id, state}``
+    with the new clamped values. Used by the dice roller for Rouse / wake /
+    mend / remorse."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         r = await client.post(
             f"{_base()}/api/characters/{character_id}/state",
             json={"hunger": hunger,
                   "damage_health_sup": damage_health_sup,
                   "damage_willpower_sup": damage_willpower_sup,
+                  "humanity": humanity,
                   "source": source},
             headers=_headers(),
         )

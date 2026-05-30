@@ -202,6 +202,22 @@ def willpower_recovery(composure: int, resolve: int) -> int:
     return max(0, int(composure or 0), int(resolve or 0))
 
 
+def frenzy_pool(resolve: int, composure: int,
+                willpower_sup: int = 0, willpower_agg: int = 0) -> int:
+    """Frenzy-resistance dice = current Willpower (Resolve + Composure minus
+    marked Willpower damage). Rolled with Hunger dice vs the trigger's
+    Difficulty."""
+    wp = (int(resolve or 0) + int(composure or 0)
+          - int(willpower_sup or 0) - int(willpower_agg or 0))
+    return max(0, wp)
+
+
+def remorse_pool(humanity: int, stains: int) -> int:
+    """Remorse dice = unstained empty Humanity boxes (10 - Humanity - Stains),
+    minimum 1. Rolled WITHOUT Hunger dice; one success keeps Humanity."""
+    return max(1, 10 - int(humanity or 0) - max(0, int(stains or 0)))
+
+
 def bane_severity(blood_potency: int) -> int:
     """V5 Bane Severity for a Blood Potency (Corebook p.216): 0 at BP0, 1 at
     1-3, 2 at 4-5, 3 at 6-7, 4 at 8-9, 5 at 10. Mirrors the web's

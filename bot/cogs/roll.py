@@ -17,8 +17,9 @@ from ..api import (
 from ..roll import (
     build_trait_index, resolve_pool, apply_specialty, roll_pool,
     reroll_failures, rouse_check, blood_surge_bonus, mend_amount,
-    willpower_recovery, bane_severity, OUTCOME_LABELS, MESSY_CRITICAL,
-    BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE, RollResult,
+    willpower_recovery, bane_severity, frenzy_pool, remorse_pool,
+    OUTCOME_LABELS, MESSY_CRITICAL, BESTIAL_FAILURE, TOTAL_FAILURE, FAILURE,
+    RollResult,
 )
 from .characters import _ATTRIBUTES, _SKILLS_BY_CAT, _DISCIPLINES
 
@@ -588,6 +589,96 @@ class RollCog(commands.Cog):
             inline=False)
         if cold_blooded:
             e.set_footer(text="Cold-Blooded: requires recent feeding from a living vessel")
+        await interaction.followup.send(embed=e)
+
+    @app_commands.command(
+        name="frenzy",
+        description="Resist frenzy — a Willpower roll vs the trigger's Difficulty.")
+    @app_commands.describe(
+        difficulty="Difficulty set by the trigger (e.g. 2-4)",
+        character="Which character (only if you have more than one)")
+    async def frenzy(self, interaction: discord.Interaction, difficulty: int = 3,
+                     character: str | None = None) -> None:
+        await interaction.response.defer()
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>` to test frenzy.")
+            return
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            await interaction.followup.send("❌ Could not load your sheet.")
+            return
+        sheet = _sheet_of(full)
+        pool = frenzy_pool(sheet.get("attr_resolve", 0), sheet.get("attr_composure", 0),
+                           sheet.get("damage_willpower_sup", 0),
+                           sheet.get("damage_willpower_agg", 0))
+        result = roll_pool(pool, int(sheet.get("hunger", 0) or 0), max(1, difficulty))
+        if result.is_win:
+            verdict = "**Resists the frenzy.**"
+        elif result.bestial:
+            verdict = "**Frenzy! — the Beast slips its leash (bestial failure).**"
+        else:
+            verdict = "**Succumbs to frenzy.**"
+        e = discord.Embed(title=f"🔥 Frenzy Check · {char['name']}",
+                          description=verdict,
+                          color=_GOLD if result.is_win else _BLOOD)
+        e.add_field(name="Willpower dice", value=_fmt_dice(result.normal_dice),
+                    inline=False)
+        if result.hunger:
+            e.add_field(name="Hunger",
+                        value=_fmt_dice(result.hunger_dice, hunger=True), inline=False)
+        e.add_field(name="Result",
+                    value=f"{result.successes} vs difficulty {result.difficulty}"
+                          f"  ·  margin {result.margin:+d}", inline=False)
+        await interaction.followup.send(embed=e)
+
+    @app_commands.command(
+        name="remorse",
+        description="Remorse check — resist losing Humanity after gaining Stains.")
+    @app_commands.describe(
+        stains="How many Stains you took this session",
+        character="Which character (only if you have more than one)")
+    async def remorse(self, interaction: discord.Interaction, stains: int = 1,
+                      character: str | None = None) -> None:
+        await interaction.response.defer()
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>` for the Remorse check.")
+            return
+        if stains <= 0:
+            await interaction.followup.send(
+                "No Stains this session — no Remorse check needed.")
+            return
+        try:
+            full = await get_character(char["id"])
+        except Exception:
+            await interaction.followup.send("❌ Could not load your sheet.")
+            return
+        sheet = _sheet_of(full)
+        humanity = int(sheet.get("humanity", 7) or 0)
+        pool = remorse_pool(humanity, stains)
+        result = roll_pool(pool, 0, 1)   # no Hunger dice; one success suffices
+        new_humanity = humanity
+        if result.is_win:
+            verdict = "**Remorse felt — Humanity holds. Stains clear.**"
+        else:
+            new_humanity = max(0, humanity - 1)
+            try:
+                resp = await apply_state_delta(char["id"], humanity=-1,
+                                               source="dice:remorse")
+                new_humanity = resp.get("state", {}).get("humanity", new_humanity)
+            except Exception as exc:
+                log.warning("remorse write-back failed for %s: %s", char.get("id"), exc)
+            verdict = f"**No remorse — Humanity falls to {new_humanity}.**"
+        e = discord.Embed(title=f"🕯️ Remorse · {char['name']}", description=verdict,
+                          color=_GOLD if result.is_win else _BLOOD)
+        e.add_field(name="Dice", value=_fmt_dice(result.normal_dice), inline=False)
+        e.set_footer(
+            text=f"{pool} unstained Humanity box{'es' if pool != 1 else ''}"
+                 f" · Humanity {humanity} · {stains} stain{'s' if stains != 1 else ''}")
         await interaction.followup.send(embed=e)
 
     async def _pick_character(self, interaction: discord.Interaction,
