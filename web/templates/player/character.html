@@ -178,6 +178,7 @@
           <form method="post" action="/characters/{{ char.id }}/image"
                 enctype="multipart/form-data" class="flex flex-wrap items-end gap-2">
             <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="hidden" name="next" value="/characters/{{ char.id }}">
             <div class="flex-1 min-w-[11rem]">
               <label class="label-gold block mb-1 text-[0.7rem]">
                 {% if char.profile_image_url %}Replace image{% else %}Upload image{% endif %}
@@ -191,6 +192,7 @@
           {% if char.profile_image_url %}
           <form method="post" action="/characters/{{ char.id }}/image/delete" class="mt-2">
             <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="hidden" name="next" value="/characters/{{ char.id }}">
             <button type="submit"
                     class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1 border-blood-900 text-blood-500 hover:text-blood-400">
               Remove image

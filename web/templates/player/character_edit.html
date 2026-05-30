@@ -68,6 +68,7 @@
       </div>
       <form method="post" action="/characters/{{ char.id }}/image/delete">
         <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="/characters/{{ char.id }}/edit">
         <button type="submit"
                 class="btn-ghost font-cinzel tracking-widest text-[0.65rem] px-3 py-1.5 border-blood-900 text-blood-500 hover:text-blood-400">
           Remove Image
@@ -81,6 +82,7 @@
           enctype="multipart/form-data"
           class="flex flex-wrap items-end gap-3">
       <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="/characters/{{ char.id }}/edit">
       <div class="flex-1 min-w-[14rem]">
         <label class="label-gold block mb-2" for="image-upload">
           {% if char.profile_image_url %}Replace Image{% else %}Upload Image{% endif %}

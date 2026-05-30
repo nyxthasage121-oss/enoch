@@ -2756,6 +2756,20 @@ def test_resume_draft_restores_predator_picks_and_src_tags(player):
             conn.execute("DELETE FROM characters WHERE name='Resume Pred'")
 
 
+def test_safe_image_return_validates_next():
+    """The image routes only honor a `next` that is the character's own
+    sheet or edit page; foreign or mismatched targets fall back to the
+    sheet so a redirect can't be hijacked to another character or host."""
+    from web.routes.player import _safe_image_return
+    assert _safe_image_return("/characters/5", 5) == "/characters/5"
+    assert _safe_image_return("/characters/5/edit", 5) == "/characters/5/edit"
+    assert _safe_image_return("https://evil.example", 5) == "/characters/5"
+    assert _safe_image_return("/characters/9", 5) == "/characters/5"  # other char
+    assert _safe_image_return("//evil.example", 5) == "/characters/5"
+    assert _safe_image_return("", 5) == "/characters/5"
+    assert _safe_image_return(None, 5) == "/characters/5"
+
+
 def test_sidebar_has_portal_switcher_for_staff(staff):
     """Staff belong to both portals — the sidebar shows a Player/Staff
     Portal switcher so they can jump between them from either side."""

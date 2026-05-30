@@ -979,6 +979,15 @@ _MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB
 _UPLOADS_DIR = Path(__file__).parent.parent / "static" / "uploads"
 
 
+def _safe_image_return(raw, character_id: int) -> str:
+    """Validate a posted `next` return path for the image routes. Only the
+    character's own sheet or edit page are allowed; anything else (external
+    URLs, other characters, protocol-relative) falls back to the sheet."""
+    allowed = {f"/characters/{character_id}", f"/characters/{character_id}/edit"}
+    dest = str(raw or "").strip()
+    return dest if dest in allowed else f"/characters/{character_id}"
+
+
 async def _persist_uploaded_image(upload, character_id: int) -> tuple[str | None, str | None]:
     """Validate and write an uploaded image to /static/uploads/.
 
@@ -1021,17 +1030,21 @@ async def character_image_upload(
         raise HTTPException(status_code=404)
 
     form = await request.form()
+    # Return to whichever page launched the upload (the sheet's About panel
+    # or the full edit page) so the player sees the result in place instead
+    # of being bounced to /edit. Falls back to the sheet.
+    dest = _safe_image_return(form.get("next"), character_id)
     upload = form.get("image")
     url, error = await _persist_uploaded_image(upload, character_id)
     if error:
         request.session["flash"] = [{"kind": "error", "message": error}]
-        return RedirectResponse(url=f"/characters/{character_id}/edit", status_code=303)
+        return RedirectResponse(url=dest, status_code=303)
 
     with get_db() as conn:
         update_character(conn, character_id, profile_image_url=url)
 
     request.session["flash"] = [{"kind": "success", "message": "Profile image updated."}]
-    return RedirectResponse(url=f"/characters/{character_id}/edit", status_code=303)
+    return RedirectResponse(url=dest, status_code=303)
 
 
 @router.post("/characters/{character_id}/image/delete", response_class=HTMLResponse)
@@ -1046,6 +1059,8 @@ async def character_image_delete(
     if not char:
         raise HTTPException(status_code=404)
 
+    form = await request.form()
+    dest = _safe_image_return(form.get("next"), character_id)
     for old in _UPLOADS_DIR.glob(f"character_{character_id}.*"):
         try:
             old.unlink()
@@ -1056,7 +1071,7 @@ async def character_image_delete(
         update_character(conn, character_id, profile_image_url=None)
 
     request.session["flash"] = [{"kind": "info", "message": "Profile image removed."}]
-    return RedirectResponse(url=f"/characters/{character_id}/edit", status_code=303)
+    return RedirectResponse(url=dest, status_code=303)
 
 
 # ── Sheet payload parsing (shared by create + edit) ──────────────────────────
