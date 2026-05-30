@@ -22,6 +22,7 @@ _COGS = [
     "bot.cogs.xp",
     "bot.cogs.characters",
     "bot.cogs.coteries",
+    "bot.cogs.roll",
 ]
 
 
