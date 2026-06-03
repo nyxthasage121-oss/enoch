@@ -1,0 +1,202 @@
+{# projects_tables.html — staff project queues. Root #projects-tables is the
+   HTMX swap target for approve/reject/note/complete actions. #}
+<div id="projects-tables">
+
+  {# ── Pending proposals ── #}
+  <div class="mb-10">
+    <p class="label-gold mb-3">Pending Proposals
+      {% if pending_projects %}<span class="chip text-blood-400 border-blood-900 text-[0.55rem] ml-2">{{ pending_projects | length }}</span>{% endif %}
+    </p>
+    {% if pending_projects %}
+    <div class="space-y-4">
+      {% for p in pending_projects %}
+      <div class="gilded p-5" x-data="{ prog: 'staged', payoff: 'freeform', rejecting: false }">
+        <div class="mb-3">
+          <p class="font-cinzel text-lg text-bone-200">{{ p.title }}</p>
+          <p class="label-gold text-[0.6rem] text-bone-500 mt-0.5">{{ p.character_name }}</p>
+        </div>
+        {% if p.description %}
+        <p class="font-garamond text-bone-400 text-sm mb-4 leading-relaxed">{{ p.description }}</p>
+        {% endif %}
+
+        {# Approve — choose how it runs + pays off #}
+        <form hx-post="/staff/projects/{{ p.id }}/approve"
+              hx-target="#projects-tables" hx-swap="outerHTML"
+              x-show="!rejecting" class="space-y-3">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Progress</label>
+              <select name="progress_type" x-model="prog" class="w-full text-sm py-1.5">
+                <option value="staged">Staff-tracked stages</option>
+                <option value="roll">Roll — extended test</option>
+              </select>
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Payoff</label>
+              <select name="payoff_type" x-model="payoff" class="w-full text-sm py-1.5">
+                <option value="freeform">Free-form (write on completion)</option>
+                <option value="structured">Structured (auto-grant)</option>
+              </select>
+            </div>
+          </div>
+
+          {# Roll config (shown when progress = roll) #}
+          <div x-show="prog === 'roll'" x-cloak class="grid grid-cols-2 sm:grid-cols-4 gap-3 gilded-inset px-3 py-3">
+            <div class="col-span-2">
+              <label class="label-gold block mb-1 text-[0.6rem]">Dice pool</label>
+              <input type="text" name="roll_pool" placeholder="resolve + occult, or a number"
+                     class="w-full text-sm py-1.5">
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Difficulty</label>
+              <input type="number" name="roll_difficulty" min="0" max="10" value="1" class="w-full text-sm py-1.5">
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Target</label>
+              <input type="number" name="target_successes" min="1" max="50" value="5" class="w-full text-sm py-1.5">
+            </div>
+          </div>
+
+          {# Structured reward config (shown when payoff = structured) #}
+          <div x-show="payoff === 'structured'" x-cloak class="grid grid-cols-2 sm:grid-cols-4 gap-3 gilded-inset px-3 py-3">
+            <div class="col-span-2 sm:col-span-1">
+              <label class="label-gold block mb-1 text-[0.6rem]">Category</label>
+              <select name="reward_category" class="w-full text-sm py-1.5">
+                <option value="">—</option>
+                {% for cat in spend_categories %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Trait</label>
+              <input type="text" name="reward_trait" placeholder="Allies…" class="w-full text-sm py-1.5">
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Dots</label>
+              <input type="number" name="reward_dots" min="0" max="5" value="0" class="w-full text-sm py-1.5">
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Bonus XP</label>
+              <input type="number" name="reward_xp" min="0" max="50" value="0" class="w-full text-sm py-1.5">
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 pt-1">
+            <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-4 py-2">Approve &amp; Activate</button>
+            <button type="button" @click="rejecting = true" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Reject</button>
+          </div>
+        </form>
+
+        {# Reject #}
+        <form hx-post="/staff/projects/{{ p.id }}/reject"
+              hx-target="#projects-tables" hx-swap="outerHTML"
+              x-show="rejecting" x-cloak class="space-y-2">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <input type="text" name="reason" placeholder="Reason for the player…" class="w-full text-sm py-1.5">
+          <div class="flex items-center gap-3">
+            <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-4 py-2">Confirm Reject</button>
+            <button type="button" @click="rejecting = false" class="btn-ghost font-cinzel text-[0.6rem] px-3 py-1.5">Cancel</button>
+          </div>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="font-garamond text-bone-600 text-sm italic">No proposals awaiting review.</p>
+    {% endif %}
+  </div>
+
+  {# ── Active projects ── #}
+  <div class="mb-10">
+    <p class="label-gold mb-3">Active Projects
+      {% if active_projects %}<span class="chip text-bone-500 border-ink-700 text-[0.55rem] ml-2">{{ active_projects | length }}</span>{% endif %}
+    </p>
+    {% if active_projects %}
+    <div class="space-y-4">
+      {% for p in active_projects %}
+      <div class="gilded p-5 {{ 'border border-gold-800' if p.target_reached else '' }}" x-data="{ completing: false }">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="font-cinzel text-base text-bone-200">{{ p.title }}</p>
+            <p class="label-gold text-[0.6rem] text-bone-500 mt-0.5">{{ p.character_name }} · {{ p.progress_type }} · {{ p.payoff_type }}</p>
+          </div>
+          {% if p.progress_type == 'roll' %}
+          <span class="font-cinzel text-sm whitespace-nowrap {{ 'text-gold-400' if p.target_reached else 'text-bone-400' }}">
+            {{ p.progress_successes }}/{{ p.target_successes }}{% if p.target_reached %} ✓{% endif %}
+          </span>
+          {% endif %}
+        </div>
+
+        {% if p.payoff_type == 'structured' %}
+        <p class="font-garamond text-bone-600 text-xs mt-2">
+          On completion grants{% if p.reward_dots and p.reward_trait %} {{ p.reward_trait }} {{ p.reward_dots }} ({{ p.reward_category }}){% endif %}{% if p.reward_xp %}{% if p.reward_dots and p.reward_trait %} +{% endif %} {{ p.reward_xp }} XP{% endif %}.
+        </p>
+        {% endif %}
+
+        {% if p.log_json %}
+        <div class="mt-3 space-y-1">
+          {% for e in p.log_json[-4:] %}
+          <p class="font-garamond text-bone-600 text-[0.7rem]">
+            <span class="text-bone-700">{{ e.at[5:16].replace('T',' ') }}</span>
+            {% if e.kind == 'roll' %}— roll: {{ e.successes }} success(es), {{ e.outcome }} → {{ e.progress }}
+            {% elif e.kind == 'note' %}— {{ e.text }}
+            {% elif e.kind == 'approved' %}— activated ({{ e.text }})
+            {% endif %}
+          </p>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Add a downtime note #}
+        <form hx-post="/staff/projects/{{ p.id }}/note"
+              hx-target="#projects-tables" hx-swap="outerHTML"
+              class="flex items-end gap-2 mt-3">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <input type="text" name="text" placeholder="Add a downtime note…" class="flex-1 text-sm py-1.5">
+          <button type="submit" class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-3 py-1.5">Note</button>
+        </form>
+
+        {# Complete + apply payoff #}
+        <div class="mt-3 pt-3 border-t border-ink-700">
+          <button type="button" @click="completing = !completing"
+                  class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-3 py-1.5">
+            Complete project…
+          </button>
+          <form hx-post="/staff/projects/{{ p.id }}/complete"
+                hx-target="#projects-tables" hx-swap="outerHTML"
+                x-show="completing" x-cloak class="mt-2 space-y-2">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            {% if p.payoff_type == 'freeform' %}
+            <input type="text" name="reward_text" placeholder="Outcome / reward to record…" class="w-full text-sm py-1.5">
+            {% else %}
+            <p class="font-garamond text-bone-600 text-xs">The structured reward above is applied to the sheet on completion.</p>
+            {% endif %}
+            <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-4 py-2">Confirm Complete</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="font-garamond text-bone-600 text-sm italic">No active projects.</p>
+    {% endif %}
+  </div>
+
+  {# ── Recently finished ── #}
+  {% if finished_projects %}
+  <div class="mb-8">
+    <p class="label-gold mb-3">Recently Finished</p>
+    <div class="space-y-2">
+      {% for p in finished_projects %}
+      <div class="gilded-inset px-4 py-2 flex items-center justify-between gap-3">
+        <span class="font-garamond text-sm text-bone-400">{{ p.title }}<span class="text-bone-700"> · {{ p.character_name }}</span></span>
+        <span class="label-gold text-[0.55rem] {{ 'text-gold-400' if p.status == 'complete' else 'text-blood-400' }}">{{ p.status }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>

@@ -1,0 +1,92 @@
+{# backgrounds.html — Background Blanking card.
+   Rendered inside character.html (overview tab) and returned by the
+   set/blank POST routes for HTMX swaps. Target: #backgrounds-card. #}
+<div id="backgrounds-card" class="gilded p-5">
+  <div class="flex items-center justify-between mb-1">
+    <p class="label-gold">Backgrounds</p>
+    {% if active_period %}
+    <span class="font-garamond text-bone-600 text-xs">Tonight · {{ active_period.label }}</span>
+    {% endif %}
+  </div>
+  <p class="font-garamond text-bone-600 text-xs mb-4 leading-relaxed">
+    Track a background's dots, then blank some for the night (a failed hunt, a
+    Lasombra's shadow…). Blanked dots return when the next night opens.
+  </p>
+
+  {% if bg_error %}
+  <div class="gilded-inset px-3 py-2 mb-3 border border-blood-900">
+    <p class="font-garamond text-blood-400 text-sm">{{ bg_error }}</p>
+  </div>
+  {% elif bg_notice %}
+  <div class="gilded-inset px-3 py-2 mb-3 border border-gold-800">
+    <p class="font-garamond text-gold-400 text-sm">{{ bg_notice }}</p>
+  </div>
+  {% endif %}
+
+  {% if backgrounds %}
+  <table class="w-full text-sm font-garamond mb-4">
+    <thead>
+      <tr class="label-gold text-[0.6rem]">
+        <th class="text-left pb-2">Background</th>
+        <th class="text-center pb-2">Total</th>
+        <th class="text-center pb-2">Blanked</th>
+        <th class="text-center pb-2">Available</th>
+        <th class="text-right pb-2">Blank</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for bg in backgrounds %}
+      <tr class="border-t border-ink-700">
+        <td class="py-2 text-bone-300">{{ bg.name }}</td>
+        <td class="py-2 text-center text-bone-400">{{ bg.dots }}</td>
+        <td class="py-2 text-center {{ 'text-blood-400' if bg.is_blanked else 'text-bone-600' }}">{{ bg.blanked_dots }}</td>
+        <td class="py-2 text-center {{ 'text-gold-400' if bg.available else 'text-bone-700' }}">{{ bg.available }}</td>
+        <td class="py-2 text-right">
+          <form hx-post="/characters/{{ char.id }}/backgrounds/blank"
+                hx-target="#backgrounds-card" hx-swap="outerHTML"
+                class="inline-flex items-center gap-1.5 justify-end">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="hidden" name="background_name" value="{{ bg.name }}">
+            <input type="number" name="dots" min="1" max="{{ bg.available or 1 }}" value="1"
+                   style="width:3.25rem" class="text-center py-1 text-xs"
+                   {% if not bg.available %}disabled{% endif %}>
+            <button type="submit" {% if not bg.available %}disabled{% endif %}
+                    class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed">
+              Blank
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="font-garamond text-bone-600 text-sm italic mb-4">
+    No backgrounds tracked yet. Add one below to start blanking per night.
+  </p>
+  {% endif %}
+
+  {# Set / update / remove a tracked background (0 dots removes it) #}
+  <form hx-post="/characters/{{ char.id }}/backgrounds/set"
+        hx-target="#backgrounds-card" hx-swap="outerHTML"
+        class="flex items-end gap-2 pt-3 border-t border-ink-700">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div class="flex-1">
+      <label class="label-gold block mb-1 text-[0.6rem]">Background</label>
+      <input type="text" name="background_name" placeholder="Allies, Resources, Herd…"
+             required class="w-full py-1 text-sm">
+    </div>
+    <div style="width:5rem">
+      <label class="label-gold block mb-1 text-[0.6rem]">Dots</label>
+      <input type="number" name="dots_total" min="0" max="10" value="1"
+             class="w-full text-center py-1 text-sm">
+    </div>
+    <button type="submit"
+            class="btn-send font-cinzel text-[0.55rem] tracking-widest px-3 py-1.5">
+      Save
+    </button>
+  </form>
+  <p class="font-garamond text-bone-700 text-[0.7rem] mt-1.5 italic">
+    Set dots to 0 to remove a background.
+  </p>
+</div>

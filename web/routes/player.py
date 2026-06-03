@@ -15,6 +15,12 @@ from ..db import (
     create_coterie_single_funder_spend,
     create_spend,
     delete_character,
+    set_character_background,
+    blank_character_background,
+    list_character_backgrounds,
+    create_project,
+    list_projects_for_character,
+    timeskip_rolls_remaining,
     get_active_period,
     get_character,
     get_claim,
@@ -1514,6 +1520,9 @@ async def character_detail(
         spends          = list_spends_for_character(conn, character_id)
         ledger          = get_ledger(conn, character_id, limit=50)
         coterie         = get_coterie_for_character(conn, character_id)
+        backgrounds     = list_character_backgrounds(conn, character_id)
+        projects        = list_projects_for_character(conn, character_id)
+        proj_rolls      = timeskip_rolls_remaining(conn, character_id)
 
     p_criteria     = _player_criteria(all_criteria)
     period_claimed = (
@@ -1540,6 +1549,9 @@ async def character_detail(
             ledger=ledger,
             coterie=coterie,
             default_tab=tab,
+            backgrounds=backgrounds,
+            projects=projects,
+            proj_rolls=proj_rolls,
             spend_categories=SPEND_CATEGORIES,
             spend_rules_json=json.dumps(RULES),
             humanity_conditions=HUMANITY_CONDITIONS,
@@ -1559,6 +1571,119 @@ def _find_draft_claim(claims: list[dict], period_id: int) -> dict | None:
         if c["play_period_id"] == period_id and c["status"] == "draft":
             return c
     return None
+
+
+# ── Background blanking ───────────────────────────────────────────────────────
+
+def _backgrounds_partial(request: Request, char: dict, conn, *,
+                         notice: str | None = None, error: str | None = None):
+    """Re-render the backgrounds card for an HTMX swap."""
+    return templates.TemplateResponse(
+        request, "player/partials/backgrounds.html",
+        _ctx(
+            request,
+            char=char,
+            backgrounds=list_character_backgrounds(conn, char["id"]),
+            active_period=get_active_period(conn),
+            bg_notice=notice,
+            bg_error=error,
+        ),
+    )
+
+
+@router.post("/characters/{character_id}/backgrounds/set", response_class=HTMLResponse)
+async def set_background(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    name = (form.get("background_name") or "").strip()
+    dots = max(0, min(10, form_int(form.get("dots_total"), 0)))
+    actor = f"player:{user.get('username') or user['id']}"
+    notice = error = None
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        try:
+            res = set_character_background(conn, character_id, name, dots, actor)
+            notice = (f"Removed {res['name']}." if res["deleted"]
+                      else f"Saved {res['name']} at {dots} dot(s).")
+        except ValueError as exc:
+            error = str(exc)
+        return _backgrounds_partial(request, char, conn, notice=notice, error=error)
+
+
+@router.post("/characters/{character_id}/backgrounds/blank", response_class=HTMLResponse)
+async def blank_background(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    name = (form.get("background_name") or "").strip()
+    dots = form_int(form.get("dots"), 1)
+    actor = f"player:{user.get('username') or user['id']}"
+    notice = error = None
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        try:
+            res = blank_character_background(conn, character_id, name, dots, actor)
+            notice = (f"Blanked {res['blanked_now']} dot(s) of {res['name']} — "
+                      "restores when the next night opens.")
+        except ValueError as exc:
+            error = str(exc)
+        return _backgrounds_partial(request, char, conn, notice=notice, error=error)
+
+
+# ── Projects (downtime endeavours) ────────────────────────────────────────────
+
+def _projects_partial(request: Request, char: dict, conn, *,
+                      notice: str | None = None, error: str | None = None):
+    """Re-render the projects card for an HTMX swap."""
+    return templates.TemplateResponse(
+        request, "player/partials/projects.html",
+        _ctx(
+            request,
+            char=char,
+            projects=list_projects_for_character(conn, char["id"]),
+            proj_rolls=timeskip_rolls_remaining(conn, char["id"]),
+            proj_notice=notice,
+            proj_error=error,
+        ),
+    )
+
+
+@router.post("/characters/{character_id}/projects/propose", response_class=HTMLResponse)
+async def propose_project(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    title = (form.get("title") or "").strip()
+    description = (form.get("description") or "").strip()
+    notice = error = None
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        if not char.get("is_approved"):
+            error = "Your character must be approved before proposing projects."
+        else:
+            try:
+                create_project(conn, character_id, title, description,
+                               proposed_by=user["id"])
+                notice = "Project proposed — staff will review it."
+            except ValueError as exc:
+                error = str(exc)
+        return _projects_partial(request, char, conn, notice=notice, error=error)
 
 
 @router.post("/characters/{character_id}/claim", response_class=HTMLResponse)

@@ -24,6 +24,7 @@ _COGS = [
     "bot.cogs.coteries",
     "bot.cogs.roll",
     "bot.cogs.timeskip",
+    "bot.cogs.projects",
 ]
 
 

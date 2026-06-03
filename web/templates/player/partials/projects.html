@@ -1,0 +1,91 @@
+{# projects.html — downtime Projects card.
+   Rendered in character.html (overview tab) and returned by the propose route
+   for HTMX swaps. Target: #projects-card. #}
+<div id="projects-card" class="gilded p-5">
+  <div class="flex items-center justify-between gap-3 mb-1">
+    <p class="label-gold">Projects</p>
+    {% if proj_rolls and proj_rolls.period_id %}
+    <span class="font-garamond text-xs {{ 'text-gold-400' if proj_rolls.remaining else 'text-blood-400' }}">
+      {{ proj_rolls.remaining }}/{{ proj_rolls.cap }} rolls left this timeskip
+    </span>
+    {% endif %}
+  </div>
+  <p class="font-garamond text-bone-600 text-xs mb-4 leading-relaxed">
+    Downtime endeavours — research, influence, crafting. Propose one and staff set
+    how it runs. Roll-based projects are worked with
+    <span class="text-bone-400">/project roll</span> each night.
+  </p>
+
+  {% if proj_error %}
+  <div class="gilded-inset px-3 py-2 mb-3 border border-blood-900">
+    <p class="font-garamond text-blood-400 text-sm">{{ proj_error }}</p>
+  </div>
+  {% elif proj_notice %}
+  <div class="gilded-inset px-3 py-2 mb-3 border border-gold-800">
+    <p class="font-garamond text-gold-400 text-sm">{{ proj_notice }}</p>
+  </div>
+  {% endif %}
+
+  {% if projects %}
+  <div class="space-y-3 mb-4">
+    {% for p in projects %}
+    <div class="gilded-inset px-4 py-3">
+      <div class="flex items-center justify-between gap-3">
+        <p class="font-cinzel text-sm text-bone-200">{{ p.title }}</p>
+        {% if p.status == 'proposed' %}
+        <span class="label-gold text-[0.6rem] text-bone-500">Pending review</span>
+        {% elif p.status == 'active' %}
+        <span class="label-gold text-[0.6rem] text-gold-400">{{ 'Ready' if p.target_reached else 'Active' }}</span>
+        {% elif p.status == 'complete' %}
+        <span class="label-gold text-[0.6rem] text-gold-400">Complete</span>
+        {% else %}
+        <span class="label-gold text-[0.6rem] text-blood-400">Returned</span>
+        {% endif %}
+      </div>
+      {% if p.description %}
+      <p class="font-garamond text-bone-600 text-xs mt-1">{{ p.description }}</p>
+      {% endif %}
+      {% if p.status == 'active' and p.progress_type == 'roll' %}
+      <div class="mt-2">
+        <div class="flex items-center justify-between text-[0.6rem] label-gold mb-1">
+          <span>{{ 'Target reached — awaiting staff' if p.target_reached else 'Extended test' }}</span>
+          <span class="text-bone-400">{{ p.progress_successes }}/{{ p.target_successes }}</span>
+        </div>
+        <div style="height:6px;background:#221f1b;border-radius:1px">
+          <div style="height:6px;background:#c29b48;width:{{ p.progress_pct }}%;border-radius:1px"></div>
+        </div>
+      </div>
+      {% elif p.status == 'active' %}
+      <p class="font-garamond text-bone-600 text-xs mt-1 italic">Staff are tracking this project.</p>
+      {% elif p.status == 'complete' and p.reward_text %}
+      <p class="font-garamond text-gold-500 text-xs mt-1">Outcome · {{ p.reward_text }}</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="font-garamond text-bone-600 text-sm italic mb-4">
+    No projects yet. Propose one below.
+  </p>
+  {% endif %}
+
+  {# Propose a project #}
+  <form hx-post="/characters/{{ char.id }}/projects/propose"
+        hx-target="#projects-card" hx-swap="outerHTML"
+        class="space-y-2 pt-3 border-t border-ink-700">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div>
+      <label class="label-gold block mb-1 text-[0.6rem]">New project</label>
+      <input type="text" name="title" maxlength="120" required
+             placeholder="Title — e.g. Decode the Tremere grimoire"
+             class="w-full py-1 text-sm">
+    </div>
+    <textarea name="description" rows="2"
+              placeholder="What are you trying to accomplish? (optional)"
+              class="w-full py-1 text-sm resize-none"></textarea>
+    <button type="submit"
+            class="btn-send font-cinzel text-[0.55rem] tracking-widest px-3 py-1.5">
+      Propose Project
+    </button>
+  </form>
+</div>

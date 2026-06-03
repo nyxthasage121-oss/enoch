@@ -129,6 +129,72 @@ async def set_bond(character_id: int, regnant: str, *, level: int | None = None,
         return r.json()
 
 
+async def get_backgrounds(character_id: int) -> dict:
+    """List a character's tracked backgrounds (for /blank autocomplete + status).
+    Returns ``{character_id, current_night, backgrounds}``."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.get(
+            f"{_base()}/api/characters/{character_id}/backgrounds",
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def blank_background(character_id: int, name: str, dots: int = 1) -> dict:
+    """Blank ``dots`` of a tracked background for the current night. Returns
+    ``{character_id, result}`` on success, or ``{error: <reason>}`` when the
+    request is rejected (no active night, background not tracked, too many
+    dots) so the caller can surface the message."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/characters/{character_id}/backgrounds/blank",
+            json={"name": name, "dots": dots},
+            headers=_headers(),
+        )
+        if r.status_code == 400:
+            try:
+                return {"error": r.json().get("detail") or "Invalid request."}
+            except Exception:
+                return {"error": "Invalid request."}
+        r.raise_for_status()
+        return r.json()
+
+
+async def get_projects(character_id: int) -> dict:
+    """List a character's downtime projects (for /project list + /project roll).
+    Returns ``{character_id, current_night, projects}``; each project has a
+    ``can_roll_now`` flag."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.get(
+            f"{_base()}/api/characters/{character_id}/projects",
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def record_project_roll(project_id: int, requester_discord_id: str,
+                              successes: int, outcome: str) -> dict:
+    """Post a downtime roll's successes for a roll project. Returns
+    ``{project}`` on success or ``{error: <reason>}`` when rejected (not your
+    project, already rolled this night, no active period, not a roll project)."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/projects/{project_id}/roll",
+            json={"requester_discord_id": requester_discord_id,
+                  "successes": successes, "outcome": outcome},
+            headers=_headers(),
+        )
+        if r.status_code in (400, 403, 404):
+            try:
+                return {"error": r.json().get("detail") or "Could not record the roll."}
+            except Exception:
+                return {"error": "Could not record the roll."}
+        r.raise_for_status()
+        return r.json()
+
+
 async def get_character_coterie(character_id: int) -> dict | None:
     """Fetch coterie info for a character. Returns None if not in a coterie."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:

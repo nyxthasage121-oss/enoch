@@ -237,6 +237,10 @@
              class="nav-link {{ 'active' if request.url.path.startswith('/staff/coteries') else '' }}">
             Coteries
           </a>
+          <a href="/staff/projects"
+             class="nav-link {{ 'active' if request.url.path.startswith('/staff/projects') else '' }}">
+            Projects
+          </a>
           {# Periods + Hunting Sites moved into /staff/admin as tabs
              2026-05 per Steward direction. The standalone routes still
              redirect, but the sidebar entries are gone. #}

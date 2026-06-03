@@ -7,6 +7,7 @@ Falls back to stdlib sqlite3 when libsql-experimental is not installed
 """
 import json
 import logging
+import re
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -88,7 +89,18 @@ def get_db():
 # ── Migrations ────────────────────────────────────────────────────────────────
 
 def run_migrations() -> None:
-    """Apply any pending numbered *.sql files from the migrations/ directory."""
+    """Apply any pending numbered *.sql files from the migrations/ directory.
+
+    Each file is applied inside an explicit transaction *together with* its
+    _migrations bookkeeping row, so a file either applies in full and is
+    recorded, or rolls back entirely. The explicit ``BEGIN`` matters: under
+    SQLite's default isolation, bare DDL (CREATE/ALTER) auto-commits one
+    statement at a time, so a failure partway through a file could leave the
+    schema half-migrated yet unrecorded — and the file would re-run on the
+    next boot, crashing on the statements that already landed. With the
+    transaction, a failed migration rolls back cleanly and halts startup
+    loudly (naming the file) so it gets fixed rather than silently looping.
+    """
     with get_db() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS _migrations (
@@ -110,13 +122,24 @@ def run_migrations() -> None:
         sql = path.read_text(encoding="utf-8")
         # Strip line comments before splitting on ";" so semicolons inside
         # comments (e.g. "-- note; more note") don't create phantom statements.
-        import re as _re
-        sql_clean = _re.sub(r"--[^\n]*", "", sql)
+        sql_clean = re.sub(r"--[^\n]*", "", sql)
         statements = [s.strip() for s in sql_clean.split(";") if s.strip()]
-        with get_db() as conn:
-            for stmt in statements:
-                conn.execute(stmt)
-            conn.execute("INSERT INTO _migrations (filename) VALUES (?)", (path.name,))
+        try:
+            with get_db() as conn:
+                # Explicit transaction so DDL joins the rollback scope; get_db()
+                # commits on a clean exit and rolls back on any exception.
+                conn.execute("BEGIN")
+                for stmt in statements:
+                    conn.execute(stmt)
+                conn.execute(
+                    "INSERT INTO _migrations (filename) VALUES (?)", (path.name,)
+                )
+        except Exception:
+            log.exception(
+                "Migration %s failed and was rolled back; halting startup",
+                path.name,
+            )
+            raise
         log.info("Applied: %s", path.name)
 
 
@@ -141,13 +164,13 @@ STAFF_PERMISSIONS: dict[str, set[str]] = {
         "approve_claim", "approve_spend", "approve_character", "reject_character",
         "edit_character", "delete_character", "adjust_xp",
         "manage_period", "manage_coterie", "manage_criteria", "manage_site",
-        "manage_map", "manage_settings", "manage_roles",
+        "manage_map", "manage_project", "manage_settings", "manage_roles",
     },
     "co_st": {
         "approve_claim", "approve_spend", "approve_character", "reject_character",
         "edit_character", "delete_character", "adjust_xp",
         "manage_period", "manage_coterie", "manage_criteria", "manage_site",
-        "manage_map",
+        "manage_map", "manage_project",
         # No manage_settings or manage_roles
     },
     "reviewer": {
@@ -690,6 +713,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "xp_cap_enabled", "xp_cap_amount",
         # Per-player character cap (migration 032)
         "max_chars_per_player",
+        # Project rolls per timeskip (migration 035)
+        "rolls_per_timeskip",
     }
     # Validate ruleset before persisting — guard against typo'd POSTs.
     if "active_ruleset" in kwargs and kwargs["active_ruleset"] not in RULESETS:
@@ -875,6 +900,186 @@ def list_recent_closed_periods(conn, limit: int = 2) -> list[dict]:
     ).fetchall()
 
 
+# ── Character backgrounds (V5 background blanking) ────────────────────────────
+#
+# A character tracks named backgrounds, each with a dot total. "Blanking" takes
+# N dots out of play for one night; the dots auto-restore when the next play
+# period opens. Re-keyed from the source tracker's integer night ordinal onto
+# Enoch's period identity: a blank stores the period it was made in
+# (blanked_period_id) and is "due" once a *different* period is active.
+
+def _bg_key(name: str) -> str:
+    """Slugify a background name into the per-character dedupe identity, so
+    'High Society' and 'high  society!' collapse onto one tracked row."""
+    return re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")[:120]
+
+
+def _bg_view(row: dict) -> dict:
+    """Decorate a raw character_backgrounds row with computed totals."""
+    total   = max(0, int(row.get("dots") or 0))
+    blanked = max(0, min(int(row.get("blanked_dots") or 0), total))
+    return {
+        **row,
+        "dots": total,
+        "blanked_dots": blanked,
+        "available": max(0, total - blanked),
+        "is_blanked": blanked > 0,
+    }
+
+
+def list_character_backgrounds(conn, character_id: int) -> list[dict]:
+    """All tracked backgrounds for a character, name-ordered, each decorated
+    with computed total / blanked / available dots."""
+    rows = conn.execute(
+        "SELECT * FROM character_backgrounds WHERE character_id=? "
+        "ORDER BY name COLLATE NOCASE",
+        (character_id,),
+    ).fetchall()
+    return [_bg_view(r) for r in rows]
+
+
+def set_character_background(
+    conn, character_id: int, name: str, dots: int, updated_by: str = ""
+) -> dict:
+    """Create, update, or remove (dots=0) a tracked background. Lowering the
+    total below the currently-blanked count re-clamps the blank; if that zeroes
+    it, the pending release is cleared. Returns {'deleted': bool, 'name': str}."""
+    name = (name or "").strip()[:120]
+    if not name:
+        raise ValueError("Background name is required.")
+    key = _bg_key(name)
+    if not key:
+        raise ValueError("Background name must contain a letter or number.")
+    total = max(0, int(dots))
+    row = conn.execute(
+        "SELECT * FROM character_backgrounds WHERE character_id=? AND bg_key=?",
+        (character_id, key),
+    ).fetchone()
+
+    if row is None:
+        if total == 0:
+            return {"deleted": False, "name": name}
+        conn.execute(
+            "INSERT INTO character_backgrounds "
+            "(character_id, name, bg_key, dots, blanked_dots, updated_at, updated_by) "
+            "VALUES (?, ?, ?, ?, 0, ?, ?)",
+            (character_id, name, key, total, _now(), updated_by),
+        )
+        return {"deleted": False, "name": name}
+
+    if total == 0:
+        conn.execute("DELETE FROM character_backgrounds WHERE id=?", (row["id"],))
+        return {"deleted": True, "name": name}
+
+    blanked = max(0, min(int(row["blanked_dots"] or 0), total))
+    if blanked == 0:
+        conn.execute(
+            "UPDATE character_backgrounds SET name=?, dots=?, blanked_dots=0, "
+            "blanked_period_id=NULL, blanked_at=NULL, updated_at=?, updated_by=? "
+            "WHERE id=?",
+            (name, total, _now(), updated_by, row["id"]),
+        )
+    else:
+        conn.execute(
+            "UPDATE character_backgrounds SET name=?, dots=?, blanked_dots=?, "
+            "updated_at=?, updated_by=? WHERE id=?",
+            (name, total, blanked, _now(), updated_by, row["id"]),
+        )
+    return {"deleted": False, "name": name}
+
+
+def blank_character_background(
+    conn, character_id: int, name: str, dots_to_blank: int, updated_by: str = ""
+) -> dict:
+    """Blank N dots of a tracked background for the current night. Requires an
+    active play period. A leftover blank from an *earlier* period is released
+    first so the one-night window never compounds across nights; same-night
+    re-blanks accumulate. Raises ValueError on any invalid input."""
+    key = _bg_key(name)
+    if not key:
+        raise ValueError("Background name is required.")
+    active = get_active_period(conn)
+    if not active:
+        raise ValueError("There is no active play period — blanking needs an open night.")
+    dots = int(dots_to_blank)
+    if dots <= 0:
+        raise ValueError("You must blank at least 1 dot.")
+
+    row = conn.execute(
+        "SELECT * FROM character_backgrounds WHERE character_id=? AND bg_key=?",
+        (character_id, key),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f'"{name}" is not a tracked background.')
+
+    total   = max(0, int(row["dots"] or 0))
+    blanked = max(0, min(int(row["blanked_dots"] or 0), total))
+    # A blank tied to a prior period is already due — drop it before re-blanking.
+    if blanked > 0 and row["blanked_period_id"] != active["id"]:
+        blanked = 0
+
+    available = total - blanked
+    if dots > available:
+        raise ValueError(
+            f"Cannot blank {dots} dot(s) of {row['name']}; only {available} available."
+        )
+
+    new_blanked = blanked + dots
+    conn.execute(
+        "UPDATE character_backgrounds SET blanked_dots=?, blanked_period_id=?, "
+        "blanked_at=?, updated_at=?, updated_by=? WHERE id=?",
+        (new_blanked, active["id"], _now(), _now(), updated_by, row["id"]),
+    )
+    return {
+        "name":         row["name"],
+        "dots":         total,
+        "blanked_now":  dots,
+        "blanked_dots": new_blanked,
+        "available":    max(0, total - new_blanked),
+        "period_label": active["label"],
+    }
+
+
+def release_due_background_blanks(conn) -> list[dict]:
+    """Restore blanked dots whose blank predates the current active period (a
+    new night has opened) and enqueue a `background_released` bot event for each
+    owner. Returns the release events. No-op when no period is active."""
+    active = get_active_period(conn)
+    if not active:
+        return []
+    rows = conn.execute(
+        """
+        SELECT cb.*, c.discord_id AS owner_discord, c.name AS character_name
+        FROM character_backgrounds cb
+        JOIN characters c ON c.id = cb.character_id
+        WHERE cb.blanked_dots > 0
+          AND cb.blanked_period_id IS NOT NULL
+          AND cb.blanked_period_id != ?
+        """,
+        (active["id"],),
+    ).fetchall()
+    released: list[dict] = []
+    for row in rows:
+        dots = int(row["blanked_dots"] or 0)
+        if dots <= 0:
+            continue
+        conn.execute(
+            "UPDATE character_backgrounds SET blanked_dots=0, blanked_period_id=NULL, "
+            "blanked_at=NULL, updated_at=?, updated_by=? WHERE id=?",
+            (_now(), "system:release", row["id"]),
+        )
+        event = {
+            "discord_id":     row["owner_discord"],
+            "character_id":   row["character_id"],
+            "character_name": row["character_name"],
+            "name":           row["name"],
+            "dots_released":  dots,
+        }
+        enqueue_bot(conn, "background_released", event)
+        released.append(event)
+    return released
+
+
 # ── Period schedule templates ────────────────────────────────────────────────
 
 def list_period_schedules(conn, active_only: bool = True) -> list[dict]:
@@ -1030,9 +1235,11 @@ def create_period(
 
 
 def set_period_active(conn, period_id: int) -> dict:
-    """Deactivate all periods, then activate the given one."""
+    """Deactivate all periods, then activate the given one. Opening a new night
+    releases any background blanks that were made during a previous period."""
     conn.execute("UPDATE play_periods SET is_active=0")
     conn.execute("UPDATE play_periods SET is_active=1 WHERE id=?", (period_id,))
+    release_due_background_blanks(conn)
     return get_period(conn, period_id)
 
 
@@ -3713,6 +3920,328 @@ def import_kml(conn, layer_id: int, kml_text: str) -> dict:
 
 
 # ── Bot Outbox ────────────────────────────────────────────────────────────────
+
+# ── Projects (downtime endeavours) ────────────────────────────────────────────
+#
+# A character proposes a Project; staff approve it and pick how it runs (staged
+# vs roll) and how it pays off (freeform vs structured). Staged projects advance
+# by staff notes; roll projects are a V5 extended test the player rolls down once
+# per period via the bot. Completion is always a staff action (which applies any
+# payoff), keeping staff in approver mode.
+
+def _project_view(row: dict | None) -> dict | None:
+    """Decorate a project row: parse log_json and add derived fields."""
+    if row is None:
+        return None
+    row = _parse(row, "log_json")
+    if not isinstance(row.get("log_json"), list):
+        row["log_json"] = []
+    target = int(row.get("target_successes") or 0)
+    prog   = int(row.get("progress_successes") or 0)
+    row["target_reached"] = (
+        row.get("progress_type") == "roll" and target > 0 and prog >= target
+    )
+    row["progress_pct"] = min(100, round(100 * prog / target)) if target > 0 else 0
+    return row
+
+
+def get_project(conn, project_id: int) -> dict | None:
+    return _project_view(
+        conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+    )
+
+
+def list_projects_for_character(conn, character_id: int) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM projects WHERE character_id=? ORDER BY created_at DESC",
+        (character_id,),
+    ).fetchall()
+    return [_project_view(r) for r in rows]
+
+
+def list_pending_projects(conn) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT p.*, c.name AS character_name
+        FROM projects p JOIN characters c ON c.id = p.character_id
+        WHERE p.status='proposed'
+        ORDER BY p.created_at ASC
+        """
+    ).fetchall()
+    return [_project_view(r) for r in rows]
+
+
+def list_active_projects(conn) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT p.*, c.name AS character_name
+        FROM projects p JOIN characters c ON c.id = p.character_id
+        WHERE p.status='active'
+        ORDER BY p.updated_at DESC
+        """
+    ).fetchall()
+    return [_project_view(r) for r in rows]
+
+
+def list_recent_finished_projects(conn, limit: int = 10) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT p.*, c.name AS character_name
+        FROM projects p JOIN characters c ON c.id = p.character_id
+        WHERE p.status IN ('complete','rejected')
+        ORDER BY p.reviewed_at DESC, p.updated_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [_project_view(r) for r in rows]
+
+
+def _project_log_append(conn, project_id: int, entry: dict) -> None:
+    proj = get_project(conn, project_id)
+    if proj is None:
+        return
+    log = proj.get("log_json") or []
+    log.append({"at": _now(), **entry})
+    conn.execute(
+        "UPDATE projects SET log_json=?, updated_at=? WHERE id=?",
+        (_j(log), _now(), project_id),
+    )
+
+
+def create_project(conn, character_id: int, title: str, description: str,
+                   proposed_by: str) -> dict:
+    title = (title or "").strip()[:120]
+    if not title:
+        raise ValueError("A project title is required.")
+    cur = conn.execute(
+        """
+        INSERT INTO projects (character_id, title, description, status,
+                              proposed_by, created_at, updated_at)
+        VALUES (?, ?, ?, 'proposed', ?, ?, ?)
+        """,
+        (character_id, title, (description or "").strip(), proposed_by, _now(), _now()),
+    )
+    return get_project(conn, cur.lastrowid)
+
+
+def approve_project(conn, project_id: int, reviewer_id: str, *,
+                    progress_type: str, payoff_type: str,
+                    roll_pool: str = "", roll_difficulty: int = 1,
+                    target_successes: int = 0,
+                    reward_category: str | None = None,
+                    reward_trait: str | None = None,
+                    reward_dots: int = 0, reward_xp: int = 0) -> dict:
+    proj = get_project(conn, project_id)
+    if proj is None:
+        raise ValueError(f"Project {project_id} not found")
+    if proj["status"] != "proposed":
+        raise ValueError("Only a proposed project can be approved.")
+    if progress_type not in ("staged", "roll"):
+        raise ValueError("Progress type must be 'staged' or 'roll'.")
+    if payoff_type not in ("freeform", "structured"):
+        raise ValueError("Payoff type must be 'freeform' or 'structured'.")
+    if progress_type == "roll":
+        if not (roll_pool or "").strip():
+            raise ValueError("A roll project needs a dice pool.")
+        if int(target_successes) <= 0:
+            raise ValueError("A roll project needs a target success count above 0.")
+    conn.execute(
+        """
+        UPDATE projects SET status='active', progress_type=?, payoff_type=?,
+            roll_pool=?, roll_difficulty=?, target_successes=?,
+            reward_category=?, reward_trait=?, reward_dots=?, reward_xp=?,
+            reviewed_by=?, reviewed_at=?, updated_at=?
+        WHERE id=?
+        """,
+        (progress_type, payoff_type, (roll_pool or "").strip(),
+         max(0, int(roll_difficulty)), max(0, int(target_successes)),
+         reward_category, reward_trait, max(0, int(reward_dots)),
+         max(0, int(reward_xp)), reviewer_id, _now(), _now(), project_id),
+    )
+    _project_log_append(conn, project_id,
+                        {"by": reviewer_id, "kind": "approved",
+                         "text": f"{progress_type} / {payoff_type}"})
+    write_audit(conn, reviewer_id, "approve_project", "project", project_id,
+                after={"progress_type": progress_type, "payoff_type": payoff_type})
+    char = get_character(conn, proj["character_id"])
+    if char and char.get("discord_id"):
+        enqueue_bot(conn, "project_approved", {
+            "discord_id":    char["discord_id"],
+            "project_id":    project_id,
+            "project_name":  proj["title"],
+            "progress_type": progress_type,
+        })
+    return get_project(conn, project_id)
+
+
+def reject_project(conn, project_id: int, reviewer_id: str, reason: str) -> dict:
+    proj = get_project(conn, project_id)
+    if proj is None:
+        raise ValueError(f"Project {project_id} not found")
+    if proj["status"] != "proposed":
+        raise ValueError("Only a proposed project can be rejected.")
+    conn.execute(
+        "UPDATE projects SET status='rejected', reviewed_by=?, reviewed_at=?, "
+        "updated_at=? WHERE id=?",
+        (reviewer_id, _now(), _now(), project_id),
+    )
+    _project_log_append(conn, project_id,
+                        {"by": reviewer_id, "kind": "rejected", "text": reason})
+    write_audit(conn, reviewer_id, "reject_project", "project", project_id,
+                after={"reason": reason})
+    char = get_character(conn, proj["character_id"])
+    if char and char.get("discord_id"):
+        enqueue_bot(conn, "project_rejected", {
+            "discord_id":   char["discord_id"],
+            "project_id":   project_id,
+            "project_name": proj["title"],
+            "reason":       reason,
+        })
+    return get_project(conn, project_id)
+
+
+def add_project_note(conn, project_id: int, staff_id: str, text: str) -> dict:
+    proj = get_project(conn, project_id)
+    if proj is None:
+        raise ValueError(f"Project {project_id} not found")
+    if proj["status"] != "active":
+        raise ValueError("Notes can only be added to an active project.")
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("Note text is required.")
+    _project_log_append(conn, project_id, {"by": staff_id, "kind": "note", "text": text})
+    return get_project(conn, project_id)
+
+
+def get_rolls_per_timeskip(conn) -> int:
+    """The chronicle-wide project-roll budget each character gets per timeskip."""
+    s = get_settings(conn) or {}
+    try:
+        return max(0, int(s.get("rolls_per_timeskip", 8) or 8))
+    except (TypeError, ValueError):
+        return 8
+
+
+def get_timeskip_rolls_used(conn, character_id: int, period_id: int) -> int:
+    row = conn.execute(
+        "SELECT rolls_used FROM timeskip_roll_usage "
+        "WHERE character_id=? AND period_id=?",
+        (character_id, period_id),
+    ).fetchone()
+    return int(row["rolls_used"]) if row else 0
+
+
+def timeskip_rolls_remaining(conn, character_id: int) -> dict:
+    """{used, cap, remaining, period_id} for the active period. remaining=0 and
+    period_id=None when no period is active."""
+    cap    = get_rolls_per_timeskip(conn)
+    active = get_active_period(conn)
+    if not active:
+        return {"used": 0, "cap": cap, "remaining": 0, "period_id": None}
+    used = get_timeskip_rolls_used(conn, character_id, active["id"])
+    return {"used": used, "cap": cap, "remaining": max(0, cap - used),
+            "period_id": active["id"]}
+
+
+def consume_timeskip_roll(conn, character_id: int, period_id: int) -> None:
+    conn.execute(
+        """
+        INSERT INTO timeskip_roll_usage (character_id, period_id, rolls_used)
+        VALUES (?, ?, 1)
+        ON CONFLICT(character_id, period_id)
+        DO UPDATE SET rolls_used = rolls_used + 1
+        """,
+        (character_id, period_id),
+    )
+
+
+def record_project_roll(conn, project_id: int, *, successes: int, outcome: str,
+                        period_id: int | None) -> dict:
+    """Accumulate a downtime roll's successes toward a roll project's target.
+    One roll per active play period. Returns the updated project; the caller
+    reads `target_reached`. Raises ValueError on any invalid state."""
+    proj = get_project(conn, project_id)
+    if proj is None:
+        raise ValueError("Project not found.")
+    if proj["status"] != "active" or proj.get("progress_type") != "roll":
+        raise ValueError("This project isn't an active roll project.")
+    if period_id is None:
+        raise ValueError("There is no active play period to roll in.")
+    # NYbN: each character has a shared pool of project rolls per timeskip
+    # (not one per project). Enforce + consume from that pool.
+    cap  = get_rolls_per_timeskip(conn)
+    used = get_timeskip_rolls_used(conn, proj["character_id"], period_id)
+    if used >= cap:
+        raise ValueError(f"No project rolls left this timeskip ({used}/{cap} used).")
+    consume_timeskip_roll(conn, proj["character_id"], period_id)
+    gain = max(0, int(successes))
+    new_prog = int(proj["progress_successes"] or 0) + gain
+    conn.execute(
+        "UPDATE projects SET progress_successes=?, last_roll_period_id=?, "
+        "updated_at=? WHERE id=?",
+        (new_prog, period_id, _now(), project_id),
+    )
+    _project_log_append(conn, project_id,
+                        {"by": "player", "kind": "roll",
+                         "successes": gain, "outcome": outcome, "progress": new_prog})
+    return get_project(conn, project_id)
+
+
+def complete_project(conn, project_id: int, staff_id: str,
+                     reward_text: str | None = None) -> dict:
+    """Mark a project complete and apply its payoff. 'freeform' records the
+    staff-written outcome; 'structured' grants the configured dots and/or XP
+    onto the sheet. Guards on active status."""
+    proj = get_project(conn, project_id)
+    if proj is None:
+        raise ValueError(f"Project {project_id} not found")
+    if proj["status"] != "active":
+        raise ValueError("Only an active project can be completed.")
+    char = get_character(conn, proj["character_id"])
+    if char is None:
+        raise ValueError("Project's character no longer exists.")
+
+    granted: list[str] = []
+    if proj.get("payoff_type") == "structured" and not proj.get("payoff_applied"):
+        dots  = int(proj.get("reward_dots") or 0)
+        cat   = proj.get("reward_category")
+        trait = proj.get("reward_trait")
+        if dots > 0 and cat and trait:
+            sheet = dict(char.get("sheet_json") or {})
+            sheet = _apply_spend_to_sheet(sheet, category=cat, trait_name=trait,
+                                          new_dots=dots)
+            conn.execute("UPDATE characters SET sheet_json=?, updated_at=? WHERE id=?",
+                         (_j(sheet), _now(), char["id"]))
+            granted.append(f"{trait} {dots} ({cat})")
+        xp = int(proj.get("reward_xp") or 0)
+        if xp > 0:
+            adjust_xp_manual(conn, char["id"], xp,
+                             f"Project reward: {proj['title']}", staff_id,
+                             target="total")
+            granted.append(f"+{xp} XP")
+        conn.execute("UPDATE projects SET payoff_applied=1 WHERE id=?", (project_id,))
+
+    final_text = (reward_text or "").strip() or proj.get("reward_text") or ""
+    conn.execute(
+        "UPDATE projects SET status='complete', reward_text=?, reviewed_by=?, "
+        "reviewed_at=?, updated_at=? WHERE id=?",
+        (final_text, staff_id, _now(), _now(), project_id),
+    )
+    summary = final_text or (", ".join(granted) if granted else "Project completed.")
+    _project_log_append(conn, project_id,
+                        {"by": staff_id, "kind": "completed", "text": summary})
+    write_audit(conn, staff_id, "complete_project", "project", project_id,
+                after={"granted": granted, "reward_text": final_text})
+    if char.get("discord_id"):
+        enqueue_bot(conn, "project_completed", {
+            "discord_id":   char["discord_id"],
+            "project_id":   project_id,
+            "project_name": proj["title"],
+            "reward":       summary,
+        })
+    return get_project(conn, project_id)
+
 
 def enqueue_bot(conn, command: str, payload: dict) -> dict:
     cur = conn.execute("""

@@ -40,6 +40,13 @@
       </p>
     </a>
 
+    <a href="/staff/projects" class="gilded p-5 block hover:border-gold-800 transition-colors aurora-beam {{ 'pending-pulse' if n_project_reqs > 0 else '' }}">
+      <p class="label-gold mb-2 text-[0.75rem]">Project Proposals</p>
+      <p class="font-cinzel text-4xl {{ 'text-mauve-400 aurora-badge-pulse inline-block' if n_project_reqs > 0 else 'text-bone-600' }}">
+        {{ n_project_reqs }}
+      </p>
+    </a>
+
     {# Near-cap tile — surfaces characters within 30 XP of retirement so
        staff can engage proactively before the auto-retire sweep fires. #}
     <a href="/staff/characters?near_cap=1"

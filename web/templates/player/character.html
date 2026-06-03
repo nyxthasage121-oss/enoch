@@ -119,8 +119,8 @@
 
   {# ── Tabs ── #}
   <div class="flex gap-0 border-b border-ink-700 mb-6 overflow-x-auto">
-    {% set xp_tabs = [('claim','Claim XP'),('spend','Spend XP'),('wishlist','Wishlist')] if char.is_approved else [] %}
-    {% for t, lbl in [('overview','Overview'),('sheet','Sheet')] + xp_tabs + [('history','History')] %}
+    {% set play_tabs = [('claim','Claim XP'),('spend','Spend XP'),('wishlist','Wishlist'),('projects','Projects')] if char.is_approved else [] %}
+    {% for t, lbl in [('overview','Overview'),('sheet','Sheet')] + play_tabs + [('history','History')] %}
     <button @click="tab='{{ t }}'"
             :class="tab === '{{ t }}'
               ? 'text-gold-400 border-b-2 border-clan'
@@ -378,7 +378,18 @@
       </div>
     </div>
     {% endif %}
+
+    {% if char.is_approved %}
+    {% include "player/partials/backgrounds.html" %}
+    {% endif %}
   </div>
+
+  {# ══ Projects ══ #}
+  {% if char.is_approved %}
+  <div x-show="tab === 'projects'" x-cloak class="space-y-4">
+    {% include "player/partials/projects.html" %}
+  </div>
+  {% endif %}
 
   {# ══ Sheet ══ #}
   <div x-show="tab === 'sheet'" x-cloak

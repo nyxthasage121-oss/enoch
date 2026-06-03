@@ -136,6 +136,17 @@
           </p>
         </div>
 
+        <div>
+          <label class="label-gold block mb-1.5 text-[0.7rem]">Project rolls per timeskip</label>
+          <input type="number" name="rolls_per_timeskip" min="0" max="99"
+                 value="{{ _cs.get('rolls_per_timeskip', 8) }}"
+                 class="w-28 text-sm py-1 px-2">
+          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
+            Project rolls each character gets per timeskip (NYbN = 8), shared across
+            all of their projects.
+          </p>
+        </div>
+
         <div class="divider-gold"></div>
 
         {# Ruleset selector — two-way Standard vs Homebrew. The In

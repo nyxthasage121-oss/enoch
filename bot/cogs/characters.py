@@ -7,6 +7,7 @@ from discord.ext import commands
 
 from ..api import (
     get_character, get_player_characters, upsert_player, set_condition, set_bond,
+    get_backgrounds, blank_background,
 )
 from ..config import settings
 
@@ -480,6 +481,73 @@ class CharactersCog(commands.Cog):
         conds = _parse_sheet(full).get("conditions") or []
         await interaction.followup.send(
             embed=_conditions_embed(char["name"], conds), ephemeral=True)
+
+    # ── /blank (background blanking) ───────────────────────────────────────────
+
+    async def _background_autocomplete(
+        self, interaction: discord.Interaction, current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """Suggest the character's tracked backgrounds that still have dots free."""
+        char = await self._one_character(
+            interaction, getattr(interaction.namespace, "character", None))
+        if not char:
+            return []
+        try:
+            data = await get_backgrounds(char["id"])
+        except Exception:
+            return []
+        cur = (current or "").lower()
+        out: list[app_commands.Choice[str]] = []
+        for bg in (data.get("backgrounds") or []):
+            nm = (bg.get("name") or "").strip()
+            if not nm or (cur and cur not in nm.lower()):
+                continue
+            label = f"{nm} ({bg.get('available', 0)}/{bg.get('dots', 0)} free)"[:100]
+            out.append(app_commands.Choice(name=label, value=nm[:100]))
+            if len(out) >= 25:
+                break
+        return out
+
+    @app_commands.command(
+        name="blank",
+        description="Blank dots of a background for tonight (restores next night)")
+    @app_commands.describe(
+        background="Which tracked background to blank",
+        dots="How many dots to blank",
+        character="Which character (only if you have more than one)")
+    @app_commands.autocomplete(background=_background_autocomplete)
+    async def blank(self, interaction: discord.Interaction, background: str,
+                    dots: app_commands.Range[int, 1, 10] = 1,
+                    character: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._one_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>`.", ephemeral=True)
+            return
+        try:
+            resp = await blank_background(char["id"], background.strip(), dots)
+        except Exception as exc:
+            log.warning("blank failed for %s: %s", char.get("id"), exc)
+            await interaction.followup.send(
+                "❌ Could not blank that background.", ephemeral=True)
+            return
+        if resp.get("error"):
+            await interaction.followup.send(f"❌ {resp['error']}", ephemeral=True)
+            return
+        r = resp.get("result") or {}
+        e = discord.Embed(
+            title="🌑 Background Blanked",
+            description=(
+                f"Blanked **{r.get('blanked_now', dots)}** dot(s) of "
+                f"**{r.get('name', background)}** for **{char['name']}**."
+            ),
+            color=_BLOOD,
+        )
+        e.add_field(name="Available now",
+                    value=f"{r.get('available', 0)}/{r.get('dots', 0)}", inline=True)
+        e.add_field(name="Restores", value="when the next night opens", inline=True)
+        await interaction.followup.send(embed=e, ephemeral=True)
 
     # ── /bond (drink / set / clear / list) ────────────────────────────────────
 

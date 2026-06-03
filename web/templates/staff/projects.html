@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Projects — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-8">
+    <p class="label-gold mb-1">Staff</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Projects</h1>
+    <p class="font-garamond text-bone-600 text-sm mt-2 max-w-2xl">
+      Downtime endeavours proposed by players. Approve one to choose how it runs
+      (staff-tracked stages or a roll-based extended test) and how it pays off,
+      track it to completion, then the reward is applied.
+    </p>
+  </div>
+
+  {% include "staff/partials/projects_tables.html" %}
+</div>
+{% endblock %}

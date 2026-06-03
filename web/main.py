@@ -14,6 +14,7 @@ from .config import settings
 from .db import (
     get_db, run_migrations, sweep_retirements,
     sweep_period_closing_soon, auto_create_next_period_if_due,
+    release_due_background_blanks,
 )
 from .deps import LoginRequired
 
@@ -50,8 +51,14 @@ async def _hourly_period_closing_sweep() -> None:
             with get_db() as conn:
                 notified = sweep_period_closing_soon(conn)
                 created  = auto_create_next_period_if_due(conn)
+                # Backstop for the release that set_period_active already does —
+                # catches blanks left dangling if the active period changed by
+                # some path other than the staff Activate action.
+                released = release_due_background_blanks(conn)
             if notified:
                 log.info("Enqueued period_closing_soon for %d period(s)", len(notified))
+            if released:
+                log.info("Released %d background blank(s) on sweep", len(released))
             if created:
                 log.info("Auto-created next period %r (id=%s)",
                          created["label"], created["id"])

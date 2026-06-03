@@ -126,6 +126,61 @@ async def _on_character_retired(bot: commands.Bot, p: dict) -> None:
     await _dm(bot, p["discord_id"], e)
 
 
+@_handler("background_released")
+async def _on_background_released(bot: commands.Bot, p: dict) -> None:
+    char = p.get("character_name") or "Your character"
+    name = p.get("name") or "a background"
+    dots = p.get("dots_released", 0)
+    e = discord.Embed(
+        title="🌙 Background Restored",
+        description=(
+            f"**{char}**'s **{name}** is available again — "
+            f"**{dots}** blanked dot(s) refreshed as the new night opened."
+        ),
+        color=0xC8A85B,
+    )
+    await _dm(bot, p["discord_id"], e)
+
+
+# ── Project events ────────────────────────────────────────────────────────────
+
+@_handler("project_approved")
+async def _on_project_approved(bot: commands.Bot, p: dict) -> None:
+    name  = p.get("project_name") or "Your project"
+    desc  = f"**{name}** has been approved by staff and is now active."
+    if p.get("progress_type") == "roll":
+        desc += "\n\nWork it down with `/project roll` once each night."
+    else:
+        desc += "\n\nStaff will track its progress over your downtimes."
+    e = discord.Embed(title="📜 Project Approved", description=desc, color=0xC8A85B)
+    await _dm(bot, p["discord_id"], e)
+
+
+@_handler("project_rejected")
+async def _on_project_rejected(bot: commands.Bot, p: dict) -> None:
+    name   = p.get("project_name") or "Your project"
+    reason = p.get("reason") or "No reason provided."
+    e = discord.Embed(
+        title="❌ Project Returned",
+        description=f"Your project **{name}** was returned by staff.\n\n"
+                    f"**Reason:** {reason}",
+        color=0x8B1A1A,
+    )
+    await _dm(bot, p["discord_id"], e)
+
+
+@_handler("project_completed")
+async def _on_project_completed(bot: commands.Bot, p: dict) -> None:
+    name   = p.get("project_name") or "Your project"
+    reward = p.get("reward") or "Completed."
+    e = discord.Embed(
+        title="📜 Project Complete",
+        description=f"**{name}** is complete!\n\n**Reward:** {reward}",
+        color=0xC8A85B,
+    )
+    await _dm(bot, p["discord_id"], e)
+
+
 # ── Coterie events ────────────────────────────────────────────────────────────
 
 @_handler("coterie_request_approved")

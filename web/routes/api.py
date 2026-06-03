@@ -20,11 +20,17 @@ from ..config import settings
 from ..db import (
     HUNT_OUTCOMES,
     ack_outbox,
+    blank_character_background,
     create_character,
     create_hunt_log,
     drain_outbox,
     get_active_period,
     get_character,
+    get_project,
+    list_character_backgrounds,
+    list_projects_for_character,
+    record_project_roll,
+    timeskip_rolls_remaining,
     get_coterie_for_character,
     get_db,
     get_hunting_site,
@@ -127,6 +133,22 @@ class BondIn(BaseModel):
     regnant: str = Field(..., min_length=1, max_length=60)
     level:   int | None = None
     delta:   int | None = None
+
+
+class BackgroundBlankIn(BaseModel):
+    """Blank ``dots`` of a tracked background for the current night (the bot's
+    `/blank` command). The background must already be tracked on the web sheet."""
+    name: str = Field(..., min_length=1, max_length=120)
+    dots: int = Field(default=1, ge=1, le=10)
+
+
+class ProjectRollIn(BaseModel):
+    """Record a downtime extended-test roll for a roll-type project (the bot's
+    `/project roll`). The bot owns the dice engine, rolls, and posts the result;
+    the web validates ownership + one-roll-per-period and accumulates."""
+    requester_discord_id: str
+    successes: int = Field(..., ge=0)
+    outcome:   str = Field(default="", max_length=40)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -419,6 +441,89 @@ async def set_bond(character_id: int, body: BondIn):
             sheet.pop("bonds", None)
         update_character(conn, character_id, sheet_json=sheet)
     return {"character_id": character_id, "bonds": bonds}
+
+
+@router.get("/characters/{character_id}/backgrounds", dependencies=[Depends(_require_bot)])
+async def get_backgrounds(character_id: int):
+    """List a character's tracked backgrounds (the bot's `/blank` autocomplete +
+    status). Includes the active night's label so the bot can show context."""
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        backgrounds = list_character_backgrounds(conn, character_id)
+        active = get_active_period(conn)
+    return {
+        "character_id": character_id,
+        "current_night": active["label"] if active else None,
+        "backgrounds": backgrounds,
+    }
+
+
+@router.post("/characters/{character_id}/backgrounds/blank", dependencies=[Depends(_require_bot)])
+async def blank_background(character_id: int, body: BackgroundBlankIn):
+    """Blank N dots of a tracked background for the current night (the bot's
+    `/blank` command). Requires an active period and an already-tracked
+    background; invalid input returns 400 with the reason."""
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        try:
+            result = blank_character_background(
+                conn, character_id, body.name, body.dots, updated_by="bot"
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+    return {"character_id": character_id, "result": result}
+
+
+@router.get("/characters/{character_id}/projects", dependencies=[Depends(_require_bot)])
+async def get_projects(character_id: int):
+    """List a character's projects (the bot's `/project list` + `/project roll`).
+    Each project carries `can_roll_now` for whether it can be rolled this night."""
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        projects = list_projects_for_character(conn, character_id)
+        active   = get_active_period(conn)
+        rolls    = timeskip_rolls_remaining(conn, character_id)
+    can_roll = active is not None and rolls["remaining"] > 0
+    for p in projects:
+        p["can_roll_now"] = bool(
+            can_roll and p.get("status") == "active"
+            and p.get("progress_type") == "roll"
+        )
+    return {
+        "character_id":  character_id,
+        "current_night": active["label"] if active else None,
+        "rolls":         rolls,
+        "projects":      projects,
+    }
+
+
+@router.post("/projects/{project_id}/roll", dependencies=[Depends(_require_bot)])
+async def roll_project(project_id: int, body: ProjectRollIn):
+    """Accumulate a downtime extended-test roll's successes toward a roll
+    project. Validates that the requester owns the project's character and that
+    it hasn't already been rolled this period (400 on any invalid state)."""
+    with get_db() as conn:
+        proj = get_project(conn, project_id)
+        if not proj:
+            raise HTTPException(status_code=404, detail="Project not found")
+        char = get_character(conn, proj["character_id"])
+        if not char or char.get("discord_id") != body.requester_discord_id:
+            raise HTTPException(status_code=403, detail="That isn't your project.")
+        active = get_active_period(conn)
+        try:
+            updated = record_project_roll(
+                conn, project_id, successes=body.successes,
+                outcome=body.outcome, period_id=active["id"] if active else None,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+    return {"project": updated}
 
 
 @router.get("/sites", dependencies=[Depends(_require_bot)])

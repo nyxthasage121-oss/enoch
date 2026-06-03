@@ -58,9 +58,17 @@ from ..db import (
     update_character,
     update_criterion,
     update_hunting_site,
+    list_pending_projects,
+    list_active_projects,
+    list_recent_finished_projects,
+    approve_project,
+    reject_project,
+    add_project_note,
+    complete_project,
 )
 from ..deps import csrf_protect, require_permission, require_settings_admin, require_staff
 from ..main import _ctx
+from ..xp_rules import SPEND_CATEGORIES
 
 router = APIRouter(prefix="/staff", tags=["staff"])
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -96,6 +104,7 @@ async def dashboard(request: Request, user: dict = Depends(require_staff)):
         upcoming_periods  = list_upcoming_periods(conn, limit=3)
         recent_periods    = list_recent_closed_periods(conn, limit=2)
         coterie_requests  = list_pending_coterie_requests(conn)
+        pending_projects  = list_pending_projects(conn)
 
     pending_chars = [c for c in all_chars if not c["is_approved"] and not c.get("is_draft")]
     active_chars  = [c for c in all_chars if c["status"] == "active"]
@@ -111,6 +120,7 @@ async def dashboard(request: Request, user: dict = Depends(require_staff)):
             n_near_cap=len(near_cap),
             near_cap_list=near_cap[:5],
             n_coterie_reqs=len(coterie_requests),
+            n_project_reqs=len(pending_projects),
             active_period=active_period,
             upcoming_periods=upcoming_periods,
             recent_periods=recent_periods,
@@ -118,6 +128,111 @@ async def dashboard(request: Request, user: dict = Depends(require_staff)):
             recent_claims=pending_claims[:5],
         ),
     )
+
+
+# ── Projects ──────────────────────────────────────────────────────────────────
+
+def _projects_ctx(conn) -> dict:
+    return {
+        "pending_projects":  list_pending_projects(conn),
+        "active_projects":   list_active_projects(conn),
+        "finished_projects": list_recent_finished_projects(conn, limit=10),
+        "spend_categories":  SPEND_CATEGORIES,
+    }
+
+
+def _projects_table(request: Request, err=None, ok=None, kind="success"):
+    with get_db() as conn:
+        ctx = _projects_ctx(conn)
+    resp = templates.TemplateResponse(
+        request, "staff/partials/projects_tables.html", _ctx(request, **ctx)
+    )
+    _toast(resp, err or ok, "error" if err else kind)
+    return resp
+
+
+@router.get("/projects", response_class=HTMLResponse)
+async def projects_admin(request: Request, user: dict = Depends(require_staff)):
+    with get_db() as conn:
+        ctx = _projects_ctx(conn)
+    return templates.TemplateResponse(request, "staff/projects.html", _ctx(request, **ctx))
+
+
+@router.post("/projects/{project_id}/approve", response_class=HTMLResponse)
+async def approve_project_route(
+    request: Request, project_id: int,
+    user: dict = Depends(require_permission("manage_project")),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    err = None
+    try:
+        with get_db() as conn:
+            approve_project(
+                conn, project_id, user["id"],
+                progress_type=(form.get("progress_type") or "").strip(),
+                payoff_type=(form.get("payoff_type") or "").strip(),
+                roll_pool=(form.get("roll_pool") or "").strip(),
+                roll_difficulty=form_int(form.get("roll_difficulty"), 1),
+                target_successes=form_int(form.get("target_successes"), 0),
+                reward_category=(form.get("reward_category") or "").strip() or None,
+                reward_trait=(form.get("reward_trait") or "").strip() or None,
+                reward_dots=form_int(form.get("reward_dots"), 0),
+                reward_xp=form_int(form.get("reward_xp"), 0),
+            )
+    except ValueError as e:
+        err = str(e)
+    return _projects_table(request, err=err, ok="Project approved and activated.")
+
+
+@router.post("/projects/{project_id}/reject", response_class=HTMLResponse)
+async def reject_project_route(
+    request: Request, project_id: int,
+    user: dict = Depends(require_permission("manage_project")),
+    _: None = Depends(csrf_protect),
+):
+    form   = await request.form()
+    reason = (form.get("reason") or "").strip() or "No reason provided"
+    err = None
+    try:
+        with get_db() as conn:
+            reject_project(conn, project_id, user["id"], reason)
+    except ValueError as e:
+        err = str(e)
+    return _projects_table(request, err=err, ok="Project returned.", kind="info")
+
+
+@router.post("/projects/{project_id}/note", response_class=HTMLResponse)
+async def project_note_route(
+    request: Request, project_id: int,
+    user: dict = Depends(require_permission("manage_project")),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    err = None
+    try:
+        with get_db() as conn:
+            add_project_note(conn, project_id, user["id"], (form.get("text") or "").strip())
+    except ValueError as e:
+        err = str(e)
+    return _projects_table(request, err=err, ok="Note added.")
+
+
+@router.post("/projects/{project_id}/complete", response_class=HTMLResponse)
+async def complete_project_route(
+    request: Request, project_id: int,
+    user: dict = Depends(require_permission("manage_project")),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    reward_text = (form.get("reward_text") or "").strip() or None
+    err = None
+    try:
+        with get_db() as conn:
+            complete_project(conn, project_id, user["id"], reward_text=reward_text)
+    except ValueError as e:
+        err = str(e)
+    return _projects_table(request, err=err, ok="Project completed.")
 
 
 # ── Data export ───────────────────────────────────────────────────────────────
@@ -1908,6 +2023,8 @@ async def admin_settings_save(
     # partial settings save (or API call) doesn't silently reset it.
     if "max_chars_per_player" in form:
         payload["max_chars_per_player"] = form_int(form.get("max_chars_per_player"), 2, lo=0, hi=20)
+    if "rolls_per_timeskip" in form:
+        payload["rolls_per_timeskip"] = form_int(form.get("rolls_per_timeskip"), 8, lo=0, hi=99)
 
     # Restricted predator types unlock list — Steward opt-in per
     # chronicle for normally-banned predator types like Blood Leech and
