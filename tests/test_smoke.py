@@ -1107,6 +1107,36 @@ def test_calendar_widget_wires_countdown_when_period_active(staff):
 
 # ── Character creation wizard + review lock ───────────────────────────────────
 
+def _raw_traits():
+    """RAW-valid base allocation for character-creation POSTs. The wizard now
+    enforces V5 spreads, so a full submission must carry the 4/3/3/3/2/2/2/2/1
+    attributes and a valid skill distribution (Balanced here). Spread into a
+    POST's `data` LAST so it overrides any partial trait fields the test sets."""
+    attrs = {
+        "attr_strength": "4", "attr_dexterity": "3", "attr_stamina": "3",
+        "attr_charisma": "3", "attr_manipulation": "2", "attr_composure": "2",
+        "attr_intelligence": "2", "attr_wits": "2", "attr_resolve": "1",
+    }
+    skills = {  # Balanced: three 3s, five 2s, seven 1s
+        "skill_brawl": "3", "skill_athletics": "3", "skill_stealth": "3",
+        "skill_melee": "2", "skill_firearms": "2", "skill_larceny": "2",
+        "skill_streetwise": "2", "skill_intimidation": "2",
+        "skill_awareness": "1", "skill_drive": "1", "skill_occult": "1",
+        "skill_academics": "1", "skill_insight": "1", "skill_persuasion": "1",
+        "skill_subterfuge": "1",
+    }
+    import json as _j
+    advantages = {  # 7 advantage dots (Backgrounds + a Merit) + 2 Flaw dots = RAW
+        "backgrounds": _j.dumps([{"name": "Allies", "dots": 3},
+                                 {"name": "Resources", "dots": 2}]),
+        "merits":      _j.dumps([{"name": "Iron Will", "dots": 2}]),
+        "advantages":  _j.dumps([]),
+        "flaws":       _j.dumps([{"name": "Enemy", "dots": 1},
+                                 {"name": "Disliked", "dots": 1}]),
+    }
+    return {**attrs, **skills, "skill_spread": "balanced", **advantages}
+
+
 def test_character_wizard_submission_populates_full_sheet(player):
     """POST /characters/new with attributes + skills + a specialty + a
     merit should produce a character whose sheet_json carries it all."""
@@ -1117,11 +1147,6 @@ def test_character_wizard_submission_populates_full_sheet(player):
             "_csrf": "dev-csrf-token",
             "name": "Wizard Smoke",
             "clan": "brujah",
-            "attr_strength": "3",
-            "attr_dexterity": "2",
-            "attr_stamina": "2",
-            "skill_brawl": "3",
-            "skill_streetwise": "2",
             "specialties": _j.dumps([
                 {"skill": "skill_streetwise", "name": "Lower East Side"}
             ]),
@@ -1134,6 +1159,8 @@ def test_character_wizard_submission_populates_full_sheet(player):
             # V5 chargen: min 2 touchstones — backstop validation.
             "touchstones":_j.dumps(["Sister Maria", "Father Joseph"]),
             "convictions":_j.dumps(["Never harm a child"]),
+            # RAW-valid base spread (overrides any partial trait fields above).
+            **_raw_traits(),
         },
         follow_redirects=False,
     )
@@ -1147,7 +1174,8 @@ def test_character_wizard_submission_populates_full_sheet(player):
         assert row is not None
         sheet = _j.loads(row["sheet_json"])
         try:
-            assert sheet["attr_strength"]   == 3
+            # _raw_traits() sets attr_strength=4, skill_brawl=3, skill_streetwise=2.
+            assert sheet["attr_strength"]   == 4
             assert sheet["skill_brawl"]     == 3
             assert sheet["skill_streetwise"] == 2
             assert any(s["name"] == "Lower East Side" for s in sheet["specialties"])
@@ -1179,6 +1207,7 @@ def test_character_wizard_accepts_optional_image_upload(player):
             "name": "Image Smoke",
             "clan": "brujah",
             "touchstones": _j.dumps(["Friend A", "Friend B"]),
+            **_raw_traits(),
         },
         files={"profile_image": ("portrait.png", png_bytes, "image/png")},
         follow_redirects=False,
@@ -1217,6 +1246,7 @@ def test_character_wizard_rejects_bad_image_but_still_creates(player):
             "name": "Bad Image Smoke",
             "clan": "brujah",
             "touchstones": _j.dumps(["Friend A", "Friend B"]),
+            **_raw_traits(),
         },
         files={"profile_image": ("notes.txt", b"hello world", "text/plain")},
         follow_redirects=False,
@@ -1247,6 +1277,7 @@ def test_pending_chars_table_shows_submission_notes_inline(staff, player):
             "clan": "brujah",
             "touchstones": _j.dumps(["Friend A", "Friend B"]),
             "submission_notes": "Please review my Auspex 3 pre-pick.",
+            **_raw_traits(),
         },
         follow_redirects=False,
     )
@@ -1280,6 +1311,7 @@ def test_bulk_approve_queue_processes_multiple_characters(staff, player):
                 "_csrf": "dev-csrf-token",
                 "name": nm, "clan": "brujah",
                 "touchstones": _j.dumps(["Friend A", "Friend B"]),
+                **_raw_traits(),
             },
             follow_redirects=False,
         )
@@ -1326,6 +1358,7 @@ def test_bulk_start_review_locks_multiple_sheets(staff, player):
             "name": "Bulk Review Smoke",
             "clan": "brujah",
             "touchstones": _j.dumps(["Friend A", "Friend B"]),
+            **_raw_traits(),
         },
         follow_redirects=False,
     )
@@ -1510,8 +1543,8 @@ def test_start_character_review_locks_player_sheet_edit(staff, player):
         data={
             "_csrf": "dev-csrf-token",
             "name": "Lock Smoke", "clan": "brujah",
-            "attr_strength": "2",
             "touchstones": _j.dumps(["Mother Anne", "Brother Tom"]),
+            **_raw_traits(),
         },
         follow_redirects=False,
     )
@@ -1561,8 +1594,8 @@ def test_approved_character_sheet_edit_unlocked_despite_review_flag(staff, playe
     r = player.post(
         "/characters/new",
         data={"_csrf": "dev-csrf-token", "name": "Unlock Smoke", "clan": "ventrue",
-              "attr_strength": "2",
-              "touchstones": _j.dumps(["Anchor One", "Anchor Two"])},
+              "touchstones": _j.dumps(["Anchor One", "Anchor Two"]),
+              **_raw_traits()},
         follow_redirects=False,
     )
     assert r.status_code == 303
@@ -1629,8 +1662,9 @@ def test_edit_locked_during_review(staff, player):
     r = player.post(
         "/characters/new",
         data={"_csrf": "dev-csrf-token", "name": "Edit Lock Smoke", "clan": "brujah",
-              "concept": "Original Concept", "attr_strength": "2",
-              "touchstones": _j.dumps(["Anchor One", "Anchor Two"])},
+              "concept": "Original Concept",
+              "touchstones": _j.dumps(["Anchor One", "Anchor Two"]),
+              **_raw_traits()},
         follow_redirects=False,
     )
     assert r.status_code == 303
@@ -1904,6 +1938,7 @@ def test_ancilla_in_memoriam_submission_persists_blob(player):
             "im_discipline_spread": "focused",
             "in_memoriam":          _j.dumps(im_blob),
             "touchstones":          _j.dumps(["A", "B"]),
+            **_raw_traits(),
         },
         follow_redirects=False,
     )
@@ -1942,6 +1977,7 @@ def test_neonate_submission_clears_ancilla_fields(player):
             "im_generation":   "12th",           # stale
             "in_memoriam":     '{"embrace_age": "up_to_100", "eras": []}',
             "touchstones":     '["A", "B"]',
+            **_raw_traits(),
         },
         follow_redirects=False,
     )
@@ -3022,15 +3058,33 @@ def test_chargen_persists_spreads_and_predator_picks(player):
     the player + staff sheets."""
     import json as _json
     from web.db import get_db
+    # This test pins skill_spread="specialist", so it needs a RAW-valid
+    # Specialist skill allocation (one 4, three 3s, three 2s, three 1s) rather
+    # than the Balanced helper. Attributes still use the standard 4/3/3/3/2/2/2/2/1.
     player.post("/characters/new", data={
         "_csrf": "dev-csrf-token",
         "name": "Spread Test",
         "clan": "brujah",
         "predator_type": "Alleycat",
         "touchstones": '["A", "B"]',
+        # Attributes — RAW spread.
+        "attr_strength": "4", "attr_dexterity": "3", "attr_stamina": "3",
+        "attr_charisma": "3", "attr_manipulation": "2", "attr_composure": "2",
+        "attr_intelligence": "2", "attr_wits": "2", "attr_resolve": "1",
+        # Skills — Specialist: one 4, three 3s, three 2s, three 1s.
+        "skill_brawl": "4",
+        "skill_athletics": "3", "skill_stealth": "3", "skill_melee": "3",
+        "skill_firearms": "2", "skill_larceny": "2", "skill_streetwise": "2",
+        "skill_awareness": "1", "skill_drive": "1", "skill_occult": "1",
         "skill_spread": "specialist",
         "discipline_spread": "standard",
         "predator_choices": _json.dumps({"s0": 1, "d1": "disc_potence"}),
+        # RAW advantages: 7 dots (Backgrounds + Merit) + 2 Flaw dots.
+        "backgrounds": _json.dumps([{"name": "Allies", "dots": 3},
+                                    {"name": "Resources", "dots": 2}]),
+        "merits": _json.dumps([{"name": "Iron Will", "dots": 2}]),
+        "flaws": _json.dumps([{"name": "Enemy", "dots": 1},
+                              {"name": "Disliked", "dots": 1}]),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3180,11 +3234,22 @@ def test_chargen_persists_starting_xp_allocation(player):
         {"cat": "attr", "key": "attr_strength", "label": "Strength", "cost": 5},
         {"cat": "disc", "key": "disc_celerity", "label": "Celerity", "cost": 5},
     ]
+    # The chargen validator checks the BASE spread (final dots minus xp_buys).
+    # attr_strength carries one bought dot, so its final value must be one above
+    # its RAW base of 4 → 5 (base 5-1=4). The other attributes have no buys, so
+    # they supply the rest of the 4/3/3/3/2/2/2/2/1 spread directly. Skills come
+    # from the Balanced helper; we only override the attributes here.
     player.post("/characters/new", data={
         "_csrf": "dev-csrf-token", "name": "XP Persist", "clan": "brujah",
         "touchstones": '["A", "B"]',
         "xp_buys": _json.dumps(buys), "xp_spent": "10", "xp_pool": "75",
-        "attr_strength": "1", "disc_celerity": "1",
+        "disc_celerity": "1",
+        **_raw_traits(),
+        # Override attributes so the base spread stays RAW after subtracting the
+        # one bought Strength dot.
+        "attr_strength": "5", "attr_dexterity": "3", "attr_stamina": "3",
+        "attr_charisma": "3", "attr_manipulation": "2", "attr_composure": "2",
+        "attr_intelligence": "2", "attr_wits": "2", "attr_resolve": "1",
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3196,7 +3261,8 @@ def test_chargen_persists_starting_xp_allocation(player):
         assert sheet.get("xp_spent") == 10
         assert sheet.get("starting_xp_pool") == 75
         assert len(sheet.get("xp_buys", [])) == 2
-        assert sheet.get("attr_strength") == 1 and sheet.get("disc_celerity") == 1
+        # attr_strength = RAW base 4 + 1 bought dot = 5.
+        assert sheet.get("attr_strength") == 5 and sheet.get("disc_celerity") == 1
     finally:
         with get_db() as conn:
             conn.execute("DELETE FROM characters WHERE name='XP Persist'")
@@ -3268,6 +3334,7 @@ def test_nosferatu_variant_bane_grants_no_flaw(player):
         "_csrf": "dev-csrf-token", "name": "Nos Var", "clan": "nosferatu",
         "touchstones": '["A", "B"]', "bane_choice": "variant",
         "flaws": _json.dumps([{"name": "Repulsive", "dots": 2, "src": "clan_bane"}]),
+        **_raw_traits(),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3294,6 +3361,7 @@ def test_nosferatu_standard_bane_grants_repulsive(player):
     player.post("/characters/new", data={
         "_csrf": "dev-csrf-token", "name": "Nos Bane", "clan": "nosferatu",
         "touchstones": '["A", "B"]',
+        **_raw_traits(),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3317,6 +3385,7 @@ def test_non_nosferatu_has_no_auto_bane_flaw(player):
     player.post("/characters/new", data={
         "_csrf": "dev-csrf-token", "name": "Bru NoBane", "clan": "brujah",
         "touchstones": '["A", "B"]',
+        **_raw_traits(),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3351,6 +3420,7 @@ def test_hecata_variant_bane_auto_applies_decay_pool(player):
         "_csrf": "dev-csrf-token", "name": "Hec Decay", "clan": "hecata",
         "touchstones": '["A", "B"]', "bane_choice": "variant",
         "bane_flaw_pool": "{}",   # empty → server auto-fills Bane Severity dots
+        **_raw_traits(),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3379,6 +3449,7 @@ def test_hecata_decay_pool_honors_player_allocation(player):
         "_csrf": "dev-csrf-token", "name": "Hec Alloc", "clan": "hecata",
         "touchstones": '["A", "B"]', "bane_choice": "variant",
         "bane_flaw_pool": _json.dumps({"Haven": 1}),
+        **_raw_traits(),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -4514,7 +4585,8 @@ def test_staff_approve_via_plain_form_redirects(player, staff):
         data={"_csrf": "dev-csrf-token",
               "name": "Approve Me Direct",
               "clan": "toreador",
-              "touchstones": '["A", "B"]'},
+              "touchstones": '["A", "B"]',
+              **_raw_traits()},
         follow_redirects=False,
     )
     with get_db() as conn:
@@ -4549,7 +4621,8 @@ def test_staff_approve_via_htmx_returns_partial(player, staff):
         data={"_csrf": "dev-csrf-token",
               "name": "Approve Via Htmx",
               "clan": "gangrel",
-              "touchstones": '["A", "B"]'},
+              "touchstones": '["A", "B"]',
+              **_raw_traits()},
         follow_redirects=False,
     )
     with get_db() as conn:
@@ -4700,6 +4773,7 @@ def test_staff_detail_renders_type_tier_and_im_eras(player, staff):
             "im_discipline_spread":"broad",
             "in_memoriam":         _j.dumps(im_blob),
             "touchstones":         _j.dumps(["A", "B"]),
+            **_raw_traits(),
         },
         follow_redirects=False,
     )
@@ -4784,7 +4858,8 @@ def test_staff_detail_renders_ingrained_discipline(player, staff):
               "name": "Sees Ingrained",
               "clan": "tremere",
               "has_ingrained_flaw": "on",
-              "touchstones": '["A", "B"]'},
+              "touchstones": '["A", "B"]',
+              **_raw_traits()},
         follow_redirects=False,
     )
     with get_db() as conn:

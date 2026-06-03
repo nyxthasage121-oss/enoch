@@ -588,3 +588,155 @@ V5_DISCIPLINE_SPREADS: dict[str, dict] = {
                   "blurb": "Two each in two Disciplines, one each in two more. (Ancilla / In Memoriam.)"},
 }
 PREDATOR_FREE_DISCIPLINE_DOTS = 1
+
+
+# ── Chargen RAW validation (Standard ruleset) ───────────────────────────────
+# Enforce the V5 priority-allocation spreads server-side. These check the BASE
+# allocation — a trait's dots BEFORE starting-XP purchases — because the wizard
+# folds bought dots into the trait value and keeps the purchase ledger in
+# `xp_buys` (each entry is one dot: {cat, key, label, cost}). Standard ruleset
+# only; callers skip this when the chronicle runs homebrew budgets.
+
+# Base attribute spread: one 4, three 3s, four 2s, one 1.
+V5_ATTRIBUTE_SPREAD: tuple[int, ...] = (4, 3, 3, 3, 2, 2, 2, 2, 1)
+
+_ATTR_KEYS: list[str] = [k for _, traits in V5_ATTRIBUTES for k, _ in traits]
+_SKILL_KEYS: list[str] = [k for _, traits in V5_SKILLS for k, _ in traits]
+
+
+def _xp_bought_dots(sheet: dict, key: str) -> int:
+    """Dots of `key` bought with starting XP. Each xp_buys entry is one dot."""
+    return sum(
+        1 for b in (sheet.get("xp_buys") or [])
+        if isinstance(b, dict) and b.get("key") == key
+    )
+
+
+def base_trait_value(sheet: dict, key: str) -> int:
+    """A trait's value BEFORE starting-XP buys (its priority-spread dots)."""
+    try:
+        final = int(sheet.get(key, 0) or 0)
+    except (TypeError, ValueError):
+        final = 0
+    return max(0, final - _xp_bought_dots(sheet, key))
+
+
+def _spread_shape(levels: dict) -> list[int]:
+    """Turn a spread's {dot_level: count} into a sorted-desc list of dot values."""
+    shape: list[int] = []
+    for lvl, n in levels.items():
+        shape.extend([int(lvl)] * int(n))
+    return sorted(shape, reverse=True)
+
+
+def _disc_keys() -> list[str]:
+    return [k for k, _ in V5_DISCIPLINES]
+
+
+def _predator_disc_options(predator_type: str | None) -> set[str]:
+    """Disciplines a predator type can grant a free dot in (its choice options) —
+    allowed at creation even when out-of-clan."""
+    info = V5_PREDATOR_INFO.get(predator_type or "")
+    opts: set[str] = set()
+    if info:
+        for g in info.get("grants", []):
+            if g.get("kind") == "discipline":
+                opts.update(g.get("options", []) or [])
+    return opts
+
+
+def validate_chargen_raw(
+    sheet: dict, *, character_type: str = "kindred",
+    clan: str = "", predator_type: str | None = None,
+    advantage_pool: int | None = None, flaw_cap: int | None = None,
+    flaw_min: int = 2,
+) -> list[str]:
+    """Validate a chargen sheet against V5 "rules as written" priority spreads.
+
+    Checks the BASE allocation (before starting-XP): attributes must be the
+    4/3/3/3/2/2/2/2/1 spread, and skills must match one of the three
+    distributions (Jack-of-all-Trades / Balanced / Specialist). Returns a list
+    of human-readable errors (empty == valid). Standard ruleset only — callers
+    skip this when the chronicle runs homebrew budgets.
+    """
+    errors: list[str] = []
+
+    # Attributes — the multiset of base values must equal the V5 spread.
+    attr_base = sorted((base_trait_value(sheet, k) for k in _ATTR_KEYS), reverse=True)
+    if attr_base != sorted(V5_ATTRIBUTE_SPREAD, reverse=True):
+        errors.append(
+            "Attributes must use the V5 spread — one at 4, three at 3, four at 2, "
+            f"one at 1 (before starting XP). Your base spread is {attr_base}."
+        )
+
+    # Skills — base allocation must match one of the three distributions exactly.
+    skill_base = sorted(
+        (v for v in (base_trait_value(sheet, k) for k in _SKILL_KEYS) if v > 0),
+        reverse=True,
+    )
+    shapes = {slug: _spread_shape(spr["levels"]) for slug, spr in V5_SKILL_SPREADS.items()}
+    chosen = (sheet.get("skill_spread") or "").strip().lower()
+    if chosen in shapes:
+        if skill_base != shapes[chosen]:
+            spr = V5_SKILL_SPREADS[chosen]
+            errors.append(
+                f"Skills don't match the chosen {spr['label']} distribution "
+                f"(before starting XP). {spr['blurb']}"
+            )
+    elif skill_base not in shapes.values():
+        errors.append(
+            "Skills must match one of the three distributions — Jack-of-all-Trades, "
+            "Balanced, or Specialist (before starting XP)."
+        )
+
+    # Disciplines (Kindred) — base (pre-XP) dots must sit in in-clan Disciplines.
+    # A predator type may grant one out-of-clan exception. Caitiff (no in-clan
+    # list) and thin-bloods are exempt here; out-of-clan dots bought with starting
+    # XP are fine (they're not part of the base allocation).
+    if character_type == "kindred":
+        inclan = CLAN_DISCIPLINES.get(clan)
+        if inclan is not None:
+            allowed = set(inclan) | _predator_disc_options(predator_type)
+            disc_labels = dict(V5_DISCIPLINES)
+            for k in _disc_keys():
+                if base_trait_value(sheet, k) > 0 and k not in allowed:
+                    errors.append(
+                        f"{disc_labels.get(k, k)} isn't in-clan for "
+                        f"{clan or 'your clan'} — base Discipline dots must be in-clan "
+                        "(a predator type may grant one exception); out-of-clan "
+                        "Disciplines can be bought with XP."
+                    )
+
+    # Advantages — player-added (no `src`) Merits + Backgrounds + Advantages must
+    # fit the pool; Flaws must hit the minimum and not exceed the cap. Auto-granted
+    # entries (clan bane, predator grants) carry a `src` tag and don't count.
+    if advantage_pool is not None:
+        def _player_dots(list_key: str) -> int:
+            total = 0
+            for it in (sheet.get(list_key) or []):
+                if isinstance(it, dict) and not it.get("src"):
+                    try:
+                        total += int(it.get("dots", 0) or 0)
+                    except (TypeError, ValueError):
+                        pass
+            return total
+
+        adv = (_player_dots("merits") + _player_dots("backgrounds")
+               + _player_dots("advantages"))
+        if adv > advantage_pool:
+            errors.append(
+                f"Advantages (Merits + Backgrounds) total {adv} dots — the limit "
+                f"is {advantage_pool} at creation."
+            )
+        flaw_dots = _player_dots("flaws")
+        if flaw_dots < flaw_min:
+            errors.append(
+                f"Take at least {flaw_min} dots of Flaws at creation "
+                f"(you have {flaw_dots})."
+            )
+        if flaw_cap is not None and flaw_dots > flaw_cap:
+            errors.append(
+                f"Flaws total {flaw_dots} dots — the limit is {flaw_cap} at creation."
+            )
+
+    return errors

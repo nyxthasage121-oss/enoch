@@ -279,6 +279,7 @@ from ..v5_traits import (
     CLAN_DISCIPLINES as _CLAN_DISCIPLINES,
     SHEET_TRAIT_KEYS as _SHEET_TRAIT_KEYS,
     SHEET_LIMITS    as _SHEET_LIMITS,
+    validate_chargen_raw as _validate_chargen_raw,
 )
 
 
@@ -608,7 +609,9 @@ async def character_create(
         if capped:
             errors.append(f"You've reached the {capped}-character limit for this chronicle.")
 
-    if errors:
+    def _rerender_wizard(errs):
+        # Keep only string fields — the profile_image UploadFile is not
+        # JSON-serializable and would 500 the wizard's `initialForm | tojson`.
         return templates.TemplateResponse(
             request, "player/character_create.html",
             _ctx(request, clans=_CLANS, predator_types=_available_predator_types(),
@@ -616,13 +619,13 @@ async def character_create(
                  v5_attributes=_V5_ATTRIBUTES, v5_skills=_V5_SKILLS,
                  v5_disciplines=_V5_DISCIPLINES,
                  clan_disciplines=_CLAN_DISCIPLINES,
-                 # Keep only string fields — the profile_image UploadFile is
-                 # not JSON-serializable and would 500 the wizard's
-                 # `initialForm | tojson` on any validation re-render.
-                 errors=errors,
+                 errors=errs,
                  form={k: v for k, v in form.items() if isinstance(v, str)},
                  **_wizard_extras()),
         )
+
+    if errors:
+        return _rerender_wizard(errors)
 
     # Always parse the sheet from the form — drafts preserve what the
     # player typed even if it's incomplete. Final submission re-uses it.
@@ -725,6 +728,25 @@ async def character_create(
             sheet["bane_flaw_pool"] = _cleaned_pool
         else:
             sheet.pop("bane_flaw_pool", None)
+
+    # V5 RAW chargen validation (Standard ruleset only). The base allocation —
+    # attributes + skills before starting-XP buys — must follow the priority
+    # spreads. Drafts stay tolerant; only full submissions are gated, and only
+    # under the standard ruleset (homebrew runs its own tier budgets).
+    if not as_draft and require_sheet:
+        _settings = _chronicle_settings()
+        _ruleset = (_settings.get("active_ruleset") or "standard").lower()
+        if _ruleset == "standard":
+            from ..db import tier_budget
+            _bud = tier_budget(_settings, character_tier)
+            raw_errors = _validate_chargen_raw(
+                sheet, character_type=character_type,
+                clan=clan, predator_type=predator_type,
+                advantage_pool=_bud["merits"] + _bud["advantages"] + _bud["backgrounds"],
+                flaw_cap=_bud["flaw_cap"],
+            )
+            if raw_errors:
+                return _rerender_wizard(raw_errors)
 
     # Short-form Submit moves the character past the wizard but keeps it in
     # the draft state so the player can keep editing the sheet on the detail

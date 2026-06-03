@@ -361,7 +361,6 @@
                 class="absolute top-2 right-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold-500 text-ink-950 font-bold text-xs">✓</span>
           <p class="font-cinzel text-base tracking-wide mb-1"
              :class="charName.character_type === '{{ slug }}' ? 'text-gold-300' : 'text-bone-200'">{{ label }}</p>
-          <p class="font-garamond text-xs text-bone-500 leading-snug">{{ blurb }}</p>
         </button>
         {% endfor %}
 
@@ -377,9 +376,6 @@
                 class="absolute top-2 right-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold-500 text-ink-950 font-bold text-xs">✓</span>
           <p class="font-cinzel text-base tracking-wide mb-1"
              :class="charName.character_type === 'revenant' ? 'text-gold-300' : 'text-bone-200'">Revenant</p>
-          <p class="font-garamond text-xs text-bone-500 leading-snug">
-            Hereditary half-Kindred bound to a vampire clan through bloodline.
-          </p>
         </button>
         {% endif %}
       </div>
@@ -1273,9 +1269,10 @@
       <div class="mb-6">
         <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-1">Curse</h1>
         <p class="font-garamond text-bone-500 text-sm leading-relaxed">
-          Set discipline ratings. <span class="text-gold-400">Gold-bordered</span>
-          disciplines are in-clan for your clan. Add the specific powers your
-          character has learned at each level.
+          Set discipline ratings — only your clan's <span class="text-gold-400">in-clan</span>
+          Disciplines (plus any your predator type grants) take base dots here;
+          out-of-clan Disciplines can be bought later with XP. Add the specific
+          powers your character has learned at each level.
         </p>
       </div>
 
@@ -1340,6 +1337,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
           {% for key, label in v5_disciplines %}
           <div class="flex items-center justify-between py-1 border-b border-ink-800"
+               x-show="isDiscPickable('{{ key }}')" x-cloak
                :class="isInClan('{{ key }}') ? 'border-gold-900' : ''">
             <div class="flex items-center gap-2">
               <span class="font-garamond text-sm" :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-bone-200' : 'text-bone-500'">{{ label }}</span>
@@ -2700,6 +2698,23 @@
       isInClan(key) {
         const list = this.clanDisciplines[this.charName.clan] || [];
         return list.includes(key);
+      },
+      // Which Disciplines may take BASE dots at creation: in-clan, plus any a
+      // predator type can grant. Caitiff = any; thin-bloods = Alchemy only;
+      // mortals = none; ghouls/revenants = all (staff verifies their special
+      // rules). Already-set dots (XP-bought / predator-applied) stay visible.
+      isDiscPickable(key) {
+        const ct = this.charName.character_type;
+        if (ct === 'mortal') return false;
+        if (ct === 'ghoul' || ct === 'revenant') return true;
+        if (this.charName.character_tier === 'thinblood' ||
+            this.charName.clan === 'thin-blood') return key === 'disc_thin_blood_alchemy';
+        if (this.charName.clan === 'caitiff') return true;
+        if (this.isInClan(key)) return true;
+        const info = this.predatorInfo[this.charName.predator_type];
+        if (info && (info.grants || []).some(
+              g => g.kind === 'discipline' && (g.options || []).includes(key))) return true;
+        return (this.sheet[key] || 0) > 0;
       },
       learnedDisciplines() {
         const labels = {

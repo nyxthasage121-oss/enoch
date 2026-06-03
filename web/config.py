@@ -7,7 +7,11 @@ load_dotenv()
 
 class Settings:
     # ── Database ─────────────────────────────────────────────────
-    DATABASE_URL: str          = os.getenv("DATABASE_URL", "enoch.db")
+    # `or` (not a getenv default) so an empty-string env var — e.g. a blank
+    # DATABASE_URL set in a host's dashboard — still falls back to a real
+    # on-disk file instead of `sqlite3.connect("")`, which hands out a throwaway
+    # temp DB per connection and breaks migrations on first boot.
+    DATABASE_URL: str          = os.getenv("DATABASE_URL") or "enoch.db"
     TURSO_AUTH_TOKEN: str|None = os.getenv("TURSO_AUTH_TOKEN")
 
     # ── Session ──────────────────────────────────────────────────
