@@ -689,6 +689,15 @@ def validate_chargen_raw(
             "Balanced, or Specialist (before starting XP)."
         )
 
+    # No trait may reach 5 at creation — Attributes, Skills, and Disciplines cap
+    # at 4 dots (a 5th dot comes later, through play).
+    if any(int(sheet.get(k, 0) or 0) >= 5
+           for k in (_ATTR_KEYS + _SKILL_KEYS + _disc_keys())):
+        errors.append(
+            "Nothing can be raised to 5 at creation — Attributes, Skills, and "
+            "Disciplines cap at 4 dots."
+        )
+
     # Disciplines (Kindred) — base (pre-XP) dots must sit in in-clan Disciplines.
     # A predator type may grant one out-of-clan exception. Caitiff (no in-clan
     # list) and thin-bloods are exempt here; out-of-clan dots bought with starting

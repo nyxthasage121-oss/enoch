@@ -3231,14 +3231,13 @@ def test_chargen_persists_starting_xp_allocation(player):
     import json as _json
     from web.db import get_db
     buys = [
-        {"cat": "attr", "key": "attr_strength", "label": "Strength", "cost": 5},
+        {"cat": "attr", "key": "attr_dexterity", "label": "Dexterity", "cost": 5},
         {"cat": "disc", "key": "disc_celerity", "label": "Celerity", "cost": 5},
     ]
-    # The chargen validator checks the BASE spread (final dots minus xp_buys).
-    # attr_strength carries one bought dot, so its final value must be one above
-    # its RAW base of 4 → 5 (base 5-1=4). The other attributes have no buys, so
-    # they supply the rest of the 4/3/3/3/2/2/2/2/1 spread directly. Skills come
-    # from the Balanced helper; we only override the attributes here.
+    # The chargen validator checks the BASE spread (final dots minus xp_buys) and
+    # caps every trait at 4 at creation. Dexterity carries one bought dot, so its
+    # final value is 4 (base 4-1=3); the other attributes supply the rest of the
+    # 4/3/3/3/2/2/2/2/1 spread directly. Skills come from the Balanced helper.
     player.post("/characters/new", data={
         "_csrf": "dev-csrf-token", "name": "XP Persist", "clan": "brujah",
         "touchstones": '["A", "B"]',
@@ -3246,8 +3245,8 @@ def test_chargen_persists_starting_xp_allocation(player):
         "disc_celerity": "1",
         **_raw_traits(),
         # Override attributes so the base spread stays RAW after subtracting the
-        # one bought Strength dot.
-        "attr_strength": "5", "attr_dexterity": "3", "attr_stamina": "3",
+        # one bought Dexterity dot (final 4 → base 3).
+        "attr_strength": "4", "attr_dexterity": "4", "attr_stamina": "3",
         "attr_charisma": "3", "attr_manipulation": "2", "attr_composure": "2",
         "attr_intelligence": "2", "attr_wits": "2", "attr_resolve": "1",
     }, follow_redirects=False)
@@ -3261,8 +3260,8 @@ def test_chargen_persists_starting_xp_allocation(player):
         assert sheet.get("xp_spent") == 10
         assert sheet.get("starting_xp_pool") == 75
         assert len(sheet.get("xp_buys", [])) == 2
-        # attr_strength = RAW base 4 + 1 bought dot = 5.
-        assert sheet.get("attr_strength") == 5 and sheet.get("disc_celerity") == 1
+        # attr_dexterity = RAW base 3 + 1 bought dot = 4 (capped at creation).
+        assert sheet.get("attr_dexterity") == 4 and sheet.get("disc_celerity") == 1
     finally:
         with get_db() as conn:
             conn.execute("DELETE FROM characters WHERE name='XP Persist'")

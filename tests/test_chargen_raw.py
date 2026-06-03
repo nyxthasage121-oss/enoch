@@ -50,9 +50,9 @@ def test_xp_buys_are_subtracted_to_base():
     """A trait raised by starting XP keeps its BASE within the spread."""
     from web.v5_traits import validate_chargen_raw
     s = _valid_sheet()
-    s["attr_strength"] = 5  # final 5 ...
-    s["xp_buys"] = [  # ... but bought up from base 4 with XP → base spread still valid
-        {"cat": "attr", "key": "attr_strength", "label": "Strength", "cost": 25},
+    s["attr_dexterity"] = 4  # final 4 (capped at creation) ...
+    s["xp_buys"] = [  # ... bought up one dot from base 3 → base spread still valid
+        {"cat": "attr", "key": "attr_dexterity", "label": "Dexterity", "cost": 20},
     ]
     assert validate_chargen_raw(s) == []
 
@@ -155,3 +155,11 @@ def test_auto_granted_flaws_dont_count_to_budget():
     ]
     assert validate_chargen_raw(s, character_type="kindred", clan="brujah",
                                 advantage_pool=7, flaw_cap=2) == []
+
+
+def test_nothing_at_five_at_creation():
+    from web.v5_traits import validate_chargen_raw
+    s = _valid_sheet()
+    s["disc_celerity"] = 5  # in-clan for Brujah, but a 5 isn't allowed at creation
+    errs = validate_chargen_raw(s, character_type="kindred", clan="brujah")
+    assert any("5" in e for e in errs)
