@@ -13,8 +13,9 @@ from discord.ext import commands
 
 from ..api import (
     get_character, get_player_characters, get_projects, record_project_roll,
+    apply_state_delta,
 )
-from ..roll import resolve_pool, roll_pool
+from ..roll import resolve_pool, roll_pool, reroll_failures, blood_surge_bonus
 from .characters import _parse_sheet
 from .roll import _TRAIT_INDEX, build_roll_embed
 
@@ -37,6 +38,41 @@ def _status_line(p: dict) -> str:
         return (f"▶ Active — {p.get('progress_successes', 0)}/"
                 f"{p.get('target_successes', 0)} successes{tag}")
     return "▶ Active (staff-tracked)"
+
+
+def _result_note(proj: dict, result: dict, rolls: dict, *,
+                 surge_dice: int = 0, rerolled: int = 0) -> str:
+    """Build the project-specific result text shown under the dice embed."""
+    o     = result.get("outcome")
+    flags = result.get("flags") or []
+    lines = [f"**{proj['title']}**"]
+    if o == "bestial":
+        lines.append(f"💥 **Bestial failure!** No progress — stage DC rose to "
+                     f"**{result.get('stage_dc')}**. Staff will apply a penalty.")
+    elif o == "project_complete":
+        extra = (" Staff will grant temporary background dots."
+                 if "final_temp_dots" in flags else "")
+        lines.append(f"✅ **Final stage complete!** Awaiting staff sign-off.{extra}")
+    elif o == "stage_complete":
+        carry = result.get("carry", 0)
+        c = f" (**{carry}** carried over)" if carry else ""
+        lines.append(f"▶ **Stage {result.get('stage')} complete!**{c} "
+                     f"Now on stage {result.get('next_stage')}.")
+    else:
+        lines.append(f"Stage {result.get('stage')}: **+{result.get('gained', 0)}** "
+                     f"(**{result.get('remaining', 0)}** to the DC).")
+    if "messy" in flags and o != "bestial":
+        lines.append("⚠️ Messy crit — staff will apply a penalty.")
+    extras = []
+    if surge_dice:
+        extras.append(f"surged +{surge_dice} dice (+1 Hunger)")
+    if rerolled:
+        extras.append(f"WP reroll ({rerolled} dice, −2 WP)")
+    if extras:
+        lines.append("· " + " · ".join(extras))
+    left = max(0, int(rolls.get("remaining", 0)) - 1)
+    lines.append(f"Project rolls left this timeskip: **{left}**")
+    return "\n".join(lines)
 
 
 class ProjectsCog(commands.Cog):
@@ -117,10 +153,14 @@ class ProjectsCog(commands.Cog):
                      description="Roll a downtime extended-test project for tonight")
     @app_commands.describe(
         project="Which roll project (if you have more than one active)",
+        surge="Blood surge this roll: +1 Hunger for extra dice",
+        willpower="Spend 2 Willpower to reroll up to 3 failed dice",
         character="Which character (only if you have more than one)")
     @app_commands.autocomplete(project=_roll_autocomplete)
     async def project_roll(self, interaction: discord.Interaction,
                            project: str | None = None,
+                           surge: bool = False,
+                           willpower: bool = False,
                            character: str | None = None) -> None:
         await interaction.response.defer(ephemeral=True)
         char = await self._one_character(interaction, character)
@@ -172,26 +212,48 @@ class ProjectsCog(commands.Cog):
             return
         sheet = _parse_sheet(full)
         expr  = (proj.get("roll_pool") or "").strip()
-        diff  = int(proj.get("roll_difficulty") or 1)
         if expr.isdigit():
             total, parts, unknown = int(expr), [], []
         else:
             total, parts, unknown = resolve_pool(expr, sheet, _TRAIT_INDEX)
         hunger = int(sheet.get("hunger", 0) or 0)
-        result = roll_pool(total, hunger, diff)
 
-        # Record the successes web-side (re-validates owner + one-per-period).
+        surge_dice = 0
+        if surge:
+            surge_dice = blood_surge_bonus(int(sheet.get("blood_potency", 0) or 0))
+            total += surge_dice
+            hunger = min(5, hunger + 1)        # a project blood surge is a flat +1 Hunger
+
+        result = roll_pool(total, hunger, 0)
+        rerolled = 0
+        if willpower:
+            result, rerolled = reroll_failures(result.normal_dice, result.hunger_dice, 0)
+        hunger_one = any(d == 1 for d in result.hunger_dice)
+
+        # Resolve web-side against the current stage (re-validates owner + budget).
         resp = await record_project_roll(
-            proj["id"], str(interaction.user.id), result.successes, result.outcome)
+            proj["id"], str(interaction.user.id), result.successes, result.outcome,
+            critical=result.critical, messy=result.messy,
+            hunger_one=hunger_one, pool_size=result.pool)
         if resp.get("error"):
             await interaction.followup.send(f"❌ {resp['error']}", ephemeral=True)
             return
-        updated = resp.get("project") or {}
-        prog    = updated.get("progress_successes", 0)
-        target  = updated.get("target_successes", 0)
-        note    = f"**{proj['title']}** — progress **{prog}/{target}**"
-        if updated.get("target_reached"):
-            note += "\n**Target reached!** Staff will finalise your reward."
+
+        # Only spend Hunger / WP once the roll has actually counted.
+        if surge:
+            try:
+                await apply_state_delta(char["id"], hunger=1, source="project blood surge")
+            except Exception as exc:
+                log.warning("surge state delta failed for %s: %s", char.get("id"), exc)
+        if willpower:
+            try:
+                await apply_state_delta(char["id"], damage_willpower_sup=2,
+                                        source="project WP reroll")
+            except Exception as exc:
+                log.warning("WP state delta failed for %s: %s", char.get("id"), exc)
+
+        note  = _result_note(proj, resp.get("result") or {}, rolls,
+                             surge_dice=surge_dice, rerolled=rerolled)
         embed = build_roll_embed(result, title=f"📜 {proj['title']} — downtime roll",
                                  pool_parts=parts, unknown=unknown, note=note)
         await interaction.followup.send(embed=embed, ephemeral=True)

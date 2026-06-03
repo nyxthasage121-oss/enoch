@@ -30,6 +30,7 @@ from ..db import (
     list_character_backgrounds,
     list_projects_for_character,
     record_project_roll,
+    resolve_project_roll,
     timeskip_rolls_remaining,
     get_coterie_for_character,
     get_db,
@@ -145,10 +146,15 @@ class BackgroundBlankIn(BaseModel):
 class ProjectRollIn(BaseModel):
     """Record a downtime extended-test roll for a roll-type project (the bot's
     `/project roll`). The bot owns the dice engine, rolls, and posts the result;
-    the web validates ownership + one-roll-per-period and accumulates."""
+    the web validates ownership + the timeskip budget and resolves it against the
+    project's current stage."""
     requester_discord_id: str
-    successes: int = Field(..., ge=0)
-    outcome:   str = Field(default="", max_length=40)
+    successes:  int  = Field(..., ge=0)
+    outcome:    str  = Field(default="", max_length=40)
+    critical:   bool = False
+    messy:      bool = False
+    hunger_one: bool = False
+    pool_size:  int  = Field(default=0, ge=0)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -515,15 +521,26 @@ async def roll_project(project_id: int, body: ProjectRollIn):
         char = get_character(conn, proj["character_id"])
         if not char or char.get("discord_id") != body.requester_discord_id:
             raise HTTPException(status_code=403, detail="That isn't your project.")
-        active = get_active_period(conn)
+        active    = get_active_period(conn)
+        period_id = active["id"] if active else None
         try:
-            updated = record_project_roll(
-                conn, project_id, successes=body.successes,
-                outcome=body.outcome, period_id=active["id"] if active else None,
-            )
+            if proj.get("stages_json"):
+                res = resolve_project_roll(
+                    conn, project_id, successes=body.successes,
+                    critical=body.critical, messy=body.messy,
+                    hunger_one=body.hunger_one, pool_size=body.pool_size,
+                    period_id=period_id,
+                )
+                project, result = res["project"], res["result"]
+            else:
+                project = record_project_roll(
+                    conn, project_id, successes=body.successes,
+                    outcome=body.outcome, period_id=period_id,
+                )
+                result = {"outcome": body.outcome or "progress"}
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-    return {"project": updated}
+    return {"project": project, "result": result}
 
 
 @router.get("/sites", dependencies=[Depends(_require_bot)])

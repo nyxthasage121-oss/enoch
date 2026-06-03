@@ -10,7 +10,7 @@
     {% if pending_projects %}
     <div class="space-y-4">
       {% for p in pending_projects %}
-      <div class="gilded p-5" x-data="{ prog: 'staged', payoff: 'freeform', rejecting: false }">
+      <div class="gilded p-5" x-data="{ prog: 'staged', payoff: 'freeform', rejecting: false, stages: [{label:'', dc:30}] }">
         <div class="mb-3">
           <p class="font-cinzel text-lg text-bone-200">{{ p.title }}</p>
           <p class="label-gold text-[0.6rem] text-bone-500 mt-0.5">{{ p.character_name }}</p>
@@ -41,21 +41,38 @@
             </div>
           </div>
 
-          {# Roll config (shown when progress = roll) #}
-          <div x-show="prog === 'roll'" x-cloak class="grid grid-cols-2 sm:grid-cols-4 gap-3 gilded-inset px-3 py-3">
-            <div class="col-span-2">
-              <label class="label-gold block mb-1 text-[0.6rem]">Dice pool</label>
+          {# Roll config (shown when progress = roll): pool + ordered stages #}
+          <div x-show="prog === 'roll'" x-cloak class="gilded-inset px-3 py-3 space-y-3">
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Dice pool (Attribute + Skill)</label>
               <input type="text" name="roll_pool" placeholder="resolve + occult, or a number"
                      class="w-full text-sm py-1.5">
             </div>
             <div>
-              <label class="label-gold block mb-1 text-[0.6rem]">Difficulty</label>
-              <input type="number" name="roll_difficulty" min="0" max="10" value="1" class="w-full text-sm py-1.5">
+              <div class="flex items-center justify-between mb-1">
+                <label class="label-gold text-[0.6rem]">Stages — rolled in order (DC presets: 15 / 30 / 45+)</label>
+                <button type="button" @click="stages.push({label:'', dc:30})"
+                        class="font-cinzel text-[0.55rem] tracking-widest text-gold-400 hover:text-gold-300">+ Add stage</button>
+              </div>
+              <template x-for="(s, i) in stages" :key="i">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="font-cinzel text-[0.65rem] text-bone-600 w-4 text-right" x-text="i+1"></span>
+                  <input type="text" x-model="s.label" placeholder="Stage name (optional)"
+                         class="flex-1 text-sm py-1">
+                  <input type="number" x-model.number="s.dc" min="1" max="200"
+                         style="width:4rem" class="text-center text-sm py-1">
+                  <template x-for="dc in [15,30,45]" :key="dc">
+                    <button type="button" @click="s.dc = dc"
+                            class="font-cinzel text-[0.55rem] px-1.5 py-1 border border-ink-700 text-bone-500 hover:text-gold-400 hover:border-gold-800"
+                            x-text="dc"></button>
+                  </template>
+                  <button type="button" @click="stages.splice(i,1)" x-show="stages.length > 1"
+                          class="text-blood-400 hover:text-blood-300 text-sm leading-none px-1">&times;</button>
+                </div>
+              </template>
             </div>
-            <div>
-              <label class="label-gold block mb-1 text-[0.6rem]">Target</label>
-              <input type="number" name="target_successes" min="1" max="50" value="5" class="w-full text-sm py-1.5">
-            </div>
+            <input type="hidden" name="stages_json" :value="JSON.stringify(stages)">
+            <input type="hidden" name="roll_difficulty" value="1">
           </div>
 
           {# Structured reward config (shown when payoff = structured) #}
@@ -124,10 +141,23 @@
           </div>
           {% if p.progress_type == 'roll' %}
           <span class="font-cinzel text-sm whitespace-nowrap {{ 'text-gold-400' if p.target_reached else 'text-bone-400' }}">
-            {{ p.progress_successes }}/{{ p.target_successes }}{% if p.target_reached %} ✓{% endif %}
+            {% if p.stages_json %}{% if p.target_reached %}all stages ✓{% else %}Stage {{ p.current_stage + 1 }}/{{ p.stage_count }}{% endif %}{% else %}{{ p.progress_successes }}/{{ p.target_successes }}{% if p.target_reached %} ✓{% endif %}{% endif %}
           </span>
           {% endif %}
         </div>
+
+        {# Stage breakdown (multi-stage roll projects) #}
+        {% if p.stages_json %}
+        <div class="mt-2 space-y-0.5">
+          {% for s in p.stages_json %}
+          <div class="flex items-center justify-between text-[0.7rem] font-garamond
+                      {{ 'text-gold-400' if s.done else ('text-bone-300' if loop.index0 == p.current_stage else 'text-bone-600') }}">
+            <span>{{ loop.index }}. {{ s.label or 'Stage ' ~ loop.index }}</span>
+            <span>{{ s.progress }}/{{ s.dc }}{% if s.done %} ✓{% endif %}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
 
         {% if p.payoff_type == 'structured' %}
         <p class="font-garamond text-bone-600 text-xs mt-2">
@@ -140,7 +170,7 @@
           {% for e in p.log_json[-4:] %}
           <p class="font-garamond text-bone-600 text-[0.7rem]">
             <span class="text-bone-700">{{ e.at[5:16].replace('T',' ') }}</span>
-            {% if e.kind == 'roll' %}— roll: {{ e.successes }} success(es), {{ e.outcome }} → {{ e.progress }}
+            {% if e.kind == 'roll' %}— roll: {{ e.successes }} success(es){% if e.stage %} on stage {{ e.stage }}{% endif %}{% if e.flags %} <span class="text-gold-500">[{{ e.flags | join(', ') }}]</span>{% endif %}
             {% elif e.kind == 'note' %}— {{ e.text }}
             {% elif e.kind == 'approved' %}— activated ({{ e.text }})
             {% endif %}

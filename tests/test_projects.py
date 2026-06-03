@@ -194,3 +194,36 @@ def test_bot_roll_api_records_and_enforces_budget(_client):
     assert r3.status_code == 403
     with get_db() as conn:
         upsert_settings(conn, rolls_per_timeskip=8)  # restore default
+
+
+def test_stage_project_approve_and_roll_via_routes(_client):
+    _client.cookies.clear()
+    _client.get("/_dev/seed_data", follow_redirects=False)
+    _client.get("/_dev/player", follow_redirects=False)
+    with get_db() as conn:
+        upsert_settings(conn, rolls_per_timeskip=8)
+        if not get_active_period(conn):
+            per = create_period(conn, "Night Wire", "night", "full",
+                                "2026-09-01T18:00:00Z", "2026-09-30T06:00:00Z", "system")
+            set_period_active(conn, per["id"])
+        owner = get_character(conn, 1)["discord_id"]
+    _client.post("/characters/1/projects/propose",
+                 data={"_csrf": "dev-csrf-token", "title": "Staged Roll", "description": ""})
+    r = _client.get("/api/characters/1/projects", headers=_BOT_HEADERS)
+    pid = next(p["id"] for p in r.json()["projects"] if p["title"] == "Staged Roll")
+    # staff approve as a roll project with two stages
+    _client.get("/_dev/seed", follow_redirects=False)
+    r = _client.post(f"/staff/projects/{pid}/approve", data={
+        "_csrf": "dev-csrf-token", "progress_type": "roll", "payoff_type": "freeform",
+        "roll_pool": "5", "stages_json": '[{"label":"A","dc":10},{"label":"B","dc":10}]'})
+    assert r.status_code == 200
+    proj = next(p for p in _client.get("/api/characters/1/projects", headers=_BOT_HEADERS)
+                .json()["projects"] if p["id"] == pid)
+    assert proj["stage_count"] == 2 and proj["status"] == "active"
+    # bot rolls a normal completion of stage 1 (12 successes vs DC 10) -> advances
+    r = _client.post(f"/api/projects/{pid}/roll", headers=_BOT_HEADERS,
+                     json={"requester_discord_id": owner, "successes": 12, "pool_size": 8})
+    assert r.status_code == 200
+    assert r.json()["result"]["outcome"] == "stage_complete"
+    assert r.json()["result"]["carry"] == 0          # normal completion drops overflow
+    assert r.json()["project"]["current_stage"] == 1

@@ -48,8 +48,14 @@
       {% if p.status == 'active' and p.progress_type == 'roll' %}
       <div class="mt-2">
         <div class="flex items-center justify-between text-[0.6rem] label-gold mb-1">
+          {% if p.stages_json %}
+          {% set cur = p.stages_json[p.current_stage] %}
+          <span>{{ 'All stages done — awaiting staff' if p.target_reached else ('Stage ' ~ (p.current_stage + 1) ~ ' / ' ~ p.stage_count ~ ((' · ' ~ cur.label) if cur.label else '')) }}</span>
+          <span class="text-bone-400">{% if not p.target_reached %}{{ cur.progress }}/{{ cur.dc }}{% endif %}</span>
+          {% else %}
           <span>{{ 'Target reached — awaiting staff' if p.target_reached else 'Extended test' }}</span>
           <span class="text-bone-400">{{ p.progress_successes }}/{{ p.target_successes }}</span>
+          {% endif %}
         </div>
         <div style="height:6px;background:#221f1b;border-radius:1px">
           <div style="height:6px;background:#c29b48;width:{{ p.progress_pct }}%;border-radius:1px"></div>

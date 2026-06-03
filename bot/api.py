@@ -175,15 +175,20 @@ async def get_projects(character_id: int) -> dict:
 
 
 async def record_project_roll(project_id: int, requester_discord_id: str,
-                              successes: int, outcome: str) -> dict:
-    """Post a downtime roll's successes for a roll project. Returns
-    ``{project}`` on success or ``{error: <reason>}`` when rejected (not your
-    project, already rolled this night, no active period, not a roll project)."""
+                              successes: int, outcome: str, *,
+                              critical: bool = False, messy: bool = False,
+                              hunger_one: bool = False, pool_size: int = 0) -> dict:
+    """Post a downtime roll for a roll project; the web resolves it against the
+    project's current stage. Returns ``{project, result}`` on success or
+    ``{error: <reason>}`` when rejected (not your project, no rolls left this
+    timeskip, no active period, not a roll project)."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         r = await client.post(
             f"{_base()}/api/projects/{project_id}/roll",
             json={"requester_discord_id": requester_discord_id,
-                  "successes": successes, "outcome": outcome},
+                  "successes": successes, "outcome": outcome,
+                  "critical": critical, "messy": messy,
+                  "hunger_one": hunger_one, "pool_size": pool_size},
             headers=_headers(),
         )
         if r.status_code in (400, 403, 404):

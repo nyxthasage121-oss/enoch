@@ -164,7 +164,14 @@ async def approve_project_route(
     user: dict = Depends(require_permission("manage_project")),
     _: None = Depends(csrf_protect),
 ):
+    import json as _json
     form = await request.form()
+    try:
+        stages = _json.loads(form.get("stages_json") or "[]")
+        if not isinstance(stages, list):
+            stages = []
+    except Exception:
+        stages = []
     err = None
     try:
         with get_db() as conn:
@@ -174,7 +181,7 @@ async def approve_project_route(
                 payoff_type=(form.get("payoff_type") or "").strip(),
                 roll_pool=(form.get("roll_pool") or "").strip(),
                 roll_difficulty=form_int(form.get("roll_difficulty"), 1),
-                target_successes=form_int(form.get("target_successes"), 0),
+                stages=stages,
                 reward_category=(form.get("reward_category") or "").strip() or None,
                 reward_trait=(form.get("reward_trait") or "").strip() or None,
                 reward_dots=form_int(form.get("reward_dots"), 0),
