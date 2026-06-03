@@ -108,10 +108,18 @@ home.
   limits, and own/retainer/coterie backgrounds being interchangeable — staff
   handle these via notes + the penalty flags.
 - **C — Advancement via projects**: buying Attribute/Skill/Merit/Background/
-  Loresheet at **3+ dots requires a project** (DC table above); learning
-  ceremonies/rituals/formulae (4×level TS-weeks **or** Int/Resolve + Occult/Science
-  at DC 5×level; library dots add, capped by library specialization; mawla grants
-  access by level). Thin-blood alchemy similarly. Wires spend_requests ↔ projects.
+  Loresheet at **3+ dots requires a project** (DC table); learning ceremonies/
+  rituals/formulae (4×level TS-weeks **or** Int/Resolve + Occult/Science at DC
+  5×level; library dots add). **PARTIAL 2026-06-02:** advancement projects already
+  work via the existing roll-project + structured-payoff (grant the trait on
+  completion); the **DC table is now shown as a reference in the staff stage
+  builder** so staff set correct DCs. ⚠️ **OPEN architecture decision** — how
+  strictly to tie a 3+-dot advancement to the XP spend system:
+  (a) **staff-coordinated** (today): staff just require/track a project and run
+  the XP spend separately — no code gating, max ST discretion;
+  (b) **gate the spend**: a 3+-dot `spend_request` can't be approved until a
+  linked project completes (XP still paid);
+  (c) **project replaces XP**: the project grants the trait, no XP.
 - **D — Coterie projects**: coterie-owned, elevated DCs (30/45/60), multi-stage,
   coterie-mates combine successes; retainers teamwork-only; benefit lost if the
   coterie disbands (reclaimable by a member's regular project).
