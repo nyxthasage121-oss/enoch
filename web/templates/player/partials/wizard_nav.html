@@ -12,8 +12,11 @@
             class="btn-ghost font-cinzel tracking-widest text-xs">
       Save Draft
     </button>
-    <button type="button" @click="goStep(step + 1)"
-            class="btn-send font-cinzel tracking-widest text-xs flex items-center gap-2">
+    <button type="button" @click="canLeaveStep() && goStep(step + 1)"
+            :disabled="!canLeaveStep()"
+            :title="canLeaveStep() ? '' : 'Resolve the over-budget items (shown in red) to continue.'"
+            :class="canLeaveStep() ? 'btn-send' : 'btn-ghost opacity-60 cursor-not-allowed'"
+            class="font-cinzel tracking-widest text-xs flex items-center gap-2">
       Next
       <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
         <path stroke-linecap="square" d="M5 12h14M12 5l7 7-7 7"/>

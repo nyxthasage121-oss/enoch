@@ -2915,6 +2915,20 @@
       // caps switch live when the player toggles character type or
       // tier. Falls back to the seed budget if tier data is missing
       // (shouldn't happen post-migration, but cheap insurance).
+      canLeaveStep() {
+        // Hard-block leaving the Legacy step (8) while over the combined
+        // Advantages budget or the flaw cap. Mirrors the sidebar's over-budget
+        // indicators exactly (merits+advantages+backgrounds vs combined cap;
+        // flaws vs flaw_cap) so illegal builds can't reach staff.
+        if (this.step === 8) {
+          const u = this.budgetUsed, b = this.budgets;
+          const advOver = (u.merits + u.advantages + u.backgrounds)
+                        > (b.merits + b.advantages + b.backgrounds);
+          return !advOver && u.flaws <= b.flaw_cap;
+        }
+        return true;
+      },
+
       get budgets() {
         const ct   = (this.charName.character_type || 'kindred');
         const tier = (this.charName.character_tier || 'neonate');
