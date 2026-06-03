@@ -19,6 +19,7 @@ from web.xp_rules import calculate_cost
     ("Clan Discipline",      1, 2, 10),   # 2x5
     ("Other Discipline",     1, 2, 14),   # 2x7
     ("Caitiff Discipline",   1, 2, 12),   # 2x6
+    ("Ghoul Discipline",     0, 1, 10),   # flat (ghoul's first Discipline dot)
     ("Advantage",            1, 3, 6),    # 2 dots x 3 (flat per dot)
     ("Blood Potency",        1, 2, 20),   # 2x10
     ("Humanity",             6, 7, 14),   # 7x2 (single dot)
@@ -47,6 +48,15 @@ def test_skill_zero_to_one_still_routes_to_new_skill():
     cost, err = calculate_cost("Skill", 0, 1)
     assert err is not None
     assert cost == 0
+
+
+def test_ghoul_discipline_is_first_dot_only():
+    """Ghoul Discipline is a flat 10 XP buy for the first dot only (0->1).
+    Anything past the first dot must be rejected (ghouls can't keep buying
+    a Discipline up at the flat ghoul rate)."""
+    assert calculate_cost("Ghoul Discipline", 0, 1) == (10, None)
+    cost, err = calculate_cost("Ghoul Discipline", 1, 2)
+    assert err is not None and cost == 0
 
 
 def test_rituals_and_formulas_buyable_from_scratch():

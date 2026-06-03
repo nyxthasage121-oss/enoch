@@ -20,6 +20,7 @@ SPEND_CATEGORIES: list[str] = [
     "Clan Discipline",
     "Other Discipline",
     "Caitiff Discipline",
+    "Ghoul Discipline",
     "Ingrained Discipline",
     "Blood Sorcery Ritual",
     "Thin-Blood Alchemy Formula",
