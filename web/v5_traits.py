@@ -683,6 +683,26 @@ def validate_chargen_raw(
             "Balanced, or Specialist (before starting XP)."
         )
 
+    # Specialties — V5 grants one free Skill specialty plus one more for each
+    # dotted Academics / Craft / Performance / Science. The player must assign at
+    # least that many; predator-granted specialties carry `src` and don't count
+    # toward the free allotment.
+    free_specialties = 1 + sum(
+        1 for k in ("skill_academics", "skill_science", "skill_craft", "skill_performance")
+        if int(sheet.get(k, 0) or 0) > 0
+    )
+    player_specialties = [
+        s for s in (sheet.get("specialties") or [])
+        if isinstance(s, dict) and not s.get("src")
+    ]
+    if len(player_specialties) < free_specialties:
+        errors.append(
+            f"Assign your {free_specialties} free Skill "
+            f"{'specialty' if free_specialties == 1 else 'specialties'} — one free, plus "
+            "one for each dotted Academics, Craft, Performance, or Science "
+            f"(you have {len(player_specialties)})."
+        )
+
     # No trait may reach 5 at creation — Attributes, Skills, and Disciplines cap
     # at 4 dots (a 5th dot comes later, through play).
     if any(int(sheet.get(k, 0) or 0) >= 5

@@ -22,6 +22,12 @@ def _valid_sheet():
     sheet["backgrounds"] = [{"name": "Allies", "dots": 3}, {"name": "Resources", "dots": 2}]
     sheet["merits"] = [{"name": "Iron Will", "dots": 2}]   # 7 advantage dots total
     sheet["flaws"] = [{"name": "Enemy", "dots": 1}, {"name": "Disliked", "dots": 1}]
+    # V5 free specialties: 1 + one per dotted Academics/Craft/Performance/Science.
+    _free = 1 + sum(1 for k in ("skill_academics", "skill_science", "skill_craft",
+                                "skill_performance") if sheet.get(k, 0) > 0)
+    _dotted = [k for k in skill_keys if sheet.get(k, 0) > 0]
+    sheet["specialties"] = [{"skill": _dotted[i % len(_dotted)], "name": f"Spec {i + 1}"}
+                            for i in range(_free)]
     return sheet
 
 
@@ -163,3 +169,22 @@ def test_nothing_at_five_at_creation():
     s["disc_celerity"] = 5  # in-clan for Brujah, but a 5 isn't allowed at creation
     errs = validate_chargen_raw(s, character_type="kindred", clan="brujah")
     assert any("5" in e for e in errs)
+
+
+def test_specialties_below_free_count_rejected():
+    """Every character gets at least one free Skill specialty — none assigned fails."""
+    from web.v5_traits import validate_chargen_raw
+    s = _valid_sheet()
+    s["specialties"] = []
+    errs = validate_chargen_raw(s)
+    assert any("specialt" in e.lower() for e in errs)
+
+
+def test_predator_specialty_excluded_from_free_count():
+    """Predator-granted specialties (src-tagged) are a bonus — they don't satisfy
+    the player's free-specialty allotment."""
+    from web.v5_traits import validate_chargen_raw
+    s = _valid_sheet()
+    s["specialties"] = [{"skill": "skill_brawl", "name": "Grappling", "src": "predator"}]
+    errs = validate_chargen_raw(s)
+    assert any("specialt" in e.lower() for e in errs)

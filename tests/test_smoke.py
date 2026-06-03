@@ -1134,6 +1134,9 @@ def _raw_traits():
         "advantages":  _j.dumps([]),
         "flaws":       _j.dumps([{"name": "Enemy", "dots": 1},
                                  {"name": "Disliked", "dots": 1}]),
+        # Free specialties: 1 free choice (Brawl) + 1 for dotted Academics = 2.
+        "specialties": _j.dumps([{"skill": "skill_academics", "name": "History"},
+                                 {"skill": "skill_brawl", "name": "Grappling"}]),
     }
     return {**attrs, **skills, "skill_spread": "balanced", **advantages}
 
@@ -1148,9 +1151,6 @@ def test_character_wizard_submission_populates_full_sheet(player):
             "_csrf": "dev-csrf-token",
             "name": "Wizard Smoke",
             "clan": "brujah",
-            "specialties": _j.dumps([
-                {"skill": "skill_streetwise", "name": "Lower East Side"}
-            ]),
             "merits":  _j.dumps([{"name": "Iron Will", "dots": 2}]),
             "flaws":   _j.dumps([{"name": "Disliked",  "dots": 1}]),
             "powers":  _j.dumps([]),
@@ -1162,6 +1162,12 @@ def test_character_wizard_submission_populates_full_sheet(player):
             "convictions":_j.dumps(["Never harm a child"]),
             # RAW-valid base spread (overrides any partial trait fields above).
             **_raw_traits(),
+            # Override _raw_traits' specialties with this test's own — still 2
+            # (1 free + 1 for dotted Academics) so "Lower East Side" survives.
+            "specialties": _j.dumps([
+                {"skill": "skill_streetwise", "name": "Lower East Side"},
+                {"skill": "skill_academics",  "name": "History"},
+            ]),
         },
         follow_redirects=False,
     )
@@ -3124,6 +3130,8 @@ def test_chargen_persists_spreads_and_predator_picks(player):
         "merits": _json.dumps([{"name": "Iron Will", "dots": 2}]),
         "flaws": _json.dumps([{"name": "Enemy", "dots": 1},
                               {"name": "Disliked", "dots": 1}]),
+        # 1 free specialty (this Specialist build dots no Academics/Craft/Perf/Science).
+        "specialties": _json.dumps([{"skill": "skill_brawl", "name": "Grappling"}]),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
