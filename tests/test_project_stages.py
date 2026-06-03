@@ -48,19 +48,19 @@ def test_stages_stored_on_approval():
         assert p["current_stage"] == 0 and p["target_reached"] is False
 
 
-def test_progress_accumulates_then_completes_stage_with_full_spill():
+def test_normal_completion_does_not_spill_overflow():
     with get_db() as conn:
-        pid = _seed(conn, "Spill", [{"dc": 15}, {"dc": 30}])
+        pid = _seed(conn, "NoSpill", [{"dc": 15}, {"dc": 30}])
         per = _period_id(conn)
         r1 = resolve_project_roll(conn, pid, successes=10, pool_size=8, period_id=per)
         assert r1["result"]["outcome"] == "progress" and r1["result"]["remaining"] == 5
         r2 = resolve_project_roll(conn, pid, successes=10, pool_size=8, period_id=per)
         assert r2["result"]["outcome"] == "stage_complete"
-        assert r2["result"]["carry"] == 5            # 20-15 overflow, full carry
+        assert r2["result"]["carry"] == 0            # plain success loses the leftover
         p = get_project(conn, pid)
         assert p["current_stage"] == 1
         assert p["stages_json"][0]["done"] is True
-        assert p["stages_json"][1]["progress"] == 5
+        assert p["stages_json"][1]["progress"] == 0
 
 
 def test_messy_completion_carries_half():
@@ -81,16 +81,16 @@ def test_crit_completion_carries_full_and_flags():
         assert get_project(conn, pid)["stages_json"][1]["progress"] == 6
 
 
-def test_bestial_bumps_dc_and_banks_no_progress():
+def test_bestial_banks_successes_then_bumps_dc():
     with get_db() as conn:
         pid = _seed(conn, "Bestial", [{"dc": 30}])
         # ceil(30/10)=3; 2 successes < 3 plus a Hunger 1 -> bestial
         r = resolve_project_roll(conn, pid, successes=2, hunger_one=True, pool_size=8,
                                  period_id=_period_id(conn))
-        assert r["result"]["outcome"] == "bestial"
+        assert r["result"]["outcome"] == "bestial" and r["result"]["gained"] == 2
         p = get_project(conn, pid)
         assert p["stages_json"][0]["dc"] == 34       # 30 + 8//2
-        assert p["stages_json"][0]["progress"] == 0
+        assert p["stages_json"][0]["progress"] == 2  # the 2 successes still bank
 
 
 def test_hunger_one_above_threshold_is_not_bestial():

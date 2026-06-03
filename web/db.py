@@ -4265,22 +4265,30 @@ def resolve_project_roll(conn, project_id: int, *, successes: int,
     new_current = idx
     flags: list[str] = []
 
-    if hunger_one and succ < (dc + 9) // 10:          # ceil(dc/10), no progress
+    if hunger_one and succ < (dc + 9) // 10:          # ceil(dc/10) -> bestial
+        # The successes still bank, then the stage DC rises by half the pool and
+        # a penalty is flagged for staff.
+        stage["progress"] = int(stage.get("progress") or 0) + succ
         stage["dc"] = dc + (pool // 2)
         flags.append("bestial")
         result = {"outcome": "bestial", "stage": idx + 1,
-                  "stage_dc": stage["dc"], "gained": 0}
+                  "stage_dc": stage["dc"], "gained": succ}
     else:
         stage["progress"] = int(stage.get("progress") or 0) + succ
         if stage["progress"] >= dc:
             overflow = stage["progress"] - dc
             stage["progress"] = dc
             stage["done"] = True
-            carry = overflow // 2 if messy else overflow
-            if messy:
-                flags.append("messy")
+            # Only a crit (full) or messy crit (half) carries overflow into the
+            # next stage; a plain success that clears the DC loses the leftover.
             if critical:
+                carry = overflow
                 flags.append("crit")
+            elif messy:
+                carry = overflow // 2
+                flags.append("messy")
+            else:
+                carry = 0
             if idx + 1 < len(stages):
                 nxt = stages[idx + 1]
                 nxt["progress"] = int(nxt.get("progress") or 0) + carry

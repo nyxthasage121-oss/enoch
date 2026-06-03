@@ -51,9 +51,8 @@ stage's DC**, consuming 1 from the timeskip budget. Per roll:
 | **Bestial failure** | the current stage's DC **rises by ½ the dice pool**; flag staff for a penalty |
 
 **Bestial-on-project trigger:** a **1 on a Hunger die** AND successes
-**< ⌈stage DC ÷ 10⌉**. On bestial: that stage's DC rises by ½ the dice pool, a
-penalty is flagged for staff, and the roll's successes do **not** bank (failed
-roll). *(Assumption: successes don't count on a bestial — adjust if wrong.)*
+**< ⌈stage DC ÷ 10⌉**. On bestial: the roll's successes **still bank**, then that
+stage's DC rises by ½ the dice pool and a penalty is flagged for staff.
 
 **Staff:** the approve form gains a **stage builder** (add stages, each a preset or
 custom DC); completion/payoff works as today. An at-a-glance view shows
@@ -62,11 +61,10 @@ stage N of M + progress toward the current DC.
 ### Resolved (2026-06-02)
 1. **Bestial trigger** — confirmed: Hunger-die-1 AND successes < ⌈DC/10⌉ (and the
    standard V5 bestial too — "assume both, adjust later").
-2. **Crit overflow** — successes over the DC **spill into the next stage if one
-   exists**; on a single-stage project (or the final stage) the spillover is null
-   (no next stage). Final-stage crit still flags staff for temp background dots.
-   *(Assumption: overflow carries on completion in general; messy carries half;
-   normal completion otherwise also carries — kept simple, flag to adjust.)*
+2. **Crit overflow** — only a **Crit (full)** or **Messy crit (half)** carries
+   leftover successes into the next stage; a plain success that clears the DC
+   **loses** the overflow. Spillover is null on the final/only stage; a
+   final-stage crit/messy flags staff for temp background dots.
 3. **Stage order** — **sequential** (in order) by default.
 4. **Accumulation** — **cumulative**: successes bank across rolls until the stage
    DC is reached (extended test).
