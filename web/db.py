@@ -708,35 +708,38 @@ RULESETS = ("standard", "homebrew", "in_memoriam")
 # ruleset or hasn't customized that tier yet. Values reflect V5 RAW
 # starting allotments for each character archetype.
 #
-# Kindred tiers map to V5's Sea of Time (Corebook p.130):
-#   fledgling — Childer, embraced last 15 yr. Baseline allocation,
-#               no XP bonus. Blood Potency 1 (or 0 if thin-blood).
-#   thinblood — variant of Fledgling. 14th-16th gen, BP 0, no clan
-#               disciplines (uses Alchemy instead). Plus 1-3 Thin-Blood
-#               Merits + matching Thin-Blood Flaws on top of the standard
-#               7 advantage / 2 flaw allocation — Steward verifies at
-#               approval since those slots are special.
-#   neonate   — embraced 1940 to a decade ago. BP 1. +15 XP over baseline.
-#   ancilla   — embraced 1780-1940. BP 2. +35 XP, +2 advantages,
-#               +2 flaws, -1 Humanity over baseline.
+# Kindred tiers map to V5's Sea of Time (Corebook p.130). The "xp" here is the
+# STANDARD-ruleset finishing-touches pool the wizard hands the player — and the
+# SINGLE source of truth: the wizard no longer layers any bonus on top, so the
+# Sea-of-Time advantage of an older Kindred is baked straight into this number.
+#   fledgling — Childer, embraced last 15 yr. Baseline: 0 finishing XP. BP 1.
+#   thinblood — variant of Fledgling. 14th-16th gen, BP 0, no clan disciplines
+#               (uses Alchemy instead). Plus 1-3 Thin-Blood Merits + matching
+#               Thin-Blood Flaws on top of the standard 7 advantage / 2 flaw
+#               allocation — Steward verifies at approval. Same 0 baseline.
+#   neonate   — embraced 1940 to a decade ago. BP 1. 15 XP (V5 RAW finishing
+#               touches — the standard starting vampire).
+#   ancilla   — embraced 1780-1940. BP 2. 35 XP (Sea-of-Time bonus for age),
+#               plus +2 advantages / +2 flaws / -1 Humanity over baseline.
+#   mortal / ghoul / revenant — non-Kindred archetypes: 0 finishing XP.
 #
 # The "merits + advantages + backgrounds" total is the V5 RAW pool of
 # 7 advantage points; the split into three buckets is for the wizard
 # sidebar (combined-pool admin override since Steward UX revision).
 _TIER_DEFAULTS = {
-    "mortal":    {"xp": 50,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
-    "ghoul":     {"xp": 60,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
-    "revenant":  {"xp": 75,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
+    "mortal":    {"xp": 0,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
+    "ghoul":     {"xp": 0,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
+    "revenant":  {"xp": 0,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
     # Childer / Fledgling — baseline Kindred, no Sea of Time XP bonus.
-    "fledgling": {"xp": 60,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
+    "fledgling": {"xp": 0,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
     # Thin-Blood — same XP as Fledgling but uses Alchemy instead of
     # in-clan Disciplines. Steward verifies the 1-3 Thin-Blood
     # Merits/Flaws at approval — they don't eat the standard pool.
-    "thinblood": {"xp": 60,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
-    "neonate":   {"xp": 75,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
+    "thinblood": {"xp": 0,  "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
+    "neonate":   {"xp": 15, "merits": 2, "advantages": 2, "backgrounds": 3, "flaw_cap": 2},
     # NYbN house rule: standard Ancilla take 3 Flaw dots (one of which must be
     # Archaic — enforced as chargen guidance + verified by staff at approval).
-    "ancilla":   {"xp": 110, "merits": 3, "advantages": 3, "backgrounds": 3, "flaw_cap": 3},
+    "ancilla":   {"xp": 35, "merits": 3, "advantages": 3, "backgrounds": 3, "flaw_cap": 3},
 }
 
 

@@ -4290,8 +4290,8 @@ def test_tier_budget_overrides_round_trip(staff):
     assert fledgling["merits"] == 3      # 9 // 3
     assert ancilla["xp"] == 150
     assert ancilla["merits"] == 5        # 15 // 3
-    # Unset tier falls back to V5 RAW defaults.
-    assert ghoul["xp"] == 60
+    # Unset tier falls back to V5 RAW defaults (non-Kindred = 0 finishing XP).
+    assert ghoul["xp"] == 0
 
 
 def test_tier_budget_honors_overrides_under_in_memoriam_ruleset(staff):
@@ -4365,7 +4365,23 @@ def test_tier_budget_ignores_overrides_when_ruleset_is_standard(staff):
     with get_db() as conn:
         s = get_settings(conn)
         neonate = tier_budget(s, "neonate")
-    assert neonate["xp"] == 75  # V5 RAW default, NOT the 999 we stored
+    assert neonate["xp"] == 15  # V5 RAW finishing XP, NOT the 999 we stored
+
+
+def test_standard_tier_xp_is_raw_finishing_pool():
+    """Standard ruleset = V5 RAW finishing XP, baked into _TIER_DEFAULTS as the
+    single source of truth (the wizard layers no Sea-of-Time bonus on top):
+    Kindred Fledgling 0 / Neonate 15 / Ancilla 35; non-Kindred 0 each.
+    The Ancilla 35 is the regression guard — it used to double-count to 70+."""
+    from web.db import tier_budget
+    s = {"active_ruleset": "standard"}
+    assert tier_budget(s, "fledgling")["xp"] == 0
+    assert tier_budget(s, "thinblood")["xp"] == 0
+    assert tier_budget(s, "neonate")["xp"] == 15
+    assert tier_budget(s, "ancilla")["xp"] == 35   # baseline 0 + 35, applied once
+    assert tier_budget(s, "mortal")["xp"] == 0
+    assert tier_budget(s, "ghoul")["xp"] == 0
+    assert tier_budget(s, "revenant")["xp"] == 0
 
 
 def test_period_schedule_stamp_generates_periods(_client):

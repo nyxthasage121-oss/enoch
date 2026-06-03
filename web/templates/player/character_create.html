@@ -246,20 +246,9 @@
              x-cloak>
           <p class="label-gold mb-2 text-[0.75rem]">Starting XP</p>
           <p class="font-cinzel text-gold-400 text-lg">
-            {# Standard Ancilla get the +35 Sea-of-Time bonus on top of the
-               base XP. Under homebrew the configured XP is authoritative —
-               no bonus is layered on. #}
-            <span x-text="charName.character_type === 'kindred'
-                           && charName.character_tier === 'ancilla'
-                           && charName.ancilla_mode === 'standard'
-                           && !budgets.homebrew
-                           ? budgets.starting_xp + 35
-                           : budgets.starting_xp"></span>
-            <span x-show="charName.character_type === 'kindred'
-                          && charName.character_tier === 'ancilla'
-                          && charName.ancilla_mode === 'standard'
-                          && !budgets.homebrew"
-                  class="text-bone-700 text-[0.65rem] ml-1">(Ancilla +35)</span>
+            {# The pool already reflects the tier's total (Sea-of-Time bonuses
+               are baked into the per-tier value, not layered here). #}
+            <span x-text="xpPool"></span>
           </p>
           <p class="font-garamond text-bone-700 text-[0.65rem] italic mt-1">
             Pre-approval XP pool for first spends after the chronicle starts.
@@ -506,7 +495,7 @@
         <p class="label-gold mb-3">Ancilla Path</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {% set _modes = [
-            ('standard',     'Standard',     '+35 XP boost over neonate baseline. Quick and clean.'),
+            ('standard',     'Standard',     '35 XP pool — the Sea-of-Time bonus for an Ancilla\'s age. Quick and clean.'),
             ('in_memoriam',  'In Memoriam',  'Build your character\'s history era-by-era. Earn XP from lived experience.'),
           ] %}
           {% for slug, label, blurb in _modes %}
@@ -2064,7 +2053,7 @@
       // budgets is now a *computed* getter below that picks the right
       // tier dict based on character_type + character_tier.
       _budgetsSeed:      opts.budgets || {
-        starting_xp: 75, merits: 7, advantages: 2, backgrounds: 5, flaw_cap: 2, homebrew: false,
+        starting_xp: 15, merits: 7, advantages: 2, backgrounds: 5, flaw_cap: 2, homebrew: false,
       },
       tierBudgets:       opts.tierBudgets || {},
       activeRuleset:     opts.activeRuleset || 'standard',
@@ -2481,14 +2470,14 @@
       // ── Starting-XP allocator (live V5 cost math) ─────────────────────
       get xpPool() {
         const ct = this.charName.character_type, tier = this.charName.character_tier;
-        if (ct === 'kindred' && tier === 'ancilla') {
-          if (this.charName.ancilla_mode === 'in_memoriam') return this.imTotals.totalXp;
-          // Standard Ancilla get the +35 Sea-of-Time bonus on top of the base
-          // XP. Under homebrew the configured Ancilla XP is the exact total —
-          // no bonus layered on.
-          const base = this.budgets.starting_xp || 0;
-          return this.budgets.homebrew ? base : base + 35;
+        // In Memoriam Ancilla build their pool era-by-era via the Era Builder.
+        if (ct === 'kindred' && tier === 'ancilla'
+            && this.charName.ancilla_mode === 'in_memoriam') {
+          return this.imTotals.totalXp;
         }
+        // Every other case: the pool is the tier's configured total. Sea-of-Time
+        // bonuses are baked into the per-tier value (web/db.py::_TIER_DEFAULTS) —
+        // nothing is layered on here, so there's one source of truth.
         return this.budgets.starting_xp || 0;
       },
       get xpSpent() { return this.xpBuys.reduce((s, b) => s + (b.cost || 0), 0); },
