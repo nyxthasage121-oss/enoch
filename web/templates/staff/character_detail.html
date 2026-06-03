@@ -359,6 +359,20 @@
             </div>
           </div>
           {% endfor %}
+          {# Willpower (Composure + Resolve) and Health (Stamina + 3) are derived
+             from Attributes — surfaced here so staff can verify them at a glance. #}
+          {% set _willpower = (sheet.get('attr_composure', 0) or 0) + (sheet.get('attr_resolve', 0) or 0) %}
+          {% set _health = (sheet.get('attr_stamina', 0) or 0) + 3 %}
+          {% for label, rating, max_dots in [('Willpower', _willpower, 10), ('Health', _health, 8)] %}
+          <div class="flex items-center justify-between py-1">
+            <span class="font-garamond text-xs {{ 'text-bone-200' if rating > 0 else 'text-bone-700' }}">{{ label }}</span>
+            <div class="flex gap-1 flex-wrap">
+              {% for n in range(1, max_dots + 1) %}
+              <span class="w-2 h-2 rounded-full {{ 'bg-clan' if rating >= n else 'border border-bone-700' }}"></span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
         </div>
       </div>
 

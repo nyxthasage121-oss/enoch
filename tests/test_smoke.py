@@ -165,6 +165,7 @@ def test_staff_character_detail(staff):
     assert "Character Sheet" in r.text
     assert "Strength" in r.text
     assert "Athletics" in r.text
+    assert "Willpower" in r.text  # derived stat now surfaced for staff (Composure + Resolve)
     assert "ST Notes" in r.text
     assert 'name="st_notes"' in r.text
     # Tab strip is rendered — at minimum the Sheet and Tools tab buttons exist
