@@ -266,15 +266,9 @@ def bane_severity_for_bp(bp) -> int:
         bp = 0
     if bp <= 0:
         return 0
-    if bp <= 3:
-        return 1
-    if bp <= 5:
-        return 2
-    if bp <= 7:
-        return 3
-    if bp <= 9:
-        return 4
-    return 5
+    # V5 Corebook p.216: 0 at BP 0, else ceil(BP / 2) + 1
+    # → BP 1-2 = 2, 3-4 = 3, 5-6 = 4, 7-8 = 5, 9-10 = 6.
+    return (min(bp, 10) + 1) // 2 + 1
 
 
 # ── Alternate clan Banes (V5 Players Guide, "Clan Bane Variants" pp. 56-59) ──

@@ -324,14 +324,15 @@ def test_willpower_recovery_is_higher_of_composure_resolve():
 
 
 def test_bane_severity_by_blood_potency():
-    # 0 at BP0, 1 at 1-3, 2 at 4-5, 3 at 6-7, 4 at 8-9, 5 at 10.
+    # V5 Corebook p.216: 0 at BP 0, else ceil(BP / 2) + 1.
     assert bane_severity(0) == 0
-    assert bane_severity(1) == 1
-    assert bane_severity(3) == 1
-    assert bane_severity(4) == 2
-    assert bane_severity(6) == 3
-    assert bane_severity(8) == 4
-    assert bane_severity(10) == 5
+    assert bane_severity(1) == 2
+    assert bane_severity(2) == 2
+    assert bane_severity(3) == 3
+    assert bane_severity(4) == 3
+    assert bane_severity(6) == 4
+    assert bane_severity(8) == 5
+    assert bane_severity(10) == 6
 
 
 def test_frenzy_pool_is_current_willpower():

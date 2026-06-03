@@ -3438,14 +3438,16 @@ def test_non_nosferatu_has_no_auto_bane_flaw(player):
 
 
 def test_bane_severity_from_blood_potency():
-    """Bane Severity scales with Blood Potency (V5 Corebook p.216)."""
+    """Bane Severity scales with Blood Potency (V5 Corebook p.216):
+    0 at BP 0, else ceil(BP / 2) + 1."""
     from web.v5_traits import bane_severity_for_bp
     assert bane_severity_for_bp(0) == 0
-    assert bane_severity_for_bp(1) == 1
-    assert bane_severity_for_bp(3) == 1
-    assert bane_severity_for_bp(4) == 2
-    assert bane_severity_for_bp(7) == 3
-    assert bane_severity_for_bp(10) == 5
+    assert bane_severity_for_bp(1) == 2
+    assert bane_severity_for_bp(2) == 2
+    assert bane_severity_for_bp(3) == 3
+    assert bane_severity_for_bp(4) == 3
+    assert bane_severity_for_bp(7) == 5
+    assert bane_severity_for_bp(10) == 6
 
 
 def test_hecata_variant_bane_auto_applies_decay_pool(player):
@@ -3468,9 +3470,9 @@ def test_hecata_variant_bane_auto_applies_decay_pool(player):
         sheet = _json.loads(row["sheet_json"] or "{}")
         assert sheet.get("bane_choice") == "variant"
         assert sheet.get("bane_variant_name") == "Decay"
-        # Neonate BP 1 → Bane Severity 1 → one free Decay Flaw dot.
+        # Neonate BP 1 → Bane Severity 2 (ceil(1/2)+1) → two free Decay Flaw dots.
         decay = [f for f in sheet.get("flaws", []) if f.get("src") == "clan_bane"]
-        assert sum(f.get("dots", 0) for f in decay) == 1
+        assert sum(f.get("dots", 0) for f in decay) == 2
         assert all(f["name"] in ("Retainer", "Haven", "Resources") for f in decay)
         assert sheet.get("bane_flaw_pool")  # allocation persisted for resume
     finally:
@@ -3486,7 +3488,7 @@ def test_hecata_decay_pool_honors_player_allocation(player):
     player.post("/characters/new", data={
         "_csrf": "dev-csrf-token", "name": "Hec Alloc", "clan": "hecata",
         "touchstones": '["A", "B"]', "bane_choice": "variant",
-        "bane_flaw_pool": _json.dumps({"Haven": 1}),
+        "bane_flaw_pool": _json.dumps({"Haven": 2}),   # full BP1 severity (2)
         **_raw_traits(),
     }, follow_redirects=False)
     try:
@@ -3495,7 +3497,7 @@ def test_hecata_decay_pool_honors_player_allocation(player):
                 "SELECT sheet_json FROM characters WHERE name='Hec Alloc'").fetchone()
         sheet = _json.loads(row["sheet_json"] or "{}")
         decay = [f for f in sheet.get("flaws", []) if f.get("src") == "clan_bane"]
-        assert len(decay) == 1 and decay[0]["name"] == "Haven" and decay[0]["dots"] == 1
+        assert len(decay) == 1 and decay[0]["name"] == "Haven" and decay[0]["dots"] == 2
     finally:
         with get_db() as conn:
             conn.execute("DELETE FROM characters WHERE name='Hec Alloc'")
