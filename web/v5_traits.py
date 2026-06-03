@@ -639,6 +639,27 @@ def _predator_disc_options(predator_type: str | None) -> set[str]:
     return opts
 
 
+def _disc_alloc_ok(base_dots: list[int], spread_shape: list[int], free: int) -> bool:
+    """True if the Discipline base allocation matches the spread plus the
+    predator's free dot. `base_dots` = each Discipline's pre-XP value; `free` is
+    0 or 1 (PREDATOR_FREE_DISCIPLINE_DOTS). The free dot may land on any allowed
+    Discipline, so for free=1 we accept any single-dot removal that yields the
+    spread shape — covering 2+1+1, 3+1, and 2+2 for the standard 2+1."""
+    base = sorted((d for d in base_dots if d > 0), reverse=True)
+    target = sorted((d for d in spread_shape if d > 0), reverse=True)
+    if free <= 0:
+        return base == target
+    if sum(base) != sum(target) + free:
+        return False
+    for i in range(len(base)):
+        reduced = sorted(
+            (d for d in (base[:i] + [base[i] - 1] + base[i + 1:]) if d > 0),
+            reverse=True)
+        if reduced == target:
+            return True
+    return False
+
+
 def validate_chargen_raw(
     sheet: dict, *, character_type: str = "kindred",
     clan: str = "", predator_type: str | None = None,
@@ -729,6 +750,22 @@ def validate_chargen_raw(
                         "(a predator type may grant one exception); out-of-clan "
                         "Disciplines can be bought with XP."
                     )
+
+        # Discipline COUNT / shape — base (pre-XP) dots must match the spread
+        # (2+1 standard, or the chosen Ancilla spread) PLUS the predator's free
+        # dot. Thin-bloods use Alchemy instead of Disciplines, so they're exempt.
+        if (clan or "").strip().lower() not in ("thin-blood", "thinblood"):
+            _spread_slug = (sheet.get("discipline_spread") or "standard").strip().lower()
+            _spread = V5_DISCIPLINE_SPREADS.get(_spread_slug) or V5_DISCIPLINE_SPREADS["standard"]
+            _free = PREDATOR_FREE_DISCIPLINE_DOTS if predator_type else 0
+            _base_disc = [base_trait_value(sheet, k) for k in _disc_keys()]
+            if not _disc_alloc_ok(_base_disc, _spread_shape(_spread["levels"]), _free):
+                errors.append(
+                    f"Disciplines must follow the {_spread['label']} spread"
+                    + (" plus your predator's free dot" if _free else "")
+                    + f" — {_spread['total'] + _free} base dots before starting XP. "
+                    + _spread["blurb"]
+                )
 
     # Advantages — player-added (no `src`) Merits + Backgrounds + Advantages must
     # fit the pool; Flaws must hit the minimum and not exceed the cap. Auto-granted

@@ -22,6 +22,10 @@ def _valid_sheet():
     sheet["backgrounds"] = [{"name": "Allies", "dots": 3}, {"name": "Resources", "dots": 2}]
     sheet["merits"] = [{"name": "Iron Will", "dots": 2}]   # 7 advantage dots total
     sheet["flaws"] = [{"name": "Enemy", "dots": 1}, {"name": "Disliked", "dots": 1}]
+    # In-clan 2+1 Discipline base — Brujah Celerity/Potence (also valid for the
+    # clan='' default, where the in-clan check is skipped).
+    sheet["disc_celerity"] = 2
+    sheet["disc_potence"] = 1
     # V5 free specialties: 1 + one per dotted Academics/Craft/Performance/Science.
     _free = 1 + sum(1 for k in ("skill_academics", "skill_science", "skill_craft",
                                 "skill_performance") if sheet.get(k, 0) > 0)
@@ -85,6 +89,7 @@ def test_in_clan_disciplines_pass():
     from web.v5_traits import validate_chargen_raw
     s = _valid_sheet()
     s["disc_celerity"] = 2  # Brujah in-clan = Celerity / Potence / Presence
+    s["disc_potence"]  = 0  # clear the helper's default so this is a clean 2 + 1
     s["disc_presence"] = 1
     assert validate_chargen_raw(s, character_type="kindred", clan="brujah") == []
 
@@ -100,6 +105,8 @@ def test_out_of_clan_base_discipline_rejected():
 def test_caitiff_any_discipline_ok():
     from web.v5_traits import validate_chargen_raw
     s = _valid_sheet()
+    s["disc_celerity"] = 0  # clear the helper's Brujah default — Caitiff picks freely
+    s["disc_potence"]  = 0
     s["disc_dominate"] = 2
     s["disc_auspex"] = 1
     assert validate_chargen_raw(s, character_type="kindred", clan="caitiff") == []
@@ -188,3 +195,29 @@ def test_predator_specialty_excluded_from_free_count():
     s["specialties"] = [{"skill": "skill_brawl", "name": "Grappling", "src": "predator"}]
     errs = validate_chargen_raw(s)
     assert any("specialt" in e.lower() for e in errs)
+
+
+def test_disciplines_must_match_2plus1_spread():
+    """Base Discipline allocation must be the standard 2 + 1 (no predator dot)."""
+    from web.v5_traits import validate_chargen_raw
+    # _valid_sheet() already carries Celerity 2 / Potence 1 — a valid 2 + 1.
+    assert validate_chargen_raw(_valid_sheet(), character_type="kindred", clan="brujah") == []
+    # Too few — a single Discipline dot.
+    s2 = _valid_sheet()
+    s2["disc_celerity"], s2["disc_potence"] = 1, 0
+    assert any("Discipline" in e for e in
+               validate_chargen_raw(s2, character_type="kindred", clan="brujah"))
+    # Wrong shape — 1 + 1 + 1 instead of 2 + 1.
+    s3 = _valid_sheet()
+    s3["disc_celerity"], s3["disc_potence"], s3["disc_presence"] = 1, 1, 1
+    assert any("Discipline" in e for e in
+               validate_chargen_raw(s3, character_type="kindred", clan="brujah"))
+
+
+def test_predator_free_discipline_dot_allowed():
+    """With a predator type the base may carry one extra dot (2 + 1 + 1)."""
+    from web.v5_traits import validate_chargen_raw
+    s = _valid_sheet()           # Celerity 2 / Potence 1 ...
+    s["disc_presence"] = 1       # ... + the predator's free dot (Brujah in-clan)
+    assert validate_chargen_raw(
+        s, character_type="kindred", clan="brujah", predator_type="Alleycat") == []

@@ -1108,11 +1108,13 @@ def test_calendar_widget_wires_countdown_when_period_active(staff):
 
 # ── Character creation wizard + review lock ───────────────────────────────────
 
-def _raw_traits():
+def _raw_traits(clan="brujah"):
     """RAW-valid base allocation for character-creation POSTs. The wizard now
     enforces V5 spreads, so a full submission must carry the 4/3/3/3/2/2/2/2/1
-    attributes and a valid skill distribution (Balanced here). Spread into a
-    POST's `data` LAST so it overrides any partial trait fields the test sets."""
+    attributes, a valid skill distribution (Balanced here), the free specialties,
+    and a 2+1 in-clan Discipline base. Spread into a POST's `data` LAST so it
+    overrides any partial trait fields the test sets. Pass `clan` to emit that
+    clan's in-clan Disciplines (defaults to Brujah's Celerity/Potence)."""
     attrs = {
         "attr_strength": "4", "attr_dexterity": "3", "attr_stamina": "3",
         "attr_charisma": "3", "attr_manipulation": "2", "attr_composure": "2",
@@ -1138,7 +1140,14 @@ def _raw_traits():
         "specialties": _j.dumps([{"skill": "skill_academics", "name": "History"},
                                  {"skill": "skill_brawl", "name": "Grappling"}]),
     }
-    return {**attrs, **skills, "skill_spread": "balanced", **advantages}
+    # In-clan 2+1 Discipline base (no predator dot). Clans with an in-clan list
+    # get their first two Disciplines as 2 + 1; thin-blood/caitiff get none.
+    from web.v5_traits import CLAN_DISCIPLINES
+    disc = {}
+    _inclan = CLAN_DISCIPLINES.get(clan)
+    if _inclan and len(_inclan) >= 2:
+        disc = {_inclan[0]: "2", _inclan[1]: "1"}
+    return {**attrs, **skills, "skill_spread": "balanced", **disc, **advantages}
 
 
 def test_character_wizard_submission_populates_full_sheet(player):
@@ -1640,7 +1649,7 @@ def test_approved_character_sheet_edit_unlocked_despite_review_flag(staff, playe
         "/characters/new",
         data={"_csrf": "dev-csrf-token", "name": "Unlock Smoke", "clan": "ventrue",
               "touchstones": _j.dumps(["Anchor One", "Anchor Two"]),
-              **_raw_traits()},
+              **_raw_traits("ventrue")},
         follow_redirects=False,
     )
     assert r.status_code == 303
@@ -3124,6 +3133,8 @@ def test_chargen_persists_spreads_and_predator_picks(player):
         "skill_spread": "specialist",
         "discipline_spread": "standard",
         "predator_choices": _json.dumps({"s0": 1, "d1": "disc_potence"}),
+        # Brujah 2+1 base with the Alleycat free dot folded onto Potence → 2 / 2.
+        "disc_celerity": "2", "disc_potence": "2",
         # RAW advantages: 7 dots (Backgrounds + Merit) + 2 Flaw dots.
         "backgrounds": _json.dumps([{"name": "Allies", "dots": 3},
                                     {"name": "Resources", "dots": 2}]),
@@ -3289,13 +3300,14 @@ def test_chargen_persists_starting_xp_allocation(player):
         "_csrf": "dev-csrf-token", "name": "XP Persist", "clan": "brujah",
         "touchstones": '["A", "B"]',
         "xp_buys": _json.dumps(buys), "xp_spent": "10", "xp_pool": "75",
-        "disc_celerity": "1",
         **_raw_traits(),
         # Override attributes so the base spread stays RAW after subtracting the
-        # one bought Dexterity dot (final 4 → base 3).
+        # one bought Dexterity dot (final 4 → base 3). Celerity also carries one
+        # bought dot (final 3 → base 2), keeping the 2+1 Discipline base intact.
         "attr_strength": "4", "attr_dexterity": "4", "attr_stamina": "3",
         "attr_charisma": "3", "attr_manipulation": "2", "attr_composure": "2",
         "attr_intelligence": "2", "attr_wits": "2", "attr_resolve": "1",
+        "disc_celerity": "3",
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3307,8 +3319,9 @@ def test_chargen_persists_starting_xp_allocation(player):
         assert sheet.get("xp_spent") == 10
         assert sheet.get("starting_xp_pool") == 75
         assert len(sheet.get("xp_buys", [])) == 2
-        # attr_dexterity = RAW base 3 + 1 bought dot = 4 (capped at creation).
-        assert sheet.get("attr_dexterity") == 4 and sheet.get("disc_celerity") == 1
+        # attr_dexterity = RAW base 3 + 1 bought dot = 4; disc_celerity = base 2
+        # + 1 bought dot = 3 (both folded in via the xp_buys ledger).
+        assert sheet.get("attr_dexterity") == 4 and sheet.get("disc_celerity") == 3
     finally:
         with get_db() as conn:
             conn.execute("DELETE FROM characters WHERE name='XP Persist'")
@@ -3380,7 +3393,7 @@ def test_nosferatu_variant_bane_grants_no_flaw(player):
         "_csrf": "dev-csrf-token", "name": "Nos Var", "clan": "nosferatu",
         "touchstones": '["A", "B"]', "bane_choice": "variant",
         "flaws": _json.dumps([{"name": "Repulsive", "dots": 2, "src": "clan_bane"}]),
-        **_raw_traits(),
+        **_raw_traits("nosferatu"),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3407,7 +3420,7 @@ def test_nosferatu_standard_bane_grants_repulsive(player):
     player.post("/characters/new", data={
         "_csrf": "dev-csrf-token", "name": "Nos Bane", "clan": "nosferatu",
         "touchstones": '["A", "B"]',
-        **_raw_traits(),
+        **_raw_traits("nosferatu"),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3468,7 +3481,7 @@ def test_hecata_variant_bane_auto_applies_decay_pool(player):
         "_csrf": "dev-csrf-token", "name": "Hec Decay", "clan": "hecata",
         "touchstones": '["A", "B"]', "bane_choice": "variant",
         "bane_flaw_pool": "{}",   # empty → server auto-fills Bane Severity dots
-        **_raw_traits(),
+        **_raw_traits("hecata"),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -3497,7 +3510,7 @@ def test_hecata_decay_pool_honors_player_allocation(player):
         "_csrf": "dev-csrf-token", "name": "Hec Alloc", "clan": "hecata",
         "touchstones": '["A", "B"]', "bane_choice": "variant",
         "bane_flaw_pool": _json.dumps({"Haven": 2}),   # full BP1 severity (2)
-        **_raw_traits(),
+        **_raw_traits("hecata"),
     }, follow_redirects=False)
     try:
         with get_db() as conn:
@@ -4689,7 +4702,7 @@ def test_staff_approve_via_plain_form_redirects(player, staff):
               "name": "Approve Me Direct",
               "clan": "toreador",
               "touchstones": '["A", "B"]',
-              **_raw_traits()},
+              **_raw_traits("toreador")},
         follow_redirects=False,
     )
     with get_db() as conn:
@@ -4725,7 +4738,7 @@ def test_staff_approve_via_htmx_returns_partial(player, staff):
               "name": "Approve Via Htmx",
               "clan": "gangrel",
               "touchstones": '["A", "B"]',
-              **_raw_traits()},
+              **_raw_traits("gangrel")},
         follow_redirects=False,
     )
     with get_db() as conn:
@@ -4876,7 +4889,7 @@ def test_staff_detail_renders_type_tier_and_im_eras(player, staff):
             "im_discipline_spread":"broad",
             "in_memoriam":         _j.dumps(im_blob),
             "touchstones":         _j.dumps(["A", "B"]),
-            **_raw_traits(),
+            **_raw_traits("ventrue"),
         },
         follow_redirects=False,
     )
@@ -4962,7 +4975,7 @@ def test_staff_detail_renders_ingrained_discipline(player, staff):
               "clan": "tremere",
               "has_ingrained_flaw": "on",
               "touchstones": '["A", "B"]',
-              **_raw_traits()},
+              **_raw_traits("tremere")},
         follow_redirects=False,
     )
     with get_db() as conn:
