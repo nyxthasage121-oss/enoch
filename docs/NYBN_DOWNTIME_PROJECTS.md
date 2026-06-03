@@ -99,13 +99,14 @@ home.
 
 ## Later phases (reference — not yet specced in detail)
 
-- **B — Background integration** (ties to the Background Blanking feature):
-  Resources blanked → bonus dice (lasts the TS); Allies/Mawla/Retainers teamwork
-  or solo rolls; appropriate Enemies/Adversaries counter or subtract dice; using a
-  Background to cut a DC blanks it until the project is done/abandoned; the
-  expanded blanking rules (Contacts/Resources/Side Hustler blank after the 1st
-  roll at dot value; Allies/Mawla/Retainers blank if used outside teamwork). May
-  use own + retainers' + coterie backgrounds interchangeably.
+- **B — Background integration** (ties to the Background Blanking feature).
+  **MVP BUILT 2026-06-02:** `/project roll` takes `background:` (spend a tracked
+  background for bonus dice = its available dots, then it's blanked for the rest
+  of the timeskip via the blanking engine), `teamwork:` (+dice), `adversary:`
+  (−dice). *Still ST-judgment / not mechanized:* Enemies "countering" a project,
+  using a Background to cut a DC (and blanking it till done), per-type teamwork
+  limits, and own/retainer/coterie backgrounds being interchangeable — staff
+  handle these via notes + the penalty flags.
 - **C — Advancement via projects**: buying Attribute/Skill/Merit/Background/
   Loresheet at **3+ dots requires a project** (DC table above); learning
   ceremonies/rituals/formulae (4×level TS-weeks **or** Int/Resolve + Occult/Science
