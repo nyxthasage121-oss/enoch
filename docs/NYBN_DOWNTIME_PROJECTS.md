@@ -113,13 +113,11 @@ home.
   5×level; library dots add). **PARTIAL 2026-06-02:** advancement projects already
   work via the existing roll-project + structured-payoff (grant the trait on
   completion); the **DC table is now shown as a reference in the staff stage
-  builder** so staff set correct DCs. ⚠️ **OPEN architecture decision** — how
-  strictly to tie a 3+-dot advancement to the XP spend system:
-  (a) **staff-coordinated** (today): staff just require/track a project and run
-  the XP spend separately — no code gating, max ST discretion;
-  (b) **gate the spend**: a 3+-dot `spend_request` can't be approved until a
-  linked project completes (XP still paid);
-  (c) **project replaces XP**: the project grants the trait, no XP.
+  builder** so staff set correct DCs. **RESOLVED 2026-06-02 → staff-coordinated**
+  (no code gating): staff require/track a project and run the normal XP spend
+  separately, per ST discretion. Phase C is considered DONE — no spend↔project
+  code linkage. (If they ever want it enforced in code, the options were: gate a
+  3+-dot spend on a linked project completing, or have the project replace XP.)
 - **D — Coterie projects**: coterie-owned, elevated DCs (30/45/60), multi-stage,
   coterie-mates combine successes; retainers teamwork-only; benefit lost if the
   coterie disbands (reclaimable by a member's regular project).
