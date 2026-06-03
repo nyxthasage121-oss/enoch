@@ -46,6 +46,11 @@ from ..db import (
     upsert_player,
     write_audit,
     update_character,
+    STAFF_ROLES,
+    get_staff_role,
+    set_staff_role,
+    staff_role_has_permission,
+    list_all_players,
 )
 
 log = logging.getLogger(__name__)
@@ -80,6 +85,13 @@ class CharacterIn(BaseModel):
 class PlayerUpsertIn(BaseModel):
     username: str
     cubby_channel: str | None = None   # Discord channel ID for DMs
+
+
+class StaffRoleIn(BaseModel):
+    actor_discord_id: str                 # the staff member issuing the change
+    target_discord_id: str                # who's being assigned
+    target_username: str | None = None    # upsert the target's profile if new
+    role: str | None = None               # one of STAFF_ROLES, or null to revoke
 
 
 class AckIn(BaseModel):
@@ -231,6 +243,51 @@ async def player_characters(discord_id: str):
     with get_db() as conn:
         chars = list_player_characters(conn, discord_id)
     return {"characters": chars, "count": len(chars)}
+
+
+# ── Staff roles ───────────────────────────────────────────────────────────────
+
+@router.get("/staff/roster", dependencies=[Depends(_require_bot)])
+async def staff_roster_api():
+    """Every player who currently holds an Enoch staff role — for `/staff list`.
+    Mirrors the web Admin → Staff tab so the bot and web always agree."""
+    with get_db() as conn:
+        players = list_all_players(conn)
+    roster = [
+        {"discord_id": p.get("discord_id"),
+         "username": p.get("username"),
+         "role": p.get("staff_role")}
+        for p in players
+        if p.get("staff_role")
+    ]
+    return {"staff": roster, "count": len(roster)}
+
+
+@router.post("/staff/role", dependencies=[Depends(_require_bot)])
+async def set_staff_role_api(body: StaffRoleIn):
+    """Assign or revoke an Enoch staff role from the bot. The *issuing* user
+    must hold `manage_roles` (i.e. be an Admin) — the web layer is the single
+    authority, so the bot can't escalate. Writes straight to the same
+    player_profiles row the web Admin → Staff tab edits: one source of truth,
+    two doors. Pass role=null/'' to revoke."""
+    with get_db() as conn:
+        # Authorize the issuer against the live matrix (Admin = manage_roles).
+        actor_role = get_staff_role(conn, body.actor_discord_id)
+        if not staff_role_has_permission(actor_role, "manage_roles"):
+            raise HTTPException(
+                status_code=403,
+                detail="You need the Admin role to assign staff roles.",
+            )
+        role = (body.role or "").strip().lower() or None
+        if role is not None and role not in STAFF_ROLES:
+            raise HTTPException(status_code=400, detail=f"Unknown role: {body.role!r}")
+
+        # Ensure the target has a profile row to carry the role, then set it.
+        upsert_player(conn, body.target_discord_id,
+                      body.target_username or body.target_discord_id)
+        set_staff_role(conn, body.target_discord_id, role,
+                       actor_id=body.actor_discord_id)
+    return {"target_discord_id": body.target_discord_id, "role": role}
 
 
 # ── Characters ────────────────────────────────────────────────────────────────

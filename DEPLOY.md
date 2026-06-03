@@ -133,11 +133,19 @@ After your first staff login (anyone with a `STAFF_ROLE_IDS` Discord role
 can sign in to the dashboard, but every mutation is gated by Enoch's
 internal role permissions):
 
-1. Sign in as your Lead ST account → `/staff/admin#players`
-2. Find your row, set role to **Lead ST**. Save.
-3. Sign out and back in — your session now carries `lead_st` and unlocks
-   every action. Assign other STs to Co-ST / Reviewer / Helper from the
-   same Players tab.
+1. Sign in as your Admin account → `/staff/admin#players`
+2. Find your row, set role to **Admin**. Save.
+3. Sign out and back in — your session now carries `admin` and unlocks
+   every action. Assign other staff to Moderator / Storyteller / Helper from
+   the same Players tab. (Roles were renamed 2026-06 from Lead ST / Co-ST /
+   Reviewer / Helper.)
+
+> **First settings-admin bootstrap:** chronicle-wide settings (XP rules,
+> ruleset selector) sit behind a separate `settings_admin` flag, not just the
+> Admin role. On a brand-new database, set
+> `ENOCH_SETTINGS_ADMIN_IDS=<your-discord-id>` on the web service so your
+> account can flip settings and grant the flag to others from `/staff/admin`.
+> (Existing chronicles received it via migration 024's backfill.)
 
 Without this step, even staff members who pass the Discord-role gate will
 get 403 on approvals, settings changes, and most mutations.

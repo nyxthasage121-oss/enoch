@@ -108,10 +108,10 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 
 _STAFF_ROLE_LABELS = {
-    "lead_st":  "Lead ST",
-    "co_st":    "Co-ST",
-    "reviewer": "Reviewer",
-    "helper":   "Helper",
+    "admin":       "Admin",
+    "moderator":   "Moderator",
+    "storyteller": "Storyteller",
+    "helper":      "Helper",
 }
 
 
@@ -160,12 +160,14 @@ def _ctx(request: Request, **extra) -> dict:
     flash = request.session.pop("flash", [])
     raw_role = request.session.get("staff_role") or ""
     cap_enabled, cap_amount = _xp_cap_settings()
+    from .db import STAFF_PERMISSIONS
     return {
         "request": request,
         "current_user": user,
         "is_staff": request.session.get("is_staff", False),
         "staff_role": raw_role,
         "staff_role_label": _STAFF_ROLE_LABELS.get(raw_role, ""),
+        "viewer_perms": STAFF_PERMISSIONS.get(raw_role, set()),
         "csrf_token": request.session.get("_csrf", ""),
         "flash_messages": flash,
         "dev_preview": settings.DEV_PREVIEW,
@@ -279,7 +281,7 @@ if settings.DEV_PREVIEW:
     @app.get("/_dev/seed")
     async def _dev_seed(request: Request):
         """Inject a mock staff session — never ships to production.
-        Dev staff get the lead_st role by default so every endpoint
+        Dev staff get the admin role by default so every endpoint
         gated by require_permission lights up under the dev preview."""
         from .db import get_db, upsert_player, set_staff_role, set_settings_admin
         request.session["user"] = {
@@ -288,14 +290,14 @@ if settings.DEV_PREVIEW:
             "avatar": None,
         }
         request.session["is_staff"]       = True
-        request.session["staff_role"]     = "lead_st"
+        request.session["staff_role"]     = "admin"
         request.session["settings_admin"] = True
         request.session["_csrf"]          = "dev-csrf-token"
         # Persist the role so DB-side lookups (audit, role admin UI) see it.
         with get_db() as conn:
             upsert_player(conn, discord_id="999999999999999999", username="DevStaff")
             try:
-                set_staff_role(conn, "999999999999999999", "lead_st", actor_id="dev-seed")
+                set_staff_role(conn, "999999999999999999", "admin", actor_id="dev-seed")
                 set_settings_admin(conn, "999999999999999999", True, actor_id="dev-seed")
             except ValueError:
                 pass

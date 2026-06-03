@@ -490,10 +490,10 @@
                         title="Set this player's staff role">
                   <option value="" {{ 'selected' if not p.staff_role else '' }}>— none —</option>
                   {% for role_key, role_label in [
-                    ('lead_st',  'Lead ST'),
-                    ('co_st',    'Co-ST'),
-                    ('reviewer', 'Reviewer'),
-                    ('helper',   'Helper'),
+                    ('admin',       'Admin'),
+                    ('moderator',   'Moderator'),
+                    ('storyteller', 'Storyteller'),
+                    ('helper',      'Helper'),
                   ] %}
                   <option value="{{ role_key }}"
                           {{ 'selected' if p.staff_role == role_key else '' }}>

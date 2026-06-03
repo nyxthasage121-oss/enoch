@@ -9,6 +9,8 @@ from ..forms import form_int
 from ..db import (
     add_coterie_member,
     adjust_xp_manual,
+    apply_bulk_xp,
+    resolve_bulk_xp,
     approve_character,
     approve_claim,
     approve_coterie_request,
@@ -2251,6 +2253,54 @@ async def admin_adjust_xp(
         sign = "+" if delta > 0 else ""
         _toast(resp, f"{name}: {sign}{delta} XP — {note[:40]}", "success")
     return resp
+
+
+@router.get("/xp/bulk", response_class=HTMLResponse)
+async def bulk_xp_form(
+    request: Request,
+    user: dict = Depends(require_permission("adjust_xp")),
+):
+    """Bulk-award XP: paste `<amount> <character name>` lines, preview, confirm.
+    Gated on `adjust_xp`, so Storytellers/Moderators/Admins can use it but
+    Helpers (spends-only) cannot."""
+    return templates.TemplateResponse(
+        request, "staff/bulk_xp.html",
+        _ctx(request, entries="", reason="", awards=None, errors=None, reason_err=None),
+    )
+
+
+@router.post("/xp/bulk", response_class=HTMLResponse)
+async def bulk_xp_submit(
+    request: Request,
+    user: dict = Depends(require_permission("adjust_xp")),
+    _: None = Depends(csrf_protect),
+):
+    """Plain submit = preview (resolve names, surface errors). Submit with
+    confirm=1 commits every award in one transaction — but only when the preview
+    is clean (no parse/lookup errors) and a reason is given. All-or-nothing, so
+    one bad line never produces a partial award."""
+    form    = await request.form()
+    entries = form.get("entries") or ""
+    reason  = (form.get("reason") or "").strip()
+    confirm = form.get("confirm") == "1"
+
+    with get_db() as conn:
+        awards, errors = resolve_bulk_xp(conn, entries)
+        if confirm and awards and not errors and reason:
+            n = apply_bulk_xp(conn, awards, f"Bulk award: {reason}", user["id"])
+            total = sum(a["amount"] for a in awards)
+            request.session["flash"] = [{
+                "kind": "success",
+                "message": f"Awarded {total} XP across {n} character{'s' if n != 1 else ''}.",
+            }]
+            return RedirectResponse(url="/staff/xp/bulk", status_code=303)
+
+    reason_err = "A reason is required." if (confirm and not reason) else None
+    return templates.TemplateResponse(
+        request, "staff/bulk_xp.html",
+        _ctx(request, entries=entries, reason=reason, awards=awards,
+             errors=errors, reason_err=reason_err),
+    )
 
 
 # ── Audit Log ─────────────────────────────────────────────────────────────────

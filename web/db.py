@@ -1,9 +1,9 @@
 """db.py — Database connection, migrations, and query helpers.
 
-Uses libsql-experimental which mirrors the sqlite3 API for local files
-and speaks HTTP to Turso for production.
-Falls back to stdlib sqlite3 when libsql-experimental is not installed
-(no pre-built wheels for every platform/Python version).
+Local SQLite files use the stdlib sqlite3 driver; only a Turso URL
+(libsql:// or https://) uses libsql-experimental. We keep local files on
+stdlib sqlite3 on purpose: libsql's Connection is a compiled type that
+rejects a custom row_factory on some Python builds, which crash-loops boot.
 """
 import json
 import logging
@@ -12,10 +12,12 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import sqlite3  # stdlib — drives local SQLite files (reliable row_factory)
+
 try:
     import libsql_experimental as libsql
 except ModuleNotFoundError:
-    import sqlite3 as libsql  # type: ignore[no-redef]  # same API for local SQLite
+    libsql = sqlite3  # type: ignore[assignment]  # libsql only used for Turso URLs
 
 from .config import settings
 
@@ -58,13 +60,18 @@ def _parse(row: dict | None, *fields: str) -> dict | None:
 
 # ── Connection ────────────────────────────────────────────────────────────────
 
-def _connect() -> libsql.Connection:
+def _connect():
     url   = settings.DATABASE_URL
     token = settings.TURSO_AUTH_TOKEN
     if url.startswith("libsql") or url.startswith("https://"):
+        # Turso (remote) — the only path that needs libsql-experimental.
         conn = libsql.connect(database=url, auth_token=token)
     else:
-        conn = libsql.connect(database=url)
+        # Local SQLite file → stdlib sqlite3. libsql's Connection rejects
+        # `conn.row_factory = ...` on some Python builds (a compiled type with
+        # no __dict__), which crash-loops the app on boot. stdlib sqlite3
+        # supports the custom row_factory and is correct for local files.
+        conn = sqlite3.connect(url)
     conn.row_factory = _row_factory
     return conn
 
@@ -153,30 +160,33 @@ def get_player(conn, discord_id: str) -> dict | None:
 
 # ── Staff role + permission matrix ───────────────────────────────────────────
 
-# Canonical role list — order matters for the admin dropdown.
-STAFF_ROLES = ("lead_st", "co_st", "reviewer", "helper")
+# Canonical role list — matches the Discord server's staff roles, highest
+# authority first (order drives the admin dropdown).
+STAFF_ROLES = ("admin", "moderator", "storyteller", "helper")
+
+# Full game-staff permission set: everything a Storyteller needs to run XP and
+# the chronicle, short of chronicle-wide settings + role management.
+_STORYTELLER_PERMS: set[str] = {
+    "approve_claim", "approve_spend", "approve_character", "reject_character",
+    "edit_character", "delete_character", "adjust_xp",
+    "manage_period", "manage_coterie", "manage_criteria", "manage_site",
+    "manage_map", "manage_project",
+}
 
 # Permission matrix. Roles are checked against permission keys. Anything
 # not listed defaults to denied. Keep keys short + verb-noun-y so route
 # wiring reads naturally (require_permission("manage_settings"), etc.).
 STAFF_PERMISSIONS: dict[str, set[str]] = {
-    "lead_st": {
-        "approve_claim", "approve_spend", "approve_character", "reject_character",
-        "edit_character", "delete_character", "adjust_xp",
-        "manage_period", "manage_coterie", "manage_criteria", "manage_site",
-        "manage_map", "manage_project", "manage_settings", "manage_roles",
-    },
-    "co_st": {
-        "approve_claim", "approve_spend", "approve_character", "reject_character",
-        "edit_character", "delete_character", "adjust_xp",
-        "manage_period", "manage_coterie", "manage_criteria", "manage_site",
-        "manage_map", "manage_project",
-        # No manage_settings or manage_roles
-    },
-    "reviewer": {
-        "approve_claim", "approve_spend",
-    },
-    "helper": set(),  # Read-only access on the dashboard
+    # Admin — full control; the only role that can manage settings + assign roles.
+    "admin": _STORYTELLER_PERMS | {"manage_settings", "manage_roles"},
+    # Moderator — full XP + chronicle management, no settings/roles. Same Enoch
+    # powers as Storyteller; the difference is organizational (also a server mod).
+    "moderator": set(_STORYTELLER_PERMS),
+    # Storyteller — "XP in general": award, approve spends, manual adjust, plus
+    # character/period/coterie management. No settings/roles.
+    "storyteller": set(_STORYTELLER_PERMS),
+    # Helper — spends only: can approve trait-spend requests, nothing else.
+    "helper": {"approve_spend"},
 }
 
 
@@ -359,6 +369,73 @@ def adjust_xp_manual(
     write_audit(conn, staff_id, "adjust_xp", "character", character_id,
                 before=audit_before, after=audit_after)
     return get_character(conn, character_id)
+
+
+def resolve_bulk_xp(conn, text: str) -> tuple[list[dict], list[str]]:
+    """Parse a bulk-XP textarea — one `<amount> <character name>` per line — and
+    resolve each line to an *active* character by exact (case-insensitive) name.
+
+    Returns ``(awards, errors)``. Each award is
+    ``{character_id, name, clan, player, amount}``; ``errors`` is a list of
+    human-readable strings. A line errors if it can't be parsed, the amount
+    isn't a positive whole number, the name matches no active character, the
+    name is ambiguous (>1 active character), or the same character is listed
+    twice. Callers should refuse to commit when ``errors`` is non-empty —
+    all-or-nothing, so one typo never produces a partial award."""
+    by_name: dict[str, list[dict]] = {}
+    for c in list_characters(conn, status="active"):
+        by_name.setdefault(c["name"].strip().lower(), []).append(c)
+
+    awards: list[dict] = []
+    errors: list[str] = []
+    seen: set[int] = set()
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        parts = line.split(None, 1)
+        if len(parts) != 2:
+            errors.append(f"Couldn't read “{line}” — use `<amount> <character name>`.")
+            continue
+        amount_str, name = parts[0], parts[1].strip()
+        try:
+            amount = int(amount_str)
+        except ValueError:
+            errors.append(f"“{line}” — “{amount_str}” isn't a whole number.")
+            continue
+        if amount <= 0:
+            errors.append(f"“{name}” — amount must be a positive whole number.")
+            continue
+        matches = by_name.get(name.lower(), [])
+        if not matches:
+            errors.append(f"No active character named “{name}”.")
+            continue
+        if len(matches) > 1:
+            errors.append(
+                f"“{name}” is ambiguous — {len(matches)} active characters share that name.")
+            continue
+        c = matches[0]
+        if c["id"] in seen:
+            errors.append(f"“{name}” is listed more than once.")
+            continue
+        seen.add(c["id"])
+        awards.append({
+            "character_id": c["id"], "name": c["name"], "clan": c.get("clan"),
+            "player": c.get("player_username"), "amount": amount,
+        })
+    return awards, errors
+
+
+def apply_bulk_xp(conn, awards: list[dict], note: str, staff_id: str) -> int:
+    """Apply a resolved, error-free list of awards. Each grants `amount` XP to
+    the character's earned total (target='total'), via the same `adjust_xp_manual`
+    path as a single manual grant — so each lands a ledger + audit row. Runs
+    inside the caller's get_db() block, so the whole batch is one transaction.
+    Returns the number of awards applied."""
+    for a in awards:
+        adjust_xp_manual(conn, a["character_id"], int(a["amount"]),
+                         note, staff_id, target="total")
+    return len(awards)
 
 
 # ── Characters ────────────────────────────────────────────────────────────────

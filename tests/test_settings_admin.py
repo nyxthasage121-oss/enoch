@@ -13,10 +13,10 @@ def _ensure_migrations(_client):
     yield
 
 
-def test_migration_backfills_lead_st(staff):
-    """Migration 024 must have set settings_admin=1 for any pre-existing
-    lead_st row. The dev seed creates DevStaff as lead_st; check that
-    DevStaff's profile carries the flag."""
+def test_dev_admin_has_settings_admin_flag(staff):
+    """The dev seed creates DevStaff as 'admin' with the settings_admin flag
+    set (migration 024 also backfilled it for any pre-existing top-tier role);
+    check that DevStaff's profile carries the flag."""
     from web.db import get_db, get_player
     with get_db() as conn:
         prof = get_player(conn, "999999999999999999")

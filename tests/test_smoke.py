@@ -3935,23 +3935,26 @@ def test_list_characters_near_cap_helper():
 
 
 def test_staff_role_permission_matrix():
-    """The permission matrix should grant Lead ST every defined permission,
-    block Reviewer from chronicle settings, and refuse all permissions
-    when no role is assigned."""
+    """Admin gets every permission; Storyteller/Moderator get full XP +
+    chronicle management but not settings/roles; Helper is spends-only;
+    unknown/missing roles deny everything."""
     from web.db import STAFF_PERMISSIONS, staff_role_has_permission
-    # Lead ST has manage_roles + manage_settings
-    assert staff_role_has_permission("lead_st", "manage_roles")
-    assert staff_role_has_permission("lead_st", "manage_settings")
-    # Co-ST has approve_claim but NOT manage_settings or manage_roles
-    assert staff_role_has_permission("co_st", "approve_claim")
-    assert not staff_role_has_permission("co_st", "manage_settings")
-    assert not staff_role_has_permission("co_st", "manage_roles")
-    # Reviewer only has the two approve permissions
-    assert staff_role_has_permission("reviewer", "approve_claim")
-    assert staff_role_has_permission("reviewer", "approve_spend")
-    assert not staff_role_has_permission("reviewer", "edit_character")
-    # Helper has nothing
-    assert STAFF_PERMISSIONS["helper"] == set()
+    # Admin has manage_roles + manage_settings (the only role that does)
+    assert staff_role_has_permission("admin", "manage_roles")
+    assert staff_role_has_permission("admin", "manage_settings")
+    # Storyteller = "XP in general": award + spend + manual adjust, no settings/roles
+    assert staff_role_has_permission("storyteller", "approve_claim")
+    assert staff_role_has_permission("storyteller", "approve_spend")
+    assert staff_role_has_permission("storyteller", "adjust_xp")
+    assert not staff_role_has_permission("storyteller", "manage_settings")
+    assert not staff_role_has_permission("storyteller", "manage_roles")
+    # Moderator mirrors Storyteller's Enoch powers exactly
+    assert STAFF_PERMISSIONS["moderator"] == STAFF_PERMISSIONS["storyteller"]
+    # Helper = spends ONLY: approve_spend, but no awarding/adjust/edits
+    assert staff_role_has_permission("helper", "approve_spend")
+    assert not staff_role_has_permission("helper", "approve_claim")
+    assert not staff_role_has_permission("helper", "adjust_xp")
+    assert not staff_role_has_permission("helper", "edit_character")
     # Unknown / missing roles always deny
     assert not staff_role_has_permission(None, "approve_claim")
     assert not staff_role_has_permission("", "approve_claim")
@@ -3969,13 +3972,13 @@ def test_set_staff_role_round_trip(staff):
     staff.get("/_dev/seed", follow_redirects=False)
     r = staff.post(
         "/staff/admin/roles/42000042/set",
-        data={"_csrf": "dev-csrf-token", "role": "reviewer"},
+        data={"_csrf": "dev-csrf-token", "role": "storyteller"},
         follow_redirects=False,
     )
     assert r.status_code == 303
 
     with get_db() as conn:
-        assert get_staff_role(conn, "42000042") == "reviewer"
+        assert get_staff_role(conn, "42000042") == "storyteller"
         # Audit row recording the change
         audit = conn.execute(
             "SELECT * FROM audit_log WHERE action='set_staff_role' "
@@ -4011,67 +4014,45 @@ def test_role_endpoint_refuses_unknown_role(staff):
         conn.execute("DELETE FROM player_profiles WHERE discord_id='43000043'")
 
 
-def test_reviewer_role_can_approve_claim_but_not_edit_character(staff):
-    """A Reviewer should be allowed at approve_claim but blocked from
-    edit_character. Exercises the permission matrix end-to-end."""
-    from web.db import get_db, set_staff_role
+def test_helper_role_can_approve_spend_but_not_award(staff):
+    """The founding 'Helpers do spends only' rule: a Helper is allowed at
+    approve_spend but blocked from awarding XP (approve_claim), manual
+    adjust, and editing characters. Exercises the matrix end-to-end."""
+    from web.db import get_db, set_staff_role, staff_role_has_permission
 
-    # Demote dev staff to reviewer and force re-pickup of role on next request.
     with get_db() as conn:
-        set_staff_role(conn, "999999999999999999", "reviewer", actor_id="smoke")
-    # Clear cached role from session
-    staff.get("/_dev/seed", follow_redirects=False)  # re-seed restores lead_st
-    # Re-demote, then DO NOT re-seed (so the session keeps lead_st cached).
-    # Instead, manually clear the cache by calling /_dev/seed in another
-    # order won't work — we need the permission check to do a DB lookup.
-    # Easiest: assert via the DB helper directly, since real session
-    # role-switching mid-test is complex.
-    from web.db import staff_role_has_permission
-    with get_db() as conn:
-        set_staff_role(conn, "999999999999999999", "reviewer", actor_id="smoke")
-        role = "reviewer"
+        set_staff_role(conn, "999999999999999999", "helper", actor_id="smoke")
+        role = "helper"
 
-    assert staff_role_has_permission(role, "approve_claim")
+    assert staff_role_has_permission(role, "approve_spend")
+    assert not staff_role_has_permission(role, "approve_claim")
+    assert not staff_role_has_permission(role, "adjust_xp")
     assert not staff_role_has_permission(role, "edit_character")
     assert not staff_role_has_permission(role, "manage_settings")
 
-    # Restore lead_st for subsequent tests
+    # Restore admin for subsequent tests
     with get_db() as conn:
-        set_staff_role(conn, "999999999999999999", "lead_st", actor_id="smoke-restore")
+        set_staff_role(conn, "999999999999999999", "admin", actor_id="smoke-restore")
 
 
 def test_admin_settings_save_requires_permission(staff, player):
-    """A staff session without the manage_settings permission (assigned
-    role = reviewer) should be blocked from saving chronicle settings."""
+    """A staff seat whose role lacks manage_settings (e.g. Storyteller) must
+    not register as able to flip chronicle settings at the matrix level."""
     from web.db import get_db, upsert_player, set_staff_role
-    # Promote the player's discord_id to a 'reviewer' staff seat and then
-    # log in as staff with that discord id, by directly mutating session.
     staff.get("/_dev/seed", follow_redirects=False)
-    # Need a session that's staff but with role='reviewer' — simulate via
-    # the role-set endpoint, then manually overwrite session role.
-    # First, take the dev staff's id and assign reviewer to it.
     with get_db() as conn:
         upsert_player(conn, discord_id="999999999999999999", username="DevStaff")
-        set_staff_role(conn, "999999999999999999", "reviewer", actor_id="smoke")
+        set_staff_role(conn, "999999999999999999", "storyteller", actor_id="smoke")
 
-    # Force the session lookup to pick up the new role on next request.
-    # Easiest: clear cached staff_role, then call any GET so deps repopulate.
-    # The session.get('staff_role') cache is set after the dev seed to
-    # 'lead_st'; we explicitly null it via a fresh seed below to test.
-    # The require_permission dependency falls back to a DB lookup when
-    # the session value is missing — we exploit that by clearing the key.
-    # Trick: re-seed forces lead_st back, so we manually monkeypatch via
-    # a helper endpoint isn't available — easier path is to assert via
-    # the DB helper directly.
     from web.db import staff_role_has_permission, get_staff_role
     with get_db() as conn:
         role = get_staff_role(conn, "999999999999999999")
-    assert role == "reviewer"
+    assert role == "storyteller"
     assert not staff_role_has_permission(role, "manage_settings")
 
-    # Reset back to lead_st so subsequent tests aren't affected.
+    # Reset back to admin so subsequent tests aren't affected.
     with get_db() as conn:
-        set_staff_role(conn, "999999999999999999", "lead_st", actor_id="smoke-restore")
+        set_staff_role(conn, "999999999999999999", "admin", actor_id="smoke-restore")
 
 
 def test_active_ruleset_in_memoriam_forces_ancilla_to_im(staff, player):

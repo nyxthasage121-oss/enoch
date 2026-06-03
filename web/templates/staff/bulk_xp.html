@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Bulk XP — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter max-w-3xl">
+  <div class="mb-6">
+    <p class="label-gold mb-1">Staff</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Bulk Award XP</h1>
+    <p class="text-bone-500 text-sm mt-2 leading-relaxed">
+      Paste one award per line as <span class="font-mono text-bone-300">amount Character Name</span>,
+      give it a reason, and Preview. Nothing is awarded until you confirm — and if any
+      line has a problem, the whole batch is held until you fix it.
+    </p>
+  </div>
+
+  <form method="POST" action="/staff/xp/bulk" class="gilded p-5 space-y-4">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+    <div>
+      <label class="label-gold block mb-1 text-[0.75rem]">Reason</label>
+      <input type="text" name="reason" value="{{ reason or '' }}"
+             placeholder="e.g. Session 12 attendance"
+             class="w-full text-sm py-2 px-3">
+      {% if reason_err %}
+      <p class="text-bone-400 text-xs mt-1 font-cinzel">{{ reason_err }}</p>
+      {% endif %}
+    </div>
+
+    <div>
+      <label class="label-gold block mb-1 text-[0.75rem]">Awards</label>
+      <textarea name="entries" rows="8"
+                placeholder="3 Valeria Morano&#10;5 Marcus Reyes&#10;2 Cassia Vane"
+                class="w-full text-sm py-2 px-3 font-mono">{{ entries or '' }}</textarea>
+      <p class="text-bone-600 text-[0.7rem] mt-1">
+        One per line: a positive whole number, then the exact character name.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button type="submit" name="confirm" value="0"
+              class="btn-ghost font-cinzel text-[0.65rem] tracking-widest px-4 py-2">
+        Preview
+      </button>
+      {% if awards and not errors %}
+      <button type="submit" name="confirm" value="1"
+              class="btn-send font-cinzel text-[0.65rem] tracking-widest px-4 py-2">
+        Confirm &amp; Award {{ awards|length }} character{{ '' if awards|length == 1 else 's' }}
+        (+{{ awards|sum(attribute='amount') }} XP)
+      </button>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if errors %}
+  <div class="gilded p-4 mt-4">
+    <p class="label-gold mb-2">Fix these before awarding</p>
+    <ul class="text-sm text-bone-300 space-y-1 list-disc pl-5">
+      {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if awards %}
+  <div class="gilded overflow-x-auto mt-4">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Character</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Clan</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Player</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">Award</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in awards %}
+        <tr class="border-b border-ink-800">
+          <td class="px-4 py-2.5 font-cinzel text-bone-200">{{ a.name }}</td>
+          <td class="px-4 py-2.5 text-bone-400 capitalize">{{ a.clan or '—' }}</td>
+          <td class="px-4 py-2.5 text-bone-500">{{ a.player or '—' }}</td>
+          <td class="px-4 py-2.5 text-right text-bone-200 font-mono">+{{ a.amount }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-bone-500 text-xs mt-2">
+    {% if errors %}Resolve the problems above to enable awarding.
+    {% else %}Looks good — press <span class="text-bone-300">Confirm &amp; Award</span> to apply.{% endif %}
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

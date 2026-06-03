@@ -41,6 +41,41 @@ async def get_player_characters(discord_id: str) -> list[dict]:
         return r.json()["characters"]
 
 
+# ── Staff roles ───────────────────────────────────────────────────────────────
+
+async def set_staff_role(actor_discord_id: str, target_discord_id: str,
+                         target_username: str, role: str | None) -> dict:
+    """Assign (or revoke, with ``role=None``) an Enoch staff role from the bot.
+    The issuing user must be an Admin — the web enforces it. Returns
+    ``{target_discord_id, role}`` on success, or ``{error: <reason>}`` when the
+    issuer lacks permission or the role is invalid, so the caller can surface it."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/staff/role",
+            json={"actor_discord_id": actor_discord_id,
+                  "target_discord_id": target_discord_id,
+                  "target_username": target_username,
+                  "role": role},
+            headers=_headers(),
+        )
+        if r.status_code in (400, 403):
+            try:
+                return {"error": r.json().get("detail") or "Could not set the role."}
+            except Exception:
+                return {"error": "Could not set the role."}
+        r.raise_for_status()
+        return r.json()
+
+
+async def get_staff_roster() -> list[dict]:
+    """Every player holding an Enoch staff role, for `/staff list`. Each entry
+    is ``{discord_id, username, role}``."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.get(f"{_base()}/api/staff/roster", headers=_headers())
+        r.raise_for_status()
+        return r.json()["staff"]
+
+
 # ── Characters ────────────────────────────────────────────────────────────────
 
 async def create_character(data: dict) -> dict:

@@ -229,6 +229,12 @@
              class="nav-link {{ 'active' if request.url.path.startswith('/staff/spends') else '' }}">
             Spends
           </a>
+          {% if 'adjust_xp' in viewer_perms %}
+          <a href="/staff/xp/bulk"
+             class="nav-link {{ 'active' if request.url.path.startswith('/staff/xp') else '' }}">
+            Bulk XP
+          </a>
+          {% endif %}
           <a href="/staff/characters"
              class="nav-link {{ 'active' if request.url.path.startswith('/staff/characters') else '' }}">
             Roster
