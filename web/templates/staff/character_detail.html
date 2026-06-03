@@ -139,6 +139,34 @@
     </div>
   </div>
 
+  {# ── RAW compliance lint — the route computes this only for not-yet-approved
+     characters under the standard ruleset (None otherwise ⇒ no panel). Advisory:
+     staff can still approve. Approved characters legitimately pass creation
+     limits through play, so we never lint them. #}
+  {% if raw_errors is not none %}
+  <div class="gilded p-4 mb-6 border {{ 'border-blood-800' if raw_errors else 'border-gold-800' }}">
+    {% if raw_errors %}
+    <div class="flex items-start gap-2.5">
+      <span class="font-cinzel text-[0.7rem] tracking-widest uppercase text-blood-400 shrink-0 mt-0.5 whitespace-nowrap">
+        ⚠ {{ raw_errors | length }} RAW issue{{ '' if raw_errors | length == 1 else 's' }}
+      </span>
+      <ul class="space-y-1 flex-1 min-w-0">
+        {% for e in raw_errors %}
+        <li class="font-garamond text-xs text-bone-300">{{ e }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <p class="font-garamond text-[0.65rem] text-bone-600 mt-2.5 italic">
+      These are V5 character-creation rules. Return with feedback, or approve anyway if it's an intentional exception.
+    </p>
+    {% else %}
+    <p class="font-cinzel text-[0.7rem] tracking-widest uppercase text-gold-400">
+      ✓ Meets V5 RAW character creation
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# ── Tab strip ─────────────────────────────────────────────────────── #}
   <div class="flex gap-1 border-b border-ink-700 mb-6 overflow-x-auto">
     {% for key, label in [

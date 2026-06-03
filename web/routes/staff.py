@@ -563,8 +563,9 @@ async def char_detail(
 ):
     from ..v5_traits import (
         V5_ATTRIBUTES, V5_SKILLS, V5_DISCIPLINES, CLAN_DISCIPLINES,
-        active_clan_bane,
+        active_clan_bane, validate_chargen_raw,
     )
+    from ..db import get_settings, tier_budget
     with get_db() as conn:
         char   = get_character(conn, character_id)
         if not char:
@@ -572,9 +573,29 @@ async def char_detail(
         claims = list_claims_for_character(conn, character_id)
         spends = list_spends_for_character(conn, character_id)
         ledger = get_ledger(conn, character_id, limit=50)
+        settings = dict(get_settings(conn) or {})
+
+    # RAW chargen lint — only meaningful before approval. Once approved a
+    # character may legitimately pass creation limits through play, so we
+    # don't second-guess them. Standard ruleset only (homebrew sets its own
+    # budgets and isn't strictly RAW). None ⇒ template shows no panel.
+    raw_errors = None
+    if (not char.get("is_approved")
+            and (settings.get("active_ruleset") or "standard").lower() == "standard"):
+        _bud = tier_budget(settings, char.get("character_tier"))
+        raw_errors = validate_chargen_raw(
+            char.get("sheet_json") or {},
+            character_type=char.get("character_type") or "kindred",
+            clan=char.get("clan") or "",
+            predator_type=char.get("predator_type"),
+            advantage_pool=_bud["merits"] + _bud["advantages"] + _bud["backgrounds"],
+            flaw_cap=_bud["flaw_cap"],
+        )
+
     return templates.TemplateResponse(
         request, "staff/character_detail.html",
         _ctx(request, char=char, claims=claims, spends=spends, ledger=ledger,
+             raw_errors=raw_errors,
              v5_attributes=V5_ATTRIBUTES, v5_skills=V5_SKILLS,
              v5_disciplines=V5_DISCIPLINES,
              active_bane=active_clan_bane(

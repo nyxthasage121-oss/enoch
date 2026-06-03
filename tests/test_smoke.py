@@ -1348,6 +1348,44 @@ def test_bulk_approve_queue_processes_multiple_characters(staff, player):
                 conn.execute("DELETE FROM characters WHERE id=?", (cid,))
 
 
+def test_staff_detail_raw_compliance_panel(staff, player):
+    """The staff detail page lints not-yet-approved characters against V5 RAW —
+    a compliant sheet shows the green pass; wiping the allocation lists the
+    issues instead. (Approved characters are gated out in the route, so they're
+    never linted — they advance past creation limits through play.)"""
+    import json as _j
+    from web.db import get_db
+    r = player.post(
+        "/characters/new",
+        data={"_csrf": "dev-csrf-token", "name": "Lint Smoke", "clan": "brujah",
+              "touchstones": _j.dumps(["Friend A", "Friend B"]),
+              **_raw_traits()},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    with get_db() as conn:
+        cid = conn.execute(
+            "SELECT id FROM characters WHERE name='Lint Smoke' LIMIT 1"
+        ).fetchone()["id"]
+    try:
+        staff.get("/_dev/seed", follow_redirects=False)  # switch session → staff
+        # Compliant pending character → green pass, nothing flagged.
+        r1 = staff.get(f"/staff/characters/{cid}")
+        assert r1.status_code == 200
+        assert "Meets V5 RAW character creation" in r1.text
+        assert "RAW issue" not in r1.text
+        # Wipe the allocation → the panel switches to listing violations.
+        with get_db() as conn:
+            conn.execute("UPDATE characters SET sheet_json=? WHERE id=?", ("{}", cid))
+        r2 = staff.get(f"/staff/characters/{cid}")
+        assert r2.status_code == 200
+        assert "RAW issue" in r2.text
+        assert "Meets V5 RAW character creation" not in r2.text
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM characters WHERE id=?", (cid,))
+
+
 def test_bulk_start_review_locks_multiple_sheets(staff, player):
     """Bulk start-review should set review_started_at on every selected
     character so players can't keep editing during triage."""
