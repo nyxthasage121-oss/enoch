@@ -3930,18 +3930,36 @@ def import_kml(conn, layer_id: int, kml_text: str) -> dict:
 # payoff), keeping staff in approver mode.
 
 def _project_view(row: dict | None) -> dict | None:
-    """Decorate a project row: parse log_json and add derived fields."""
+    """Decorate a project row: parse log_json/stages_json and add derived fields.
+    Multi-stage roll projects (Phase A) carry a `stages_json` list of
+    {label, dc, progress, done}; single-stage / legacy projects fall back to the
+    flat target_successes counter."""
     if row is None:
         return None
-    row = _parse(row, "log_json")
+    row = _parse(row, "log_json", "stages_json")
     if not isinstance(row.get("log_json"), list):
         row["log_json"] = []
-    target = int(row.get("target_successes") or 0)
-    prog   = int(row.get("progress_successes") or 0)
-    row["target_reached"] = (
-        row.get("progress_type") == "roll" and target > 0 and prog >= target
-    )
-    row["progress_pct"] = min(100, round(100 * prog / target)) if target > 0 else 0
+    stages = row.get("stages_json")
+    if not isinstance(stages, list):
+        stages = []
+    row["stages_json"] = stages
+
+    if stages:
+        row["target_reached"] = all(s.get("done") for s in stages)
+        total_dc = sum(max(0, int(s.get("dc") or 0)) for s in stages) or 1
+        done     = sum(min(int(s.get("progress") or 0), int(s.get("dc") or 0))
+                       for s in stages)
+        row["progress_pct"]  = min(100, round(100 * done / total_dc))
+        row["stage_count"]   = len(stages)
+        row["current_stage"] = max(0, min(int(row.get("current_stage") or 0),
+                                          len(stages) - 1))
+    else:
+        target = int(row.get("target_successes") or 0)
+        prog   = int(row.get("progress_successes") or 0)
+        row["target_reached"] = (
+            row.get("progress_type") == "roll" and target > 0 and prog >= target
+        )
+        row["progress_pct"] = min(100, round(100 * prog / target)) if target > 0 else 0
     return row
 
 
@@ -4029,6 +4047,7 @@ def approve_project(conn, project_id: int, reviewer_id: str, *,
                     progress_type: str, payoff_type: str,
                     roll_pool: str = "", roll_difficulty: int = 1,
                     target_successes: int = 0,
+                    stages: list | None = None,
                     reward_category: str | None = None,
                     reward_trait: str | None = None,
                     reward_dots: int = 0, reward_xp: int = 0) -> dict:
@@ -4041,21 +4060,35 @@ def approve_project(conn, project_id: int, reviewer_id: str, *,
         raise ValueError("Progress type must be 'staged' or 'roll'.")
     if payoff_type not in ("freeform", "structured"):
         raise ValueError("Payoff type must be 'freeform' or 'structured'.")
+    norm_stages: list[dict] = []
     if progress_type == "roll":
         if not (roll_pool or "").strip():
             raise ValueError("A roll project needs a dice pool.")
-        if int(target_successes) <= 0:
-            raise ValueError("A roll project needs a target success count above 0.")
+        for s in (stages or []):
+            dc = max(0, int(s.get("dc") or 0))
+            if dc <= 0:
+                continue
+            norm_stages.append({
+                "label": (s.get("label") or "").strip()[:80],
+                "dc": dc, "progress": 0, "done": False,
+            })
+        # Back-compat: the old single-target form (a target with no explicit
+        # stages) stays a flat counter handled by record_project_roll.
+        if not norm_stages and int(target_successes) <= 0:
+            raise ValueError("A roll project needs at least one stage with a DC.")
+    total_target = (sum(s["dc"] for s in norm_stages) if norm_stages
+                    else max(0, int(target_successes)))
     conn.execute(
         """
         UPDATE projects SET status='active', progress_type=?, payoff_type=?,
             roll_pool=?, roll_difficulty=?, target_successes=?,
+            stages_json=?, current_stage=0,
             reward_category=?, reward_trait=?, reward_dots=?, reward_xp=?,
             reviewed_by=?, reviewed_at=?, updated_at=?
         WHERE id=?
         """,
         (progress_type, payoff_type, (roll_pool or "").strip(),
-         max(0, int(roll_difficulty)), max(0, int(target_successes)),
+         max(0, int(roll_difficulty)), total_target, _j(norm_stages),
          reward_category, reward_trait, max(0, int(reward_dots)),
          max(0, int(reward_xp)), reviewer_id, _now(), _now(), project_id),
     )
@@ -4186,6 +4219,92 @@ def record_project_roll(conn, project_id: int, *, successes: int, outcome: str,
                         {"by": "player", "kind": "roll",
                          "successes": gain, "outcome": outcome, "progress": new_prog})
     return get_project(conn, project_id)
+
+
+def resolve_project_roll(conn, project_id: int, *, successes: int,
+                         critical: bool = False, messy: bool = False,
+                         hunger_one: bool = False, pool_size: int = 0,
+                         period_id: int | None) -> dict:
+    """Apply one downtime roll to a multi-stage roll project's *current* stage,
+    consuming one timeskip roll. Handles cumulative progress, stage completion
+    with overflow spill into the next stage, and the crit/messy/bestial outcomes
+    (engine math only — staff apply the narrative flaws / penalties / temp dots).
+
+    Outcome rules (see docs/NYBN_DOWNTIME_PROJECTS.md, with flagged assumptions):
+      * progress accumulates toward the current stage's DC across rolls;
+      * on completion, leftover successes spill into the next stage — full for a
+        normal/crit completion, half for a messy crit; a final-stage completion
+        flags staff for temporary background dots on crit/messy;
+      * a project-bestial (a Hunger 1 AND successes < ceil(stage DC / 10)) banks
+        no progress, raises that stage's DC by half the dice pool, and flags a
+        staff penalty.
+
+    Returns {project, result}; `result` describes the outcome for the bot to
+    render. Raises ValueError on any invalid state."""
+    proj = get_project(conn, project_id)
+    if proj is None:
+        raise ValueError("Project not found.")
+    if proj["status"] != "active" or proj.get("progress_type") != "roll":
+        raise ValueError("This project isn't an active roll project.")
+    stages = proj.get("stages_json") or []
+    if not stages:
+        raise ValueError("This project has no stages to roll against.")
+    if period_id is None:
+        raise ValueError("There is no active play period to roll in.")
+    cap  = get_rolls_per_timeskip(conn)
+    used = get_timeskip_rolls_used(conn, proj["character_id"], period_id)
+    if used >= cap:
+        raise ValueError(f"No project rolls left this timeskip ({used}/{cap} used).")
+    consume_timeskip_roll(conn, proj["character_id"], period_id)
+
+    idx   = max(0, min(int(proj.get("current_stage") or 0), len(stages) - 1))
+    stage = stages[idx]
+    dc    = int(stage.get("dc") or 0)
+    succ  = max(0, int(successes))
+    pool  = max(0, int(pool_size))
+    new_current = idx
+    flags: list[str] = []
+
+    if hunger_one and succ < (dc + 9) // 10:          # ceil(dc/10), no progress
+        stage["dc"] = dc + (pool // 2)
+        flags.append("bestial")
+        result = {"outcome": "bestial", "stage": idx + 1,
+                  "stage_dc": stage["dc"], "gained": 0}
+    else:
+        stage["progress"] = int(stage.get("progress") or 0) + succ
+        if stage["progress"] >= dc:
+            overflow = stage["progress"] - dc
+            stage["progress"] = dc
+            stage["done"] = True
+            carry = overflow // 2 if messy else overflow
+            if messy:
+                flags.append("messy")
+            if critical:
+                flags.append("crit")
+            if idx + 1 < len(stages):
+                nxt = stages[idx + 1]
+                nxt["progress"] = int(nxt.get("progress") or 0) + carry
+                new_current = idx + 1
+                result = {"outcome": "stage_complete", "stage": idx + 1,
+                          "carry": carry, "next_stage": idx + 2}
+            else:
+                if critical or messy:
+                    flags.append("final_temp_dots")
+                result = {"outcome": "project_complete", "stage": idx + 1, "carry": 0}
+        else:
+            result = {"outcome": "progress", "stage": idx + 1,
+                      "gained": succ, "remaining": dc - stage["progress"]}
+
+    result["flags"] = flags
+    conn.execute(
+        "UPDATE projects SET stages_json=?, current_stage=?, updated_at=? WHERE id=?",
+        (_j(stages), new_current, _now(), project_id),
+    )
+    _project_log_append(conn, project_id, {
+        "by": "player", "kind": "roll", "successes": succ,
+        "outcome": result["outcome"], "stage": idx + 1, "flags": flags,
+    })
+    return {"project": get_project(conn, project_id), "result": result}
 
 
 def complete_project(conn, project_id: int, staff_id: str,
