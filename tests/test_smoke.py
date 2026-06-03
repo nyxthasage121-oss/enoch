@@ -4384,6 +4384,45 @@ def test_standard_tier_xp_is_raw_finishing_pool():
     assert tier_budget(s, "revenant")["xp"] == 0
 
 
+def test_sea_of_time_bp_humanity_seeded_per_tier(player):
+    """Standard Kindred get Sea-of-Time starting Blood Potency + Humanity seeded
+    server-side per tier (the wizard only previews them): Neonate BP 1 / Hum 7,
+    Ancilla BP 2 / Hum 6, Thin-blood BP 0. Regression guard for the old flat
+    BP 1 / Humanity 7 that ignored the tier entirely."""
+    import json as _j
+    from web.db import get_db
+
+    def _make(name, tier, clan="brujah", **extra):
+        r = player.post("/characters/new", data={
+            "_csrf": "dev-csrf-token", "name": name, "clan": clan,
+            "character_type": "kindred", "character_tier": tier,
+            "touchstones": _j.dumps(["A", "B"]),
+            **_raw_traits(), **extra,
+        }, follow_redirects=False)
+        assert r.status_code == 303, f"{name} create failed: {r.status_code}"
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT sheet_json FROM characters WHERE name=? ORDER BY id DESC LIMIT 1",
+                (name,),
+            ).fetchone()
+        return _j.loads(row["sheet_json"])
+
+    try:
+        neo = _make("SoT Neonate", "neonate")
+        assert neo["blood_potency"] == 1 and neo["humanity"] == 7
+        anc = _make("SoT Ancilla", "ancilla", ancilla_mode="standard")
+        assert anc["blood_potency"] == 2, "standard Ancilla = BP 2 (was wrongly 1)"
+        assert anc["humanity"] == 6, "standard Ancilla = Humanity 6 (was wrongly 7)"
+        tb = _make("SoT ThinBlood", "thinblood", clan="thin-blood")
+        assert tb["blood_potency"] == 0, "Thin-blood = BP 0 (was wrongly 1)"
+    finally:
+        with get_db() as conn:
+            conn.execute(
+                "DELETE FROM characters WHERE name IN "
+                "('SoT Neonate', 'SoT Ancilla', 'SoT ThinBlood')"
+            )
+
+
 def test_period_schedule_stamp_generates_periods(_client):
     """Saving a schedule template then stamping N periods should produce
     that many rows, each separated by the cadence and following the

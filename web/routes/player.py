@@ -635,21 +635,29 @@ async def character_create(
     # apply when the player hasn't already typed something (drafts
     # preserve in-progress values; final submission fills in defaults).
     if character_type == "kindred":
+        # Sea-of-Time per-tier starting Blood Potency + Humanity. The wizard
+        # only PREVIEWS these (they aren't posted), so the route is the
+        # authoritative seed — it must match applyTierBloodDefaults() in
+        # character_create.html. Older code seeded a flat BP 1 / Humanity 7 for
+        # every tier, which understated Ancilla (BP 2 / Humanity 6) and
+        # overstated Thin-blood (BP 0).
+        _tier_bp       = {"thinblood": 0, "fledgling": 1, "neonate": 1, "ancilla": 2}
+        _tier_humanity = {"thinblood": 7, "fledgling": 7, "neonate": 7, "ancilla": 6}
         if "blood_potency" not in sheet:
             if ancilla_mode == "in_memoriam" and im_generation:
                 sheet["blood_potency"] = {"12th": 1, "11th-10th": 2, "9th-8th": 3}.get(im_generation, 1)
             else:
-                sheet["blood_potency"] = 1
+                sheet["blood_potency"] = _tier_bp.get(character_tier, 1)
         if "humanity" not in sheet:
-            base_humanity = 7
             if ancilla_mode == "in_memoriam" and isinstance(in_memoriam, dict):
+                # In Memoriam derives Humanity from lived eras + embrace age,
+                # starting from the RAW base of 7 (not the tier shortcut).
                 loss = sum(int(e.get("humanity_loss") or 0) for e in (in_memoriam.get("eras") or []) if isinstance(e, dict))
-                # Pull embrace-age loss too
                 age_id = in_memoriam.get("embrace_age")
                 age_loss = {"up_to_100": 0, "up_to_150": 1, "over_150": 2}.get(age_id, 0)
-                sheet["humanity"] = max(0, base_humanity - loss - age_loss)
+                sheet["humanity"] = max(0, 7 - loss - age_loss)
             else:
-                sheet["humanity"] = base_humanity
+                sheet["humanity"] = _tier_humanity.get(character_tier, 7)
         if "hunger" not in sheet:
             sheet["hunger"] = 1
     elif character_type == "ghoul" or character_type == "revenant":
