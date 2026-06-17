@@ -164,7 +164,12 @@ LORESHEET_PICKER: list[dict] = [
         "source": l.get("source", ""),
         "requires_st_permission": bool(l.get("requires_st_permission")),
         "clan_restriction": l.get("clan_restriction"),
-        "dots": [{"dot": d["dot"], "name": d["name"]} for d in l.get("dots", [])],
+        "dots": [
+            {k2: v2 for k2, v2 in {
+                "dot": d["dot"], "name": d["name"], "grants": d.get("grants"),
+            }.items() if v2 is not None}
+            for d in l.get("dots", [])
+        ],
     }.items() if v is not None}
     for l in LORESHEET_CATALOG
 ]

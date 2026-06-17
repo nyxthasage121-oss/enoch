@@ -323,12 +323,26 @@
       {
         "dot": 4,
         "name": "Money Multiplies",
-        "description": "You are (or are directly related to) a legitimate investment banker. Gain three dots (up to five) in Resources. In addition, anyone in your coterie loses the Destitute Flaw and can purchase dots in Resources at 2 XP per dot instead of the usual 3."
+        "description": "You are (or are directly related to) a legitimate investment banker. Gain three dots (up to five) in Resources. In addition, anyone in your coterie loses the Destitute Flaw and can purchase dots in Resources at 2 XP per dot instead of the usual 3.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Resources",
+            "dots": 3
+          }
+        ]
       },
       {
         "dot": 5,
         "name": "Money Dictates",
-        "description": "You are the head of the Dunsirn family accounts, with your undead finger on the pulse of the Hecata's finances. Gain three free dots of Status in the Hecata. Once per chronicle, you can either give every Hecata two additional dots of Resources or remove all Resource dots from every Hecata — lasting a single story; removals generate a chronicle-length Adversary Flaw."
+        "description": "You are the head of the Dunsirn family accounts, with your undead finger on the pulse of the Hecata's finances. Gain three free dots of Status in the Hecata. Once per chronicle, you can either give every Hecata two additional dots of Resources or remove all Resource dots from every Hecata — lasting a single story; removals generate a chronicle-length Adversary Flaw.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 3
+          }
+        ]
       }
     ],
     "clan_restriction": [
@@ -1875,7 +1889,14 @@
       {
         "dot": 3,
         "name": "Psychopomp",
-        "description": "You are a Psychopomp and travel the Goblin Roads at will. This journey requires 24 hours of preparation to attune yourself to the proper rites and sacrifices necessary for safe passage. You gain two dots of Status reflecting your occupation."
+        "description": "You are a Psychopomp and travel the Goblin Roads at will. This journey requires 24 hours of preparation to attune yourself to the proper rites and sacrifices necessary for safe passage. You gain two dots of Status reflecting your occupation.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 4,
@@ -2344,7 +2365,14 @@
       {
         "dot": 2,
         "name": "Niche Following",
-        "description": "Your knowledge in a specific area grants you a degree of online authority. Your threads occasionally go viral, and you've been paid to write articles thanks to your unique voice. Gain two dots of Influence in your field. Once per story, you may temporarily increase your Resources by one dot when you pen an article or do a video hangout for a small audience."
+        "description": "Your knowledge in a specific area grants you a degree of online authority. Your threads occasionally go viral, and you've been paid to write articles thanks to your unique voice. Gain two dots of Influence in your field. Once per story, you may temporarily increase your Resources by one dot when you pen an article or do a video hangout for a small audience.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Influence",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 3,
@@ -3397,7 +3425,14 @@
       {
         "dot": 1,
         "name": "Fan Club",
-        "description": "You've been a Baby Chorus fan for decades, collecting their albums and bootlegged recordings. Damien recognizes you as a frequent face in the front row, and other fans see you as an authority on the band. Gain two dots of Influence among other Baby Chorus devotees."
+        "description": "You've been a Baby Chorus fan for decades, collecting their albums and bootlegged recordings. Damien recognizes you as a frequent face in the front row, and other fans see you as an authority on the band. Gain two dots of Influence among other Baby Chorus devotees.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Influence",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 2,
@@ -4082,7 +4117,14 @@
       {
         "dot": 3,
         "name": "Troubleshooter",
-        "description": "You are an agent of Prince Jackson, the Archons, or some other group whose best interests were served by the convention's success. Gain two dots of Status among the Kindred of Chicago and a 'get out of jail free' card from the Prince. Once per chronicle, the authorities of your domain turn a blind eye toward a minor violation of the Traditions."
+        "description": "You are an agent of Prince Jackson, the Archons, or some other group whose best interests were served by the convention's success. Gain two dots of Status among the Kindred of Chicago and a 'get out of jail free' card from the Prince. Once per chronicle, the authorities of your domain turn a blind eye toward a minor violation of the Traditions.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 4,

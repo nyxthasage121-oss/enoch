@@ -77,6 +77,33 @@ def test_chargen_page_embeds_picker(player):
     assert "loresheetPicker" in r.text
 
 
+_KNOWN_BACKGROUNDS = {"allies", "contacts", "fame", "haven", "herd", "influence",
+                      "mask", "mawla", "resources", "retainers", "status", "domain"}
+
+
+def test_loresheet_grants_resolve_to_real_traits():
+    """Error-proofing: every authored loresheet grant must name a trait that
+    actually exists (background / catalog merit / catalog flaw). A typo or
+    misread here fails the build instead of silently granting garbage."""
+    from web.v5_traits import MERIT_CATALOG, FLAW_CATALOG
+    merit_names = {m["name"].lower() for m in MERIT_CATALOG if m.get("kind") != "background"}
+    flaw_names = {f["name"].lower() for f in FLAW_CATALOG}
+    bg_names = {m["name"].lower() for m in MERIT_CATALOG if m.get("kind") == "background"} | _KNOWN_BACKGROUNDS
+    seen = 0
+    for ls in LORESHEET_CATALOG:
+        for d in ls["dots"]:
+            for g in d.get("grants", []):
+                seen += 1
+                assert g["kind"] in {"merit", "background", "flaw"}, (ls["id"], g)
+                assert isinstance(g["name"], str) and g["name"]
+                assert 1 <= int(g["dots"]) <= 5
+                pool = (bg_names if g["kind"] == "background"
+                        else flaw_names if g["kind"] == "flaw" else merit_names)
+                assert g["name"].lower() in pool, \
+                    f"{ls['id']} grants {g['name']} ({g['kind']}) — not a real trait"
+    assert seen >= 6, "expected the seeded background grants"
+
+
 def test_loresheets_count_toward_advantage_pool():
     """Server-side: loresheet dots draw the same Advantages pool as
     merits/backgrounds, so a bypass can't overspend via loresheets."""

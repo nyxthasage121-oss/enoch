@@ -385,11 +385,17 @@
             <span class="font-cinzel text-[0.6rem] text-gold-500 shrink-0">{{ _levels | sum }} dots</span>
           </div>
           {% if full %}
-          <div class="mt-1 ml-2 space-y-0.5">
+          <div class="mt-1 ml-2 space-y-1.5">
             {% for d in full.dots if d.dot in _levels %}
-            <p class="font-garamond text-[0.65rem] text-bone-600">
-              <span class="text-bone-700">({{ d.dot }})</span> {{ d.name }}
-            </p>
+            <div>
+              <p class="font-garamond text-[0.65rem]">
+                <span class="text-bone-700">({{ d.dot }})</span>
+                <span class="text-bone-300">{{ d.name }}</span>
+                {% if d.grants %}<span class="text-gold-600 ml-1">· auto‑granted {% for g in d.grants %}{{ g.name }} {{ g.dots }}{{ ', ' if not loop.last else '' }}{% endfor %}</span>
+                {% else %}<span class="text-mauve-500 ml-1" title="Read the benefit and apply any granted traits by hand">· staff applies</span>{% endif %}
+              </p>
+              <p class="font-garamond text-[0.6rem] text-bone-700 leading-snug italic ml-3">{{ d.description }}</p>
+            </div>
             {% endfor %}
           </div>
           {% endif %}

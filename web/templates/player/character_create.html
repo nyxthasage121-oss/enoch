@@ -1517,16 +1517,21 @@
           <p class="label-gold mb-3 text-xs">Merits</p>
           <template x-for="(m, idx) in merits" :key="'m'+idx">
             <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
-              <span class="font-garamond text-xs text-bone-300 flex-1 truncate" x-text="m.name"></span>
+              <span class="font-garamond text-xs text-bone-300 flex-1 truncate">
+                <span x-text="m.name"></span>
+                <span x-show="m.src" class="text-[0.5rem] font-cinzel tracking-widest uppercase text-mauve-400 ml-1"
+                      x-text="m.src === 'loresheet' ? 'Loresheet' : (m.src === 'predator' ? 'Predator' : m.src)"></span>
+              </span>
               <div class="flex gap-0.5">
                 <template x-for="n in 5">
-                  <button type="button" @click="m.dots = (m.dots === n ? n - 1 : n)"
+                  <button type="button" @click="if (!m.src) m.dots = (m.dots === n ? n - 1 : n)"
                           class="w-2.5 h-2.5 rounded-full border transition-colors"
-                          :class="m.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
+                          :class="(m.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700') + (m.src ? ' opacity-60 cursor-default' : '')"></button>
                 </template>
               </div>
-              <button type="button" @click="merits.splice(idx, 1)"
+              <button type="button" x-show="!m.src" @click="merits.splice(idx, 1)"
                       class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+              <span x-show="m.src" class="text-bone-800 text-xs ml-1 w-3 text-center" title="Granted — managed for you">&#128274;</span>
             </div>
           </template>
           <div class="flex items-center gap-2 mt-3">
@@ -1544,16 +1549,21 @@
           <p class="label-gold mb-3 text-xs">Backgrounds</p>
           <template x-for="(b, idx) in backgrounds" :key="'b'+idx">
             <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
-              <span class="font-garamond text-xs text-bone-300 flex-1 truncate" x-text="b.name"></span>
+              <span class="font-garamond text-xs text-bone-300 flex-1 truncate">
+                <span x-text="b.name"></span>
+                <span x-show="b.src" class="text-[0.5rem] font-cinzel tracking-widest uppercase text-mauve-400 ml-1"
+                      x-text="b.src === 'loresheet' ? 'Loresheet' : (b.src === 'predator' ? 'Predator' : b.src)"></span>
+              </span>
               <div class="flex gap-0.5">
                 <template x-for="n in 5">
-                  <button type="button" @click="b.dots = (b.dots === n ? n - 1 : n)"
+                  <button type="button" @click="if (!b.src) b.dots = (b.dots === n ? n - 1 : n)"
                           class="w-2.5 h-2.5 rounded-full border transition-colors"
-                          :class="b.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
+                          :class="(b.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700') + (b.src ? ' opacity-60 cursor-default' : '')"></button>
                 </template>
               </div>
-              <button type="button" @click="backgrounds.splice(idx, 1)"
+              <button type="button" x-show="!b.src" @click="backgrounds.splice(idx, 1)"
                       class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+              <span x-show="b.src" class="text-bone-800 text-xs ml-1 w-3 text-center" title="Granted — managed for you">&#128274;</span>
             </div>
           </template>
           <div class="flex items-center gap-2 mt-3">
@@ -2926,12 +2936,14 @@
           for (let i = this.xpBuys.length - 1; i >= 0; i--) {
             if (this.xpBuys[i].key === key) { this.xpBuys.splice(i, 1); break; }
           }
+          this.removeLoresheetGrants(id, level);
         } else {
           if (level * 3 > this.xpRemaining) { this.newXpLoreError = 'Not enough XP.'; return; }
           this.newXpLoreError = '';
           if (!entry) { entry = { id, name: l.name, levels: [], src: 'xp' }; this.loresheets.push(entry); }
           entry.levels.push(level); entry.levels.sort((a, b) => a - b);
           this.xpBuys.push({ cat: 'loresheet', key, label: l.name + ' (' + level + ')', cost: level * 3, level });
+          this.applyLoresheetGrants(id, level);
         }
       },
 
@@ -3370,11 +3382,41 @@
       hasLoresheetLevel(ls, level) {
         return (ls.levels || []).includes(level);
       },
+      // ── Loresheet trait grants ───────────────────────────────────────────
+      // Some loresheet entries grant a merit/background/flaw (authored `grants`
+      // field). Selecting the entry auto-adds them tagged src:'loresheet'
+      // (budget-free, like predator grants) so staff sees + can adjust them.
+      // Entries without `grants` show their description on the sheet for manual
+      // application.
+      _loresheetDotGrants(id, dot) {
+        const d = this.loresheetDots(id).find(x => x.dot === dot);
+        return (d && d.grants) || [];
+      },
+      _grantList(kind) {
+        return kind === 'flaw' ? this.flaws
+             : (kind === 'background' ? this.backgrounds : this.merits);
+      },
+      applyLoresheetGrants(id, dot) {
+        const gkey = 'ls:' + id + ':' + dot;
+        for (const g of this._loresheetDotGrants(id, dot)) {
+          const list = this._grantList(g.kind);
+          if (list.some(x => x.gkey === gkey && x.name === g.name)) continue;
+          list.push({ name: g.name, dots: g.dots || 1, src: 'loresheet', gkey });
+        }
+      },
+      removeLoresheetGrants(id, dot) {
+        const gkey = 'ls:' + id + ':' + dot;
+        for (const list of [this.merits, this.backgrounds, this.flaws]) {
+          for (let i = list.length - 1; i >= 0; i--) {
+            if (list[i].gkey === gkey) list.splice(i, 1);
+          }
+        }
+      },
       toggleLoresheetLevel(ls, level) {
         ls.levels = ls.levels || [];
         const i = ls.levels.indexOf(level);
-        if (i >= 0) ls.levels.splice(i, 1);
-        else { ls.levels.push(level); ls.levels.sort((a, b) => a - b); }
+        if (i >= 0) { ls.levels.splice(i, 1); this.removeLoresheetGrants(ls.id, level); }
+        else { ls.levels.push(level); ls.levels.sort((a, b) => a - b); this.applyLoresheetGrants(ls.id, level); }
       },
       addLoresheet() {
         this.newLoresheetError = '';
@@ -3386,7 +3428,10 @@
       },
       removeLoresheet(id) {
         const i = this.loresheets.findIndex(x => x.id === id);
-        if (i >= 0) this.loresheets.splice(i, 1);
+        if (i >= 0) {
+          (this.loresheets[i].levels || []).forEach(lv => this.removeLoresheetGrants(id, lv));
+          this.loresheets.splice(i, 1);
+        }
       },
 
       // Touchstone+Conviction pairs. V5 chargen: 2–3 pairs.
