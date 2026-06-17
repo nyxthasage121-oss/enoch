@@ -93,6 +93,61 @@
   </div>
   {% endif %}
 
+  {# ── Shared Backgrounds · nightly pool (migration 039) ──
+       Donated backgrounds any member can "blank" for the night; blanked dots
+       leave the pool for the WHOLE coterie until the next play period. #}
+  {% if shared_backgrounds %}
+  <div class="gilded p-5 mb-6">
+    <div class="flex items-center justify-between mb-1">
+      <p class="label-gold text-xs">Shared Backgrounds · Tonight</p>
+      {% if active_period %}
+      <span class="font-garamond text-bone-600 text-[0.65rem]">{{ active_period.label }}</span>
+      {% endif %}
+    </div>
+    <p class="font-garamond text-bone-700 text-[0.65rem] mb-3 italic">
+      Donated backgrounds are shared. Blanking removes dots from the whole
+      coterie until the next night opens.
+    </p>
+    <div class="space-y-2">
+      {% for b in shared_backgrounds %}
+      <div class="py-1.5 border-b border-ink-800 last:border-0">
+        <div class="flex items-center justify-between">
+          <span class="font-cinzel text-xs text-bone-200">{{ b.name }}</span>
+          <span class="font-cinzel text-xs {{ 'text-blood-400' if b.is_blanked else 'text-gold-500' }}">
+            {{ b.available }} / {{ b.dots }}
+            {% if b.is_blanked %}<span class="text-bone-600 text-[0.6rem] ml-1">({{ b.blanked_dots }} blanked)</span>{% endif %}
+          </span>
+        </div>
+        {% if active_period and b.available > 0 %}
+        <form method="POST" action="/coteries/{{ coterie.id }}/backgrounds/blank"
+              class="flex items-center gap-2 mt-1.5">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <input type="hidden" name="name" value="{{ b.name }}">
+          <select name="dots"
+                  class="bg-ink-900 border border-ink-700 rounded text-bone-300 text-[0.65rem] font-cinzel px-1.5 py-0.5">
+            {% for n in range(1, b.available + 1) %}
+            <option value="{{ n }}">{{ n }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit"
+                  class="font-cinzel tracking-widest text-[0.6rem] text-blood-500 hover:text-blood-400">
+            Blank for tonight
+          </button>
+        </form>
+        {% elif active_period and b.available == 0 %}
+        <p class="font-garamond text-bone-700 text-[0.6rem] mt-1 italic">Fully blanked tonight — restores next night.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% if not active_period %}
+    <p class="font-garamond text-bone-700 text-[0.65rem] mt-3 italic">
+      No active night right now — blanking opens when a night is active.
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# ── Coterie Flaws ── #}
   {% if coterie_flaws %}
   <div class="gilded p-5 mb-6">
@@ -105,6 +160,45 @@
       </div>
       {% endfor %}
     </div>
+  </div>
+  {% endif %}
+
+  {# ── Donations & Funding — who contributed what, and how it was paid for.
+       Fills the "XP donation display" gap: donated shares vs XP-funded dots,
+       each attributed to the funding member. #}
+  {% set _funded = active_contribs
+       | selectattr('contribution_type', 'in', ['donated', 'paid_xp', 'timeskip_advance', 'staff_grant'])
+       | selectattr('target_name')
+       | list %}
+  {% if _funded %}
+  {% set _type_labels = {
+       'donated': 'Donated', 'paid_xp': 'XP',
+       'timeskip_advance': 'Timeskip XP', 'staff_grant': 'Staff grant'} %}
+  <div class="gilded p-5 mb-6">
+    <p class="label-gold text-xs mb-3">Donations &amp; Funding</p>
+    <div class="space-y-1">
+      {% for c in _funded %}
+      <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
+        <div class="min-w-0">
+          <span class="font-cinzel text-xs text-bone-200">{{ c.target_name }}</span>
+          <span class="font-garamond text-bone-600 text-[0.65rem] ml-1.5">· {{ c.target_kind }}</span>
+          {% if c.character_name %}
+          <span class="font-garamond text-bone-500 text-[0.65rem] ml-1.5">— {{ c.character_name }}</span>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="chip text-[0.5rem]
+            {{ 'text-mauve-400 border-mauve-800' if c.contribution_type == 'donated' else 'text-gold-400 border-gold-700' }}">
+            {{ _type_labels.get(c.contribution_type, c.contribution_type) }}
+          </span>
+          <span class="font-cinzel text-gold-500 text-xs">{{ c.dots }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="font-garamond text-bone-700 text-[0.65rem] mt-2 italic">
+      Donations are free shares from a member's sheet; XP entries were bought with personal experience.
+    </p>
   </div>
   {% endif %}
 

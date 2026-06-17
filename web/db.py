@@ -1160,6 +1160,150 @@ def release_due_background_blanks(conn) -> list[dict]:
     return released
 
 
+# ── Coterie shared-background blanking ───────────────────────────────────────
+# A coterie's donated backgrounds form a shared pool. Any member can blank dots
+# of one for the night, making them unavailable to the WHOLE coterie until the
+# next play period — the same period-keyed release as the per-character feature
+# above. The pool total per background is derived live from the active 'donated'
+# contributions; coterie_background_blanks only tracks the blanks.
+
+def list_coterie_shared_backgrounds(conn, coterie_id: int) -> list[dict]:
+    """The coterie's donated backgrounds as a shared pool: each name with its
+    total donated dots, how many are currently blanked, and what's available."""
+    donated = conn.execute(
+        """
+        SELECT target_name AS name, SUM(dots) AS total
+        FROM coterie_contributions
+        WHERE coterie_id=? AND target_kind='background'
+          AND contribution_type='donated' AND status='active'
+          AND target_name IS NOT NULL AND TRIM(target_name) != ''
+        GROUP BY target_name
+        ORDER BY target_name COLLATE NOCASE
+        """,
+        (coterie_id,),
+    ).fetchall()
+    blanks = {
+        r["bg_key"]: r
+        for r in conn.execute(
+            "SELECT * FROM coterie_background_blanks WHERE coterie_id=?",
+            (coterie_id,),
+        ).fetchall()
+    }
+    out: list[dict] = []
+    for d in donated:
+        name = d["name"]
+        total = max(0, int(d["total"] or 0))
+        b = blanks.get(_bg_key(name))
+        blanked = max(0, min(int(b["blanked_dots"]) if b else 0, total))
+        out.append({
+            "name":         name,
+            "dots":         total,
+            "blanked_dots": blanked,
+            "available":    max(0, total - blanked),
+            "is_blanked":   blanked > 0,
+        })
+    return out
+
+
+def blank_coterie_background(
+    conn, coterie_id: int, name: str, dots_to_blank: int,
+    blanked_by: int | None = None,
+) -> dict:
+    """Blank N dots of a coterie's shared background for the current night.
+    Requires an active play period. A leftover blank from an earlier period is
+    released first so the one-night window never compounds; same-night re-blanks
+    accumulate. Raises ValueError on any invalid input."""
+    key = _bg_key(name)
+    if not key:
+        raise ValueError("Background name is required.")
+    active = get_active_period(conn)
+    if not active:
+        raise ValueError("There is no active play period — blanking needs an open night.")
+    dots = int(dots_to_blank)
+    if dots <= 0:
+        raise ValueError("You must blank at least 1 dot.")
+
+    shared = next(
+        (b for b in list_coterie_shared_backgrounds(conn, coterie_id)
+         if _bg_key(b["name"]) == key),
+        None,
+    )
+    if shared is None:
+        raise ValueError(f'"{name}" is not a shared coterie background.')
+    total = shared["dots"]
+
+    row = conn.execute(
+        "SELECT * FROM coterie_background_blanks WHERE coterie_id=? AND bg_key=?",
+        (coterie_id, key),
+    ).fetchone()
+    blanked = max(0, min(int(row["blanked_dots"] or 0), total)) if row else 0
+    # A blank tied to a prior period is already due — drop it before re-blanking.
+    if row and blanked > 0 and row["blanked_period_id"] != active["id"]:
+        blanked = 0
+
+    available = total - blanked
+    if dots > available:
+        raise ValueError(
+            f"Cannot blank {dots} dot(s) of {shared['name']}; only {available} available."
+        )
+
+    new_blanked = blanked + dots
+    if row:
+        conn.execute(
+            "UPDATE coterie_background_blanks SET name=?, blanked_dots=?, "
+            "blanked_period_id=?, blanked_by=?, blanked_at=?, updated_at=? WHERE id=?",
+            (shared["name"], new_blanked, active["id"], blanked_by,
+             _now(), _now(), row["id"]),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO coterie_background_blanks "
+            "(coterie_id, name, bg_key, blanked_dots, blanked_period_id, "
+            " blanked_by, blanked_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (coterie_id, shared["name"], key, new_blanked, active["id"],
+             blanked_by, _now(), _now()),
+        )
+    return {
+        "name":         shared["name"],
+        "dots":         total,
+        "blanked_now":  dots,
+        "blanked_dots": new_blanked,
+        "available":    max(0, total - new_blanked),
+        "period_label": active["label"],
+    }
+
+
+def release_due_coterie_background_blanks(conn) -> list[dict]:
+    """Restore coterie background blanks whose blank predates the current active
+    period (a new night has opened). Returns the release events. No-op when no
+    period is active."""
+    active = get_active_period(conn)
+    if not active:
+        return []
+    rows = conn.execute(
+        "SELECT * FROM coterie_background_blanks WHERE blanked_dots > 0 "
+        "AND blanked_period_id IS NOT NULL AND blanked_period_id != ?",
+        (active["id"],),
+    ).fetchall()
+    released: list[dict] = []
+    for row in rows:
+        dots = int(row["blanked_dots"] or 0)
+        if dots <= 0:
+            continue
+        conn.execute(
+            "UPDATE coterie_background_blanks SET blanked_dots=0, "
+            "blanked_period_id=NULL, blanked_at=NULL, updated_at=? WHERE id=?",
+            (_now(), row["id"]),
+        )
+        released.append({
+            "coterie_id":    row["coterie_id"],
+            "name":          row["name"],
+            "dots_released": dots,
+        })
+    return released
+
+
 # ── Period schedule templates ────────────────────────────────────────────────
 
 def list_period_schedules(conn, active_only: bool = True) -> list[dict]:
@@ -1320,6 +1464,7 @@ def set_period_active(conn, period_id: int) -> dict:
     conn.execute("UPDATE play_periods SET is_active=0")
     conn.execute("UPDATE play_periods SET is_active=1 WHERE id=?", (period_id,))
     release_due_background_blanks(conn)
+    release_due_coterie_background_blanks(conn)
     return get_period(conn, period_id)
 
 

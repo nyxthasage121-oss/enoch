@@ -2211,11 +2211,18 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
     from ..db import (
         list_coterie_contributions, COTERIE_NAMED_TRAIT_CAP,
         member_free_dots_used, CREATION_FREE_DOTS_PER_MEMBER,
-        coterie_free_budget,
+        coterie_free_budget, list_coterie_shared_backgrounds,
+        get_active_period,
     )
     coterie = get_coterie(conn, coterie_id)
     members = list_coterie_members(conn, coterie_id)
     spends  = list_coterie_spends(conn, coterie_id)
+
+    # Shared-background pool: donated backgrounds any member can blank for the
+    # night (migration 039). Total per name derives from active 'donated'
+    # contributions; the blank state is per active play period.
+    shared_backgrounds = list_coterie_shared_backgrounds(conn, coterie_id) if coterie else []
+    active_period = get_active_period(conn)
 
     # Free creation dots per member — only meaningful while the coterie is
     # still 'forming'. Surfaced for ALL members so a single assembler can
@@ -2324,7 +2331,9 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
             "coterie_free_dots": coterie_free_dots,
             "free_dots_per_member": CREATION_FREE_DOTS_PER_MEMBER,
             "free_budget": free_budget,
-            "coterie_flaws": coterie_flaws}
+            "coterie_flaws": coterie_flaws,
+            "shared_backgrounds": shared_backgrounds,
+            "active_period": active_period}
 
 
 def _resolve_member_char(player_chars: list[dict], members: list[dict],
@@ -2407,6 +2416,49 @@ def _coterie_flash_response(request, conn, coterie_id, user_id,
     )
     _toast(resp, flash_msg, flash_kind)
     return resp
+
+
+@router.post("/coteries/{coterie_id}/backgrounds/blank", response_class=HTMLResponse)
+async def blank_coterie_background_route(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Any coterie member can blank dots of a shared (donated) background for
+    the current night. Blanked dots leave the pool for the whole coterie until
+    the next play period opens (same release engine as per-character blanking)."""
+    from ..db import blank_coterie_background as _blank
+    form = await request.form()
+    name = (form.get("name") or "").strip()
+    try:
+        dots = int(form.get("dots") or 0)
+    except (TypeError, ValueError):
+        dots = 0
+
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+        # Membership gate — must own a character in this coterie.
+        player_chars = list_player_characters(conn, user["id"])
+        members = list_coterie_members(conn, coterie_id)
+        actor = _resolve_member_char(player_chars, members, None)
+        if actor is None:
+            raise HTTPException(status_code=403, detail="Not a member of this coterie")
+
+        flash_kind, flash_msg = "success", ""
+        try:
+            res = _blank(conn, coterie_id, name, dots, blanked_by=actor["id"])
+            flash_msg = (
+                f"Blanked {res['blanked_now']} dot(s) of {res['name']} for "
+                f"{res['period_label']} — {res['available']} left to the coterie tonight."
+            )
+        except ValueError as e:
+            flash_kind, flash_msg = "error", str(e)
+
+        return _coterie_flash_response(request, conn, coterie_id, user["id"],
+                                       flash_msg, flash_kind)
 
 
 @router.post("/coteries/{coterie_id}/free-dots", response_class=HTMLResponse)
