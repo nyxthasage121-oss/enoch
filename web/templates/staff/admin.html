@@ -55,20 +55,11 @@
        proper fix is in db.py::get_settings which now decodes JSON. #}
     {% set _tb_raw = _cs.get('homebrew_tier_budgets') %}
     {% set _tier_budgets = _tb_raw if (_tb_raw is mapping) else {} %}
-    {# Per-tier V5 RAW defaults — used when ruleset is standard or a tier
-       hasn't been overridden under homebrew. Keep in sync with
-       web/db.py::_TIER_DEFAULTS. Numbers reflect V5 Corebook Sea of Time
-       allocations: 7 Advantage points + 2 Flaw points baseline, Ancilla
-       adds +2/+2 on top. #}
-    {% set _tier_defaults = {
-      'mortal':    {'xp': 50,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
-      'ghoul':     {'xp': 60,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
-      'revenant':  {'xp': 75,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
-      'fledgling': {'xp': 60,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
-      'thinblood': {'xp': 60,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
-      'neonate':   {'xp': 75,  'merits': 2, 'advantages': 2, 'backgrounds': 3, 'flaw_cap': 2},
-      'ancilla':   {'xp': 110, 'merits': 3, 'advantages': 3, 'backgrounds': 3, 'flaw_cap': 4},
-    } %}
+    {# Per-tier V5 RAW defaults — passed from the route (db._TIER_DEFAULTS, the
+       SAME source chargen uses) so the displayed placeholders can't drift from
+       the actual budgets. NYbN Sea-of-Time: most tiers 0 XP, Neonate 15,
+       Ancilla 35. #}
+    {% set _tier_defaults = tier_defaults | default({}) %}
     <div class="gilded p-5" x-data="{
            ruleset: '{{ _ruleset }}',
            revenants: {{ 'true' if _cs.get('revenants_enabled') else 'false' }},

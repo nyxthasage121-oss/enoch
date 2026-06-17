@@ -1914,7 +1914,7 @@ def _admin_ctx_extras() -> dict:
     + sites + coteries-for-picker datasets each of those tabs needs."""
     from ..db import (
         get_settings, list_restrictions, list_periods, list_period_schedules,
-        list_hunting_sites,
+        list_hunting_sites, _TIER_DEFAULTS,
     )
     from ..v5_traits import V5_SITE_PREDATOR_TYPES
     with get_db() as conn:
@@ -1933,6 +1933,9 @@ def _admin_ctx_extras() -> dict:
             "players":               list_all_players(conn),
             "all_chars":             list_characters(conn),
             "chronicle_settings":    dict(get_settings(conn) or {}),
+            # Real V5 RAW tier defaults (source of truth) so the admin table
+            # can't drift from chargen — see db._TIER_DEFAULTS.
+            "tier_defaults":         {k: dict(v) for k, v in _TIER_DEFAULTS.items()},
             "criteria":              list_criteria(conn, active_only=False),
             "restrictions":          restrictions,
             "restriction_lookup":    rdict,
