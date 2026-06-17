@@ -1348,15 +1348,20 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
             items = None
         if isinstance(items, list):
             cleaned_ls: list[dict] = []
-            seen_ls: set[str] = set()
+            seen_ls: set[tuple] = set()
             for it in items:
                 if not isinstance(it, dict):
                     continue
                 lid = str(it.get("id", "")).strip()
                 ls = _get_loresheet(lid)
-                if not ls or lid in seen_ls:
+                if not ls:
                     continue
-                seen_ls.add(lid)
+                # A loresheet may appear twice — a creation entry and an
+                # XP-bought (src='xp') entry — so dedupe on (id, src), not id.
+                src = str(it.get("src", "")).strip()[:20]
+                if (lid, src) in seen_ls:
+                    continue
+                seen_ls.add((lid, src))
                 # Loresheet entries are independent picks, each costing its own
                 # level (non-cumulative). Validate each selected level against
                 # the catalog. Fall back to a legacy {dots:N} rating = levels 1..N.
@@ -1373,7 +1378,10 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
                 })
                 if not levels:          # no entries selected → nothing to store
                     continue
-                cleaned_ls.append({"id": lid, "name": ls["name"], "levels": levels})
+                entry = {"id": lid, "name": ls["name"], "levels": levels}
+                if src:   # src='xp' → bought with XP, not the creation pool
+                    entry["src"] = src
+                cleaned_ls.append(entry)
             sheet["loresheets"] = cleaned_ls
 
     # Free-text lists: touchstones, convictions

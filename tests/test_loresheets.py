@@ -97,6 +97,35 @@ def test_loresheets_count_toward_advantage_pool():
     assert not any("Advantages" in e for e in validate_chargen_raw(ok, advantage_pool=7))
 
 
+def test_xp_bought_advantages_excluded_from_creation_pool():
+    """Advance-step purchases carry src='xp' and draw starting XP, not the
+    creation Advantages pool — so they don't count toward advantage_pool."""
+    from web.v5_traits import validate_chargen_raw
+    sheet = {
+        "merits": [{"name": "Beautiful", "dots": 2},
+                   {"name": "Iron Will", "dots": 3, "src": "xp"}],   # XP — excluded
+        "backgrounds": [{"name": "Resources", "dots": 3}],
+        "loresheets": [
+            {"id": "chamber-1444", "name": "1444 Chamber", "levels": [2]},
+            {"id": "theo-bell", "name": "Theo Bell", "levels": [5], "src": "xp"},  # XP — excluded
+        ],
+    }  # creation pool = 2 + 3 + 2 = 7
+    assert not any("Advantages" in e for e in validate_chargen_raw(sheet, advantage_pool=7))
+
+
+def test_parse_keeps_creation_and_xp_loresheet_entries():
+    """A loresheet can appear twice — creation + XP — deduped on (id, src)."""
+    from web.routes.player import _parse_sheet_from_form
+    form = {"loresheets": json.dumps([
+        {"id": "chamber-1444", "name": "1444 Chamber", "levels": [1]},
+        {"id": "chamber-1444", "name": "1444 Chamber", "levels": [3], "src": "xp"},
+    ])}
+    ls = _parse_sheet_from_form(form)["loresheets"]
+    assert len(ls) == 2
+    assert [x for x in ls if not x.get("src")][0]["levels"] == [1]
+    assert [x for x in ls if x.get("src") == "xp"][0]["levels"] == [3]
+
+
 def test_merit_catalog_kind_split():
     """The catalog is tagged merit vs background so the two Legacy pickers can
     filter; backgrounds follow the friend's category set."""
