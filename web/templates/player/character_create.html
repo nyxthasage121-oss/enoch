@@ -151,6 +151,8 @@
             <div class="text-xs space-y-1">
               <div class="flex justify-between"><span class="text-bone-600">Attributes</span><span class="font-cinzel text-gold-500" x-text="(sumAttrs && sumAttrs()) + ' dots'"></span></div>
               <div class="flex justify-between"><span class="text-bone-600">Skills</span><span class="font-cinzel text-gold-500" x-text="(sumSkills && sumSkills()) + ' dots'"></span></div>
+              <div class="flex justify-between" x-show="(sheet.attr_stamina || 0) > 0"><span class="text-bone-600">Health</span><span class="font-cinzel text-gold-500" x-text="healthMax"></span></div>
+              <div class="flex justify-between" x-show="(sheet.attr_resolve || 0) + (sheet.attr_composure || 0) > 0"><span class="text-bone-600">Willpower</span><span class="font-cinzel text-gold-500" x-text="willpowerMax"></span></div>
               <div class="flex justify-between" x-show="(sheet.blood_potency || 0) > 0"><span class="text-bone-600">Blood Potency</span><span class="font-cinzel text-gold-500" x-text="sheet.blood_potency"></span></div>
               <div class="flex justify-between" x-show="(sheet.humanity || 0) > 0"><span class="text-bone-600">Humanity</span><span class="font-cinzel text-gold-500" x-text="sheet.humanity"></span></div>
             </div>
@@ -1606,6 +1608,9 @@
         </div>
       </div>
 
+      <p x-show="mfError" x-cloak x-text="mfError"
+         class="font-garamond text-[0.75rem] text-blood-400 italic mt-3"></p>
+
       {# Autocomplete catalogs (merits/flaws lift). Split by kind so the Merits
          box offers merits and the Backgrounds box offers backgrounds (both incl.
          advanced-complexity entries, tagged "adv"); flaws have their own. #}
@@ -2361,6 +2366,7 @@
       newMeritName: '', newAdvantageName: '',
       newBackgroundName: '', newFlawName: '',
       newLoresheetName: '', newLoresheetError: '',
+      mfError: '',   // merit/flaw mutual-exclusion message
       // Advance-step XP purchases of advantages
       newXpMeritName: '', newXpBackgroundName: '', newXpAdvError: '',
       newXpLoreName: '', newXpLoreError: '',
@@ -2709,6 +2715,8 @@
           (kind === 'background' ? m.kind === 'background' : m.kind !== 'background')
           && m.name.toLowerCase() === name.toLowerCase());
         if (c) name = c.name;
+        const xreason = this.exclusionReason(name);
+        if (xreason) { this.newXpAdvError = name + ' ' + xreason + '.'; return; }
         if (3 > this.xpRemaining) { this.newXpAdvError = 'Not enough XP.'; return; }
         this.newXpAdvError = '';
         const list = this._xpAdvList(kind);
@@ -3033,12 +3041,49 @@
         const e = kind === 'flaw' ? this.flawByName(name) : this.meritByName(name);
         return e ? e.summary : '';
       },
+      // Mutual exclusions — many V5 merits/flaws conflict (Beautiful vs Ugly,
+      // No Haven vs Haven merits, …). Block adding a trait that conflicts with
+      // one already taken, in either direction, and name the conflict.
+      _mfCatalogByName() {
+        if (!this._mfIndex) {
+          this._mfIndex = {};
+          [...this.meritCatalog, ...this.flawCatalog].forEach(
+            m => { this._mfIndex[m.name.toLowerCase()] = m; });
+        }
+        return this._mfIndex;
+      },
+      takenTraitNames() {
+        return [...this.merits, ...this.backgrounds, ...this.advantages, ...this.flaws]
+          .map(x => (x.name || '').toLowerCase());
+      },
+      exclusionReason(name) {
+        const n = (name || '').trim().toLowerCase();
+        if (!n) return '';
+        const idx = this._mfCatalogByName();
+        const taken = this.takenTraitNames();
+        const cand = idx[n];
+        if (cand) {   // (a) the candidate excludes something already taken
+          const hit = (cand.excludes || []).find(ex => taken.includes(ex.toLowerCase()));
+          if (hit) return 'conflicts with ' + hit;
+        }
+        for (const t of taken) {   // (b) something taken excludes the candidate
+          const tc = idx[t];
+          if (tc && (tc.excludes || []).some(ex => ex.toLowerCase() === n)) {
+            return 'conflicts with ' + (tc.name || t);
+          }
+        }
+        return '';
+      },
       _addTrait(listKey, rawName, lookup) {
         let name = (rawName || '').trim().slice(0, 80);
         if (!name) return false;
         let dots = 1;
         const c = lookup(name);
         if (c) { name = c.name; dots = (c.costs && c.costs[0]) || 1; }
+        // Block mutually-exclusive picks (Beautiful vs Ugly, …).
+        const reason = this.exclusionReason(name);
+        if (reason) { this.mfError = name + ' ' + reason + '.'; return true; }
+        this.mfError = '';
         // No duplicate trait within the same list.
         if (!this[listKey].some(x => x.name.toLowerCase() === name.toLowerCase())) {
           this[listKey].push({ name, dots });
@@ -3373,6 +3418,11 @@
           flaws:       sum(this.flaws),
         };
       },
+
+      // Derived stats (V5): Health = Stamina + 3, Willpower = Resolve + Composure.
+      // Shown live in the preview so the player sees their resilience as they build.
+      get healthMax() { return (this.sheet.attr_stamina || 0) + 3; },
+      get willpowerMax() { return (this.sheet.attr_resolve || 0) + (this.sheet.attr_composure || 0); },
     };
   }
 
