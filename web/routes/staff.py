@@ -1838,14 +1838,22 @@ async def create_coterie_route(
 
     try:
         with get_db() as conn:
-            co = create_coterie(
-                conn, name=name,
-                chasse=max(0, min(5, chasse)),
-                lien=max(0, min(5, lien)),
-                portillon=max(0, min(5, portillon)),
-                discord_role_id=role_id,
-            )
-            from ..db import write_audit
+            co = create_coterie(conn, name=name, discord_role_id=role_id)
+            # The chasse/lien/portillon columns are a cache recomputed from
+            # contributions, so any starting domain a staff member sets must be
+            # recorded as durable staff_grant contributions — a bare column
+            # write would be wiped on the next recompute.
+            from ..db import (add_coterie_contribution, _recompute_coterie_ratings,
+                              write_audit)
+            for kind, dots in (("chasse", chasse), ("lien", lien),
+                               ("portillon", portillon)):
+                d = max(0, min(5, dots))
+                if d > 0:
+                    add_coterie_contribution(
+                        conn, coterie_id=co["id"], contribution_type="staff_grant",
+                        target_kind=kind, target_name=None, dots=d,
+                        note="Starting domain (staff-created)", recompute=False)
+            _recompute_coterie_ratings(conn, co["id"])
             write_audit(conn, user["id"], "create_coterie", "coterie", co["id"],
                         after={"name": name, "by": "staff"})
         request.session["flash"] = [{"kind": "success",
