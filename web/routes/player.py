@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from ..forms import form_int
@@ -498,6 +498,12 @@ async def character_create(
     revenant_family  = (form.get("revenant_family") or "").strip() or None
     ghoul_regnant    = (form.get("ghoul_regnant") or "").strip() or None
     as_draft         = form.get("as_draft") == "1"
+    # Background autosave (save-as-you-go): the wizard posts this on step
+    # navigation via fetch. It's always a tolerant draft write and returns the
+    # draft_id as JSON instead of redirecting, so the page never reloads.
+    autosave         = form.get("autosave") == "1"
+    if autosave:
+        as_draft = True
     draft_id_raw     = (form.get("draft_id") or "").strip()
     draft_id         = int(draft_id_raw) if draft_id_raw.isdigit() else 0
     require_sheet    = _is_sheet_required()
@@ -625,6 +631,8 @@ async def character_create(
         )
 
     if errors:
+        if autosave:
+            return JSONResponse({"ok": False, "errors": errors})
         return _rerender_wizard(errors)
 
     # Always parse the sheet from the form — drafts preserve what the
@@ -851,6 +859,11 @@ async def character_create(
                 "kind": "error",
                 "message": f"Profile image not saved: {image_error}",
             })
+
+    # Background autosave: return the draft id as JSON (no redirect) so the
+    # wizard keeps editing in place and reuses the same draft next time.
+    if autosave:
+        return JSONResponse({"ok": True, "draft_id": char["id"]})
 
     # Draft branch: send the player back to their roster with a soft
     # "saved" flash. They can resume editing from there.

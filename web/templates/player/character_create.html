@@ -2061,6 +2061,8 @@
       // POST handler updates this row instead of creating a new one.
       draftId:           initial.draft_id || '',
       asDraft:           false,
+      autosaving:        false,   // a background autosave is in flight
+      autosaveStatus:    '',      // '', 'saving', 'saved' — shown by the nav
       submissionNotes:   initial.submission_notes || '',
       // Profile image upload (wizard only; persists post-create via server)
       imagePreview:      '',     // data URL for preview
@@ -2648,6 +2650,7 @@
         if (n > 13) n = 13;
         this.step = n;
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        this.autosaveDraft();   // save-as-you-go on every navigation
       },
 
       // Dot pip click — toggles highest = N OR N-1 if already at N
@@ -2910,6 +2913,37 @@
         const form = fromTarget || document.querySelector('form[action="/characters/new"]');
         // Defer so Alpine writes the as_draft hidden input first.
         this.$nextTick(() => { if (form) form.submit(); });
+      },
+
+      // Save-as-you-go: post the current wizard state as a draft in the
+      // background (no reload) and remember the returned draft_id so the next
+      // autosave updates the same row. Fired on step navigation, so progress
+      // and corrections persist without pressing Save Draft.
+      autosaveDraft() {
+        if (this.autosaving) return;                                   // don't overlap
+        if (!this.charName || !this.charName.name || !this.charName.name.trim()) return;
+        const form = document.querySelector('form[action="/characters/new"]');
+        if (!form) return;
+        this.autosaving = true;
+        this.autosaveStatus = 'saving';
+        this.$nextTick(() => {                                          // flush bindings first
+          const fd = new FormData(form);
+          fd.set('autosave', '1');
+          fd.set('as_draft', '1');
+          fd.delete('profile_image');                                  // don't re-upload each save
+          fetch('/characters/new', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(r => (r.ok ? r.json() : null))
+            .then(d => {
+              if (d && d.ok && d.draft_id) {
+                this.draftId = d.draft_id;
+                this.autosaveStatus = 'saved';
+              } else {
+                this.autosaveStatus = '';
+              }
+            })
+            .catch(() => { this.autosaveStatus = ''; })
+            .finally(() => { this.autosaving = false; });
+        });
       },
 
       // Active budget — derived from the picked tier so the sidebar

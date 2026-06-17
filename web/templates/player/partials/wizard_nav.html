@@ -8,6 +8,9 @@
     Back
   </button>
   <div class="flex items-center gap-2">
+    <span x-show="autosaveStatus" x-cloak
+          class="font-garamond text-bone-600 text-xs italic"
+          x-text="autosaveStatus === 'saving' ? 'Saving…' : 'Draft saved ✓'"></span>
     <button type="button" @click="saveAsDraft($event)"
             class="btn-ghost font-cinzel tracking-widest text-xs">
       Save Draft
