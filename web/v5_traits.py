@@ -601,7 +601,7 @@ V5_PREDATOR_INFO: dict[str, dict] = {
                 {"skill": "skill_persuasion", "name": "Seduction"},
                 {"skill": "skill_subterfuge", "name": "Seduction"}]},
             {"kind": "discipline", "options": ["disc_fortitude", "disc_presence"]},
-            {"kind": "fixed", "list": "merits", "name": "Looks: Beautiful", "dots": 2},
+            {"kind": "fixed", "list": "merits", "name": "Beautiful", "dots": 2},
             {"kind": "fixed", "list": "flaws", "name": "Enemy (spurned lover)", "dots": 1},
         ],
     },

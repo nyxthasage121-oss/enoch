@@ -1467,7 +1467,7 @@
             <input type="text" maxlength="80" x-model="newMeritName"
                    list="mf-merits" autocomplete="off"
                    @keydown.enter.prevent="addMerit()"
-                   placeholder="e.g. Iron Will, Beautiful…" class="text-xs py-1 px-2 flex-1">
+                   placeholder="e.g. Tempered Will, Beautiful…" class="text-xs py-1 px-2 flex-1">
             <button type="button" @click="addMerit()"
                     class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
           </div>
@@ -1937,6 +1937,40 @@
         <p x-show="newXpLoreError" x-cloak x-text="newXpLoreError" class="font-garamond text-blood-400 text-[0.6rem] mt-1"></p>
       </div>
 
+      {# Upgrade granted traits — e.g. Siren's free Beautiful → Stunning, paying
+         only the XP delta. Shows only when a grant has a pricier exclusive option. #}
+      <template x-if="grantedUpgradeOptions().length">
+        <div class="gilded p-5 mb-5">
+          <p class="label-gold mb-1 text-xs">Upgrade Granted Traits</p>
+          <p class="font-garamond text-[0.65rem] text-bone-700 italic mb-3">
+            A free granted trait can be upgraded to a stronger version in the same
+            family — you pay only the XP difference.
+          </p>
+          <template x-for="g in grantedUpgradeOptions()" :key="g.baseName">
+            <div class="py-1.5 border-b border-ink-800 last:border-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-garamond text-xs text-bone-300 mr-1">
+                  <span x-text="isUpgraded(g.entry) ? g.entry.name : g.baseName"></span>
+                  <span class="text-bone-700 text-[0.6rem]" x-show="isUpgraded(g.entry)"
+                        x-text="'(from ' + g.baseName + ')'"></span>
+                </span>
+                <template x-for="opt in g.options" :key="opt.name">
+                  <button type="button" @click="applyUpgrade(g.entry, g.baseName, g.baseDots, opt.name)"
+                          :disabled="upgradeDeltaXp(g.baseDots, opt) > xpRemaining"
+                          :class="upgradeDeltaXp(g.baseDots, opt) > xpRemaining ? 'opacity-30 cursor-not-allowed' : 'hover:text-gold-400 hover:border-gold-700'"
+                          class="font-cinzel text-[0.55rem] tracking-widest text-bone-400 border border-ink-600 px-2 py-1">
+                    → <span x-text="opt.name"></span> · <span x-text="upgradeDeltaXp(g.baseDots, opt)"></span> XP
+                  </button>
+                </template>
+                <button type="button" x-show="isUpgraded(g.entry)" @click="refundUpgrade(g.entry)"
+                        class="font-cinzel text-[0.55rem] tracking-widest text-blood-500 hover:text-blood-400 ml-1">Refund</button>
+              </div>
+            </div>
+          </template>
+          <p x-show="upgradeError" x-cloak x-text="upgradeError" class="font-garamond text-blood-400 text-[0.6rem] mt-1"></p>
+        </div>
+      </template>
+
       <p x-show="xpRemaining < 0" x-cloak class="font-garamond text-[0.75rem] text-blood-400 italic mb-3">
         You've overspent your Starting XP by <span x-text="-xpRemaining"></span> — refund a dot before submitting.
       </p>
@@ -2369,7 +2403,7 @@
       mfError: '',   // merit/flaw mutual-exclusion message
       // Advance-step XP purchases of advantages
       newXpMeritName: '', newXpBackgroundName: '', newXpAdvError: '',
-      newXpLoreName: '', newXpLoreError: '',
+      newXpLoreName: '', newXpLoreError: '', upgradeError: '',
       newTouchstone: '', newConviction: '',
       // Pre-allocated so Alpine reactivity tracks bracket-indexed writes
       // from the per-discipline power inputs. Without this, x-model on
@@ -2746,6 +2780,58 @@
           this.loresheets.push({ id: l.id, name: l.name, levels: [], src: 'xp' });
         }
         this.newXpLoreName = ''; this.newXpLoreError = '';
+      },
+      // Predator/clan-grant upgrades — a free granted merit (e.g. Siren's
+      // Beautiful ••) can be upgraded to a pricier mutually-exclusive merit
+      // (Stunning ••••) by paying only the XP delta (the grant's dots are
+      // credited). The granted entry keeps its src so it stays out of the
+      // creation pool; the delta is logged in xpBuys.
+      grantedUpgradeOptions() {
+        const out = [];
+        const idx = this._mfCatalogByName();
+        for (const e of [...this.merits, ...this.backgrounds]) {
+          if (e.src !== 'predator' && e.src !== 'clan_bane') continue;
+          const baseName = e._upgradeFrom ? e._upgradeFrom.name : e.name;
+          const baseDots = e._upgradeFrom ? e._upgradeFrom.dots : e.dots;
+          const base = idx[(baseName || '').toLowerCase()];
+          if (!base) continue;
+          const options = (base.excludes || [])
+            .map(n => idx[n.toLowerCase()])
+            .filter(m => m && m.kind === base.kind
+                         && (m.costs && m.costs[0] > baseDots) && m.name !== e.name);
+          if (options.length || e._upgradeFrom) out.push({ entry: e, baseName, baseDots, options });
+        }
+        return out;
+      },
+      upgradeDeltaXp(baseDots, target) {
+        return Math.max(0, ((target.costs && target.costs[0]) || baseDots) - baseDots) * 3;
+      },
+      isUpgraded(entry) { return !!entry._upgradeFrom; },
+      applyUpgrade(entry, baseName, baseDots, targetName) {
+        const target = this._mfCatalogByName()[(targetName || '').toLowerCase()];
+        if (!target) return;
+        const cost = this.upgradeDeltaXp(baseDots, target);
+        const key = 'upg:' + baseName.toLowerCase();
+        const prior = this.xpBuys.filter(b => b.key === key).reduce((s, b) => s + b.cost, 0);
+        if (cost - prior > this.xpRemaining) { this.upgradeError = 'Not enough XP to upgrade.'; return; }
+        this.upgradeError = '';
+        if (!entry._upgradeFrom) entry._upgradeFrom = { name: baseName, dots: baseDots };
+        entry.name = target.name;
+        entry.dots = (target.costs && target.costs[0]) || baseDots;
+        for (let i = this.xpBuys.length - 1; i >= 0; i--) {
+          if (this.xpBuys[i].key === key) this.xpBuys.splice(i, 1);
+        }
+        this.xpBuys.push({ cat: 'upgrade', key, label: baseName + ' → ' + target.name, cost });
+      },
+      refundUpgrade(entry) {
+        if (!entry._upgradeFrom) return;
+        const key = 'upg:' + entry._upgradeFrom.name.toLowerCase();
+        entry.name = entry._upgradeFrom.name;
+        entry.dots = entry._upgradeFrom.dots;
+        delete entry._upgradeFrom;
+        for (let i = this.xpBuys.length - 1; i >= 0; i--) {
+          if (this.xpBuys[i].key === key) this.xpBuys.splice(i, 1);
+        }
       },
       hasXpLoresheetLevel(id, level) {
         const e = this.loresheets.find(x => x.id === id && x.src === 'xp');
