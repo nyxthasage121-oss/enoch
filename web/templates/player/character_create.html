@@ -29,6 +29,7 @@
        clanBaneVariants:  {{ (clan_bane_variants | default({})) | tojson | forceescape }},
        skillLabels:       {{ (skill_labels | default({})) | tojson | forceescape }},
        discLabels:        {{ (disc_labels | default({})) | tojson | forceescape }},
+       disciplinePowers:  {{ (discipline_powers | default({})) | tojson | forceescape }},
        skillSpreads:      {{ (skill_spreads | default({})) | tojson | forceescape }},
        disciplineSpreads: {{ (discipline_spreads | default({})) | tojson | forceescape }},
        predatorFreeDiscDots: {{ (predator_free_disc_dots | default(1)) | tojson }},
@@ -1355,12 +1356,14 @@
         </label>
       </div>
 
-      {# Powers (per-discipline named powers) #}
+      {# Powers (per-discipline named powers) — autocompletes from the V5
+         discipline-powers catalog (packages/rules/discipline_powers.json),
+         filtered to the character's dots; homebrew free text still allowed. #}
       <div class="gilded p-5 mb-5" x-show="learnedDisciplines().length > 0" x-cloak>
         <div class="flex items-baseline justify-between mb-3">
           <p class="label-gold text-xs">Powers</p>
           <p class="font-garamond text-[0.65rem] text-bone-700 italic">
-            Name powers your character has learned. Use the discipline level (1-5).
+            Pick from the listed V5 powers, or type your own. Level auto-fills for listed powers.
           </p>
         </div>
 
@@ -1370,11 +1373,16 @@
               <p class="font-cinzel text-[0.7rem] tracking-[0.2em] uppercase text-bone-500 mb-1.5"
                  x-text="disc.label + ' · ' + (sheet[disc.key] || 0) + ' dot' + ((sheet[disc.key]||0) === 1 ? '' : 's')"></p>
               <template x-for="(p, idx) in powersFor(disc.key)" :key="idx">
-                <div class="flex items-center gap-2 mb-1 ml-2">
-                  <span class="font-cinzel text-[0.6rem] text-bone-700 w-5 shrink-0" x-text="p.level"></span>
-                  <span class="font-garamond text-xs text-bone-300 flex-1" x-text="p.name"></span>
+                <div class="flex items-start gap-2 mb-1 ml-2">
+                  <span class="font-cinzel text-[0.6rem] text-bone-700 w-5 shrink-0 mt-0.5" x-text="p.level"></span>
+                  <div class="flex-1 min-w-0">
+                    <span class="font-garamond text-xs text-bone-300" x-text="p.name"></span>
+                    <span class="block font-garamond text-[0.6rem] text-bone-700 italic leading-snug"
+                          x-show="powerSummary(disc.key, p.name)"
+                          x-text="powerSummary(disc.key, p.name)"></span>
+                  </div>
                   <button type="button" @click="removePower(disc.key, p.name)"
-                          class="text-bone-700 hover:text-blood-400 text-xs">×</button>
+                          class="text-bone-700 hover:text-blood-400 text-xs shrink-0">×</button>
                 </div>
               </template>
               <div class="flex items-end gap-2 mt-2 ml-2">
@@ -1387,10 +1395,18 @@
                 <div class="flex-1 min-w-0">
                   <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">Power name</label>
                   <input type="text" maxlength="80"
-                         :placeholder="'e.g. a ' + disc.label + ' power…'"
+                         :list="'pwr-' + disc.key"
+                         autocomplete="off"
+                         :placeholder="catalogPowersFor(disc.key).length ? 'Pick a power or type your own…' : ('e.g. a ' + disc.label + ' power…')"
                          x-model="newPowerName[disc.key]"
+                         @change="syncPowerLevel(disc.key)"
                          @keydown.enter.prevent="addPower(disc.key)"
                          class="text-sm py-1.5 px-2 w-full">
+                  <datalist :id="'pwr-' + disc.key">
+                    <template x-for="cp in catalogPowersFor(disc.key)" :key="cp.name">
+                      <option :value="cp.name" :label="'L' + cp.level + ' · ' + cp.summary"></option>
+                    </template>
+                  </datalist>
                 </div>
                 <button type="button" @click="addPower(disc.key)"
                         class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5 shrink-0">Add</button>
@@ -2034,6 +2050,7 @@
       baneChoice:        (initial.bane_choice === 'variant') ? 'variant' : 'standard',
       skillLabels:       opts.skillLabels || {},
       discLabels:        opts.discLabels || {},
+      disciplinePowers:  opts.disciplinePowers || {},
       skillSpreads:      opts.skillSpreads || {},
       disciplineSpreads: opts.disciplineSpreads || {},
       predatorFreeDiscDots: opts.predatorFreeDiscDots || 0,
@@ -2721,11 +2738,45 @@
       powersFor(disc) {
         return this.powers.filter(p => p.discipline === disc);
       },
+      // Catalog powers for a discipline, capped at the character's dots and
+      // hiding ones already added — drives the power-name autocomplete.
+      catalogPowersFor(disc) {
+        const max = this.sheet[disc] || 0;
+        const taken = new Set(this.powersFor(disc).map(p => (p.name || '').toLowerCase()));
+        return (this.disciplinePowers[disc] || [])
+          .filter(p => p.level <= max && !taken.has((p.name || '').toLowerCase()));
+      },
+      // Find a catalog power by case-insensitive name within a discipline.
+      catalogPower(disc, name) {
+        const n = (name || '').trim().toLowerCase();
+        return (this.disciplinePowers[disc] || []).find(p => (p.name || '').toLowerCase() === n) || null;
+      },
+      // Summary line for an added power, when it matches the catalog.
+      powerSummary(disc, name) {
+        const p = this.catalogPower(disc, name);
+        return p ? p.summary : '';
+      },
+      // When the typed/picked name matches a catalog power, snap the level
+      // field to that power's level (the player can still override it).
+      syncPowerLevel(disc) {
+        const c = this.catalogPower(disc, this.newPowerName[disc]);
+        if (c) this.newPowerLevel[disc] = c.level;
+      },
       addPower(disc) {
-        const name  = (this.newPowerName[disc]  || '').trim().slice(0, 80);
-        const level = parseInt(this.newPowerLevel[disc] || 1, 10) || 1;
+        let name  = (this.newPowerName[disc]  || '').trim().slice(0, 80);
+        let level = parseInt(this.newPowerLevel[disc] || 1, 10) || 1;
         if (!name) return;
         const max = this.sheet[disc] || 1;
+        // If the typed name matches a catalog power, snap to its canonical
+        // name + level so the saved sheet is correct regardless of casing
+        // or a mis-set level. Free text (homebrew) passes through untouched.
+        const cat = this.catalogPower(disc, name);
+        if (cat) { name = cat.name; level = cat.level; }
+        // No duplicate powers within a discipline.
+        if (this.powersFor(disc).some(p => p.name.toLowerCase() === name.toLowerCase())) {
+          this.newPowerName[disc] = '';
+          return;
+        }
         this.powers.push({ discipline: disc, name, level: Math.max(1, Math.min(max, level)) });
         this.newPowerName[disc] = '';
         this.newPowerLevel[disc] = 1;

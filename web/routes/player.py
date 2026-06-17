@@ -271,6 +271,7 @@ from ..v5_traits import (
     V5_ATTRIBUTES   as _V5_ATTRIBUTES,
     V5_SKILLS       as _V5_SKILLS,
     V5_DISCIPLINES  as _V5_DISCIPLINES,
+    DISCIPLINE_POWERS as _DISCIPLINE_POWERS,
     V5_CLAN_INFO    as _V5_CLAN_INFO,
     V5_PREDATOR_INFO as _V5_PREDATOR_INFO,
     V5_SKILL_SPREADS as _V5_SKILL_SPREADS,
@@ -281,6 +282,11 @@ from ..v5_traits import (
     SHEET_LIMITS    as _SHEET_LIMITS,
     validate_chargen_raw as _validate_chargen_raw,
 )
+
+# Make the discipline-powers catalog available to every template render (the
+# chargen wizard power picker, and the edit page) without threading it through
+# each render call.
+templates.env.globals["discipline_powers"] = _DISCIPLINE_POWERS
 
 
 _CLANS = [

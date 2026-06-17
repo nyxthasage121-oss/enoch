@@ -4,6 +4,8 @@ Single source of truth for the V5 sheet structure — imported by both the
 player route (for the editor) and the staff route (for the read-only sheet
 display). Keep player.py + staff.py in sync via this module.
 """
+import json
+from pathlib import Path
 
 V5_ATTRIBUTES: list[tuple[str, list[tuple[str, str]]]] = [
     ("Physical", [
@@ -91,6 +93,25 @@ CLAN_DISCIPLINES: dict[str, list[str]] = {
     "tzimisce":   ["disc_animalism",     "disc_dominate",      "disc_protean"],
     "ventrue":    ["disc_dominate",      "disc_fortitude",     "disc_presence"],
 }
+
+# Discipline powers catalog — V5-generic, lifted from the friend's data set
+# (2026-06-17). Keyed by the disc_* keys above; each power is
+# {name, level, summary, dice_pool, rouse_checks, amalgam?[{discipline, level}]}.
+# Loaded once at import, mirroring packages/rules/xp_costs.json.
+_DISCIPLINE_POWERS_PATH = Path(__file__).parent.parent / "packages" / "rules" / "discipline_powers.json"
+DISCIPLINE_POWERS: dict[str, list[dict]] = json.loads(
+    _DISCIPLINE_POWERS_PATH.read_text(encoding="utf-8")
+)
+
+
+def discipline_powers(disc_key: str, max_level: int | None = None) -> list[dict]:
+    """Powers for a discipline, optionally capped at max_level (the character's
+    current dots in it). Returns [] for an unknown key."""
+    powers = DISCIPLINE_POWERS.get(disc_key, [])
+    if max_level is not None:
+        powers = [p for p in powers if p["level"] <= max_level]
+    return powers
+
 
 # Flat allow-list of single-value sheet keys. Free-form lists (merits/flaws/
 # rituals/ceremonies/formulae) are handled separately by the save route.
