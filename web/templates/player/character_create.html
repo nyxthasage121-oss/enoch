@@ -1432,9 +1432,13 @@
         <div class="flex items-baseline justify-between mb-3">
           <p class="label-gold text-xs">Powers</p>
           <p class="font-garamond text-[0.65rem] text-bone-700 italic">
-            Pick from the listed V5 powers, or type your own. Level auto-fills for listed powers.
+            The list shows only powers you can take now — a level-N power needs one
+            at each lower level, and amalgams need their other Discipline.
           </p>
         </div>
+
+        <p x-show="powerError" x-cloak x-text="powerError"
+           class="font-garamond text-[0.7rem] text-blood-400 italic mb-3"></p>
 
         <div class="space-y-3">
           <template x-for="disc in learnedDisciplines()" :key="disc.key">
@@ -2463,6 +2467,7 @@
       newBackgroundName: '', newFlawName: '',
       newLoresheetName: '', newLoresheetError: '',
       mfError: '',   // merit/flaw mutual-exclusion message
+      powerError: '',  // discipline-power prerequisite / amalgam message
       // Guided attribute spread (optional): 0=off, 1=pick the 4, 2=pick three 3s,
       // 3=pick the 1; then the rest auto-fill to 2.
       attrGuide: 0,
@@ -3141,7 +3146,8 @@
         const max = this.sheet[disc] || 0;
         const taken = new Set(this.powersFor(disc).map(p => (p.name || '').toLowerCase()));
         return (this.disciplinePowers[disc] || [])
-          .filter(p => p.level <= max && !taken.has((p.name || '').toLowerCase()));
+          .filter(p => p.level <= max && !taken.has((p.name || '').toLowerCase())
+                       && !this.powerBlockReason(disc, p.level, p));
       },
       // Find a catalog power by case-insensitive name within a discipline.
       catalogPower(disc, name) {
@@ -3152,6 +3158,25 @@
       powerSummary(disc, name) {
         const p = this.catalogPower(disc, name);
         return p ? p.summary : '';
+      },
+      // Prerequisite gating (V5): a level-N power needs one power at EACH lower
+      // level in that discipline, and any amalgam needs its other discipline at
+      // the required rating. Returns a reason string, or '' if addable.
+      powerAmalgamUnmet(cat) {
+        for (const a of (cat && cat.amalgam) || []) {
+          if ((this.sheet[a.discipline] || 0) < a.level) return a;
+        }
+        return null;
+      },
+      powerBlockReason(disc, level, cat) {
+        for (let lv = 1; lv < level; lv++) {
+          if (!this.powers.some(p => p.discipline === disc && p.level === lv)) {
+            return 'needs a level-' + lv + ' ' + (this.discLabels[disc] || 'discipline') + ' power first';
+          }
+        }
+        const am = this.powerAmalgamUnmet(cat);
+        if (am) return 'needs ' + (this.discLabels[am.discipline] || am.discipline) + ' ' + am.level;
+        return '';
       },
       // When the typed/picked name matches a catalog power, snap the level
       // field to that power's level (the player can still override it).
@@ -3174,6 +3199,10 @@
           this.newPowerName[disc] = '';
           return;
         }
+        // Enforce level prerequisites + amalgam requirements.
+        const reason = this.powerBlockReason(disc, level, cat);
+        if (reason) { this.powerError = name + ' — ' + reason + '.'; return; }
+        this.powerError = '';
         this.powers.push({ discipline: disc, name, level: Math.max(1, Math.min(max, level)) });
         this.newPowerName[disc] = '';
         this.newPowerLevel[disc] = 1;
@@ -3181,6 +3210,21 @@
       removePower(disc, name) {
         const idx = this.powers.findIndex(p => p.discipline === disc && p.name === name);
         if (idx >= 0) this.powers.splice(idx, 1);
+        this._cascadePowers();   // drop any power orphaned by this removal
+      },
+      _cascadePowers() {
+        let changed = true;
+        while (changed) {
+          changed = false;
+          // Highest level first — removing a foundation orphans those above it.
+          for (const p of this.powers.slice().sort((a, b) => b.level - a.level)) {
+            const cat = this.catalogPower(p.discipline, p.name);
+            if (this.powerBlockReason(p.discipline, p.level, cat)) {
+              const i = this.powers.indexOf(p);
+              if (i >= 0) { this.powers.splice(i, 1); changed = true; break; }
+            }
+          }
+        }
       },
 
       // Positive/flaw lists — each item is { name, dots }. Names autocomplete
