@@ -39,3 +39,12 @@ pytest                              # tests
 Configuration is via environment variables — see [.env.example](.env.example).
 Deployment (Railway) is covered in [DEPLOY.md](DEPLOY.md); deeper design notes
 live in [docs/](docs/).
+
+## Credits
+
+Enoch is an independent rewrite, but it grew out of — and adapts a number of
+patterns from — a friend's **MCbN XP Tracker**
+([jkomg/mcbn-xp-tracker](https://github.com/jkomg/mcbn-xp-tracker)), the tracker
+for the *Music City by Night* chronicle. Thanks to
+[@jkomg](https://github.com/jkomg) for the groundwork; the specific borrowed
+patterns are credited inline in the code.
