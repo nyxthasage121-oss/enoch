@@ -1232,6 +1232,28 @@
         </p>
       </div>
 
+      {# Optional guided spread — appears once a distribution is chosen; walks
+         its levels high→low. The pips still work for fine-tuning after. #}
+      <div class="mb-4">
+        <template x-if="skillGuide === 0 && skillSpread">
+          <div class="gilded-inset px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+            <p class="font-garamond text-bone-500 text-xs">Let the guide place your distribution for you — fine-tune after.</p>
+            <button type="button" @click="startSkillGuide()"
+                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 shrink-0">Guided setup</button>
+          </div>
+        </template>
+        <template x-if="skillGuide > 0">
+          <div class="gilded-inset px-4 py-3 border-l-2 border-gold-700">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <p class="font-cinzel text-sm text-gold-400" x-text="skillGuidePrompt()"></p>
+              <button type="button" @click="cancelSkillGuide()"
+                      class="font-cinzel text-[0.55rem] tracking-widest text-bone-600 hover:text-blood-400">Cancel</button>
+            </div>
+            <p class="font-garamond text-[0.65rem] text-bone-700 italic mt-1">Click skill names below — unpicked skills stay at 0.</p>
+          </div>
+        </template>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
         {% for cat, traits in v5_skills %}
         <div class="gilded p-5">
@@ -1241,7 +1263,11 @@
             <div class="border-b border-ink-800 last:border-0 py-1.5">
               <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-1.5 min-w-0">
-                  <span class="font-garamond text-sm text-bone-300 truncate">{{ label }}</span>
+                  <span class="font-garamond text-sm truncate"
+                        :class="skillGuide > 0
+                          ? ((sheet['{{ key }}']||0) > 0 ? 'text-gold-700' : 'text-gold-400 cursor-pointer hover:text-gold-200 underline decoration-dotted underline-offset-2')
+                          : 'text-bone-300'"
+                        @click="skillGuide > 0 && skillGuidePick('{{ key }}')">{{ label }}</span>
                   <button type="button"
                           @click="startAddingSpec('{{ key }}')"
                           title="Add a specialty"
@@ -2441,6 +2467,12 @@
       // 3=pick the 1; then the rest auto-fill to 2.
       attrGuide: 0,
       attrGuidePicks: { four: null, threes: [], one: null },
+      // Guided skill spread (optional): walks the chosen distribution's levels
+      // high→low; click N skills per level, the rest stay 0.
+      skillGuide: 0,
+      skillGuideLevels: [],
+      skillGuideIdx: 0,
+      skillGuidePicked: 0,
       // Advance-step XP purchases of advantages
       newXpMeritName: '', newXpBackgroundName: '', newXpAdvError: '',
       newXpLoreName: '', newXpLoreError: '', upgradeError: '',
@@ -3422,6 +3454,39 @@
           this.attrGuidePicks.one = key; this.sheet[key] = 1;
           this._attrKeys().forEach(k => { if (!this.sheet[k]) this.sheet[k] = 2; });
           this.attrGuide = 0;   // done — pips take over for tweaks
+        }
+      },
+      // Guided skill spread — walks the chosen distribution's levels high→low.
+      _skillKeys() { return Object.keys(this.skillLabels); },
+      startSkillGuide() {
+        const spr = this.skillSpreads[this.skillSpread];
+        if (!spr || !spr.levels) return;
+        this.skillGuideLevels = Object.entries(spr.levels)
+          .map(([lvl, cnt]) => ({ level: Number(lvl), count: Number(cnt) }))
+          .filter(x => x.count > 0)
+          .sort((a, b) => b.level - a.level);
+        this._skillKeys().forEach(k => { this.sheet[k] = 0; });
+        this.xpBuys = this.xpBuys.filter(b => b.cat !== 'skill');  // reset base
+        this.skillGuideIdx = 0; this.skillGuidePicked = 0; this.skillGuide = 1;
+      },
+      cancelSkillGuide() { this.skillGuide = 0; },
+      skillGuideCurrent() { return this.skillGuideLevels[this.skillGuideIdx] || null; },
+      skillGuidePrompt() {
+        const lv = this.skillGuideCurrent();
+        if (!lv) return '';
+        return 'Pick ' + lv.count + ' skill' + (lv.count === 1 ? '' : 's')
+          + ' at ' + lv.level + ' dot' + (lv.level === 1 ? '' : 's')
+          + ' — ' + this.skillGuidePicked + '/' + lv.count;
+      },
+      skillGuidePick(key) {
+        if (this.skillGuide === 0 || (this.sheet[key] || 0) > 0) return;
+        const lv = this.skillGuideCurrent();
+        if (!lv) return;
+        this.sheet[key] = lv.level;
+        this.skillGuidePicked += 1;
+        if (this.skillGuidePicked >= lv.count) {
+          this.skillGuideIdx += 1; this.skillGuidePicked = 0;
+          if (this.skillGuideIdx >= this.skillGuideLevels.length) this.skillGuide = 0;
         }
       },
       // Skill target = the chosen spread's dot total (0 until one is picked).
