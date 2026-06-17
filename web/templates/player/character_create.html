@@ -32,6 +32,8 @@
        disciplinePowers:  {{ (discipline_powers | default({})) | tojson | forceescape }},
        meritCatalog:      {{ (merit_catalog | default([])) | tojson | forceescape }},
        flawCatalog:       {{ (flaw_catalog | default([])) | tojson | forceescape }},
+       ritualCatalog:     {{ (ritual_catalog | default([])) | tojson | forceescape }},
+       ceremonyCatalog:   {{ (ceremony_catalog | default([])) | tojson | forceescape }},
        skillSpreads:      {{ (skill_spreads | default({})) | tojson | forceescape }},
        disciplineSpreads: {{ (discipline_spreads | default({})) | tojson | forceescape }},
        predatorFreeDiscDots: {{ (predator_free_disc_dots | default(1)) | tojson }},
@@ -2072,6 +2074,8 @@
       disciplinePowers:  opts.disciplinePowers || {},
       meritCatalog:      opts.meritCatalog || [],
       flawCatalog:       opts.flawCatalog || [],
+      ritualCatalog:     opts.ritualCatalog || [],
+      ceremonyCatalog:   opts.ceremonyCatalog || [],
       skillSpreads:      opts.skillSpreads || {},
       disciplineSpreads: opts.disciplineSpreads || {},
       predatorFreeDiscDots: opts.predatorFreeDiscDots || 0,
@@ -2849,10 +2853,31 @@
       },
 
       // Rituals / Ceremonies / Formulae helpers — used by the partial
+      // Rituals / Ceremonies / Formulae names autocomplete from a catalog:
+      // rituals → blood sorcery rituals, ceremonies → oblivion ceremonies,
+      // formulae → thin-blood alchemy powers (the same discipline catalog).
+      leveledCatalog(listKey) {
+        if (listKey === 'rituals')    return this.ritualCatalog;
+        if (listKey === 'ceremonies') return this.ceremonyCatalog;
+        if (listKey === 'formulae')   return this.disciplinePowers['disc_thin_blood_alchemy'] || [];
+        return [];
+      },
+      leveledCatalogEntry(listKey, name) {
+        const n = (name || '').trim().toLowerCase();
+        return this.leveledCatalog(listKey).find(e => (e.name || '').toLowerCase() === n) || null;
+      },
+      leveledSummary(listKey, name) {
+        const e = this.leveledCatalogEntry(listKey, name);
+        return e ? e.summary : '';
+      },
       addToLeveledList(listKey, name, level) {
         name = (name || '').trim().slice(0, 80);
         level = Math.max(1, Math.min(5, parseInt(level, 10) || 1));
         if (!name) return;
+        // Snap to a catalog entry's canonical name + level when matched.
+        const c = this.leveledCatalogEntry(listKey, name);
+        if (c) { name = c.name; level = c.level; }
+        if (this[listKey].some(x => x.name.toLowerCase() === name.toLowerCase())) return;
         this[listKey].push({ name, level });
       },
 

@@ -1,0 +1,1223 @@
+{
+  "rituals": [
+    {
+      "name": "Astromancy",
+      "level": 1,
+      "summary": "Learn information such as Skills, Desires, and Convictions about a target person. Knowing their correct birth or Embrace date adds 1 die to the Ritual pool.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min"
+    },
+    {
+      "name": "Beelzebeatit",
+      "level": 1,
+      "summary": "Make a small area repellent to animals, vermin, plants, and other lesser living creatures. Directed or controlled creatures are not prevented from entering.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "Vinegar or alcohol"
+    },
+    {
+      "name": "Bind the Accusing Tongue",
+      "level": 1,
+      "summary": "Prevent the target from communicating anything negative about the caster. The victim can break free by rolling Composure + Resolve.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min"
+    },
+    {
+      "name": "Blood Apocrypha",
+      "level": 1,
+      "summary": "Embed messages into blood or vessels. The first person receives the message if they are the intended recipient or if they possess A Taste for Blood.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min"
+    },
+    {
+      "name": "Blood Missive",
+      "level": 1,
+      "summary": "Send messages through blood. The first person to taste the blood receives the message as if it were intended for them, or if they possess A Taste for Blood.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "The caster's blood"
+    },
+    {
+      "name": "Blood to Water",
+      "level": 1,
+      "summary": "Turn blood into water, removing all traces of blood.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min"
+    },
+    {
+      "name": "Blood Walk",
+      "level": 1,
+      "summary": "Use blood to learn about a subject's generation, name, sire, and — on a crit — any active Blood Bonds. Requires one Rouse Check from the subject.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "1 hour",
+      "ingredients": "Blood of the subject"
+    },
+    {
+      "name": "Bloody Message",
+      "level": 1,
+      "summary": "Write a blood message onto a remembered reflective surface for a chosen type of viewer. Make the Ritual Roll when enchanting the surface.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "A mirror, human blood, and UV light"
+    },
+    {
+      "name": "Clinging of the Insect",
+      "level": 1,
+      "summary": "Drink blood mixed with a freshly crushed spider to cling to walls like an insect. The user must cling with both hands and feet.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "Living spider, your own blood"
+    },
+    {
+      "name": "Coax the Garden",
+      "level": 1,
+      "summary": "Animate nearby plant life to hinder and harm anyone in the ritual area except the caster.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "Human blood and poppy seeds"
+    },
+    {
+      "name": "Craft Bloodstone",
+      "level": 1,
+      "summary": "Slowly soak blood into a small magnet. Once done, sense the direction and rough distance of the stone for a week. A caster may have up to as many stones as their Resolve.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "3 nights",
+      "ingredients": "Small magnet, your blood"
+    },
+    {
+      "name": "Douse the Fear",
+      "level": 1,
+      "summary": "Briefly steady yourself against fire, gaining a bonus to resist terror frenzy from flames. The power wears off once the scene ends.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "A holy object exposed to flame"
+    },
+    {
+      "name": "Enrich the Blood",
+      "level": 1,
+      "summary": "Make a human vessel's blood richer so a smaller drink slakes more Hunger for a short time. Does not work on Kindred vitae.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "A vial of the target's blood and fresh human blood"
+    },
+    {
+      "name": "Herd Ward (Minor)",
+      "level": 1,
+      "summary": "Ward a single member of a herd to prevent unauthorized feeding. Make the Ritual Roll when someone else tries to feed from them.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min"
+    },
+    {
+      "name": "Letter Ward",
+      "level": 1,
+      "summary": "Seal a letter so anyone except the intended recipient is burned and the message is destroyed. Make the Ritual Roll if anyone other than the recipient opens it.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "Pigeon blood, wax, and dog blood"
+    },
+    {
+      "name": "Revealing the Crimson Trail",
+      "level": 1,
+      "summary": "Reveal traces of spilled blood at the caster's current location. Very old traces require a Resolve + Awareness test.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min"
+    },
+    {
+      "name": "Sanguine Tidings",
+      "level": 1,
+      "summary": "Make a message appear on a mirror when a specific type of person comes nearby. The message disappears once read.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 0,
+      "required_time": "5 min"
+    },
+    {
+      "name": "Seal the Brand",
+      "level": 1,
+      "summary": "Make a tattoo, scar, brand, or similar body modification permanent on vampiric flesh. The process inflicts 1 Superficial damage.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "Molten silver poured over the body modification"
+    },
+    {
+      "name": "Shared Memory",
+      "level": 1,
+      "summary": "Observe another's In Memoriam. Participants can observe events and offer advice but cannot directly influence them.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min"
+    },
+    {
+      "name": "Wake with Evening's Freshness",
+      "level": 1,
+      "summary": "When threatened during the day after performing this ritual, awaken and ignore daytime penalties for a scene. Do not make the Ritual Roll until true danger appears.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "Burnt bones of a rooster"
+    },
+    {
+      "name": "Ward Against Ghouls",
+      "level": 1,
+      "summary": "Place a ward on a small object. When a ghoul tries to touch it, make the Ritual Roll — on a success, the ghoul cannot touch it and is damaged. Uses standard rules for Wards.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min"
+    },
+    {
+      "name": "As Fog on Water",
+      "level": 2,
+      "summary": "Walk silently across the surface of a body of water for the rest of the night. Can be ended early.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min",
+      "ingredients": "A piece of wood from a ship and water"
+    },
+    {
+      "name": "Calix Secretus",
+      "level": 2,
+      "summary": "Store your vitae inside a small object and release it later with a command word. Two Rouse Checks stored will slake one Hunger.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "1 hour",
+      "ingredients": "A hand-sized object and the caster's blood"
+    },
+    {
+      "name": "Calling the Aura's Remnants",
+      "level": 2,
+      "summary": "Speak with the residual aura of someone who has died. The aura retains memories only up to the time of death.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Communicate with Kindred Sire",
+      "level": 2,
+      "summary": "Create a long-distance telepathic link between Sire and Childe. A major disturbance on either side breaks the connection.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Craftmaster",
+      "level": 2,
+      "summary": "Temporarily gain dots and a specialty in Academics, Craft, Performance, or Science. Dots replace existing dots in that skill, but grant an extra die if the caster already has the specialty. On a total failure, the caster takes Aggravated Damage.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Depths of Nightmare",
+      "level": 2,
+      "summary": "Curse someone with nightmares that cause Willpower damage which cannot be healed during the Ritual's duration. On a total failure, the victim has pleasant dreams and is pointed toward the caster.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Elemental Grasp",
+      "level": 2,
+      "summary": "Command your chosen element to interfere with a target. The target takes Superficial Health damage and must roll to continue. Gain +1 die to the Ritual pool if the element is already naturally active.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Enhance Dyscrasia",
+      "level": 2,
+      "summary": "Amplify a vessel's Dyscrasia so several Kindred can benefit from it over three nights.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min",
+      "ingredients": "A resonant personal object belonging to the target"
+    },
+    {
+      "name": "Eyes of Babel",
+      "level": 2,
+      "summary": "Consume the eyes and tongue of a victim to gain the ability to read and speak any language known by them. This Ritual may incur Stains.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min",
+      "ingredients": "The victim's eyes and tongue"
+    },
+    {
+      "name": "Illuminate Trail of Prey",
+      "level": 2,
+      "summary": "Follow the trail of a specific person. The victim's face must be known to the caster.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Le Sang de l'Amour",
+      "level": 2,
+      "summary": "Create a mystical connection between two people who desire each other at the time of casting. Both can use Resolve + Awareness to estimate where the other is. On a total failure of the Ritual, the roll disorients them and temporarily reduces Composure by one.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Shroud of Silence",
+      "level": 2,
+      "summary": "Seal a room so no sound can escape until the focus is removed or the scene ends. Requires vitae from a Kindred who possesses Obfuscate.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min",
+      "ingredients": "Woven cloth, a golden ring, and vitae from an Obfuscate user"
+    },
+    {
+      "name": "Silentia Mortis",
+      "level": 2,
+      "summary": "Replicate Silence of Death (Obfuscate ●), creating a radius of silence. If cast on someone other than the caster, they must also make a Rouse Check.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Soporific Touch",
+      "level": 2,
+      "summary": "Turn your vitae into a touch-activated narcotic that weakens the victim's resistance to mundane manipulation or mind-altering Disciplines. The Ritual Roll is contested against the victim's Stamina + Resolve.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min",
+      "ingredients": "Hashish or another narcotic substance"
+    },
+    {
+      "name": "Stolen Memory",
+      "level": 2,
+      "summary": "Access your sire's memories. Can reach grandsire or beyond with a Difficulty increase of 2 per generation past the sire.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Tiamat Glistens",
+      "level": 2,
+      "summary": "Attune yourself to a place of power (Furcus), gaining bonuses to Rituals cast there. Only one caster can be attuned at a time; if another performs the Ritual, the original caster immediately loses their bonus.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Truth of Blood",
+      "level": 2,
+      "summary": "Discern truth from lies in a target's speech. The target resists with Composure + Occult. Cannot get past memory-wiping Disciplines.",
+      "dice_pool": "Resolve + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Unseen Underground",
+      "level": 2,
+      "summary": "Become invisible while underground. Immediately ends if the caster goes above ground or takes hostile actions; otherwise lasts one hour.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Viscera Garden",
+      "level": 2,
+      "summary": "Grow Blood-addicted plants that can consume corpses. Kindred can eat them without slaking Hunger but they stay down. Mortals who ingest a plant become more susceptible to Disciplines.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Ward against Spirits",
+      "level": 2,
+      "summary": "Protect a small object against spirits. Uses standard rules for Wards.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Warding Circle against Ghouls",
+      "level": 2,
+      "summary": "Protect an area against Ghouls. Uses standard rules for Wards.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 3,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Web of Hunger",
+      "level": 2,
+      "summary": "Avoid the pull of the Beckoning. Normally a 4th level Ritual, but reduced to 2nd level when used with the required dagger.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "10 min",
+      "ingredients": "A special dagger"
+    },
+    {
+      "name": "Bladed Hands",
+      "level": 3,
+      "summary": "Sharpen the caster's hands into weapons. Treated as a light piercing Brawl weapon with a +2 modifier.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 2,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Blood Sigil",
+      "level": 3,
+      "summary": "Create a tattoo on a Kindred that also contains a hidden message. Read it with a Resolve + Occult roll or Sense the Unseen (Auspex ●). The caster can remove it by spending Willpower and touching the tattoo.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Bloodless Feast",
+      "level": 3,
+      "summary": "Transmute an unconscious human's life into clear vitae that can sate Hunger. Those who consume enough of it become weaker to diablerie. May incur Stains.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "3 hours",
+      "ingredients": "An unconscious human and a flawless crystal chalice"
+    },
+    {
+      "name": "Communal Vigor",
+      "level": 3,
+      "summary": "Strengthen a pack's Vaulderie so members share the priest's Blood Potency for the night. The Priest gains +3 bonus dice on Dominate and Presence tests against packmates.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "ingredients": "A fingernail from the pack priest"
+    },
+    {
+      "name": "Dagon's Call",
+      "level": 3,
+      "summary": "Rupture the blood vessels of a victim from afar. Can be used up to two additional times the same night, each costing another Rouse Check. Opposed by Stamina + Resolve.",
+      "dice_pool": "Resolve + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Deflection of Wooden Doom",
+      "level": 3,
+      "summary": "Protect yourself from being staked. Do not make the Ritual Roll until actually staked.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Elemental Shelter",
+      "level": 3,
+      "summary": "Meld with your chosen element, similar to Earth Meld (Protean ●●●). Fire Kolduns must resist terror frenzy before casting. The caster's form can be detected with Wits + Awareness or Sense the Unseen. If the bonded element is removed, the Koldun enters torpor.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Essence of Air",
+      "level": 3,
+      "summary": "Allows for flight. The Camarilla frowns upon this Ritual due to its Masquerade dangers.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Eyes of the Past",
+      "level": 3,
+      "summary": "See what happened at the caster's current location in the past. Only holds events within the last five years.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Fire in the Blood",
+      "level": 3,
+      "summary": "Burn a target's blood from afar, causing painful Superficial damage and physical penalties. A victim can only be affected by this Ritual once per night.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "ingredients": "Target's blood, their image, and a red candle or iron lighter"
+    },
+    {
+      "name": "Firewalker",
+      "level": 3,
+      "summary": "Allow yourself and your comrades to become resistant to fire. The required fingertip removal must all come from the caster, even when cast on others.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "ingredients": "The caster's fingertips"
+    },
+    {
+      "name": "Galvanic Ruination",
+      "level": 3,
+      "summary": "Destroy nearby electrical systems, knocking out lights, alarms, cars, and cameras in a warehouse or three-story building. Extend to additional buildings by increasing Difficulty by 1 per building.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "ingredients": "A copper coin smeared with the caster's blood"
+    },
+    {
+      "name": "Gentle Mind",
+      "level": 3,
+      "summary": "Protect the mind of a target against Frenzy. The caster must share blood with the target and cannot cast this on themselves.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Grim Chrysalis",
+      "level": 3,
+      "summary": "Spit out a protective cocoon that shields from sunlight and accelerates healing or reshaping. The cocoon is hard and provides some protection from outside damage.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "ingredients": "Human hair and a moth or butterfly"
+    },
+    {
+      "name": "Haunted House",
+      "level": 3,
+      "summary": "Make a haven appear as if it's haunted. The effects last for 10 years.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 3,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Herd Ward (Major)",
+      "level": 3,
+      "summary": "Ward a door to protect multiple herd members within against unauthorized feeding. Make the Ritual Roll when someone else tries to feed from the herd.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "ingredients": "Scorpion poison and the caster's vitae"
+    },
+    {
+      "name": "Illusion of Peaceful Death",
+      "level": 3,
+      "summary": "Make a corpse appear as if it died a natural death. The body must have at least half of its blood remaining to succeed.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Illusion of Perfection",
+      "level": 3,
+      "summary": "Become a nondescript, unremarkable person to blend into crowds, similar to Mask of a Thousand Faces (Obfuscate).",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Nepenthe",
+      "level": 3,
+      "summary": "Create a draught that removes Stains, but prolonged use makes those Stains permanent. Using Nepenthe two sessions in a row causes one Stain to become permanent (cumulative).",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "One with the Blade",
+      "level": 3,
+      "summary": "Dedicate a melee weapon to yourself so it resists decay and can be anointed for combat. Only one weapon can hold this ritual at a time.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "1 night",
+      "ingredients": "A melee weapon immersed in the caster's vitae"
+    },
+    {
+      "name": "Sanguine Watcher",
+      "level": 3,
+      "summary": "Create a small rat from vitae that can observe or steal on the caster's behalf. Instructions must be very explicit.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Seeing with the Sky's Eyes",
+      "level": 3,
+      "summary": "Observe a target from above. Ask one question about their location and surroundings per success. Critical Wins grant 3 extra questions and can reveal Ambitions, Desires, Convictions, and Humanity.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Seeking Tiamat",
+      "level": 3,
+      "summary": "Find veins of the Earth (Furcae). Costs one Rouse Check and Aggravated Health damage. Critical Wins discover the closest vein and point toward 2 Furcae on that vein.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Sleep of Judas",
+      "level": 3,
+      "summary": "Prepare a supernatural narcotic that can incapacitate vampires and kill mortals or ghouls. Make the Ritual Roll when the target is drugged.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "ingredients": "Blood from a mystical landmark and opium"
+    },
+    {
+      "name": "Soul of the Hemonculus",
+      "level": 3,
+      "summary": "Create a Hemonculus — a shrivelled, smaller, weaker version of the caster who must obey every command. Immune to sunlight but cannot be Embraced, made into a ghoul, or Blood Bonded. Kindred slake no Hunger from drinking its blood.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Stone of the True Form",
+      "level": 3,
+      "summary": "Dispel illusions and Discipline-altered creatures. Must throw the stone with Dexterity + Athletics. On a win: illusions dispelled, shapeshifters painfully returned to original form, Discipline-made beings separated into components. Target resists with Resolve + Occult.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "The Unseen Change",
+      "level": 3,
+      "summary": "Force Lupines entering the area into Wolf Form. They resist with a contested Willpower roll; on failure they enter Lupus Form instead.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 3,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Trespass",
+      "level": 3,
+      "summary": "Flow through any crevice that blood can fit through to move through a building undetected. Unlike Incorporeal Passage, the caster can be attacked if noticed.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Viral Haruspex",
+      "level": 3,
+      "summary": "Gather information from everyone in an area suffering from a certain disease. The caster must drink from someone infected with that disease within 24 hours before casting.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "ingredients": "Blood of someone infected with the target disease"
+    },
+    {
+      "name": "Ward against Lupines",
+      "level": 3,
+      "summary": "Protect a small object against Werewolves. Uses standard rules for Wards.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Warding Circle against Spirits",
+      "level": 3,
+      "summary": "Protect an area against spirits. Uses standard rules for Wards.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 3,
+      "required_time": "15 min"
+    },
+    {
+      "name": "Balm of Bathory",
+      "level": 4,
+      "summary": "Brew a blood balm from young mortal blood that temporarily grants the Stunning (••••) Merit. Each subsequent use requires double the mortal blood of the last batch.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "1 hour",
+      "ingredients": "Caster vitae, youthful mortal blood, chamomile, and fat or butter"
+    },
+    {
+      "name": "Compel the Inanimate",
+      "level": 4,
+      "summary": "Give a simple command to an inanimate object that it follows a few minutes later. The caster must remain in the same general area. Detectable with Sense the Unseen (Auspex ●) via a contested roll.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Defense of the Sacred Haven",
+      "level": 4,
+      "summary": "Protect a haven with mystical darkness from sunlight. The Ritual Roll is made once the sun rises.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Egregore Consultation",
+      "level": 4,
+      "summary": "By hosting an illness, access the collective experiences of everyone in the area with that illness to enhance Skills. Skills very common locally can grant up to +2 extra dice.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Eyes of the Nighthawk",
+      "level": 4,
+      "summary": "Take control of a carnivorous bird and act through them. The caster can use most non-physical Disciplines through the bird.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Feast of Ashes",
+      "level": 4,
+      "summary": "Curse a vampire so they vomit blood for a night and can only sate Hunger with ashes (minimum Hunger 3). Contested against the victim's Resolve + Willpower.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min",
+      "ingredients": "A parchment bearing the target's name, burned to ash"
+    },
+    {
+      "name": "Guided Memory",
+      "level": 4,
+      "summary": "Drink a willing Kindred's prepared vitae to relive their memories guided by them. Can be used to unlock Discipline powers, Merits, and other gifts.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min",
+      "ingredients": "Another vampire's vitae, dried rosemary, and poppies or forget-me-nots"
+    },
+    {
+      "name": "Incorporeal Passage",
+      "level": 4,
+      "summary": "The caster's form becomes ghost-like, allowing them to pass through solid matter. They may only interact with the world through speech and sight.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Innocence of the Child's Heart",
+      "level": 4,
+      "summary": "Block Scry the Soul (Auspex) to hide evidence of diablerie and other vampiric traits. Extremely rare — only learned by obtaining Nicolai's notes or by Storyteller discretion.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Innocence's Veil",
+      "level": 4,
+      "summary": "Temporarily make traces of Diablerie undetectable. Cannot be detected by A Taste for Blood or Scry the Soul.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 0,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Invisible Chains of Binding",
+      "level": 4,
+      "summary": "Prepare a chain link that can pin a target in place for one hour per success in the margin and hinder their physical defenses. Ends if the chain is destroyed or removed.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "1 hour",
+      "ingredients": "A chain link inscribed with the caster's blood"
+    },
+    {
+      "name": "Land's Sustenance",
+      "level": 4,
+      "summary": "Feed from a place of power, turning it into a place of suffering where injuries are more severe. Lasts until end of the Story. Once per session, automatically pass Rouse Checks equal to the Ritual margin.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Protean Curse",
+      "level": 4,
+      "summary": "Transform a target into a bat, similar to Metamorphosis (Protean). Cannot be used on the caster.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 2,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Rending the Sweet Earth",
+      "level": 4,
+      "summary": "Pull a vampire from the earth who is using Earth Meld (Protean). Automatically awakens the target unless they are in torpor or the Ritual Roll is a Critical Win.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Riding the Earth's Vein",
+      "level": 4,
+      "summary": "Travel from one Furcus to a random other. The caster has no control over the destination. One-way; only activates where first cast.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Seek the Gathered Vitae",
+      "level": 4,
+      "summary": "Sense a concentration of Kindred vitae with a collective Blood Potency of 13 or higher and track its direction for an hour. Ghouls count as 1/4 and Duskborn as 1/2.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "Red ink, pomegranate juice, white paper or cloth, and a large top"
+    },
+    {
+      "name": "Ward against Cainites",
+      "level": 4,
+      "summary": "Protect a small object against Kindred. Uses standard rules for Wards. A vampire examining the ward may read the caster's name with an Intelligence + Auspex vs. Intelligence + Blood Sorcery roll.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Warding Circle against Lupines",
+      "level": 4,
+      "summary": "Protect an area against Werewolves. Uses standard rules for Wards.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 3,
+      "required_time": "20 min"
+    },
+    {
+      "name": "Antebrachia Ignium",
+      "level": 5,
+      "summary": "Coat your arms in vitae that catches fire, letting you wield flame by touch for a scene. The caster is only resistant to fire on their arms.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "25 min",
+      "ingredients": "Enough vitae to coat both arms and a source of flame"
+    },
+    {
+      "name": "Atrocity's Release",
+      "level": 5,
+      "summary": "Reverse the effects of Diablerie. Can be resisted with a Resolve + Blood Sorcery test.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "25 min"
+    },
+    {
+      "name": "Dominion",
+      "level": 5,
+      "summary": "Claim a building as your domain, blocking others from using Animalism, Auspex, Dominate, or Presence there. The area of effect is determined by the number of Rouse Checks spent.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "3 hours",
+      "ingredients": "Iron seals embedded over every doorway"
+    },
+    {
+      "name": "Eden's Bounty",
+      "level": 5,
+      "summary": "Draw blood from nearby mortals through a tree to reduce the caster's Hunger. Mortals suffer −1 die to Physical rolls and 1 Aggravated health damage for the remainder of the chapter. May incur Stains.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "25 min",
+      "ingredients": "A corpse, a living tree, a fresh apple, and a rotten apple"
+    },
+    {
+      "name": "Elemental Attack",
+      "level": 5,
+      "summary": "Command your chosen element to attack a foe. Can be a Chain Ritual. Gain +1 die if the element is naturally active. Chained with Elemental Grasp and Tiamat Glistens, becomes a natural disaster (tornado, magma flow, tsunami, etc.).",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "25 min"
+    },
+    {
+      "name": "Escape to True Sanctuary",
+      "level": 5,
+      "summary": "Create a one-way portal between two ritual circles. Requires 12 Rouse Checks total. A caster may only have one set of circles active at a time.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 12,
+      "required_time": "25 min"
+    },
+    {
+      "name": "Fisher King",
+      "level": 5,
+      "summary": "Become one with your land, gaining access to its secrets. Can be a Chain Ritual. Use Wits + Streetwise or Survival to ask questions about the land; gain one extra question per session. Lasts until end of the story. Chained with Land's Sustenance and Compel the Inanimate, casters gain complete control and can heal 5 Aggravated damage total each night.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "25 min"
+    },
+    {
+      "name": "Heart of Stone",
+      "level": 5,
+      "summary": "Turn your heart to stone, preventing staking. Causes emotional detachment, penalizing Remorse rolls and active Social-related rolls. Cannot use Presence during the Ritual's duration, but gain a bonus when resisting its use on you.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "25 min"
+    },
+    {
+      "name": "Reawakened Vigor",
+      "level": 5,
+      "summary": "Regain Blood Potency faster after extended torpor. Inflicts Aggravated damage on anyone other than the caster.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "25 min"
+    },
+    {
+      "name": "Shaft of Belated Dissolution",
+      "level": 5,
+      "summary": "Create a stake that seeks out a vampire's heart. Even if the initial attack misses the heart, a splinter breaks off and moves toward it — if it finds the heart, the target faces Final Death.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 2,
+      "required_time": "25 min",
+      "ingredients": "A wooden stake"
+    },
+    {
+      "name": "Simulacrum Gate",
+      "level": 5,
+      "summary": "Build a sacrificial replica doorway that allows multiple vampires to cross vast distances. May incur Stains.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 1,
+      "required_time": "weeks",
+      "ingredients": "Replica materials, mortal sacrifices, and a vampire sacrifice"
+    },
+    {
+      "name": "Transferring the Soul",
+      "level": 5,
+      "summary": "Take over a new body through the act of diablerie. Requires another Kindred with Oblivion ●●●●●, or a single Kindred possessing both Blood Sorcery ●●●●● and Oblivion ●●●●●.",
+      "dice_pool": "Intelligence + Blood Sorcery and Intelligence + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "25 min"
+    },
+    {
+      "name": "Warding Circle against Cainites",
+      "level": 5,
+      "summary": "Protect an area against Kindred. Uses standard rules for Wards.",
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "rouse_checks": 3,
+      "required_time": "25 min"
+    }
+  ],
+  "ceremonies": [
+    {
+      "name": "Knowing Stone",
+      "level": 1,
+      "summary": "Identify the locations and existences of specific ghosts. The caster must know the ghost's name.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "5 min",
+      "ingredients": "A stone and the ghost's name",
+      "prerequisite_powers": [
+        "Ashes to Ashes",
+        "The Binding Fetter"
+      ]
+    },
+    {
+      "name": "Summon Spirit",
+      "level": 1,
+      "summary": "Call a named wraith through the Shroud by using one of its fetters, without forcing it to obey.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "5min",
+      "ingredients": "A wraith's fetter, your vitae, and an image, signature, or name of the wraith",
+      "prerequisite_powers": [
+        "The Binding Fetter"
+      ]
+    },
+    {
+      "name": "The Gift of False Life",
+      "level": 1,
+      "summary": "Animate prepared corpses to carry out one simple command until they finish the task or are destroyed.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "5min",
+      "ingredients": "One or more human bodies, plus a mixture of blood, phlegm, and bile",
+      "prerequisite_powers": [
+        "Ashes to Ashes"
+      ]
+    },
+    {
+      "name": "Traveler's Call",
+      "level": 1,
+      "summary": "Send a vision of your surroundings through Oblivion to call another Shalimite to you.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "5min",
+      "ingredients": "The black book given during Shalimite indoctrination",
+      "prerequisite_powers": [
+        "Oblivion's Sight"
+      ]
+    },
+    {
+      "name": "Ashen Relic",
+      "level": 2,
+      "summary": "Preserve a Kindred's body against decay. Three successes in the margin preserves more completely.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "10 min",
+      "prerequisite_powers": [
+        "Ashes to Ashes",
+        "Oblivion's Sight"
+      ]
+    },
+    {
+      "name": "Awaken the Homuncular Servant",
+      "level": 2,
+      "summary": "Create a loyal spy or stalker from a severed body part or small animal carcass.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "10min",
+      "ingredients": "A body part or small carcass, the weapon used on it, and a foul bodily mixture",
+      "prerequisite_powers": [
+        "Where the Shroud Thins"
+      ]
+    },
+    {
+      "name": "Blinding the Alloy Eye",
+      "level": 2,
+      "summary": "Bind a death-spirit to foil nearby cameras and surveillance for a scene.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "1 scene",
+      "ingredients": "A small piece of aluminum mesh",
+      "prerequisite_powers": [
+        "Shadow Cast"
+      ]
+    },
+    {
+      "name": "Compel Spirit",
+      "level": 2,
+      "summary": "Force a nearby wraith into service for a limited task, with harsher demands possible on stronger wins.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "10min",
+      "ingredients": "A wraith's fetter, your vitae, and leverage against the fetter",
+      "prerequisite_powers": [
+        "Where the Shroud Thins"
+      ]
+    },
+    {
+      "name": "Maw of Ahriman",
+      "level": 2,
+      "summary": "Open a portal to the Abyss, usually within the caster's own mouth. The caster cannot speak until the portal is cancelled or the next sunrise.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "10 min"
+    },
+    {
+      "name": "Craft Flesh Golem",
+      "level": 3,
+      "summary": "Animate stitched corpse parts into a flesh golem that obeys its creator's commands.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "1 hour",
+      "ingredients": "Corpse parts, sea-bed clay, acid-dissolved copper, and an engraving tool",
+      "prerequisite_powers": [
+        "Aura of Decay",
+        "Necrotic Plague"
+      ]
+    },
+    {
+      "name": "Create Corpse Suit",
+      "level": 3,
+      "summary": "Sew a sentient skin garment that warns of danger but brings folklore weaknesses.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "1 hour",
+      "ingredients": "Human skin, mortal fat, waxed thread, and decorative elements",
+      "prerequisite_powers": [
+        "Shadow Perspective",
+        "Touch of Oblivion"
+      ]
+    },
+    {
+      "name": "Fortezza Sindonica",
+      "level": 3,
+      "summary": "Lay a chain ward that tortures and hinders wraiths crossing its boundary.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 3,
+      "required_time": "20min",
+      "ingredients": "Powdered bones, salt, steel chain, vitae, a finger, and a metal basin",
+      "prerequisite_powers": [
+        "Where the Shroud Thins"
+      ]
+    },
+    {
+      "name": "Harrowhaunt",
+      "level": 3,
+      "summary": "Make a place radiate supernatural dread, driving mortals away and testing vampires for fear frenzy.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "1 scene",
+      "ingredients": "Mortals subjected to terror and suffering in the place",
+      "prerequisite_powers": [
+        "Aura of Decay"
+      ]
+    },
+    {
+      "name": "Host Spirit",
+      "level": 3,
+      "summary": "Invite a wraith into your body, gaining physical strength and health while risking possession.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "15min",
+      "ingredients": "A tribute for a wraith, a parasitic bug, and two of your teeth",
+      "prerequisite_powers": [
+        "Aura of Decay"
+      ]
+    },
+    {
+      "name": "Knit the Veil",
+      "level": 3,
+      "summary": "Thicken the Shroud in a marked area, blocking ghostly passage and spying while the candle burns.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "20min",
+      "ingredients": "Ground bones, an iron needle, catgut, vitae, and a goat-tallow candle",
+      "prerequisite_powers": [
+        "Where the Shroud Thins"
+      ]
+    },
+    {
+      "name": "Name of the Father",
+      "level": 3,
+      "summary": "Invoke Shalim to overwhelm a victim with sensory darkness and paralyzing despair.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "15min",
+      "ingredients": "Ancient Greek speech, eye contact with the victim, and five charcoal sticks",
+      "prerequisite_powers": [
+        "Shadow Perspective"
+      ]
+    },
+    {
+      "name": "Shallow Slumber",
+      "level": 3,
+      "summary": "Reduce time spent in torpor.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "prerequisite_powers": [
+        "Passion Feast",
+        "Touch of Oblivion"
+      ]
+    },
+    {
+      "name": "Shambling Hordes",
+      "level": 3,
+      "summary": "Raise several aggressive corpses that obey commands and attack others when left idle.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "15min",
+      "ingredients": "Prepared corpses and a fresh human sacrifice",
+      "prerequisite_powers": [
+        "Aura of Decay"
+      ]
+    },
+    {
+      "name": "Wisdom of the Dead",
+      "level": 3,
+      "summary": "Gain information by speaking with a corpse skull or severed head. Add two dice to the pool if still carrying the skull or head for the rest of the night.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "15 min",
+      "ingredients": "A corpse skull or severed head",
+      "prerequisite_powers": [
+        "Where the Shroud Thins",
+        "Oblivion's Sight"
+      ]
+    },
+    {
+      "name": "Befoul Vessel",
+      "level": 4,
+      "summary": "Infect a mortal's blood so any vampire feeding from them gains Hunger instead of slaking it.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "1 action",
+      "ingredients": "The vampire's saliva",
+      "prerequisite_powers": [
+        "Necrotic Plague"
+      ]
+    },
+    {
+      "name": "Bind the Spirit",
+      "level": 4,
+      "summary": "Anchor a compelled wraith to a place or person, causing its strongest emotions to haunt the target.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "20min",
+      "ingredients": "A wraith's fetter, your vitae, a human sacrifice, salt, and a link to the target",
+      "prerequisite_powers": [
+        "Necrotic Plague"
+      ]
+    },
+    {
+      "name": "Bind to Mortal Form",
+      "level": 4,
+      "summary": "Chain a mortal's spirit to their aging body, extending life without making them a ghoul.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "1 hour",
+      "ingredients": "A mortal, Oblivion-marked chain, human tallow candle, grave dirt, and body fluid",
+      "prerequisite_powers": [
+        "Necrotic Plague",
+        "Skuld Fulfilled"
+      ]
+    },
+    {
+      "name": "Death Rattle",
+      "level": 4,
+      "summary": "Force a target to experience a chosen wraith's death through a prepared link.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "20min",
+      "ingredients": "A wraith's fetter, target keepsake, vitae, overproof rum, candle, and bowl",
+      "prerequisite_powers": [
+        "Fatal Precognition"
+      ]
+    },
+    {
+      "name": "Split the Veil",
+      "level": 4,
+      "summary": "Tear open the boundary to the Shadowlands, making passage easier and allowing ghosts through if widened enough.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "20min",
+      "ingredients": "A used scalpel, chalk or charcoal, silk, and a human sacrifice",
+      "prerequisite_powers": [
+        "Necrotic Plague"
+      ]
+    },
+    {
+      "name": "Ex Nihilo",
+      "level": 5,
+      "summary": "Cross physically into the Shadowlands with companions, remaining there until you end the power or are destroyed.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 3,
+      "required_time": "25min",
+      "ingredients": "Masks, your vitae for each participant's feet, and two coins per traveler",
+      "prerequisite_powers": [
+        "Withering Spirit"
+      ]
+    },
+    {
+      "name": "Gift of True Life",
+      "level": 5,
+      "summary": "Move years of mortal life from one person to another, extending one life by shortening the other.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "1 scene",
+      "ingredients": "Two mortals and a length of silk rope",
+      "prerequisite_powers": [
+        "Necrotic Plague",
+        "Passion Feast"
+      ]
+    },
+    {
+      "name": "Lazarene Blessing",
+      "level": 5,
+      "summary": "Offer a newly dead body as a vessel for a willing wraith, restoring it to a fragile imitation of life.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "25min",
+      "ingredients": "A human sacrifice, incense, a mammal heart, and powdered silver",
+      "prerequisite_powers": [
+        "Skuld Fulfilled"
+      ]
+    },
+    {
+      "name": "Pit of Contemplation",
+      "level": 5,
+      "summary": "Open a doorway into Oblivion that pulls victims into an empty black prison.",
+      "dice_pool": "Resolve + Oblivion",
+      "rouse_checks": 1,
+      "required_time": "25min",
+      "ingredients": "A pot of ink, blood from an innocent victim, and an unlit room with a painted doorway",
+      "prerequisite_powers": [
+        "Tenebrous Avatar"
+      ]
+    }
+  ]
+}

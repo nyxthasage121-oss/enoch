@@ -123,6 +123,16 @@ MERITS_FLAWS: dict[str, list[dict]] = json.loads(
 MERIT_CATALOG: list[dict] = MERITS_FLAWS.get("merits", [])
 FLAW_CATALOG:  list[dict] = MERITS_FLAWS.get("flaws", [])
 
+# Blood Sorcery Rituals + Oblivion Ceremonies catalog — V5-generic, lifted from
+# the friend's data set (2026-06-17). Each entry is {name, level, summary,
+# dice_pool, rouse_checks, required_time?, ingredients?, prerequisite_powers?}.
+_RITUALS_PATH = Path(__file__).parent.parent / "packages" / "rules" / "rituals_ceremonies.json"
+_RITUALS_CEREMONIES: dict[str, list[dict]] = json.loads(
+    _RITUALS_PATH.read_text(encoding="utf-8")
+)
+RITUAL_CATALOG:   list[dict] = _RITUALS_CEREMONIES.get("rituals", [])
+CEREMONY_CATALOG: list[dict] = _RITUALS_CEREMONIES.get("ceremonies", [])
+
 
 # Flat allow-list of single-value sheet keys. Free-form lists (merits/flaws/
 # rituals/ceremonies/formulae) are handled separately by the save route.

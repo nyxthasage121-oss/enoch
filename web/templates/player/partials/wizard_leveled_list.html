@@ -8,7 +8,8 @@
 <template x-for="(item, idx) in {{ _list }}" :key="idx">
   <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
     <span class="font-cinzel text-[0.6rem] text-bone-700 w-5 shrink-0" x-text="'L' + item.level"></span>
-    <span class="font-garamond text-xs text-bone-300 flex-1 truncate" x-text="item.name"></span>
+    <span class="font-garamond text-xs text-bone-300 flex-1 truncate" x-text="item.name"
+          :title="leveledSummary('{{ _list }}', item.name)"></span>
     <button type="button" @click="{{ _list }}.splice(idx, 1)"
             class="text-bone-700 hover:text-blood-400 text-xs">×</button>
   </div>
@@ -24,9 +25,16 @@
   <div class="flex-1 min-w-0">
     <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">{{ _label | capitalize }} name</label>
     <input type="text" maxlength="80" x-model="name"
+           list="ll-{{ _list }}" autocomplete="off"
            placeholder="Add a {{ _label }}…"
+           @change="const e = leveledCatalogEntry('{{ _list }}', name); if (e) level = e.level"
            @keydown.enter.prevent="addToLeveledList('{{ _list }}', name, level); name=''; level=1;"
            class="text-sm py-1.5 px-2 w-full">
+    <datalist id="ll-{{ _list }}">
+      <template x-for="ce in leveledCatalog('{{ _list }}')" :key="ce.name">
+        <option :value="ce.name" :label="'L' + ce.level + (ce.summary ? ' · ' + ce.summary : '')"></option>
+      </template>
+    </datalist>
   </div>
   <button type="button"
           @click="addToLeveledList('{{ _list }}', name, level); name=''; level=1;"

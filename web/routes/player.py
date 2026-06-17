@@ -274,6 +274,8 @@ from ..v5_traits import (
     DISCIPLINE_POWERS as _DISCIPLINE_POWERS,
     MERIT_CATALOG   as _MERIT_CATALOG,
     FLAW_CATALOG    as _FLAW_CATALOG,
+    RITUAL_CATALOG  as _RITUAL_CATALOG,
+    CEREMONY_CATALOG as _CEREMONY_CATALOG,
     V5_CLAN_INFO    as _V5_CLAN_INFO,
     V5_PREDATOR_INFO as _V5_PREDATOR_INFO,
     V5_SKILL_SPREADS as _V5_SKILL_SPREADS,
@@ -290,6 +292,8 @@ from ..v5_traits import (
 templates.env.globals["discipline_powers"] = _DISCIPLINE_POWERS
 templates.env.globals["merit_catalog"] = _MERIT_CATALOG
 templates.env.globals["flaw_catalog"] = _FLAW_CATALOG
+templates.env.globals["ritual_catalog"] = _RITUAL_CATALOG
+templates.env.globals["ceremony_catalog"] = _CEREMONY_CATALOG
 
 
 _CLANS = [
