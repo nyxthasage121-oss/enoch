@@ -34,6 +34,7 @@
        flawCatalog:       {{ (flaw_catalog | default([])) | tojson | forceescape }},
        ritualCatalog:     {{ (ritual_catalog | default([])) | tojson | forceescape }},
        ceremonyCatalog:   {{ (ceremony_catalog | default([])) | tojson | forceescape }},
+       loresheetPicker:   {{ (loresheet_picker | default([])) | tojson | forceescape }},
        skillSpreads:      {{ (skill_spreads | default({})) | tojson | forceescape }},
        disciplineSpreads: {{ (discipline_spreads | default({})) | tojson | forceescape }},
        predatorFreeDiscDots: {{ (predator_free_disc_dots | default(1)) | tojson }},
@@ -1644,11 +1645,70 @@
             {% include "player/partials/wizard_leveled_list.html" %}
           {% endwith %}
         </div>
+
+        {# Loresheets — first-class: pick a sheet + a dot rating; each dot
+           grants that level's benefit ({{ loresheet_dot_xp }} XP/dot). #}
+        <div class="gilded p-5">
+          <div class="flex items-baseline justify-between mb-2">
+            <p class="label-gold text-xs">Loresheets</p>
+            <span class="font-cinzel text-[0.6rem] text-bone-700">{{ loresheet_dot_xp }} XP / dot</span>
+          </div>
+          <p class="font-garamond text-[0.65rem] text-bone-700 italic mb-3">
+            Story connections bought in dots; each dot grants that level's benefit. Many need ST approval.
+          </p>
+
+          <template x-for="ls in loresheets" :key="ls.id">
+            <div class="py-1.5 border-b border-ink-800 last:border-0">
+              <div class="flex items-center gap-2">
+                <span class="font-cinzel text-xs text-bone-200 flex-1 truncate" x-text="ls.name"></span>
+                <div class="flex gap-0.5">
+                  <template x-for="n in 5">
+                    <button type="button"
+                            @click="ls.dots = (ls.dots === n ? n - 1 : n); if (ls.dots < 1) removeLoresheet(ls.id)"
+                            class="w-2.5 h-2.5 rounded-full border transition-colors"
+                            :class="ls.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
+                  </template>
+                </div>
+                <button type="button" @click="removeLoresheet(ls.id)"
+                        class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+              </div>
+              <div class="mt-1 ml-1 space-y-0.5">
+                <template x-for="d in loresheetDots(ls.id)" :key="d.dot">
+                  <p class="font-garamond text-[0.6rem]"
+                     :class="d.dot <= ls.dots ? 'text-bone-500' : 'text-bone-800'">
+                    <span x-text="d.dot"></span>. <span x-text="d.name"></span>
+                  </p>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <div class="flex items-end gap-2 mt-3">
+            <div class="flex-1 min-w-0">
+              <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">Loresheet</label>
+              <input type="text" maxlength="80" x-model="newLoresheetName"
+                     list="ls-catalog" autocomplete="off"
+                     placeholder="Search loresheets…"
+                     @keydown.enter.prevent="addLoresheet()"
+                     class="text-sm py-1.5 px-2 w-full">
+              <datalist id="ls-catalog">
+                <template x-for="l in loresheetPicker" :key="l.id">
+                  <option :value="l.name" :label="l.source + (l.requires_st_permission ? ' · ST' : '')"></option>
+                </template>
+              </datalist>
+            </div>
+            <button type="button" @click="addLoresheet()"
+                    class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5 shrink-0">Add</button>
+          </div>
+          <p x-show="newLoresheetError" x-cloak x-text="newLoresheetError"
+             class="font-garamond text-blood-400 text-[0.6rem] mt-1"></p>
+        </div>
       </div>
 
       <input type="hidden" name="rituals"    :value="JSON.stringify(rituals)">
       <input type="hidden" name="ceremonies" :value="JSON.stringify(ceremonies)">
       <input type="hidden" name="formulae"   :value="JSON.stringify(formulae)">
+      <input type="hidden" name="loresheets" :value="JSON.stringify(loresheets)">
 
       {% include "player/partials/wizard_nav.html" %}
     </div>
@@ -2076,6 +2136,7 @@
       flawCatalog:       opts.flawCatalog || [],
       ritualCatalog:     opts.ritualCatalog || [],
       ceremonyCatalog:   opts.ceremonyCatalog || [],
+      loresheetPicker:   opts.loresheetPicker || [],
       skillSpreads:      opts.skillSpreads || {},
       disciplineSpreads: opts.disciplineSpreads || {},
       predatorFreeDiscDots: opts.predatorFreeDiscDots || 0,
@@ -2208,6 +2269,7 @@
       rituals:     seededSheet.rituals     || [],
       ceremonies:  seededSheet.ceremonies  || [],
       formulae:    seededSheet.formulae    || [],
+      loresheets:  seededSheet.loresheets  || [],
       // Touchstones are now paired with Convictions. Backward-compat:
       // older drafts may have stored each as a plain string; normalize
       // on load so the UI always sees {name, conviction} objects.
@@ -2226,6 +2288,7 @@
       convictions: [],  // legacy state retained but unused going forward
       newMeritName: '', newAdvantageName: '',
       newBackgroundName: '', newFlawName: '',
+      newLoresheetName: '', newLoresheetError: '',
       newTouchstone: '', newConviction: '',
       // Pre-allocated so Alpine reactivity tracks bracket-indexed writes
       // from the per-discipline power inputs. Without this, x-model on
@@ -2879,6 +2942,28 @@
         if (c) { name = c.name; level = c.level; }
         if (this[listKey].some(x => x.name.toLowerCase() === name.toLowerCase())) return;
         this[listKey].push({ name, level });
+      },
+
+      // Loresheets — pick from the catalog by name, rate in dots 1–5.
+      loresheetByName(name) {
+        const n = (name || '').trim().toLowerCase();
+        return this.loresheetPicker.find(l => (l.name || '').toLowerCase() === n) || null;
+      },
+      loresheetDots(id) {
+        const l = this.loresheetPicker.find(x => x.id === id);
+        return l ? (l.dots || []) : [];
+      },
+      addLoresheet() {
+        this.newLoresheetError = '';
+        const l = this.loresheetByName(this.newLoresheetName);
+        if (!l) { this.newLoresheetError = 'Pick a loresheet from the list.'; return; }
+        if (this.loresheets.some(x => x.id === l.id)) { this.newLoresheetName = ''; return; }
+        this.loresheets.push({ id: l.id, name: l.name, dots: 1 });
+        this.newLoresheetName = '';
+      },
+      removeLoresheet(id) {
+        const i = this.loresheets.findIndex(x => x.id === id);
+        if (i >= 0) this.loresheets.splice(i, 1);
       },
 
       // Touchstone+Conviction pairs. V5 chargen: 2–3 pairs.

@@ -994,6 +994,37 @@
         </div>
       </div>
 
+      {# ── Loresheets (read-only; chosen at creation, managed by staff) ── #}
+      {% set _ls = (char.sheet_json or {}).get('loresheets') %}
+      {% if _ls %}
+      <div class="gilded p-5">
+        <div class="flex items-baseline justify-between mb-3">
+          <p class="label-gold">Loresheets</p>
+          <p class="font-garamond text-bone-700 text-xs italic">Set at creation · staff-managed</p>
+        </div>
+        {% for ls in _ls %}
+        {% set full = loresheets_by_id.get(ls.id) %}
+        <div class="py-1.5 border-b border-ink-800 last:border-0">
+          <div class="flex items-center justify-between">
+            <span class="font-garamond text-sm text-bone-200 truncate pr-2">{{ ls.name }}</span>
+            <div class="flex gap-1 shrink-0">
+              {% for n in range(1, 6) %}
+              <span class="w-3 h-3 rounded-full {{ 'pip-on' if ls.dots >= n else 'pip-off' }}"></span>
+              {% endfor %}
+            </div>
+          </div>
+          {% if full %}
+          <div class="mt-1 ml-1 space-y-0.5">
+            {% for d in full.dots if d.dot <= ls.dots %}
+            <p class="font-garamond text-[0.65rem] text-bone-600"><span class="text-bone-700">{{ d.dot }}.</span> {{ d.name }}</p>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
       {# ── Core traits ── #}
       <div class="gilded p-5">
         <p class="label-gold mb-4">Core Traits</p>

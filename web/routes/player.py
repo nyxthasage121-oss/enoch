@@ -276,6 +276,10 @@ from ..v5_traits import (
     FLAW_CATALOG    as _FLAW_CATALOG,
     RITUAL_CATALOG  as _RITUAL_CATALOG,
     CEREMONY_CATALOG as _CEREMONY_CATALOG,
+    LORESHEET_PICKER as _LORESHEET_PICKER,
+    LORESHEET_CATALOG as _LORESHEET_CATALOG,
+    LORESHEET_DOT_XP as _LORESHEET_DOT_XP,
+    get_loresheet   as _get_loresheet,
     V5_CLAN_INFO    as _V5_CLAN_INFO,
     V5_PREDATOR_INFO as _V5_PREDATOR_INFO,
     V5_SKILL_SPREADS as _V5_SKILL_SPREADS,
@@ -294,6 +298,9 @@ templates.env.globals["merit_catalog"] = _MERIT_CATALOG
 templates.env.globals["flaw_catalog"] = _FLAW_CATALOG
 templates.env.globals["ritual_catalog"] = _RITUAL_CATALOG
 templates.env.globals["ceremony_catalog"] = _CEREMONY_CATALOG
+templates.env.globals["loresheet_picker"] = _LORESHEET_PICKER
+templates.env.globals["loresheets_by_id"] = {l["id"]: l for l in _LORESHEET_CATALOG}
+templates.env.globals["loresheet_dot_xp"] = _LORESHEET_DOT_XP
 
 
 _CLANS = [
@@ -1330,6 +1337,36 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
                 cleaned_pow.append({"discipline": disc, "name": name,
                                     "level": max(1, min(5, level))})
             sheet["powers"] = cleaned_pow
+
+    # Loresheets — {id, name, dots}; validated against the catalog. Names are
+    # canonicalized from the catalog; unknown ids and duplicates are dropped.
+    raw = form.get("loresheets")
+    if raw is not None:
+        try:
+            items = json.loads(raw)
+        except (ValueError, TypeError):
+            items = None
+        if isinstance(items, list):
+            cleaned_ls: list[dict] = []
+            seen_ls: set[str] = set()
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                lid = str(it.get("id", "")).strip()
+                ls = _get_loresheet(lid)
+                if not ls or lid in seen_ls:
+                    continue
+                seen_ls.add(lid)
+                try:
+                    dots = int(it.get("dots", 0))
+                except (ValueError, TypeError):
+                    dots = 0
+                max_dot = max((d["dot"] for d in ls.get("dots", [])), default=5)
+                cleaned_ls.append({
+                    "id": lid, "name": ls["name"],
+                    "dots": max(1, min(max_dot, dots)),
+                })
+            sheet["loresheets"] = cleaned_ls
 
     # Free-text lists: touchstones, convictions
     for list_key in _FREE_LIST_KEYS:

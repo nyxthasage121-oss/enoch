@@ -133,6 +133,35 @@ _RITUALS_CEREMONIES: dict[str, list[dict]] = json.loads(
 RITUAL_CATALOG:   list[dict] = _RITUALS_CEREMONIES.get("rituals", [])
 CEREMONY_CATALOG: list[dict] = _RITUALS_CEREMONIES.get("ceremonies", [])
 
+# Loresheets catalog — V5-generic, lifted from the friend's data set
+# (2026-06-17). First-class loresheets: each is {id, name, source,
+# requires_st_permission, clan_restriction?, dots:[{dot, name, description,
+# clan_restriction?}]}, dots 1–5 each granting that level's benefit (cost = dot×3
+# XP). The full catalog (with long descriptions) is for server-side display;
+# LORESHEET_PICKER is a trimmed projection embedded in the chargen wizard.
+_LORESHEETS_PATH = Path(__file__).parent.parent / "packages" / "rules" / "loresheets.json"
+LORESHEET_CATALOG: list[dict] = json.loads(_LORESHEETS_PATH.read_text(encoding="utf-8"))
+_LORESHEET_BY_ID: dict[str, dict] = {l["id"]: l for l in LORESHEET_CATALOG}
+LORESHEET_PICKER: list[dict] = [
+    {k: v for k, v in {
+        "id":   l["id"],
+        "name": l["name"],
+        "source": l.get("source", ""),
+        "requires_st_permission": bool(l.get("requires_st_permission")),
+        "clan_restriction": l.get("clan_restriction"),
+        "dots": [{"dot": d["dot"], "name": d["name"]} for d in l.get("dots", [])],
+    }.items() if v is not None}
+    for l in LORESHEET_CATALOG
+]
+
+
+def get_loresheet(loresheet_id: str) -> dict | None:
+    """Full loresheet (with per-dot descriptions) by id, or None."""
+    return _LORESHEET_BY_ID.get(loresheet_id)
+
+
+LORESHEET_DOT_XP = 3   # XP per loresheet dot (V5: dot × 3)
+
 
 # Flat allow-list of single-value sheet keys. Free-form lists (merits/flaws/
 # rituals/ceremonies/formulae) are handled separately by the save route.

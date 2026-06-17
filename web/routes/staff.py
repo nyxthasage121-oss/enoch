@@ -75,6 +75,13 @@ from ..xp_rules import SPEND_CATEGORIES
 router = APIRouter(prefix="/staff", tags=["staff"])
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 
+# The staff sheet view renders first-class loresheets; expose the id→loresheet
+# lookup to this module's Jinja env (player.py registers the same on its own).
+from ..v5_traits import LORESHEET_CATALOG as _STAFF_LORESHEET_CATALOG  # noqa: E402
+templates.env.globals["loresheets_by_id"] = {
+    l["id"]: l for l in _STAFF_LORESHEET_CATALOG
+}
+
 
 def _header_safe(s: str) -> str:
     """HTTP headers must be latin-1; replace common Unicode punctuation."""
