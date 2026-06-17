@@ -1840,7 +1840,7 @@ async def create_coterie_route(
         with get_db() as conn:
             co = create_coterie(
                 conn, name=name,
-                chasse=max(1, min(5, chasse)),
+                chasse=max(0, min(5, chasse)),
                 lien=max(0, min(5, lien)),
                 portillon=max(0, min(5, portillon)),
                 discord_role_id=role_id,

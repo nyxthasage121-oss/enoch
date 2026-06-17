@@ -2299,7 +2299,7 @@ COTERIE_CREATION_STATES = {"forming", "submitted", "active"}
 def create_coterie(
     conn,
     name: str,
-    chasse: int = 1,
+    chasse: int = 0,
     lien: int = 0,
     portillon: int = 0,
     discord_role_id: str | None = None,
