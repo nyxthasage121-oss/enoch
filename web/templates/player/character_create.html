@@ -211,14 +211,14 @@
                 <span x-text="discDotsTarget"></span>
               </span>
             </li>
-            {# Merits, Backgrounds and Advantages are one V5 "Advantages"
-               pool — track them combined, not as three separate budgets.
+            {# Merits, Backgrounds, Advantages AND loresheets are one V5
+               "Advantages" pool — track them combined, not as separate budgets.
                Predator-granted dots are free (budgetUsed excludes them). #}
             <li class="flex items-center justify-between gap-2 pt-1.5 border-t border-ink-800">
               <span class="text-bone-500">Advantages</span>
-              <span :class="(budgetUsed.merits + budgetUsed.advantages + budgetUsed.backgrounds) > (budgets.merits + budgets.advantages + budgets.backgrounds)
+              <span :class="(budgetUsed.merits + budgetUsed.advantages + budgetUsed.backgrounds + budgetUsed.loresheets) > (budgets.merits + budgets.advantages + budgets.backgrounds)
                               ? 'text-blood-400 aurora-pulse-blood inline-block rounded px-1' : 'text-gold-400'">
-                <span x-text="budgetUsed.merits + budgetUsed.advantages + budgetUsed.backgrounds"></span>
+                <span x-text="budgetUsed.merits + budgetUsed.advantages + budgetUsed.backgrounds + budgetUsed.loresheets"></span>
                 <span class="text-bone-700">/</span>
                 <span x-text="budgets.merits + budgets.advantages + budgets.backgrounds"></span>
               </span>
@@ -1471,33 +1471,6 @@
           </div>
         </div>
 
-        {# Advantages #}
-        <div class="gilded p-5">
-          <p class="label-gold mb-3 text-xs">Advantages</p>
-          <template x-for="(a, idx) in advantages" :key="'a'+idx">
-            <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
-              <span class="font-garamond text-xs text-bone-300 flex-1 truncate" x-text="a.name"></span>
-              <div class="flex gap-0.5">
-                <template x-for="n in 5">
-                  <button type="button" @click="a.dots = (a.dots === n ? n - 1 : n)"
-                          class="w-2.5 h-2.5 rounded-full border transition-colors"
-                          :class="a.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
-                </template>
-              </div>
-              <button type="button" @click="advantages.splice(idx, 1)"
-                      class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
-            </div>
-          </template>
-          <div class="flex items-center gap-2 mt-3">
-            <input type="text" maxlength="80" x-model="newAdvantageName"
-                   list="mf-merits" autocomplete="off"
-                   @keydown.enter.prevent="addAdvantage()"
-                   placeholder="e.g. Linguistics, Catenating Blood…" class="text-xs py-1 px-2 flex-1">
-            <button type="button" @click="addAdvantage()"
-                    class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
-          </div>
-        </div>
-
         {# Backgrounds #}
         <div class="gilded p-5">
           <p class="label-gold mb-3 text-xs">Backgrounds</p>
@@ -1517,12 +1490,71 @@
           </template>
           <div class="flex items-center gap-2 mt-3">
             <input type="text" maxlength="80" x-model="newBackgroundName"
-                   list="mf-merits" autocomplete="off"
+                   list="mf-backgrounds" autocomplete="off"
                    @keydown.enter.prevent="addBackground()"
                    placeholder="e.g. Haven, Resources, Allies…" class="text-xs py-1 px-2 flex-1">
             <button type="button" @click="addBackground()"
                     class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300">Add</button>
           </div>
+        </div>
+
+        {# Loresheets — count toward the Advantages pool, same as a background.
+           Pick a sheet + a dot rating; each dot grants that level's benefit. #}
+        <div class="gilded p-5">
+          <div class="flex items-baseline justify-between mb-2">
+            <p class="label-gold text-xs">Loresheets</p>
+            <span class="font-cinzel text-[0.6rem] text-bone-700">counts as Advantages</span>
+          </div>
+          <p class="font-garamond text-[0.65rem] text-bone-700 italic mb-3">
+            Story connections bought in dots ({{ loresheet_dot_xp }} XP/dot); each dot grants that
+            level's benefit and draws the shared Advantages pool. Many need ST approval.
+          </p>
+
+          <template x-for="ls in loresheets" :key="ls.id">
+            <div class="py-1.5 border-b border-ink-800 last:border-0">
+              <div class="flex items-center gap-2">
+                <span class="font-cinzel text-xs text-bone-200 flex-1 truncate" x-text="ls.name"></span>
+                <div class="flex gap-0.5">
+                  <template x-for="n in 5">
+                    <button type="button"
+                            @click="ls.dots = (ls.dots === n ? n - 1 : n); if (ls.dots < 1) removeLoresheet(ls.id)"
+                            class="w-2.5 h-2.5 rounded-full border transition-colors"
+                            :class="ls.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
+                  </template>
+                </div>
+                <button type="button" @click="removeLoresheet(ls.id)"
+                        class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+              </div>
+              <div class="mt-1 ml-1 space-y-0.5">
+                <template x-for="d in loresheetDots(ls.id)" :key="d.dot">
+                  <p class="font-garamond text-[0.6rem]"
+                     :class="d.dot <= ls.dots ? 'text-bone-500' : 'text-bone-800'">
+                    <span x-text="d.dot"></span>. <span x-text="d.name"></span>
+                  </p>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <div class="flex items-end gap-2 mt-3">
+            <div class="flex-1 min-w-0">
+              <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">Loresheet</label>
+              <input type="text" maxlength="80" x-model="newLoresheetName"
+                     list="ls-catalog" autocomplete="off"
+                     placeholder="Search loresheets…"
+                     @keydown.enter.prevent="addLoresheet()"
+                     class="text-sm py-1.5 px-2 w-full">
+              <datalist id="ls-catalog">
+                <template x-for="l in loresheetPicker" :key="l.id">
+                  <option :value="l.name" :label="l.source + (l.requires_st_permission ? ' · ST' : '')"></option>
+                </template>
+              </datalist>
+            </div>
+            <button type="button" @click="addLoresheet()"
+                    class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5 shrink-0">Add</button>
+          </div>
+          <p x-show="newLoresheetError" x-cloak x-text="newLoresheetError"
+             class="font-garamond text-blood-400 text-[0.6rem] mt-1"></p>
         </div>
 
         {# Flaws #}
@@ -1573,16 +1605,22 @@
         </div>
       </div>
 
-      {# Shared autocomplete catalogs (merits/flaws lift, 2026-06-17). One merit
-         list feeds Merits / Advantages / Backgrounds; flaws have their own. #}
+      {# Autocomplete catalogs (merits/flaws lift). Split by kind so the Merits
+         box offers merits and the Backgrounds box offers backgrounds (both incl.
+         advanced-complexity entries, tagged "adv"); flaws have their own. #}
       <datalist id="mf-merits">
-        <template x-for="m in meritCatalog" :key="m.name">
-          <option :value="m.name" :label="m.category + (m.summary ? ' · ' + m.summary : '')"></option>
+        <template x-for="m in meritCatalog.filter(x => x.kind !== 'background')" :key="m.name">
+          <option :value="m.name" :label="(m.advanced ? '[adv] ' : '') + m.category + (m.summary ? ' · ' + m.summary : '')"></option>
+        </template>
+      </datalist>
+      <datalist id="mf-backgrounds">
+        <template x-for="m in meritCatalog.filter(x => x.kind === 'background')" :key="m.name">
+          <option :value="m.name" :label="(m.advanced ? '[adv] ' : '') + m.category + (m.summary ? ' · ' + m.summary : '')"></option>
         </template>
       </datalist>
       <datalist id="mf-flaws">
         <template x-for="m in flawCatalog" :key="m.name">
-          <option :value="m.name" :label="m.category + (m.summary ? ' · ' + m.summary : '')"></option>
+          <option :value="m.name" :label="(m.advanced ? '[adv] ' : '') + m.category + (m.summary ? ' · ' + m.summary : '')"></option>
         </template>
       </datalist>
 
@@ -1590,6 +1628,7 @@
       <input type="hidden" name="advantages"  :value="JSON.stringify(advantages)">
       <input type="hidden" name="backgrounds" :value="JSON.stringify(backgrounds)">
       <input type="hidden" name="flaws"       :value="JSON.stringify(flaws)">
+      <input type="hidden" name="loresheets"  :value="JSON.stringify(loresheets)">
 
       {% include "player/partials/wizard_nav.html" %}
     </div>
@@ -1646,69 +1685,11 @@
           {% endwith %}
         </div>
 
-        {# Loresheets — first-class: pick a sheet + a dot rating; each dot
-           grants that level's benefit ({{ loresheet_dot_xp }} XP/dot). #}
-        <div class="gilded p-5">
-          <div class="flex items-baseline justify-between mb-2">
-            <p class="label-gold text-xs">Loresheets</p>
-            <span class="font-cinzel text-[0.6rem] text-bone-700">{{ loresheet_dot_xp }} XP / dot</span>
-          </div>
-          <p class="font-garamond text-[0.65rem] text-bone-700 italic mb-3">
-            Story connections bought in dots; each dot grants that level's benefit. Many need ST approval.
-          </p>
-
-          <template x-for="ls in loresheets" :key="ls.id">
-            <div class="py-1.5 border-b border-ink-800 last:border-0">
-              <div class="flex items-center gap-2">
-                <span class="font-cinzel text-xs text-bone-200 flex-1 truncate" x-text="ls.name"></span>
-                <div class="flex gap-0.5">
-                  <template x-for="n in 5">
-                    <button type="button"
-                            @click="ls.dots = (ls.dots === n ? n - 1 : n); if (ls.dots < 1) removeLoresheet(ls.id)"
-                            class="w-2.5 h-2.5 rounded-full border transition-colors"
-                            :class="ls.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
-                  </template>
-                </div>
-                <button type="button" @click="removeLoresheet(ls.id)"
-                        class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
-              </div>
-              <div class="mt-1 ml-1 space-y-0.5">
-                <template x-for="d in loresheetDots(ls.id)" :key="d.dot">
-                  <p class="font-garamond text-[0.6rem]"
-                     :class="d.dot <= ls.dots ? 'text-bone-500' : 'text-bone-800'">
-                    <span x-text="d.dot"></span>. <span x-text="d.name"></span>
-                  </p>
-                </template>
-              </div>
-            </div>
-          </template>
-
-          <div class="flex items-end gap-2 mt-3">
-            <div class="flex-1 min-w-0">
-              <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">Loresheet</label>
-              <input type="text" maxlength="80" x-model="newLoresheetName"
-                     list="ls-catalog" autocomplete="off"
-                     placeholder="Search loresheets…"
-                     @keydown.enter.prevent="addLoresheet()"
-                     class="text-sm py-1.5 px-2 w-full">
-              <datalist id="ls-catalog">
-                <template x-for="l in loresheetPicker" :key="l.id">
-                  <option :value="l.name" :label="l.source + (l.requires_st_permission ? ' · ST' : '')"></option>
-                </template>
-              </datalist>
-            </div>
-            <button type="button" @click="addLoresheet()"
-                    class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5 shrink-0">Add</button>
-          </div>
-          <p x-show="newLoresheetError" x-cloak x-text="newLoresheetError"
-             class="font-garamond text-blood-400 text-[0.6rem] mt-1"></p>
-        </div>
       </div>
 
       <input type="hidden" name="rituals"    :value="JSON.stringify(rituals)">
       <input type="hidden" name="ceremonies" :value="JSON.stringify(ceremonies)">
       <input type="hidden" name="formulae"   :value="JSON.stringify(formulae)">
-      <input type="hidden" name="loresheets" :value="JSON.stringify(loresheets)">
 
       {% include "player/partials/wizard_nav.html" %}
     </div>
@@ -3154,7 +3135,7 @@
         // flaws vs flaw_cap) so illegal builds can't reach staff.
         if (this.step === 8) {
           const u = this.budgetUsed, b = this.budgets;
-          const advOver = (u.merits + u.advantages + u.backgrounds)
+          const advOver = (u.merits + u.advantages + u.backgrounds + u.loresheets)
                         > (b.merits + b.advantages + b.backgrounds);
           return !advOver && u.flaws <= b.flaw_cap;
         }
@@ -3206,6 +3187,7 @@
           merits:      sum(this.merits),
           advantages:  sum(this.advantages),
           backgrounds: sum(this.backgrounds),
+          loresheets:  sum(this.loresheets),   // count toward the Advantages pool
           flaws:       sum(this.flaws),
         };
       },

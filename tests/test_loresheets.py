@@ -72,6 +72,36 @@ def test_chargen_page_embeds_picker(player):
     assert "loresheetPicker" in r.text
 
 
+def test_loresheets_count_toward_advantage_pool():
+    """Server-side: loresheet dots draw the same Advantages pool as
+    merits/backgrounds, so a bypass can't overspend via loresheets."""
+    from web.v5_traits import validate_chargen_raw
+    over = {
+        "merits":      [{"name": "Beautiful", "dots": 2}],
+        "backgrounds": [{"name": "Resources", "dots": 3}],
+        "loresheets":  [{"id": "chamber-1444", "name": "1444 Chamber", "dots": 3}],
+    }  # 2 + 3 + 3 = 8 > pool 7
+    errs = validate_chargen_raw(over, advantage_pool=7)
+    assert any("Advantages" in e and "Loresheets" in e for e in errs)
+
+    ok = {
+        "merits":      [{"name": "Beautiful", "dots": 2}],
+        "backgrounds": [{"name": "Resources", "dots": 3}],
+        "loresheets":  [{"id": "chamber-1444", "name": "1444 Chamber", "dots": 2}],
+    }  # 2 + 3 + 2 = 7 == pool 7
+    assert not any("Advantages" in e for e in validate_chargen_raw(ok, advantage_pool=7))
+
+
+def test_merit_catalog_kind_split():
+    """The catalog is tagged merit vs background so the two Legacy pickers can
+    filter; backgrounds follow the friend's category set."""
+    from web.v5_traits import MERIT_CATALOG
+    by_name = {m["name"]: m for m in MERIT_CATALOG}
+    assert by_name["Resources"]["kind"] == "background"
+    assert by_name["Beautiful"]["kind"] == "merit"
+    assert all(m["kind"] in {"merit", "background"} for m in MERIT_CATALOG)
+
+
 def _make_char_with_loresheet(discord_id="111111111111111111"):
     import json as _json
     from web.db import get_db, upsert_player, create_character, get_character

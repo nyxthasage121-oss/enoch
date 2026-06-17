@@ -123,6 +123,14 @@ MERITS_FLAWS: dict[str, list[dict]] = json.loads(
 MERIT_CATALOG: list[dict] = MERITS_FLAWS.get("merits", [])
 FLAW_CATALOG:  list[dict] = MERITS_FLAWS.get("flaws", [])
 
+# Split the positive catalog into merits vs backgrounds so the chargen Legacy
+# step can show two focused pickers. Background categories follow the friend's
+# authoritative classification (MeritsAndFlawsPicker BG title sets); everything
+# else is a merit. Loresheets are treated as backgrounds for budget purposes.
+_BACKGROUND_CATEGORIES = {"Haven", "Resources", "Kindred", "Mortals", "Fame", "Influence"}
+for _m in MERIT_CATALOG:
+    _m["kind"] = "background" if _m.get("category") in _BACKGROUND_CATEGORIES else "merit"
+
 # Blood Sorcery Rituals + Oblivion Ceremonies catalog — V5-generic, lifted from
 # the friend's data set (2026-06-17). Each entry is {name, level, summary,
 # dice_pool, rouse_checks, required_time?, ingredients?, prerequisite_powers?}.
@@ -852,12 +860,14 @@ def validate_chargen_raw(
                         pass
             return total
 
+        # Loresheets count the same as Merits/Backgrounds — they draw the same
+        # Advantages pool (a loresheet dot is treated as a background dot).
         adv = (_player_dots("merits") + _player_dots("backgrounds")
-               + _player_dots("advantages"))
+               + _player_dots("advantages") + _player_dots("loresheets"))
         if adv > advantage_pool:
             errors.append(
-                f"Advantages (Merits + Backgrounds) total {adv} dots — the limit "
-                f"is {advantage_pool} at creation."
+                f"Advantages (Merits + Backgrounds + Loresheets) total {adv} dots — "
+                f"the limit is {advantage_pool} at creation."
             )
         flaw_dots = _player_dots("flaws")
         if flaw_dots < flaw_min:
