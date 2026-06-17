@@ -234,6 +234,17 @@
                 <span x-text="budgets.flaw_cap"></span>
               </span>
             </li>
+            {# Thin-Bloods: tb-specific Merits must be 1:1 matched by tb Flaws
+               (a separate balanced set, free of the pools above). #}
+            <li class="flex items-center justify-between gap-2" x-show="isThinblood()" x-cloak>
+              <span class="text-bone-500">Thin-Blood M/F</span>
+              <span :class="tbMeritCount() > tbFlawCount() ? 'text-blood-400'
+                              : (tbMeritCount() > 0 && tbMeritCount() === tbFlawCount() ? 'text-gold-400' : 'text-bone-400')">
+                <span x-text="tbMeritCount()"></span>
+                <span class="text-bone-700">/</span>
+                <span x-text="tbFlawCount()"></span>
+              </span>
+            </li>
             <li class="flex items-center justify-between gap-2 pt-1.5 border-t border-ink-800">
               <span class="text-bone-500">Touchstones</span>
               <span :class="touchstones.length < 2 || touchstones.length > 3
@@ -3123,6 +3134,18 @@
         const n = (name || '').trim().toLowerCase();
         return this.flawCatalog.find(m => m.name.toLowerCase() === n) || null;
       },
+      // Thin-blood-specific merits/flaws (catalog restriction:'thinblood') form a
+      // separate 1:1 balanced set — each tb merit must be funded by a tb flaw.
+      _isTbTrait(name) {
+        const c = this.meritByName(name) || this.flawByName(name);
+        return !!(c && c.restriction === 'thinblood');
+      },
+      tbMeritCount() { return this.merits.filter(m => this._isTbTrait(m.name)).length; },
+      tbFlawCount()  { return this.flaws.filter(f => this._isTbTrait(f.name)).length; },
+      isThinblood() {
+        return this.charName.character_type === 'kindred'
+          && (this.charName.character_tier === 'thinblood' || this.charName.clan === 'thin-blood');
+      },
       mfSummary(name, kind) {
         const e = kind === 'flaw' ? this.flawByName(name) : this.meritByName(name);
         return e ? e.summary : '';
@@ -3169,6 +3192,12 @@
         // Block mutually-exclusive picks (Beautiful vs Ugly, …).
         const reason = this.exclusionReason(name);
         if (reason) { this.mfError = name + ' ' + reason + '.'; return true; }
+        // Thin-blood merits must each be funded by a thin-blood flaw (1:1).
+        if (listKey === 'merits' && this._isTbTrait(name)
+            && this.tbMeritCount() >= this.tbFlawCount()) {
+          this.mfError = name + ': take a Thin-Blood Flaw first to fund this Thin-Blood Merit.';
+          return true;
+        }
         this.mfError = '';
         // No duplicate trait within the same list.
         if (!this[listKey].some(x => x.name.toLowerCase() === name.toLowerCase())) {
@@ -3445,7 +3474,9 @@
           const u = this.budgetUsed, b = this.budgets;
           const advOver = (u.merits + u.advantages + u.backgrounds + u.loresheets)
                         > (b.merits + b.advantages + b.backgrounds);
-          return !advOver && u.flaws <= b.flaw_cap;
+          // Thin-Bloods can't leave with unfunded thin-blood Merits.
+          const tbUnbalanced = this.isThinblood() && this.tbMeritCount() > this.tbFlawCount();
+          return !advOver && u.flaws <= b.flaw_cap && !tbUnbalanced;
         }
         return true;
       },
@@ -3488,8 +3519,10 @@
         // Granted dots are free in V5 — predator grants AND clan-Bane flaws
         // (e.g. Nosferatu's Repulsive ••) don't eat the player's merit/
         // advantage/background/flaw pools, so exclude any src-tagged entry.
+        // Thin-blood-specific merits/flaws are also free: each tb merit is
+        // offset by a tb flaw (a separate 1:1 balanced set), so exclude both.
         const sum = list => list
-          .filter(x => !x.src)
+          .filter(x => !x.src && !this._isTbTrait(x.name))
           .reduce((acc, x) => acc + (x.dots || 0), 0);
         // Loresheets: each picked entry costs its own level (non-cumulative).
         // XP-bought entries (src:'xp', from the Advance step) draw XP, not the

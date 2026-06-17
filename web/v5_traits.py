@@ -131,6 +131,13 @@ _BACKGROUND_CATEGORIES = {"Haven", "Resources", "Kindred", "Mortals", "Fame", "I
 for _m in MERIT_CATALOG:
     _m["kind"] = "background" if _m.get("category") in _BACKGROUND_CATEGORIES else "merit"
 
+# Thin-blood-specific merit/flaw names — a separate 1:1 balanced set (each tb
+# merit funded by a tb flaw), free of the normal Advantages pool / flaw cap.
+_TB_RESTRICTED_NAMES: set[str] = {
+    m["name"].lower() for m in (MERIT_CATALOG + FLAW_CATALOG)
+    if m.get("restriction") == "thinblood"
+}
+
 # Blood Sorcery Rituals + Oblivion Ceremonies catalog — V5-generic, lifted from
 # the friend's data set (2026-06-17). Each entry is {name, level, summary,
 # dice_pool, rouse_checks, required_time?, ingredients?, prerequisite_powers?}.
@@ -853,11 +860,16 @@ def validate_chargen_raw(
         def _player_dots(list_key: str) -> int:
             total = 0
             for it in (sheet.get(list_key) or []):
-                if isinstance(it, dict) and not it.get("src"):
-                    try:
-                        total += int(it.get("dots", 0) or 0)
-                    except (TypeError, ValueError):
-                        pass
+                if not (isinstance(it, dict) and not it.get("src")):
+                    continue
+                # Thin-blood-specific merits/flaws are a separate balanced set,
+                # free of the normal pool / cap — exclude them here.
+                if str(it.get("name", "")).strip().lower() in _TB_RESTRICTED_NAMES:
+                    continue
+                try:
+                    total += int(it.get("dots", 0) or 0)
+                except (TypeError, ValueError):
+                    pass
             return total
 
         # Loresheets count the same as Merits/Backgrounds — they draw the same
@@ -892,5 +904,20 @@ def validate_chargen_raw(
             errors.append(
                 f"Flaws total {flaw_dots} dots — the limit is {flaw_cap} at creation."
             )
+
+        # Thin-blood-specific Merits must each be funded by a thin-blood Flaw (1:1).
+        if (clan or "").strip().lower() in ("thin-blood", "thinblood"):
+            def _tb_count(list_key: str) -> int:
+                return sum(
+                    1 for it in (sheet.get(list_key) or [])
+                    if isinstance(it, dict)
+                    and str(it.get("name", "")).strip().lower() in _TB_RESTRICTED_NAMES
+                )
+            tb_m, tb_f = _tb_count("merits"), _tb_count("flaws")
+            if tb_m > tb_f:
+                errors.append(
+                    f"Thin-Blood Merits ({tb_m}) must each be matched by a "
+                    f"Thin-Blood Flaw (you have {tb_f})."
+                )
 
     return errors
