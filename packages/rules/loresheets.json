@@ -82,7 +82,14 @@
       {
         "dot": 2,
         "name": "Boss Lady",
-        "description": "You have a personal relationship with Chastain. Not only does she consider you an associate, but she has taken you under her wing and acts as your mentor. You possess Mawla (••) (Amanda Chastain). If you're too public with this relationship, you may risk attracting the attention of one of Amanda's enemies (•)."
+        "description": "You have a personal relationship with Chastain. Not only does she consider you an associate, but she has taken you under her wing and acts as your mentor. You possess Mawla (••) (Amanda Chastain). If you're too public with this relationship, you may risk attracting the attention of one of Amanda's enemies (•).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Mawla",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 3,
@@ -97,7 +104,14 @@
       {
         "dot": 5,
         "name": "Learning the System",
-        "description": "Chastain considers you a close personal friend and has taught you her system of setting up a domain. She has given you the tools of her rather ruthless and influential trade. Gain Influence (••). When dealing with mortal politicians, law enforcement, or the media, add two extra dice to all Social dice pools. Once per story, you may ask for Chastain's assistance and receive it (at the Storyteller's discretion)."
+        "description": "Chastain considers you a close personal friend and has taught you her system of setting up a domain. She has given you the tools of her rather ruthless and influential trade. Gain Influence (••). When dealing with mortal politicians, law enforcement, or the media, add two extra dice to all Social dice pools. Once per story, you may ask for Chastain's assistance and receive it (at the Storyteller's discretion).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Influence",
+            "dots": 2
+          }
+        ]
       }
     ]
   },
@@ -153,7 +167,14 @@
       {
         "dot": 3,
         "name": "Taught by the Best",
-        "description": "As one of Ambrus' disciples, you are provided with a ready supply of intel on topics from Second Inquisition operations to the fashion in Harajuku tomorrow night. Ambrus can also time-lock information in the Dark Web or set you up with your own Ukrainian hacker at \"friend prices.\" Consider Ambrus a three-dot Mawla (●●●)."
+        "description": "As one of Ambrus' disciples, you are provided with a ready supply of intel on topics from Second Inquisition operations to the fashion in Harajuku tomorrow night. Ambrus can also time-lock information in the Dark Web or set you up with your own Ukrainian hacker at \"friend prices.\" Consider Ambrus a three-dot Mawla (●●●).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Mawla",
+            "dots": 3
+          }
+        ]
       },
       {
         "dot": 4,
@@ -163,7 +184,14 @@
       {
         "dot": 5,
         "name": "On Another Grid Entirely",
-        "description": "Ambrus went all out with your false identity. You have two two-dot Mask (●●) cover identities and have been Zeroed (p. 192). You get three extra dice to resist attempts to research you online or uncover your activities in the mortal world."
+        "description": "Ambrus went all out with your false identity. You have two two-dot Mask (●●) cover identities and have been Zeroed (p. 192). You get three extra dice to resist attempts to research you online or uncover your activities in the mortal world.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Mask",
+            "dots": 2
+          }
+        ]
       }
     ]
   },
@@ -434,12 +462,31 @@
       {
         "dot": 3,
         "name": "Paranoia Strikes Deep",
-        "description": "You know about the existence of FIRSTLIGHT and know they're active somewhere near — possibly inside — Chicago. You possess Contacts (••••) related to FIRSTLIGHT or government-sponsored vampire hunting operations; use them once per story before they go dark."
+        "description": "You know about the existence of FIRSTLIGHT and know they're active somewhere near — possibly inside — Chicago. You possess Contacts (••••) related to FIRSTLIGHT or government-sponsored vampire hunting operations; use them once per story before they go dark.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Contacts",
+            "dots": 4
+          }
+        ]
       },
       {
         "dot": 4,
         "name": "It's My Job To Know This Stuff",
-        "description": "As a security specialist for the Chicago Domain, you've uncovered considerable information about the government's vampire hunters, including that they have a permanent installation near Chicago. Grants Status (••) among Kindred and Influence (••) among kine."
+        "description": "As a security specialist for the Chicago Domain, you've uncovered considerable information about the government's vampire hunters, including that they have a permanent installation near Chicago. Grants Status (••) among Kindred and Influence (••) among kine.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 2
+          },
+          {
+            "kind": "background",
+            "name": "Influence",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 5,
@@ -602,12 +649,26 @@
       {
         "dot": 3,
         "name": "Just One Job",
-        "description": "When you help the Capone Gang with a heist, you get a cut. They plan the job and leave you to walk in, grab what's good, and walk out. Gain Resources (•••) from a successful completion of the job."
+        "description": "When you help the Capone Gang with a heist, you get a cut. They plan the job and leave you to walk in, grab what's good, and walk out. Gain Resources (•••) from a successful completion of the job.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Resources",
+            "dots": 3
+          }
+        ]
       },
       {
         "dot": 4,
         "name": "One of Us",
-        "description": "You've become an official member of the Capone Gang via a making ceremony. Gain Resources (••) and Allies: Capone Gang (••), allowing you to hire members for work — with Eddie Wu's permission. You gain one additional die to Streetwise rolls concerning organized crime."
+        "description": "You've become an official member of the Capone Gang via a making ceremony. Gain Resources (••) and Allies: Capone Gang (••), allowing you to hire members for work — with Eddie Wu's permission. You gain one additional die to Streetwise rolls concerning organized crime.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Resources",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 5,
@@ -635,7 +696,14 @@
       {
         "dot": 3,
         "name": "Neillson Library",
-        "description": "Carmelita Neillson's small libraries dot the world in Camarilla domains, serving as hives of information used to prompt and support elder vampires' memories. You are the curator or warden for one of these libraries, which counts as a two-dot Haven (●●) with a two-dot Library (●●). Other vampires and Kindred historians meet there as well, which has both advantages and downsides."
+        "description": "Carmelita Neillson's small libraries dot the world in Camarilla domains, serving as hives of information used to prompt and support elder vampires' memories. You are the curator or warden for one of these libraries, which counts as a two-dot Haven (●●) with a two-dot Library (●●). Other vampires and Kindred historians meet there as well, which has both advantages and downsides.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Haven",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 4,
@@ -918,7 +986,24 @@
       {
         "dot": 5,
         "name": "Shalim Is",
-        "description": "You are a true servant of Shalim. Your position grants Herd (••) for your followers and Influence (•••) in the religious community of your choice. You gain the Dark Secret Flaw (•). You automatically pass any Composure-based roll to hide your membership in the cult."
+        "description": "You are a true servant of Shalim. Your position grants Herd (••) for your followers and Influence (•••) in the religious community of your choice. You gain the Dark Secret Flaw (•). You automatically pass any Composure-based roll to hide your membership in the cult.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Herd",
+            "dots": 2
+          },
+          {
+            "kind": "background",
+            "name": "Influence",
+            "dots": 3
+          },
+          {
+            "kind": "flaw",
+            "name": "Dark Secret",
+            "dots": 1
+          }
+        ]
       }
     ]
   },
@@ -1079,7 +1164,14 @@
       {
         "dot": 3,
         "name": "Ventrue Pillar",
-        "description": "Due to your prestigious lineage, other Ventrue look to you for guidance. Regardless of your Status with other groups, you always have three dots of Status (●●●) with Ventrue."
+        "description": "Due to your prestigious lineage, other Ventrue look to you for guidance. Regardless of your Status with other groups, you always have three dots of Status (●●●) with Ventrue.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 3
+          }
+        ]
       },
       {
         "dot": 4,
@@ -1254,7 +1346,14 @@
       {
         "dot": 2,
         "name": "Responsible Middle Childe",
-        "description": "A steadfast and proud member of Lodin's bloodline, just coming into your own. Other Kindred of similar age and Generation look to you for leadership. With them you always carry a minimum of Status (••)."
+        "description": "A steadfast and proud member of Lodin's bloodline, just coming into your own. Other Kindred of similar age and Generation look to you for leadership. With them you always carry a minimum of Status (••).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 3,
@@ -1269,7 +1368,14 @@
       {
         "dot": 5,
         "name": "Long-Lost Relative",
-        "description": "You are a descendant of one of the childer Lodin sired between his departure from Veracruz and his arrival in Chicago. Your arrival has sent a shockwave through the city. You enjoy Status (••••) among Ventrue and court officials, and a definite seat at the Prince's table."
+        "description": "You are a descendant of one of the childer Lodin sired between his departure from Veracruz and his arrival in Chicago. Your arrival has sent a shockwave through the city. You enjoy Status (••••) among Ventrue and court officials, and a definite seat at the Prince's table.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 4
+          }
+        ]
       }
     ],
     "clan_restriction": [
@@ -1393,7 +1499,14 @@
       {
         "dot": 1,
         "name": "Proud Childe",
-        "description": "Your grandsire is among the most storied and respected of any to walk among the Clan of Death. While within any Hecata controlled domain, haven, or social gathering, you have two dots of Status (••)."
+        "description": "Your grandsire is among the most storied and respected of any to walk among the Clan of Death. While within any Hecata controlled domain, haven, or social gathering, you have two dots of Status (••).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 2,
@@ -1721,7 +1834,14 @@
       {
         "dot": 3,
         "name": "Friendly Benefits",
-        "description": "You enjoy a three-dot Mawla (•••) friendship with Fiorenza. She offers information, safe houses, the occasional mortal introduction, and protection of a limited nature."
+        "description": "You enjoy a three-dot Mawla (•••) friendship with Fiorenza. She offers information, safe houses, the occasional mortal introduction, and protection of a limited nature.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Mawla",
+            "dots": 3
+          }
+        ]
       },
       {
         "dot": 4,
@@ -2233,12 +2353,26 @@
       {
         "dot": 2,
         "name": "Recent Graduate",
-        "description": "You have emerged from one of the Prince's finishing schools, ready to help him achieve his goals. You have been granted the assistance of one of his ghouls equivalent to Retainers (••) who schools you in Chicago and assists you in whatever duties the Prince assigns."
+        "description": "You have emerged from one of the Prince's finishing schools, ready to help him achieve his goals. You have been granted the assistance of one of his ghouls equivalent to Retainers (••) who schools you in Chicago and assists you in whatever duties the Prince assigns.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Retainers",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 3,
         "name": "Up and Comer",
-        "description": "The Prince has granted you provisional access to one of his non-criminal areas of interest, equivalent to Influence (•••). Once per story, you may invoke Jackson's name to automatically succeed in a Social test with a Kindred SPC whose interests overlap with the Prince's."
+        "description": "The Prince has granted you provisional access to one of his non-criminal areas of interest, equivalent to Influence (•••). Once per story, you may invoke Jackson's name to automatically succeed in a Social test with a Kindred SPC whose interests overlap with the Prince's.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Influence",
+            "dots": 3
+          }
+        ]
       },
       {
         "dot": 4,
@@ -2382,7 +2516,14 @@
       {
         "dot": 4,
         "name": "Collabs and Sponsorships",
-        "description": "Everyone interested in your subject matter knows your name. Companies offer to work with you to create branded products and woo you with freebies they hope you'll promote. In addition to two dots in Fame, gain Allies (••) from among your fans and declare a two-dot Contact at one of the companies you've promoted."
+        "description": "Everyone interested in your subject matter knows your name. Companies offer to work with you to create branded products and woo you with freebies they hope you'll promote. In addition to two dots in Fame, gain Allies (••) from among your fans and declare a two-dot Contact at one of the companies you've promoted.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Allies",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 5,
@@ -2736,7 +2877,14 @@
       {
         "dot": 5,
         "name": "The Once and Future Prince",
-        "description": "You're one of the highly placed Kindred Maxwell is counting on in Chicago. He's guided and financed your rise, helped rid you of enemies, and provided information about Prince Jackson's machinations. Gain Resources (•••••); two dots must be spent securing Maxwell's plans, but the remaining three are yours. You have a list of Kindred in Chicago who owe Maxwell boons — once per story, you can call in a minor boon from someone on the list; once per chronicle, you can call in a major boon. Maxwell expects an account of how you've spent his favors. Using them foolishly will earn his ire."
+        "description": "You're one of the highly placed Kindred Maxwell is counting on in Chicago. He's guided and financed your rise, helped rid you of enemies, and provided information about Prince Jackson's machinations. Gain Resources (•••••); two dots must be spent securing Maxwell's plans, but the remaining three are yours. You have a list of Kindred in Chicago who owe Maxwell boons — once per story, you can call in a minor boon from someone on the list; once per chronicle, you can call in a major boon. Maxwell expects an account of how you've spent his favors. Using them foolishly will earn his ire.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Resources",
+            "dots": 5
+          }
+        ]
       }
     ]
   },
@@ -2782,12 +2930,26 @@
       {
         "dot": 1,
         "name": "The Nod Lot",
-        "description": "You have cultivated a small Herd (••) in the unofficial northwest district known as the Nod Lot. The blood resonance of your herd varies from melancholic to completely absent. However, feeding from such victims presents a high risk of transferring blood-borne pathogens. You must take the Flaw Addiction (•) or Dark Secret - Plague Bearer (•)."
+        "description": "You have cultivated a small Herd (••) in the unofficial northwest district known as the Nod Lot. The blood resonance of your herd varies from melancholic to completely absent. However, feeding from such victims presents a high risk of transferring blood-borne pathogens. You must take the Flaw Addiction (•) or Dark Secret - Plague Bearer (•).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Herd",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 2,
         "name": "The Artist Formerly Known As...",
-        "description": "You are one of the lucky few who has made a name for themselves within the music industry as a performing artist. Since your Embrace, your renown has become a double-edged sword, especially after the highly publicized reports of your death. You gain Fame (•••), however, you must also take the Flaw Mask (Known Corpse)."
+        "description": "You are one of the lucky few who has made a name for themselves within the music industry as a performing artist. Since your Embrace, your renown has become a double-edged sword, especially after the highly publicized reports of your death. You gain Fame (•••), however, you must also take the Flaw Mask (Known Corpse).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Fame",
+            "dots": 3
+          }
+        ]
       },
       {
         "dot": 3,
@@ -2835,7 +2997,14 @@
       {
         "dot": 5,
         "name": "Pauper Dynasty",
-        "description": "Whatever Chicago's Kindred think, Modius is a Prince and has been one for over half a century. He has insight into what it takes to rule and imparts that wisdom to you in the hopes you'll seize praxis in some other domain — provided it's neither Gary nor Chicago. Gain Modius as a five-dot Mawla, and gain Influence (••) in a city of your choosing to reflect the groundwork he's helped you lay there."
+        "description": "Whatever Chicago's Kindred think, Modius is a Prince and has been one for over half a century. He has insight into what it takes to rule and imparts that wisdom to you in the hopes you'll seize praxis in some other domain — provided it's neither Gary nor Chicago. Gain Modius as a five-dot Mawla, and gain Influence (••) in a city of your choosing to reflect the groundwork he's helped you lay there.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Influence",
+            "dots": 2
+          }
+        ]
       }
     ]
   },
@@ -2863,7 +3032,14 @@
       {
         "dot": 4,
         "name": "The Hollow Veins",
-        "description": "Deep within Nashville's darkest sewer places lies the Hollowed Veins freehold, ruled by a motley of Sluagh called the Whispered Court. Thallain flock to the freehold, held in check by the sly and wicked Unseelie. You've met denizens or prisoners of the freehold and perhaps done work for them. You know an emissary of the dark Unseelie and may call upon them for information or favors — though as with any Fae dealing, the reward is often not what you expect. Gain Mawla (••••) to be used at your own peril."
+        "description": "Deep within Nashville's darkest sewer places lies the Hollowed Veins freehold, ruled by a motley of Sluagh called the Whispered Court. Thallain flock to the freehold, held in check by the sly and wicked Unseelie. You've met denizens or prisoners of the freehold and perhaps done work for them. You know an emissary of the dark Unseelie and may call upon them for information or favors — though as with any Fae dealing, the reward is often not what you expect. Gain Mawla (••••) to be used at your own peril.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Mawla",
+            "dots": 4
+          }
+        ]
       },
       {
         "dot": 5,
@@ -2917,12 +3093,31 @@
       {
         "dot": 1,
         "name": "Recruit",
-        "description": "Something about you has attracted Bordruff's attention. He has extended his hand in friendship in the form of Mawla (••) but requires you accept a one-step Blood Bond with him."
+        "description": "Something about you has attracted Bordruff's attention. He has extended his hand in friendship in the form of Mawla (••) but requires you accept a one-step Blood Bond with him.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Mawla",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 2,
         "name": "Collaborator",
-        "description": "You have accepted Bordruff's friendship or patronage in what seems like a reasonable quid pro quo arrangement. You have developed Resources (•) and Status (•) and a reputation as ambitious and hardworking, but with a certain stench clinging to you from your associations."
+        "description": "You have accepted Bordruff's friendship or patronage in what seems like a reasonable quid pro quo arrangement. You have developed Resources (•) and Status (•) and a reputation as ambitious and hardworking, but with a certain stench clinging to you from your associations.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Resources",
+            "dots": 1
+          },
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 1
+          }
+        ]
       },
       {
         "dot": 3,
@@ -2932,7 +3127,14 @@
       {
         "dot": 4,
         "name": "Conspirator",
-        "description": "Bordruff has brought you fully into his confidence and asked you to join his conspiracy to bring down Kindred society from within. He has granted you access to his principal human minions — the pastor and consistory, all his ghouls with a virulent hatred of the undead — as Allies (••••)."
+        "description": "Bordruff has brought you fully into his confidence and asked you to join his conspiracy to bring down Kindred society from within. He has granted you access to his principal human minions — the pastor and consistory, all his ghouls with a virulent hatred of the undead — as Allies (••••).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Allies",
+            "dots": 4
+          }
+        ]
       },
       {
         "dot": 5,
@@ -3585,7 +3787,14 @@
       {
         "dot": 4,
         "name": "Songstress Supreme",
-        "description": "Whether vitae of the Daughters really flows in your veins or you're just exceptionally talented, your voice surpasses most mortal singers. Gain four additional dice to any vocal performances. Your talent has earned unwanted attention — gain the Stalkers Flaw and a single powerful Adversary who feels either jealous or possessive of you."
+        "description": "Whether vitae of the Daughters really flows in your veins or you're just exceptionally talented, your voice surpasses most mortal singers. Gain four additional dice to any vocal performances. Your talent has earned unwanted attention — gain the Stalkers Flaw and a single powerful Adversary who feels either jealous or possessive of you.",
+        "grants": [
+          {
+            "kind": "flaw",
+            "name": "Stalkers",
+            "dots": 1
+          }
+        ]
       },
       {
         "dot": 5,
@@ -3710,7 +3919,14 @@
       {
         "dot": 2,
         "name": "The Pen is Mightier",
-        "description": "Following in the footsteps of Tegyrius, you value knowledge and choose to hone your mental abilities just as much as you do your fighting skills. As a protégé of Tegyrius, you have access to a Banu Haqim library transplanted from Alamut during the Schism. The library counts as a two-dot Haven (••) with a two-dot Library (••), but its contents are being sought after by one of the Shepherds of Ur-Shulgi, counting as a two-dot Adversary."
+        "description": "Following in the footsteps of Tegyrius, you value knowledge and choose to hone your mental abilities just as much as you do your fighting skills. As a protégé of Tegyrius, you have access to a Banu Haqim library transplanted from Alamut during the Schism. The library counts as a two-dot Haven (••) with a two-dot Library (••), but its contents are being sought after by one of the Shepherds of Ur-Shulgi, counting as a two-dot Adversary.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Haven",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 3,
@@ -3791,7 +4007,14 @@
       {
         "dot": 5,
         "name": "Summon the Pack",
-        "description": "You are a formal member of the Anubi or a similar Lupine-hunting organization and can call on these Kindred for aid at a moment's notice when Lupines are near. Your membership grants you a temporary Mawla (•••) and four dots of Allies (Anubi Bikers) — representing mortal bikers who follow the Anubi — who can be called on once per story when Lupines are involved. Situations not involving Lupines may require favor trading and/or boons."
+        "description": "You are a formal member of the Anubi or a similar Lupine-hunting organization and can call on these Kindred for aid at a moment's notice when Lupines are near. Your membership grants you a temporary Mawla (•••) and four dots of Allies (Anubi Bikers) — representing mortal bikers who follow the Anubi — who can be called on once per story when Lupines are involved. Situations not involving Lupines may require favor trading and/or boons.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Mawla",
+            "dots": 3
+          }
+        ]
       }
     ]
   },
@@ -4333,7 +4556,14 @@
       {
         "dot": 4,
         "name": "Lydia's Lair",
-        "description": "There's a blind Tremere oracle named Lydia who lives in the abandoned train ruins. She reads the future through Blood Sorcery with uncanny accuracy. If you bring her something to eat, she'll tell you one specific thing about the future. She counts as a Mawla (••••)."
+        "description": "There's a blind Tremere oracle named Lydia who lives in the abandoned train ruins. She reads the future through Blood Sorcery with uncanny accuracy. If you bring her something to eat, she'll tell you one specific thing about the future. She counts as a Mawla (••••).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Mawla",
+            "dots": 4
+          }
+        ]
       },
       {
         "dot": 5,
@@ -4486,7 +4716,14 @@
       {
         "dot": 1,
         "name": "Plus One",
-        "description": "By a stroke of luck, your companion secured an invitation and asked you to be their plus one. You could only observe, but being there raised your social capital. Gain two dice to Persuasion and Status (••) in any encounter with a fan or regular of the Painted Lady who sees you during the week following the visit."
+        "description": "By a stroke of luck, your companion secured an invitation and asked you to be their plus one. You could only observe, but being there raised your social capital. Gain two dice to Persuasion and Status (••) in any encounter with a fan or regular of the Painted Lady who sees you during the week following the visit.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 2,
@@ -4496,7 +4733,14 @@
       {
         "dot": 3,
         "name": "Schedule an Appointment",
-        "description": "Your slim matte metal membership card entitles you to attend one party per week and schedule appointments for standard tattoos or piercings. You attract the particular regard of one regular as Retainers (••), and a piercing or tattoo improves your Status among domain counter-culturalists by one dot."
+        "description": "Your slim matte metal membership card entitles you to attend one party per week and schedule appointments for standard tattoos or piercings. You attract the particular regard of one regular as Retainers (••), and a piercing or tattoo improves your Status among domain counter-culturalists by one dot.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Retainers",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 4,
@@ -4506,7 +4750,14 @@
       {
         "dot": 5,
         "name": "A Beaubien Original",
-        "description": "You have received a commissioned piece executed by Edith Beaubien herself in the Japanese tebori style — a tattoo that never disappears upon waking. A Beaubien original adds two dice to all Streetwise rolls, grants permanent Status (•••) among Painted Lady enthusiasts and art lovers, and permanent Status (••) among other Chicago Kindred."
+        "description": "You have received a commissioned piece executed by Edith Beaubien herself in the Japanese tebori style — a tattoo that never disappears upon waking. A Beaubien original adds two dice to all Streetwise rolls, grants permanent Status (•••) among Painted Lady enthusiasts and art lovers, and permanent Status (••) among other Chicago Kindred.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Status",
+            "dots": 3
+          }
+        ]
       }
     ]
   },
@@ -4524,7 +4775,14 @@
       {
         "dot": 2,
         "name": "It Speaks",
-        "description": "You proved yourself to the Prince and were finally given speaking parts in the troupe, performing in front of Kindred and mortals. Gain Fame (•) and two extra dice whenever performing plays you learned with the troupe. One of the troupe ghouls is jealous of you, earning you Enemy (•)."
+        "description": "You proved yourself to the Prince and were finally given speaking parts in the troupe, performing in front of Kindred and mortals. Gain Fame (•) and two extra dice whenever performing plays you learned with the troupe. One of the troupe ghouls is jealous of you, earning you Enemy (•).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Fame",
+            "dots": 1
+          }
+        ]
       },
       {
         "dot": 3,
@@ -4702,7 +4960,14 @@
       {
         "dot": 4,
         "name": "High Roller",
-        "description": "You've had a string of luck at the Ruby Throat that got attention — some even said it was unrealistic. Any existing Resources Background is increased by two (to a maximum of four), and you gain access to Herd (••) whenever you are within Atlantic City, each vessel with a resonance of your choosing. You also suffer Adversary (•), as a fellow Kindred thinks you're gaming the house."
+        "description": "You've had a string of luck at the Ruby Throat that got attention — some even said it was unrealistic. Any existing Resources Background is increased by two (to a maximum of four), and you gain access to Herd (••) whenever you are within Atlantic City, each vessel with a resonance of your choosing. You also suffer Adversary (•), as a fellow Kindred thinks you're gaming the house.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Herd",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 5,
@@ -4735,12 +5000,31 @@
       {
         "dot": 4,
         "name": "Father or Mother",
-        "description": "You were a fully professed and ordained priest or senior canoness prior to your Embrace. You know exactly who the Society members are in the city and where they meet, and have strategies to avoid or misdirect them — amounting to Influence (•••) with the diocese. You retain access to church properties as a permanent Haven (••). Comes with Infamy Flaw (•)."
+        "description": "You were a fully professed and ordained priest or senior canoness prior to your Embrace. You know exactly who the Society members are in the city and where they meet, and have strategies to avoid or misdirect them — amounting to Influence (•••) with the diocese. You retain access to church properties as a permanent Haven (••). Comes with Infamy Flaw (•).",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Influence",
+            "dots": 3
+          },
+          {
+            "kind": "background",
+            "name": "Haven",
+            "dots": 2
+          }
+        ]
       },
       {
         "dot": 5,
         "name": "Inquisitor",
-        "description": "You are a former, fallen member of the Society of St. Leopold or one of its constituent organizations (the Condottieri, the Gladius Dei, the Office of the Censor, or the Order of St. Joan). Once per story, ask the Storyteller for one piece of true information about the Society's current activities. You gain Influence (••••) over any one branch of the Society — misuse it and it is lost until you regain their favor."
+        "description": "You are a former, fallen member of the Society of St. Leopold or one of its constituent organizations (the Condottieri, the Gladius Dei, the Office of the Censor, or the Order of St. Joan). Once per story, ask the Storyteller for one piece of true information about the Society's current activities. You gain Influence (••••) over any one branch of the Society — misuse it and it is lost until you regain their favor.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Influence",
+            "dots": 4
+          }
+        ]
       }
     ]
   },
@@ -5063,7 +5347,19 @@
       {
         "dot": 3,
         "name": "Insider Connections",
-        "description": "Wauneka knows someone inside almost every industry in Chicago — usually the people that go unnoticed, like janitors, sanitation workers, or food workers. Once per story, Wauneka can hook you up with someone to get you inside or get you the info you need. This individual counts as Retainers (••) for one session, but remains Contacts (•) if you spend the required Experience."
+        "description": "Wauneka knows someone inside almost every industry in Chicago — usually the people that go unnoticed, like janitors, sanitation workers, or food workers. Once per story, Wauneka can hook you up with someone to get you inside or get you the info you need. This individual counts as Retainers (••) for one session, but remains Contacts (•) if you spend the required Experience.",
+        "grants": [
+          {
+            "kind": "background",
+            "name": "Retainers",
+            "dots": 2
+          },
+          {
+            "kind": "background",
+            "name": "Contacts",
+            "dots": 1
+          }
+        ]
       },
       {
         "dot": 4,
