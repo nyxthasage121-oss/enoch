@@ -30,6 +30,8 @@
        skillLabels:       {{ (skill_labels | default({})) | tojson | forceescape }},
        discLabels:        {{ (disc_labels | default({})) | tojson | forceescape }},
        disciplinePowers:  {{ (discipline_powers | default({})) | tojson | forceescape }},
+       meritCatalog:      {{ (merit_catalog | default([])) | tojson | forceescape }},
+       flawCatalog:       {{ (flaw_catalog | default([])) | tojson | forceescape }},
        skillSpreads:      {{ (skill_spreads | default({})) | tojson | forceescape }},
        disciplineSpreads: {{ (discipline_spreads | default({})) | tojson | forceescape }},
        predatorFreeDiscDots: {{ (predator_free_disc_dots | default(1)) | tojson }},
@@ -1458,6 +1460,7 @@
           </template>
           <div class="flex items-center gap-2 mt-3">
             <input type="text" maxlength="80" x-model="newMeritName"
+                   list="mf-merits" autocomplete="off"
                    @keydown.enter.prevent="addMerit()"
                    placeholder="e.g. Iron Will, Beautiful…" class="text-xs py-1 px-2 flex-1">
             <button type="button" @click="addMerit()"
@@ -1484,6 +1487,7 @@
           </template>
           <div class="flex items-center gap-2 mt-3">
             <input type="text" maxlength="80" x-model="newAdvantageName"
+                   list="mf-merits" autocomplete="off"
                    @keydown.enter.prevent="addAdvantage()"
                    placeholder="e.g. Linguistics, Catenating Blood…" class="text-xs py-1 px-2 flex-1">
             <button type="button" @click="addAdvantage()"
@@ -1510,6 +1514,7 @@
           </template>
           <div class="flex items-center gap-2 mt-3">
             <input type="text" maxlength="80" x-model="newBackgroundName"
+                   list="mf-merits" autocomplete="off"
                    @keydown.enter.prevent="addBackground()"
                    placeholder="e.g. Haven, Resources, Allies…" class="text-xs py-1 px-2 flex-1">
             <button type="button" @click="addBackground()"
@@ -1556,6 +1561,7 @@
           </template>
           <div class="flex items-center gap-2 mt-3">
             <input type="text" maxlength="80" x-model="newFlawName"
+                   list="mf-flaws" autocomplete="off"
                    @keydown.enter.prevent="addFlaw()"
                    placeholder="e.g. Disliked, Stake Bait…" class="text-xs py-1 px-2 flex-1">
             <button type="button" @click="addFlaw()"
@@ -1563,6 +1569,19 @@
           </div>
         </div>
       </div>
+
+      {# Shared autocomplete catalogs (merits/flaws lift, 2026-06-17). One merit
+         list feeds Merits / Advantages / Backgrounds; flaws have their own. #}
+      <datalist id="mf-merits">
+        <template x-for="m in meritCatalog" :key="m.name">
+          <option :value="m.name" :label="m.category + (m.summary ? ' · ' + m.summary : '')"></option>
+        </template>
+      </datalist>
+      <datalist id="mf-flaws">
+        <template x-for="m in flawCatalog" :key="m.name">
+          <option :value="m.name" :label="m.category + (m.summary ? ' · ' + m.summary : '')"></option>
+        </template>
+      </datalist>
 
       <input type="hidden" name="merits"      :value="JSON.stringify(merits)">
       <input type="hidden" name="advantages"  :value="JSON.stringify(advantages)">
@@ -2051,6 +2070,8 @@
       skillLabels:       opts.skillLabels || {},
       discLabels:        opts.discLabels || {},
       disciplinePowers:  opts.disciplinePowers || {},
+      meritCatalog:      opts.meritCatalog || [],
+      flawCatalog:       opts.flawCatalog || [],
       skillSpreads:      opts.skillSpreads || {},
       disciplineSpreads: opts.disciplineSpreads || {},
       predatorFreeDiscDots: opts.predatorFreeDiscDots || 0,
@@ -2786,30 +2807,45 @@
         if (idx >= 0) this.powers.splice(idx, 1);
       },
 
-      // Legacy lists — each item is { name, dots }
+      // Positive/flaw lists — each item is { name, dots }. Names autocomplete
+      // from the V5 merits/flaws catalog: a matched name snaps to its canonical
+      // spelling and defaults dots to the lowest allowed cost. Homebrew free
+      // text still passes through.
+      meritByName(name) {
+        const n = (name || '').trim().toLowerCase();
+        return this.meritCatalog.find(m => m.name.toLowerCase() === n) || null;
+      },
+      flawByName(name) {
+        const n = (name || '').trim().toLowerCase();
+        return this.flawCatalog.find(m => m.name.toLowerCase() === n) || null;
+      },
+      mfSummary(name, kind) {
+        const e = kind === 'flaw' ? this.flawByName(name) : this.meritByName(name);
+        return e ? e.summary : '';
+      },
+      _addTrait(listKey, rawName, lookup) {
+        let name = (rawName || '').trim().slice(0, 80);
+        if (!name) return false;
+        let dots = 1;
+        const c = lookup(name);
+        if (c) { name = c.name; dots = (c.costs && c.costs[0]) || 1; }
+        // No duplicate trait within the same list.
+        if (!this[listKey].some(x => x.name.toLowerCase() === name.toLowerCase())) {
+          this[listKey].push({ name, dots });
+        }
+        return true;
+      },
       addMerit() {
-        const name = (this.newMeritName || '').trim().slice(0, 80);
-        if (!name) return;
-        this.merits.push({ name, dots: 1 });
-        this.newMeritName = '';
+        if (this._addTrait('merits', this.newMeritName, n => this.meritByName(n))) this.newMeritName = '';
       },
       addAdvantage() {
-        const name = (this.newAdvantageName || '').trim().slice(0, 80);
-        if (!name) return;
-        this.advantages.push({ name, dots: 1 });
-        this.newAdvantageName = '';
+        if (this._addTrait('advantages', this.newAdvantageName, n => this.meritByName(n))) this.newAdvantageName = '';
       },
       addBackground() {
-        const name = (this.newBackgroundName || '').trim().slice(0, 80);
-        if (!name) return;
-        this.backgrounds.push({ name, dots: 1 });
-        this.newBackgroundName = '';
+        if (this._addTrait('backgrounds', this.newBackgroundName, n => this.meritByName(n))) this.newBackgroundName = '';
       },
       addFlaw() {
-        const name = (this.newFlawName || '').trim().slice(0, 80);
-        if (!name) return;
-        this.flaws.push({ name, dots: 1 });
-        this.newFlawName = '';
+        if (this._addTrait('flaws', this.newFlawName, n => this.flawByName(n))) this.newFlawName = '';
       },
 
       // Rituals / Ceremonies / Formulae helpers — used by the partial

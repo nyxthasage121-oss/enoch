@@ -113,6 +113,17 @@ def discipline_powers(disc_key: str, max_level: int | None = None) -> list[dict]
     return powers
 
 
+# Merits & Flaws catalog — V5-generic, lifted from the friend's data set
+# (2026-06-17). Two flat lists; each entry is {name, costs:[allowed dot values],
+# summary, category, advanced, restriction?, excludes?}. Loaded once at import.
+_MERITS_FLAWS_PATH = Path(__file__).parent.parent / "packages" / "rules" / "merits_flaws.json"
+MERITS_FLAWS: dict[str, list[dict]] = json.loads(
+    _MERITS_FLAWS_PATH.read_text(encoding="utf-8")
+)
+MERIT_CATALOG: list[dict] = MERITS_FLAWS.get("merits", [])
+FLAW_CATALOG:  list[dict] = MERITS_FLAWS.get("flaws", [])
+
+
 # Flat allow-list of single-value sheet keys. Free-form lists (merits/flaws/
 # rituals/ceremonies/formulae) are handled separately by the save route.
 SHEET_TRAIT_KEYS: set[str] = (

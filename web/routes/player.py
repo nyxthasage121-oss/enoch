@@ -272,6 +272,8 @@ from ..v5_traits import (
     V5_SKILLS       as _V5_SKILLS,
     V5_DISCIPLINES  as _V5_DISCIPLINES,
     DISCIPLINE_POWERS as _DISCIPLINE_POWERS,
+    MERIT_CATALOG   as _MERIT_CATALOG,
+    FLAW_CATALOG    as _FLAW_CATALOG,
     V5_CLAN_INFO    as _V5_CLAN_INFO,
     V5_PREDATOR_INFO as _V5_PREDATOR_INFO,
     V5_SKILL_SPREADS as _V5_SKILL_SPREADS,
@@ -283,10 +285,11 @@ from ..v5_traits import (
     validate_chargen_raw as _validate_chargen_raw,
 )
 
-# Make the discipline-powers catalog available to every template render (the
-# chargen wizard power picker, and the edit page) without threading it through
-# each render call.
+# Make the V5 reference catalogs available to every template render (the chargen
+# wizard pickers, and the edit page) without threading them through each call.
 templates.env.globals["discipline_powers"] = _DISCIPLINE_POWERS
+templates.env.globals["merit_catalog"] = _MERIT_CATALOG
+templates.env.globals["flaw_catalog"] = _FLAW_CATALOG
 
 
 _CLANS = [

@@ -1,0 +1,2378 @@
+{
+  "merits": [
+    {
+      "name": "Abhorrent Blood",
+      "costs": [
+        1
+      ],
+      "summary": "other vampires cannot stomach your blood; anyone trying to drink from you must spend 2 Willpower per turn to continue; mortals and Thin-blood Alchemy unaffected",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Allies: Effectiveness",
+      "costs": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "summary": "how capable your ally group is. ● weak mortal (likely useless in violence). ●● average mortal or tight-knit group of weak mortals (church group, NGO chapter). ●●● gifted mortal or dangerous average group (street gang, blue-collar union local). ●●●● deadly mortal, gifted mortal with supernatural power, or well-armed group (private security squad, Mafia bratva). Effectiveness + Reliability combined may not exceed 6.",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Allies: Reliability",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "how dependable your ally group is. ● appear about half the time. ●● appear within 1–10 hours (roll a die). ●●● appear as soon as possible. Effectiveness + Reliability combined may not exceed 6.",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Anarch Comrades",
+      "costs": [
+        1
+      ],
+      "summary": "A coterie of Anarchs considers you their pet",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Apocryphal Texts",
+      "costs": [
+        1
+      ],
+      "summary": "possess disputed writings that help related Intelligence rolls",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Archangel's Grace",
+      "costs": [
+        3
+      ],
+      "summary": "swap Performance and Athletics for athletic artistry, fights, or dancing",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Armored",
+      "costs": [
+        1
+      ],
+      "summary": "reinforced mobile haven resists damage and protects passengers better",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Bargainer",
+      "costs": [
+        1
+      ],
+      "summary": "reduce Difficulty when assessing a deal or transaction",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Beautiful",
+      "costs": [
+        2
+      ],
+      "summary": "+1 die in Social rolls",
+      "category": "Looks",
+      "advanced": false,
+      "excludes": [
+        "Stunning",
+        "Ugly",
+        "Repulsive"
+      ]
+    },
+    {
+      "name": "Blood Empathy",
+      "costs": [
+        2
+      ],
+      "summary": "sense your domitor's emotional/psychological state within 1 mile; know when they are in peril or require your presence; does not allow telepathic communication",
+      "category": "Ghoul specific",
+      "advanced": true,
+      "restriction": "ghoul"
+    },
+    {
+      "name": "Bloodhound",
+      "costs": [
+        1
+      ],
+      "summary": "smell resonance in mortal blood",
+      "category": "Feeding",
+      "advanced": false
+    },
+    {
+      "name": "Bond Resistance",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "add dice to resist blood bonds",
+      "category": "Bonding",
+      "advanced": true,
+      "excludes": [
+        "Bondslave"
+      ]
+    },
+    {
+      "name": "Bonds of Fealty",
+      "costs": [
+        3
+      ],
+      "summary": "requires Dominate. Your Dominate powers do not require eye contact when targeting someone blood bound to you. You still need to communicate your instructions, but need not be physically present.",
+      "category": "Bonding",
+      "advanced": true
+    },
+    {
+      "name": "Bull-Slayer",
+      "costs": [
+        3
+      ],
+      "summary": "reroll regular dice during extended tests as you adapt to a chosen target",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Business Establishment",
+      "costs": [
+        2,
+        3
+      ],
+      "summary": "your haven contains a money-making business with useful local access",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Camarilla Contact",
+      "costs": [
+        1
+      ],
+      "summary": "A Camarilla recruiter promises you admittance, but treats you badly and asks you to do tasks",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Catenating Blood",
+      "costs": [
+        1
+      ],
+      "summary": "You can create blood bonds and embrace new Vampires",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Cell",
+      "costs": [
+        1
+      ],
+      "summary": "you can imprison people in your haven",
+      "category": "Haven",
+      "advanced": false,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Check the Trunk",
+      "costs": [
+        1
+      ],
+      "summary": "Get easy access to an armory or tools; none of the items can be more valuable than Resources 2",
+      "category": "Resources",
+      "advanced": false
+    },
+    {
+      "name": "City Secrets",
+      "costs": [
+        1
+      ],
+      "summary": "hold a dangerous local secret that can protect or leverage you",
+      "category": "Influence",
+      "advanced": true
+    },
+    {
+      "name": "Cobbler",
+      "costs": [
+        1
+      ],
+      "summary": "You can make or source masks for others",
+      "category": "Mask",
+      "advanced": false
+    },
+    {
+      "name": "Cold Dead Hunger",
+      "costs": [
+        3
+      ],
+      "summary": "add dice to resist Hunger frenzy",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Consanguineous Influence",
+      "costs": [
+        2
+      ],
+      "summary": "mental Disciplines are more effective on those of the same bloodline: +1 die against any clan member or direct ancestor/descendant, or +2 dice if only one or two generations removed. Not available to Caitiff or Duskborn.",
+      "category": "Blood Ties",
+      "advanced": true
+    },
+    {
+      "name": "Consanguineous Sense",
+      "costs": [
+        2
+      ],
+      "summary": "your Blood calls out to close relations. Instinctively recognize direct bloodline members within a few paces. Resolve + Awareness vs Difficulty 3 to confirm if a Kindred within ~3m shares your bloodline (but not their exact Generation distance). Not available to Caitiff or Duskborn.",
+      "category": "Blood Ties",
+      "advanced": true
+    },
+    {
+      "name": "Contacts",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "mortals who provide information or valuable items",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Custodian of History",
+      "costs": [
+        1
+      ],
+      "summary": "an elder confided their version of a lost age to you. Choose one subject (Book of Nod, First Inquisition, Constantinople, Revelations of the Dark Mother, Antiquity and Carthage, etc.): +1 die to all Skill tests pertaining to it.",
+      "category": "Archaic",
+      "advanced": true
+    },
+    {
+      "name": "Dark Mother's Song",
+      "costs": [
+        2
+      ],
+      "summary": "gain dice when recruiting others into Lilith worship through grief or pain",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Day Drinker",
+      "costs": [
+        1
+      ],
+      "summary": "Walking in the sun doesn't damage you, but removes all your Vampiric abilities and halves your health",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Discipline Affinity",
+      "costs": [
+        1
+      ],
+      "summary": "Pick a Discipline (lv1) that you can increase like a normal Vampire",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Drive-thru",
+      "costs": [
+        1
+      ],
+      "summary": "once per session, raise hunt Difficulty to finish feeding within minutes",
+      "category": "Feeding",
+      "advanced": true
+    },
+    {
+      "name": "Eat Food",
+      "costs": [
+        2
+      ],
+      "summary": "can consume normal food",
+      "category": "Mythic",
+      "advanced": false
+    },
+    {
+      "name": "Enduring Bond",
+      "costs": [
+        1
+      ],
+      "summary": "your blood bonds last longer than normal. Complete and partial blood bonds only weaken every other month, not every month.",
+      "category": "Bonding",
+      "advanced": true,
+      "excludes": [
+        "Short Bond"
+      ]
+    },
+    {
+      "name": "Enduring Fame",
+      "costs": [
+        1
+      ],
+      "summary": "lost Fame returns at the start of the next story",
+      "category": "Fame",
+      "advanced": true
+    },
+    {
+      "name": "Faith-Proof",
+      "costs": [
+        1
+      ],
+      "summary": "too close to mortality for True Faith to affect you",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "False Love",
+      "costs": [
+        1
+      ],
+      "summary": "choose a Storyteller character as your obsession. When in their presence, treat Humanity as 1 higher (max 10) for Blush of Life, eating/drinking, and intercourse. Does not combine with other Humanity-treating-as-higher effects. If they die, gain 3 Stains but choose a new obsession next session.",
+      "category": "Psychological",
+      "advanced": true,
+      "excludes": [
+        "Up All Night"
+      ]
+    },
+    {
+      "name": "Fame",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "1 - a select subculture loves you, 5 - you are well known and loved globally",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Famous Face",
+      "costs": [
+        1
+      ],
+      "summary": "look like a celebrity; helps socially but makes you memorable",
+      "category": "Looks",
+      "advanced": true
+    },
+    {
+      "name": "Favored Blood",
+      "costs": [
+        4
+      ],
+      "summary": "buy dots in any Discipline without tasting that Discipline's blood first",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff",
+      "excludes": [
+        "Muddled Blood"
+      ]
+    },
+    {
+      "name": "Fire Resistant",
+      "costs": [
+        1
+      ],
+      "summary": "convert a little fire aggravated damage during daysleep more efficiently",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Fixer",
+      "costs": [
+        2
+      ],
+      "summary": "once per story, call in leverage from someone you procured secrets for",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Furcus",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "mystic crossing in your haven aids rituals or ceremonies performed there",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Gardener",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "lead a Bahari garden that acts as selective Herd and Influence",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Gematria",
+      "costs": [
+        1
+      ],
+      "summary": "understand the Shalimite cipher well enough to encrypt and decrypt messages",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Go to Ground",
+      "costs": [
+        1
+      ],
+      "summary": "add dice to evade pursuit with prepared escape routes and go bags",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Haven",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "secure homebase, 1 - apartment, 3 - big building",
+      "category": "Haven",
+      "advanced": false,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Herd",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "group of mortals who let you feed, 1 - a couple of people, 5 - large group and you can freely pick desired resonances",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Hidden Armory",
+      "costs": [
+        1
+      ],
+      "summary": "weapons and armor in your haven",
+      "category": "Haven",
+      "advanced": false,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "High-functioning addict",
+      "costs": [
+        1
+      ],
+      "summary": "add a die to one category of pool (choose once) when the last person you fed from was on your drug",
+      "category": "Feeding",
+      "advanced": false
+    },
+    {
+      "name": "Holy Ground",
+      "costs": [
+        1
+      ],
+      "summary": "cult-significant haven site can call defenders once per story",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Influence",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "power over a mortal sphere (politics, media, finance…), 1 - minor sway, 5 - near-total control",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Influencer",
+      "costs": [
+        1
+      ],
+      "summary": "temporarily leverage Fame like narrower Influence once per story",
+      "category": "Fame",
+      "advanced": true
+    },
+    {
+      "name": "Ingénue",
+      "costs": [
+        1
+      ],
+      "summary": "look innocent, adding dice to deflect blame or suspicion",
+      "category": "Looks",
+      "advanced": true
+    },
+    {
+      "name": "Insidious Whispers",
+      "costs": [
+        2
+      ],
+      "summary": "score criticals more easily when undermining a target's Conviction",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Inspired Artist",
+      "costs": [
+        2
+      ],
+      "summary": "cult-themed art makes viewers more susceptible to cult social pressure",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Iron Gullet",
+      "costs": [
+        3
+      ],
+      "summary": "able to feed on rancid blood",
+      "category": "Feeding",
+      "advanced": false
+    },
+    {
+      "name": "Laboratory",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "equipped haven lab for Science, Technology, or alchemy work",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Ley Line Leech",
+      "costs": [
+        1
+      ],
+      "summary": "after meaningful travel, wake the next night without a rising Rouse Check",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Library",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "research collection tied to one scholarly specialty per dot",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Lifelike",
+      "costs": [
+        1
+      ],
+      "summary": "Your body appears fully human, with a beating heart and a working stomach",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Linguistics",
+      "costs": [
+        1
+      ],
+      "summary": "fluently speak another language",
+      "category": "Linguistics",
+      "advanced": false
+    },
+    {
+      "name": "Location",
+      "costs": [
+        1
+      ],
+      "summary": "prime haven spot that helps nearby hunting, politics, or security",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Low Appetite",
+      "costs": [
+        1
+      ],
+      "summary": "when rising at Hunger 0 or 1, roll two dice on your Rouse Check and take the highest",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Lucid Dreamer",
+      "costs": [
+        1
+      ],
+      "summary": "you dream and can recall them; once per session ask the ST for a clue from the previous night's memories or a story hint suitable for dream revelation",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Luck of the Devil",
+      "costs": [
+        4
+      ],
+      "summary": "once per session, shift a misfortune onto someone nearby",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Luxury",
+      "costs": [
+        1
+      ],
+      "summary": "+2 Dice on Social rolls in your haven",
+      "category": "Haven",
+      "advanced": false,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Machine Shop",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "tools and machinery for building, repairing, or dismantling equipment",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Major Boon",
+      "costs": [
+        2,
+        3,
+        4
+      ],
+      "summary": "a serious favor owed by another vampire, scaled by their status",
+      "category": "Boons and Debts",
+      "advanced": true
+    },
+    {
+      "name": "Mark of Caine",
+      "costs": [
+        2
+      ],
+      "summary": "+2 dice to intimidate or cow vampires who believe in the myth of Caine; diablerists cannot add Blood Potency vs you and failure on their roll results in a bestial failure",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff"
+    },
+    {
+      "name": "Mask",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "fake identity with fake documents, lv2 can pass background checks",
+      "category": "Mask",
+      "advanced": false
+    },
+    {
+      "name": "Mawla",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "kindred mentor to advise or help you",
+      "category": "Kindred",
+      "advanced": false
+    },
+    {
+      "name": "Memories of the Fallen",
+      "costs": [
+        2
+      ],
+      "summary": "Ashe visions make some Blood Alchemy rolls critically stronger",
+      "category": "Thin-blood specific",
+      "advanced": true,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Minor Boon",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "a tracked favor owed by another vampire, scaled by their status",
+      "category": "Boons and Debts",
+      "advanced": true
+    },
+    {
+      "name": "Mobile",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "your haven is a vehicle, from a small sunproof ride to a large transport",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Mockingbird",
+      "costs": [
+        3
+      ],
+      "summary": "for one night after drinking 1 Hunger die of blood from a vampire, borrow one of their Discipline powers (up to your highest Discipline level); mimic donor's bane at their severity during this time; once per night",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff"
+    },
+    {
+      "name": "Mortality's Mien",
+      "costs": [
+        1
+      ],
+      "summary": "your aura appears mortal rather than vampiric; +2 dice to any attempt to appear mortal",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Mystic of the Void",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "count selected Oblivion powers as known for ceremony prerequisites",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Nuit Mode",
+      "costs": [
+        2
+      ],
+      "summary": "at low Blood Potency, keep chosen body modifications after rest",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Object of Power",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "a rare and powerful item. ● set of uncommonly lucky dice: reroll one non-Hunger die once per story. ●● Grimoire: +1 die to all Level 1 Ritual tests. ●●● golden eye amulet: free Premonition warning once per session when someone is about to harm you.",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Pack Diablerie",
+      "costs": [
+        2
+      ],
+      "summary": "claim the main benefit when sharing diablerie and gain a small echo if aiding",
+      "category": "Other",
+      "advanced": true
+    },
+    {
+      "name": "Penitence",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "self-scourging converts superficial Health damage into Willpower healing",
+      "category": "Mental",
+      "advanced": true,
+      "excludes": [
+        "Groveling Worm"
+      ]
+    },
+    {
+      "name": "Persistent Blush",
+      "costs": [
+        3
+      ],
+      "summary": "one Blush of Life activation lasts a week",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Postern",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "hidden exit or escape route from your haven",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Remarkable Feature",
+      "costs": [
+        1
+      ],
+      "summary": "striking feature helps first impressions but hinders disguises",
+      "category": "Looks",
+      "advanced": true
+    },
+    {
+      "name": "Resources",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "wealth & income, 1 - you can afford basics, 5 - you can afford anything money can buy",
+      "category": "Resources",
+      "advanced": false,
+      "excludes": [
+        "Destitute"
+      ]
+    },
+    {
+      "name": "Retainer",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "loyal servant. ● weak mortal (child, criminal lowlife, or horror nerd). ●● average mortal or ghoul with no Advantages (family servant, human lover, dominated thrall). ●●● gifted mortal or ghoul with supernatural abilities, competent enough to act independently.",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Scene Kid",
+      "costs": [
+        1
+      ],
+      "summary": "embody a subculture's style, helping social rolls with those in the know",
+      "category": "Looks",
+      "advanced": true
+    },
+    {
+      "name": "Security System",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "better alarms and defenses against unwanted entry",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Semblance of the Methuselah",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "resemble an ancient ancestor, helping with those who respect or fear them",
+      "category": "Looks",
+      "advanced": true
+    },
+    {
+      "name": "Short Bond",
+      "costs": [
+        2
+      ],
+      "summary": "blood bonds on you fade faster than normal",
+      "category": "Bonding",
+      "advanced": true,
+      "excludes": [
+        "Long Bond"
+      ]
+    },
+    {
+      "name": "Shrine",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "haven shrine helps gather or prepare ritual and ceremony ingredients",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Side Hustler",
+      "costs": [
+        2
+      ],
+      "summary": "once per session, pull a small item, lead, or access from your network",
+      "category": "Resources",
+      "advanced": true
+    },
+    {
+      "name": "Sins of the Fathers",
+      "costs": [
+        2,
+        3
+      ],
+      "summary": "after committing diablerie on a direct ancestor or descendant, you show no telltale signs. Powers like Scry the Soul or A Taste for Blood do not detect the crime. ●●●: extends to any member of your own clan. Caitiff and Duskborn cannot take the 3-dot version.",
+      "category": "Blood Ties",
+      "advanced": true
+    },
+    {
+      "name": "Smugglers Stash",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "hidden compartment in a mobile haven for cargo or daysleep",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Soothed Beast",
+      "costs": [
+        1
+      ],
+      "summary": "choose a Storyteller character as your obsession. Once per session when in their presence, ignore one Bestial Failure or Messy Critical. If they die, gain 3 Stains but choose a new obsession at the start of the next session.",
+      "category": "Psychological",
+      "advanced": true
+    },
+    {
+      "name": "Spare Plates",
+      "costs": [
+        2
+      ],
+      "summary": "swap mobile haven identifiers quickly to evade most ordinary searches",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Status",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "positive reputation within a faction",
+      "category": "Kindred",
+      "advanced": false
+    },
+    {
+      "name": "Streamer",
+      "costs": [
+        2
+      ],
+      "summary": "once per story, mobilize online followers for a simple nonviolent action",
+      "category": "Fame",
+      "advanced": true
+    },
+    {
+      "name": "Stunning",
+      "costs": [
+        4
+      ],
+      "summary": "+2 dice in Social rolls",
+      "category": "Looks",
+      "advanced": false,
+      "excludes": [
+        "Beautiful",
+        "Ugly",
+        "Repulsive"
+      ]
+    },
+    {
+      "name": "Sun-Scarred",
+      "costs": [
+        5
+      ],
+      "summary": "first turn of sunlight: no Health damage, 1 Aggravated Willpower damage, auto-succeed terror frenzy roll; remainder of scene: all sun Health damage becomes Superficial",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff"
+    },
+    {
+      "name": "Surgery",
+      "costs": [
+        1
+      ],
+      "summary": "medical room that helps Medicine tests in your haven",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Swift Feeder",
+      "costs": [
+        1
+      ],
+      "summary": "slake 1 Hunger in one turn including licking the wound closed; once per scene",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Tempered Will",
+      "costs": [
+        3
+      ],
+      "summary": "sense Dominate or Presence and resist them better once per session",
+      "category": "Mental",
+      "advanced": true
+    },
+    {
+      "name": "Thin-blood Alchemist",
+      "costs": [
+        1
+      ],
+      "summary": "Gain one dot and one formula in Thin-blood Alchemy",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Traveling Preacher",
+      "costs": [
+        2
+      ],
+      "summary": "mapped safe routes reduce notice from hunters while traveling",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Unbondable",
+      "costs": [
+        5
+      ],
+      "summary": "you cannot be blood bound",
+      "category": "Bonding",
+      "advanced": true,
+      "excludes": [
+        "Bondslave",
+        "Bond Junkie",
+        "Long Bond"
+      ]
+    },
+    {
+      "name": "Uncle Fangs",
+      "costs": [
+        3
+      ],
+      "summary": "easy access to a local coterie of 3–5 thin-bloods; treat as Allies (undead); they often know street events early and may provide Alchemical concoctions",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff",
+      "excludes": [
+        "Liquidator"
+      ]
+    },
+    {
+      "name": "Unholy Will",
+      "costs": [
+        2,
+        4
+      ],
+      "summary": "resist True Faith effects better and reduce holy damage",
+      "category": "Mental",
+      "advanced": true
+    },
+    {
+      "name": "Unseemly Aura",
+      "costs": [
+        2
+      ],
+      "summary": "your aura appears vampiric rather than mortal; may cause others to overestimate you",
+      "category": "Ghoul specific",
+      "advanced": true,
+      "restriction": "ghoul"
+    },
+    {
+      "name": "Untouchable",
+      "costs": [
+        5
+      ],
+      "summary": "once per story, avoid official punishment for a severe offense",
+      "category": "Influence",
+      "advanced": true
+    },
+    {
+      "name": "Up All Night",
+      "costs": [
+        2,
+        4
+      ],
+      "summary": "for Blush of Life, eating/drinking, and sexual intercourse, treat Humanity as 1 higher (●●) or 2 higher (●●●●). Cannot combine with other Humanity-treating-as-higher effects. Nosferatu cannot select; Hecata can only select at 2 dots.",
+      "category": "Looks",
+      "advanced": true
+    },
+    {
+      "name": "Vampiric Resilience",
+      "costs": [
+        1
+      ],
+      "summary": "Suffer only superficial damage from most sources, like a normal Vampire",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Vessel Recognition",
+      "costs": [
+        1
+      ],
+      "summary": "smell whether a mortal has recently been fed on",
+      "category": "Feeding",
+      "advanced": true
+    },
+    {
+      "name": "Vigilant",
+      "costs": [
+        2
+      ],
+      "summary": "always know when you are watched unless supernatural concealment hides it",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Warding",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "mystic protection against scrying or supernatural intrusion",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Watchmen",
+      "costs": [
+        1
+      ],
+      "summary": "mortal security guards",
+      "category": "Haven",
+      "advanced": false,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Zealotry",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "turn Conviction-aligned normal successes into messy criticals",
+      "category": "Mental",
+      "advanced": true
+    },
+    {
+      "name": "Zeroed",
+      "costs": [
+        1
+      ],
+      "summary": "all your real records are purged, you officially don't exist",
+      "category": "Mask",
+      "advanced": false
+    }
+  ],
+  "flaws": [
+    {
+      "name": "Addiction",
+      "costs": [
+        1
+      ],
+      "summary": "-1 die on all pools if the last person you fed from wasn't on your drug",
+      "category": "Feeding",
+      "advanced": false,
+      "excludes": [
+        "Hopeless Addiction"
+      ]
+    },
+    {
+      "name": "Adversary",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "Kindred who opposes you, rated by their Status or relevant Trait. ● Neonate. ●● Ancilla. ●●● Elder. ●●●● Primogen or Anarch Revolutionary Council member. ●●●●● Prince or Baron.",
+      "category": "Kindred",
+      "advanced": false
+    },
+    {
+      "name": "Archaic",
+      "costs": [
+        2
+      ],
+      "summary": "Can't use computers, technology skill stuck at 0",
+      "category": "Keeping up with the times",
+      "advanced": false
+    },
+    {
+      "name": "Ashe Addiction",
+      "costs": [
+        2
+      ],
+      "summary": "failed Ashe-related alchemy leaves you distracted for the session",
+      "category": "Thin-blood specific",
+      "advanced": true,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Baby Teeth",
+      "costs": [
+        1
+      ],
+      "summary": "Your teeth are useless for feeding, you need to cut your victims",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Baneful Blood",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "experience your first domitor's clan bane at 1 level per dot; domitor must be Lasombra, Malkavian, Ministry, Nosferatu, Ravnos, Salubri, or Toreador; bane does not change if domitor changes",
+      "category": "Ghoul specific",
+      "advanced": true,
+      "restriction": "ghoul"
+    },
+    {
+      "name": "Banned From...",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "barred from a Kindred-ruled city. ● small city (Portland, Salzburg). ●● mid-sized city (Venice, Sacramento). ●●● large city (Paris, Tokyo, Cairo). Getting in anyway causes serious trouble.",
+      "category": "Fame",
+      "advanced": true
+    },
+    {
+      "name": "Beacon of Profanity",
+      "costs": [
+        1
+      ],
+      "summary": "mortals with even faint True Faith can sense your profane presence",
+      "category": "Mental",
+      "advanced": true
+    },
+    {
+      "name": "Befouling Vitae",
+      "costs": [
+        2
+      ],
+      "summary": "any mortal you Embrace or kill by feeding returns as a wight within a few nights; the local Prince or Baron will hear about it",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff"
+    },
+    {
+      "name": "Bestial Temper",
+      "costs": [
+        1
+      ],
+      "summary": "Be weak to frenzy like a normal vampire",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Blatant Diablerist",
+      "costs": [
+        1
+      ],
+      "summary": "telltale signs of diablerie are always noticeable to those who can sense it. Powers such as Scry the Soul or A Taste for Blood always reveal diablerie, even on an otherwise failed test. Can only be taken at creation if the character has a history of diablerie.",
+      "category": "Diablerie",
+      "advanced": true
+    },
+    {
+      "name": "Bond Junkie",
+      "costs": [
+        1
+      ],
+      "summary": "lose one die on all actions that go against your blood bond",
+      "category": "Bonding",
+      "advanced": false,
+      "excludes": [
+        "Unbondable"
+      ]
+    },
+    {
+      "name": "Bondslave",
+      "costs": [
+        2
+      ],
+      "summary": "blood bonds on you are created on the first drink",
+      "category": "Bonding",
+      "advanced": false,
+      "excludes": [
+        "Bond Resistance",
+        "Unbondable"
+      ]
+    },
+    {
+      "name": "Branded by the Camarilla",
+      "costs": [
+        1
+      ],
+      "summary": "The Camarilla have their eyes peeled on you",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Clan Curse",
+      "costs": [
+        1
+      ],
+      "summary": "Pick a Clan Curse (severity 1)",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Compromised",
+      "costs": [
+        2
+      ],
+      "summary": "your haven is on a watchlist",
+      "category": "Haven",
+      "advanced": false,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Corpse Flesh",
+      "costs": [
+        2
+      ],
+      "summary": "your body cannot benefit from Blush of Life",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Creepy",
+      "costs": [
+        1
+      ],
+      "summary": "your haven looks like the den of a serial killer, neighbors might phone in a tip to the police",
+      "category": "Haven",
+      "advanced": false,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Crisis of Faith",
+      "costs": [
+        1
+      ],
+      "summary": "bestial failures also damage your Willpower",
+      "category": "Mental",
+      "advanced": true
+    },
+    {
+      "name": "Crone's Curse",
+      "costs": [
+        2
+      ],
+      "summary": "the Blood aged you rapidly; appear at least a decade older than you are and have one fewer Health box",
+      "category": "Ghoul specific",
+      "advanced": true,
+      "restriction": "ghoul"
+    },
+    {
+      "name": "Cursed Object",
+      "costs": [
+        1
+      ],
+      "summary": "something you own wants you dead. Once per session at a time determined by the Storyteller, you must reroll a successful test, risking failure instead.",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Dark Secret",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "You have a dark secret, like owing a debt to bad people or having escaped a blood hunt for masquerade breaching in another city",
+      "category": "Kindred",
+      "advanced": false
+    },
+    {
+      "name": "Dead Flesh",
+      "costs": [
+        1
+      ],
+      "summary": "Your flesh slowly rots, -1 to social tests with Mortals",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Debt Peon",
+      "costs": [
+        2
+      ],
+      "summary": "owe boons to a high-Status vampire who never considers them settled; two-dice penalty to Social combat against you in front of other Kindred; refusal adds the Shunned flaw and risks a Blood Hunt",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff"
+    },
+    {
+      "name": "Despised",
+      "costs": [
+        2
+      ],
+      "summary": "a local group or region actively works against you",
+      "category": "Influence",
+      "advanced": true,
+      "excludes": [
+        "Influence",
+        "Disliked"
+      ]
+    },
+    {
+      "name": "Destitute",
+      "costs": [
+        1
+      ],
+      "summary": "poor & no income",
+      "category": "Resources",
+      "advanced": false,
+      "excludes": [
+        "Resources"
+      ]
+    },
+    {
+      "name": "Disease Vector",
+      "costs": [
+        1
+      ],
+      "summary": "sick vessels always infect you and your next feeding victim",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Disliked",
+      "costs": [
+        1
+      ],
+      "summary": "lose a die socially with most local groups",
+      "category": "Influence",
+      "advanced": true,
+      "excludes": [
+        "Influence",
+        "Despised"
+      ]
+    },
+    {
+      "name": "Distressing Fangs",
+      "costs": [
+        1
+      ],
+      "summary": "the Blood gave you strange, unsettling teeth; -1 die to Social pools with mortals",
+      "category": "Ghoul specific",
+      "advanced": true,
+      "restriction": "ghoul"
+    },
+    {
+      "name": "Empty",
+      "costs": [
+        1
+      ],
+      "summary": "your hollowness unsettles outsiders and penalizes social rolls",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Enemy",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "mortal group working against you, rated two dots below their Effectiveness. ● enemy at Effectiveness ●●● (gifted mortal or dangerous group). ●● enemy at Effectiveness ●●●● (deadly mortal, well-armed group). Number of enemy groups equals number of player characters.",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Excommunicated",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "your former cult shuns you or actively works toward your ruin",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Failed Initiate",
+      "costs": [
+        1
+      ],
+      "summary": "a cult minder scrutinizes and interrupts you after a failed step",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Faithless",
+      "costs": [
+        2
+      ],
+      "summary": "you fake belief and suffer when acting for the cult or advancing within it",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "False Alarms",
+      "costs": [
+        1
+      ],
+      "summary": "failed Awareness rolls become total failures under constant paranoia",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Farmer",
+      "costs": [
+        2
+      ],
+      "summary": "feeding on non-animal blood costs you 2 willpower",
+      "category": "Feeding",
+      "advanced": false,
+      "excludes": [
+        "Vegan"
+      ]
+    },
+    {
+      "name": "Folkloric Bane",
+      "costs": [
+        1
+      ],
+      "summary": "specific items damage you (eg. silver, garlic)",
+      "category": "Mythic",
+      "advanced": false
+    },
+    {
+      "name": "Folkloric Block",
+      "costs": [
+        1
+      ],
+      "summary": "must spend willpower to move past specific block (eg. running water, door uninvited)",
+      "category": "Mythic",
+      "advanced": false
+    },
+    {
+      "name": "Grief Phobia",
+      "costs": [
+        1
+      ],
+      "summary": "a lost Touchstone left you with a permanent phobia for something that reminds you of them. -1 die to all tests made in the presence of your phobic stimulus. Can be taken once per lost Touchstone.",
+      "category": "Archaic",
+      "advanced": true
+    },
+    {
+      "name": "Groveling Worm",
+      "costs": [
+        2
+      ],
+      "summary": "must scourge yourself each session or suffer aggravated Willpower damage",
+      "category": "Mental",
+      "advanced": true,
+      "excludes": [
+        "Penitence"
+      ]
+    },
+    {
+      "name": "Haunted",
+      "costs": [
+        1
+      ],
+      "summary": "ghostly presence in your haven",
+      "category": "Haven",
+      "advanced": false,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Heliophobia",
+      "costs": [
+        1
+      ],
+      "summary": "fear sunlight as though a full vampire; susceptible to terror frenzy from sunlight",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Hopeless Addiction",
+      "costs": [
+        2
+      ],
+      "summary": "-2 dice on all pools if the last person you fed from wasn't on your drug",
+      "category": "Feeding",
+      "advanced": false,
+      "excludes": [
+        "Addiction"
+      ]
+    },
+    {
+      "name": "Horrible Scars of Penitence",
+      "costs": [
+        1
+      ],
+      "summary": "faith scars make you socially repulsive outside your cult",
+      "category": "Mental",
+      "advanced": true
+    },
+    {
+      "name": "Illiterate",
+      "costs": [
+        2
+      ],
+      "summary": "Can't read or write, Academics and Science capped at 1",
+      "category": "Linguistics",
+      "advanced": false
+    },
+    {
+      "name": "Infamy",
+      "costs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "summary": "1 - a select subculture despises you, 5 - you are well known and hated globally",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Ingrained Discipline",
+      "costs": [
+        0
+      ],
+      "summary": "take a Discipline-specific drawback to unlock extra purchasable powers in that Discipline",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Inherited Bane",
+      "costs": [
+        1
+      ],
+      "summary": "you suffer another clan's bane in addition to your own (e.g., Tremere may take the Salubri clan bane).",
+      "category": "Diablerie",
+      "advanced": true
+    },
+    {
+      "name": "Knowledge Hungry",
+      "costs": [
+        1
+      ],
+      "summary": "must resist pursuing study of a chosen subject when new sources appear",
+      "category": "Other",
+      "advanced": true
+    },
+    {
+      "name": "Known Blankbody",
+      "costs": [
+        2
+      ],
+      "summary": "Certain governments / organizations know you're a vampire",
+      "category": "Mask",
+      "advanced": false
+    },
+    {
+      "name": "Known Corpse",
+      "costs": [
+        1
+      ],
+      "summary": "others know you're dead",
+      "category": "Mask",
+      "advanced": false
+    },
+    {
+      "name": "Land Locked",
+      "costs": [
+        1
+      ],
+      "summary": "air or sea travel provokes fear frenzy from your Beast",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Life Debt",
+      "costs": [
+        2,
+        3
+      ],
+      "summary": "you owe an overwhelming debt to another vampire",
+      "category": "Boons and Debts",
+      "advanced": true
+    },
+    {
+      "name": "Liquidator",
+      "costs": [
+        1
+      ],
+      "summary": "thin-bloods shun and avoid you; -2 dice to Social skill pools against thin-bloods except Intimidation",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff",
+      "excludes": [
+        "Uncle Fangs"
+      ]
+    },
+    {
+      "name": "Living in the Past",
+      "costs": [
+        1
+      ],
+      "summary": "you have outdated views & convictions",
+      "category": "Keeping up with the times",
+      "advanced": false
+    },
+    {
+      "name": "Long Bond",
+      "costs": [
+        1
+      ],
+      "summary": "blood bonds on you take longer to wane",
+      "category": "Bonding",
+      "advanced": false,
+      "excludes": [
+        "Short Bond",
+        "Unbondable"
+      ]
+    },
+    {
+      "name": "Major Debt",
+      "costs": [
+        1,
+        2,
+        3
+      ],
+      "summary": "you owe a dangerous favor to another vampire",
+      "category": "Boons and Debts",
+      "advanced": true
+    },
+    {
+      "name": "Methusela's Thirst",
+      "costs": [
+        1
+      ],
+      "summary": "can't fully satiate on mortal blood",
+      "category": "Feeding",
+      "advanced": false
+    },
+    {
+      "name": "Minor Debt",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "you owe a smaller boon to another vampire",
+      "category": "Boons and Debts",
+      "advanced": true
+    },
+    {
+      "name": "Mortal Frailty",
+      "costs": [
+        1
+      ],
+      "summary": "Cannot rouse your blood to heal yourself",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Mortal Pretender",
+      "costs": [
+        1
+      ],
+      "summary": "Masquerade enforcers distrust your attempt to live too much like a mortal",
+      "category": "Other",
+      "advanced": true
+    },
+    {
+      "name": "Muddled Blood",
+      "costs": [
+        1
+      ],
+      "summary": "must drink blood of someone with a Discipline to buy dots in it, even if you already possess it",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff",
+      "excludes": [
+        "Favored Blood"
+      ]
+    },
+    {
+      "name": "Night Terrors",
+      "costs": [
+        1
+      ],
+      "summary": "once per session night terrors onset and you take a -1 die penalty to all actions for the rest of the scene",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "No Haven",
+      "costs": [
+        1
+      ],
+      "summary": "you don't have a home",
+      "category": "Haven",
+      "advanced": false,
+      "excludes": [
+        "Haven",
+        "Hidden Armory",
+        "Cell",
+        "Watchmen",
+        "Luxury",
+        "Haunted",
+        "Creepy"
+      ]
+    },
+    {
+      "name": "Obvious Predator",
+      "costs": [
+        2
+      ],
+      "summary": "mortals are scared of you, can't keep Herd",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Old Tricks",
+      "costs": [
+        1
+      ],
+      "summary": "you've never mastered the modern age: all your Skill specialties must be Archaic specialties.",
+      "category": "Archaic",
+      "advanced": true
+    },
+    {
+      "name": "On the Rails",
+      "costs": [
+        1
+      ],
+      "summary": "mobile haven follows fixed routes or destinations outside your full control",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Organovore",
+      "costs": [
+        2
+      ],
+      "summary": "your hunger demands human flesh and organs",
+      "category": "Feeding",
+      "advanced": false
+    },
+    {
+      "name": "Outdated Preference",
+      "costs": [
+        2
+      ],
+      "summary": "your preferred vessel has become nearly impossible to find (castrati, quaalude addicts, footmen, etc). You must force mortals to fit your preference, or always spend 1 Willpower to feed.",
+      "category": "Feeding",
+      "advanced": true
+    },
+    {
+      "name": "Plague Bearer",
+      "costs": [
+        1
+      ],
+      "summary": "still susceptible to mortal illness; roll a die per Hunger slaked when feeding — on a 1 you catch something (ST determines effect); only slaking to Hunger 0 cures you; can infect those you feed on",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Plaguebringer",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "a persistent disease lives in your vitae and spreads through your bite",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Prestation Debts",
+      "costs": [
+        1
+      ],
+      "summary": "owe two minor boons to a more influential Kindred",
+      "category": "Other",
+      "advanced": true
+    },
+    {
+      "name": "Prey Exclusion",
+      "costs": [
+        1
+      ],
+      "summary": "can't feed on certain types of people",
+      "category": "Feeding",
+      "advanced": false
+    },
+    {
+      "name": "Repulsive",
+      "costs": [
+        2
+      ],
+      "summary": "-2 dice in Social rolls",
+      "category": "Looks",
+      "advanced": false,
+      "excludes": [
+        "Beautiful",
+        "Stunning",
+        "Ugly"
+      ]
+    },
+    {
+      "name": "Resistant Blush",
+      "costs": [
+        1
+      ],
+      "summary": "roll twice and keep the worse result when using Blush of Life",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Resonance Mimic",
+      "costs": [
+        2
+      ],
+      "summary": "victims' memories and personalities intrude after feeding",
+      "category": "Feeding",
+      "advanced": true
+    },
+    {
+      "name": "Resonance Sensitivity",
+      "costs": [
+        1
+      ],
+      "summary": "one intense resonance triggers a lingering custom Compulsion after feeding",
+      "category": "Feeding",
+      "advanced": true
+    },
+    {
+      "name": "Risk-Taker",
+      "costs": [
+        1
+      ],
+      "summary": "new risky temptations distract you until indulged or the scene ends",
+      "category": "Other",
+      "advanced": true
+    },
+    {
+      "name": "Schism",
+      "costs": [
+        1
+      ],
+      "summary": "your lineage or history makes your cult suspicious of your loyalty",
+      "category": "Cult",
+      "advanced": true
+    },
+    {
+      "name": "Secret Master",
+      "costs": [
+        1
+      ],
+      "summary": "requires Mawla 1+. Your Mawla has a hold over you and once per story requires a minor secret task. Failure escalates next story. Continued failure forfeits the flaw, replaced by 2+ dots of other flaws.",
+      "category": "Kindred",
+      "advanced": false
+    },
+    {
+      "name": "Shameful Childe",
+      "costs": [
+        1
+      ],
+      "summary": "you Embraced someone and abandoned them. They're out there somewhere, and sooner or later they'll come back to confront you.",
+      "category": "Kindred",
+      "advanced": false
+    },
+    {
+      "name": "Shared",
+      "costs": [
+        1,
+        2
+      ],
+      "summary": "other Kindred have access to or authority over your haven",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Shunned",
+      "costs": [
+        2
+      ],
+      "summary": "despised by a faction",
+      "category": "Kindred",
+      "advanced": false
+    },
+    {
+      "name": "Shunned by the Anarchs",
+      "costs": [
+        1
+      ],
+      "summary": "Anarchs shun you",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Sloppy Drinker",
+      "costs": [
+        1
+      ],
+      "summary": "make Dex + Medicine vs difficulty = Hunger slaked after feeding to close wound marks; on failure the wound is too ragged, risking the Masquerade",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Sloppy Feeder",
+      "costs": [
+        2
+      ],
+      "summary": "your feeding leaves a recognizable pattern useful to authorities or hunters",
+      "category": "Feeding",
+      "advanced": true
+    },
+    {
+      "name": "Stake Bait",
+      "costs": [
+        2
+      ],
+      "summary": "Final Death when staked",
+      "category": "Mythic",
+      "advanced": false
+    },
+    {
+      "name": "Stalkers",
+      "costs": [
+        1
+      ],
+      "summary": "unwanted mortal followers",
+      "category": "Mortals",
+      "advanced": false
+    },
+    {
+      "name": "Starving Decay",
+      "costs": [
+        2
+      ],
+      "summary": "at Hunger 3+, decay harms physical and mortal social tests",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Stench",
+      "costs": [
+        1
+      ],
+      "summary": "foul odor hurts seduction and hiding from those who can smell",
+      "category": "Looks",
+      "advanced": true
+    },
+    {
+      "name": "Stigmata",
+      "costs": [
+        1
+      ],
+      "summary": "bleed from your hands, feet and forehead when at Hunger 4",
+      "category": "Mythic",
+      "advanced": false
+    },
+    {
+      "name": "Sun-Faded",
+      "costs": [
+        1
+      ],
+      "summary": "cannot use Disciplines or Thin-blood Alchemy in sunlight; indoors by day suffer -2 dice penalty as long as no sunlight reaches you",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Supernatural Tell",
+      "costs": [
+        1
+      ],
+      "summary": "other supernatural entities can sense your presence; -2 dice from Stealth pools against supernatural opponents including other vampires",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Suspect",
+      "costs": [
+        1
+      ],
+      "summary": "bad reputation within a faction, -2 on Social tests with them",
+      "category": "Kindred",
+      "advanced": false
+    },
+    {
+      "name": "Temperamental",
+      "costs": [
+        1
+      ],
+      "summary": "mobile haven breaks down at the worst time after failed Drive tests",
+      "category": "Haven",
+      "advanced": true,
+      "excludes": [
+        "No Haven"
+      ]
+    },
+    {
+      "name": "Touchstone Embraced by Your Enemies",
+      "costs": [
+        2
+      ],
+      "summary": "a former Touchstone was Embraced and now runs with your enemies. A single neonate Adversary with allies; confronting them risks Stains.",
+      "category": "Kindred",
+      "advanced": false
+    },
+    {
+      "name": "Transparent",
+      "costs": [
+        1
+      ],
+      "summary": "bad liar; lose dice with Subterfuge and cannot improve it",
+      "category": "Looks",
+      "advanced": true
+    },
+    {
+      "name": "Twice-Cursed",
+      "costs": [
+        2
+      ],
+      "summary": "suffer your clan's variant Bane in addition to its normal Bane",
+      "category": "Mythic",
+      "advanced": true
+    },
+    {
+      "name": "Twilight Presence",
+      "costs": [
+        1
+      ],
+      "summary": "mortals and Kindred are uncomfortable around you; -1 die from Social pools with everyone except other thin-bloods",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Two Masters",
+      "costs": [
+        1
+      ],
+      "summary": "you can be Blood Bound to two individuals simultaneously. May cause complications if you drink Kindred blood recreationally.",
+      "category": "Bonding",
+      "advanced": true
+    },
+    {
+      "name": "Ugly",
+      "costs": [
+        1
+      ],
+      "summary": "-1 die in Social rolls",
+      "category": "Looks",
+      "advanced": false,
+      "excludes": [
+        "Beautiful",
+        "Stunning",
+        "Repulsive"
+      ]
+    },
+    {
+      "name": "Unblinking Visage",
+      "costs": [
+        1
+      ],
+      "summary": "your dead body has forgotten blinking, breathing, and automatic reflexes. Count Humanity as two levels lower (minimum zero) for Blush of Life and similar life-mimicking activities.",
+      "category": "Looks",
+      "advanced": false
+    },
+    {
+      "name": "Unending Hunger",
+      "costs": [
+        1
+      ],
+      "summary": "your Beast always hungers for more; slake 1 fewer Hunger than other thin-bloods per scene",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Vegan",
+      "costs": [
+        2
+      ],
+      "summary": "feed only from animals; human blood costs Willpower",
+      "category": "Feeding",
+      "advanced": true,
+      "excludes": [
+        "Farmer"
+      ]
+    },
+    {
+      "name": "Vein Tapper",
+      "costs": [
+        1
+      ],
+      "summary": "cannot feed from mortals while being observed",
+      "category": "Feeding",
+      "advanced": true
+    },
+    {
+      "name": "Vitae Dependency",
+      "costs": [
+        1
+      ],
+      "summary": "Need to drink Vampire vitae once a week to use Disciplines",
+      "category": "Thin-blood specific",
+      "advanced": false,
+      "restriction": "thinblood"
+    },
+    {
+      "name": "Walking Omen",
+      "costs": [
+        2
+      ],
+      "summary": "scrying, premonitions, and fortune-telling in your domain regularly point to you as a source of disaster; at least one serious altercation per story as oracles or hunters seek you out",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff"
+    },
+    {
+      "name": "Weak-Willed",
+      "costs": [
+        2
+      ],
+      "summary": "struggle to resist a leader's influence and cannot actively resist mental sway",
+      "category": "Mental",
+      "advanced": true
+    },
+    {
+      "name": "Word-Scarred",
+      "costs": [
+        1
+      ],
+      "summary": "your body is covered in ancient vampiric lore text; the major occult force in the chronicle seeks to imprison, flense, or otherwise neutralize you; others who read the full text learn a terrible Gehenna secret",
+      "category": "Caitiff specific",
+      "advanced": true,
+      "restriction": "caitiff"
+    },
+    {
+      "name": "Yearning",
+      "costs": [
+        1
+      ],
+      "summary": "working against a lost master's goals costs Willpower",
+      "category": "Cult",
+      "advanced": true
+    }
+  ]
+}
