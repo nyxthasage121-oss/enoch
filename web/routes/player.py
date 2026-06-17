@@ -1357,15 +1357,23 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
                 if not ls or lid in seen_ls:
                     continue
                 seen_ls.add(lid)
-                try:
-                    dots = int(it.get("dots", 0))
-                except (ValueError, TypeError):
-                    dots = 0
-                max_dot = max((d["dot"] for d in ls.get("dots", [])), default=5)
-                cleaned_ls.append({
-                    "id": lid, "name": ls["name"],
-                    "dots": max(1, min(max_dot, dots)),
+                # Loresheet entries are independent picks, each costing its own
+                # level (non-cumulative). Validate each selected level against
+                # the catalog. Fall back to a legacy {dots:N} rating = levels 1..N.
+                valid_levels = {int(d["dot"]) for d in ls.get("dots", [])}
+                raw_levels = it.get("levels")
+                if raw_levels is None and it.get("dots"):
+                    try:
+                        raw_levels = list(range(1, int(it["dots"]) + 1))
+                    except (ValueError, TypeError):
+                        raw_levels = []
+                levels = sorted({
+                    int(x) for x in (raw_levels or [])
+                    if isinstance(x, (int, float)) and int(x) in valid_levels
                 })
+                if not levels:          # no entries selected → nothing to store
+                    continue
+                cleaned_ls.append({"id": lid, "name": ls["name"], "levels": levels})
             sheet["loresheets"] = cleaned_ls
 
     # Free-text lists: touchstones, convictions

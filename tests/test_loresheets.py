@@ -44,24 +44,29 @@ def test_get_loresheet():
     assert get_loresheet("nonexistent-id") is None
 
 
-def test_parse_validates_and_canonicalizes():
+def test_parse_validates_levels_non_cumulative():
+    """Entries are independent picks: valid `levels` are kept (sorted), invalid
+    ones dropped, a legacy {dots:N} rating expands to levels 1..N, and unknown
+    ids / duplicates are dropped."""
     from web.routes.player import _parse_sheet_from_form
-    sample = LORESHEET_CATALOG[0]
+    a, b = LORESHEET_CATALOG[0], LORESHEET_CATALOG[1]
     form = {"loresheets": json.dumps([
-        {"id": sample["id"], "name": "WRONG NAME", "dots": 9},   # clamp + canonical
-        {"id": "does-not-exist", "dots": 2},                     # dropped (unknown)
-        {"id": sample["id"], "dots": 1},                         # dropped (duplicate)
+        {"id": a["id"], "name": "WRONG NAME", "levels": [3, 1, 99]},  # 99 invalid
+        {"id": "does-not-exist", "levels": [1]},                      # unknown → drop
+        {"id": a["id"], "levels": [2]},                               # duplicate → drop
+        {"id": b["id"], "dots": 2},                                   # legacy rating
+        {"id": LORESHEET_CATALOG[2]["id"], "levels": []},             # empty → drop
     ])}
-    ls = _parse_sheet_from_form(form)["loresheets"]
-    assert len(ls) == 1
-    assert ls[0]["id"] == sample["id"]
-    assert ls[0]["name"] == sample["name"]      # canonicalized from catalog
-    assert ls[0]["dots"] == 5                   # clamped to the sheet's max dot
+    ls = {x["id"]: x for x in _parse_sheet_from_form(form)["loresheets"]}
+    assert set(ls) == {a["id"], b["id"]}
+    assert ls[a["id"]]["name"] == a["name"]          # canonicalized
+    assert ls[a["id"]]["levels"] == [1, 3]           # 99 dropped, sorted, non-cumulative
+    assert ls[b["id"]]["levels"] == [1, 2]           # dots:2 → levels 1..2
 
 
 def test_parse_preserves_loresheets_when_field_absent():
     from web.routes.player import _parse_sheet_from_form
-    base = {"loresheets": [{"id": "x", "name": "X", "dots": 2}]}
+    base = {"loresheets": [{"id": "x", "name": "X", "levels": [1, 2]}]}
     sheet = _parse_sheet_from_form({}, base=base)   # form omits 'loresheets'
     assert sheet["loresheets"] == base["loresheets"]
 
@@ -79,15 +84,15 @@ def test_loresheets_count_toward_advantage_pool():
     over = {
         "merits":      [{"name": "Beautiful", "dots": 2}],
         "backgrounds": [{"name": "Resources", "dots": 3}],
-        "loresheets":  [{"id": "chamber-1444", "name": "1444 Chamber", "dots": 3}],
-    }  # 2 + 3 + 3 = 8 > pool 7
+        "loresheets":  [{"id": "chamber-1444", "name": "1444 Chamber", "levels": [3]}],
+    }  # 2 + 3 + 3 = 8 > pool 7  (loresheet cost = sum of levels)
     errs = validate_chargen_raw(over, advantage_pool=7)
     assert any("Advantages" in e and "Loresheets" in e for e in errs)
 
     ok = {
         "merits":      [{"name": "Beautiful", "dots": 2}],
         "backgrounds": [{"name": "Resources", "dots": 3}],
-        "loresheets":  [{"id": "chamber-1444", "name": "1444 Chamber", "dots": 2}],
+        "loresheets":  [{"id": "chamber-1444", "name": "1444 Chamber", "levels": [2]}],
     }  # 2 + 3 + 2 = 7 == pool 7
     assert not any("Advantages" in e for e in validate_chargen_raw(ok, advantage_pool=7))
 
@@ -109,20 +114,23 @@ def _make_char_with_loresheet(discord_id="111111111111111111"):
         upsert_player(conn, discord_id, "LSPlayer")
         cid = create_character(conn, discord_id, "Loresheet Subject", "tremere")["id"]
         sheet = (get_character(conn, cid).get("sheet_json") or {})
-        sheet["loresheets"] = [{"id": "chamber-1444", "name": "1444 Chamber", "dots": 2}]
+        # Non-cumulative: entries 1 and 3 selected, NOT 2.
+        sheet["loresheets"] = [{"id": "chamber-1444", "name": "1444 Chamber", "levels": [1, 3]}]
         conn.execute("UPDATE characters SET sheet_json=? WHERE id=?",
                      (_json.dumps(sheet), cid))
     return cid
 
 
 def test_player_view_renders_loresheet_panel(player):
-    """Regression: the read-only loresheet panel renders (and the id→benefit
-    lookup global is wired) on the player's own character page."""
+    """Regression: the read-only loresheet panel renders the SELECTED entries
+    (non-cumulative) and the id→benefit lookup global is wired."""
     cid = _make_char_with_loresheet()
     r = player.get(f"/characters/{cid}")
     assert r.status_code == 200
     assert "1444 Chamber" in r.text
-    assert "Shadow of the Chamber" in r.text       # dot-1 benefit name
+    assert "Shadow of the Chamber" in r.text       # entry 1 (selected)
+    assert "Gilded Promises" in r.text             # entry 3 (selected)
+    assert "Mercenary Work" not in r.text          # entry 2 (NOT selected)
 
 
 def test_staff_view_renders_loresheet_panel(staff):
@@ -132,4 +140,5 @@ def test_staff_view_renders_loresheet_panel(staff):
     r = staff.get(f"/staff/characters/{cid}")
     assert r.status_code == 200
     assert "1444 Chamber" in r.text
-    assert "Shadow of the Chamber" in r.text
+    assert "Gilded Promises" in r.text             # entry 3 (selected)
+    assert "Mercenary Work" not in r.text          # entry 2 (NOT selected)

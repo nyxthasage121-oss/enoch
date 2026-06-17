@@ -861,9 +861,22 @@ def validate_chargen_raw(
             return total
 
         # Loresheets count the same as Merits/Backgrounds — they draw the same
-        # Advantages pool (a loresheet dot is treated as a background dot).
+        # Advantages pool. Each picked entry costs its own level (non-cumulative),
+        # so a loresheet's cost is the sum of its selected `levels`.
+        def _loresheet_dots() -> int:
+            total = 0
+            for it in (sheet.get("loresheets") or []):
+                if not (isinstance(it, dict) and not it.get("src")):
+                    continue
+                for lv in (it.get("levels") or []):
+                    try:
+                        total += int(lv)
+                    except (TypeError, ValueError):
+                        pass
+            return total
+
         adv = (_player_dots("merits") + _player_dots("backgrounds")
-               + _player_dots("advantages") + _player_dots("loresheets"))
+               + _player_dots("advantages") + _loresheet_dots())
         if adv > advantage_pool:
             errors.append(
                 f"Advantages (Merits + Backgrounds + Loresheets) total {adv} dots — "

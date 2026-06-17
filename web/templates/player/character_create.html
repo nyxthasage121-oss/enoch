@@ -1498,39 +1498,40 @@
           </div>
         </div>
 
-        {# Loresheets — count toward the Advantages pool, same as a background.
-           Pick a sheet + a dot rating; each dot grants that level's benefit. #}
+        {# Loresheets — each of a sheet's entries is an INDEPENDENT pick costing
+           its own level (entry 1 = 1 dot … entry 5 = 5 dots); they are NOT
+           cumulative, and count toward the Advantages pool like a background. #}
         <div class="gilded p-5">
           <div class="flex items-baseline justify-between mb-2">
             <p class="label-gold text-xs">Loresheets</p>
             <span class="font-cinzel text-[0.6rem] text-bone-700">counts as Advantages</span>
           </div>
           <p class="font-garamond text-[0.65rem] text-bone-700 italic mb-3">
-            Story connections bought in dots ({{ loresheet_dot_xp }} XP/dot); each dot grants that
-            level's benefit and draws the shared Advantages pool. Many need ST approval.
+            Each entry is bought separately at a cost equal to its level
+            ({{ loresheet_dot_xp }} XP/dot) — they're not cumulative. Click the
+            entries you want. Many need ST approval.
           </p>
 
           <template x-for="ls in loresheets" :key="ls.id">
             <div class="py-1.5 border-b border-ink-800 last:border-0">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 mb-1">
                 <span class="font-cinzel text-xs text-bone-200 flex-1 truncate" x-text="ls.name"></span>
-                <div class="flex gap-0.5">
-                  <template x-for="n in 5">
-                    <button type="button"
-                            @click="ls.dots = (ls.dots === n ? n - 1 : n); if (ls.dots < 1) removeLoresheet(ls.id)"
-                            class="w-2.5 h-2.5 rounded-full border transition-colors"
-                            :class="ls.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700'"></button>
-                  </template>
-                </div>
+                <span class="font-cinzel text-[0.6rem] text-gold-500"
+                      x-text="loresheetCost(ls) + (loresheetCost(ls) === 1 ? ' dot' : ' dots')"></span>
                 <button type="button" @click="removeLoresheet(ls.id)"
                         class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
               </div>
-              <div class="mt-1 ml-1 space-y-0.5">
+              <div class="ml-1 space-y-0.5">
                 <template x-for="d in loresheetDots(ls.id)" :key="d.dot">
-                  <p class="font-garamond text-[0.6rem]"
-                     :class="d.dot <= ls.dots ? 'text-bone-500' : 'text-bone-800'">
-                    <span x-text="d.dot"></span>. <span x-text="d.name"></span>
-                  </p>
+                  <button type="button" @click="toggleLoresheetLevel(ls, d.dot)"
+                          class="flex items-start gap-1.5 w-full text-left group">
+                    <span class="w-2.5 h-2.5 mt-0.5 rounded-full border shrink-0 transition-colors"
+                          :class="hasLoresheetLevel(ls, d.dot) ? 'bg-gold-500 border-gold-400' : 'border-bone-700 group-hover:border-bone-500'"></span>
+                    <span class="font-garamond text-[0.62rem] leading-snug"
+                          :class="hasLoresheetLevel(ls, d.dot) ? 'text-bone-300' : 'text-bone-600'">
+                      <span class="text-bone-700" x-text="'(' + d.dot + ') '"></span><span x-text="d.name"></span>
+                    </span>
+                  </button>
                 </template>
               </div>
             </div>
@@ -2250,7 +2251,10 @@
       rituals:     seededSheet.rituals     || [],
       ceremonies:  seededSheet.ceremonies  || [],
       formulae:    seededSheet.formulae    || [],
-      loresheets:  seededSheet.loresheets  || [],
+      loresheets:  (seededSheet.loresheets || []).map(ls => ls && Array.isArray(ls.levels)
+                     ? ls
+                     : { id: ls.id, name: ls.name,
+                         levels: ls && ls.dots ? Array.from({length: ls.dots}, (_, i) => i + 1) : [] }),
       // Touchstones are now paired with Convictions. Backward-compat:
       // older drafts may have stored each as a plain string; normalize
       // on load so the UI always sees {name, conviction} objects.
@@ -2925,7 +2929,10 @@
         this[listKey].push({ name, level });
       },
 
-      // Loresheets — pick from the catalog by name, rate in dots 1–5.
+      // Loresheets — each of a sheet's 5 entries is an INDEPENDENT purchase
+      // costing its own level (entry 1 = 1 dot … entry 5 = 5 dots); they are NOT
+      // cumulative. On the sheet a loresheet is { id, name, levels:[selected] };
+      // its cost = the sum of the selected levels.
       loresheetByName(name) {
         const n = (name || '').trim().toLowerCase();
         return this.loresheetPicker.find(l => (l.name || '').toLowerCase() === n) || null;
@@ -2934,12 +2941,24 @@
         const l = this.loresheetPicker.find(x => x.id === id);
         return l ? (l.dots || []) : [];
       },
+      loresheetCost(ls) {
+        return (ls.levels || []).reduce((a, lv) => a + lv, 0);
+      },
+      hasLoresheetLevel(ls, level) {
+        return (ls.levels || []).includes(level);
+      },
+      toggleLoresheetLevel(ls, level) {
+        ls.levels = ls.levels || [];
+        const i = ls.levels.indexOf(level);
+        if (i >= 0) ls.levels.splice(i, 1);
+        else { ls.levels.push(level); ls.levels.sort((a, b) => a - b); }
+      },
       addLoresheet() {
         this.newLoresheetError = '';
         const l = this.loresheetByName(this.newLoresheetName);
         if (!l) { this.newLoresheetError = 'Pick a loresheet from the list.'; return; }
         if (this.loresheets.some(x => x.id === l.id)) { this.newLoresheetName = ''; return; }
-        this.loresheets.push({ id: l.id, name: l.name, dots: 1 });
+        this.loresheets.push({ id: l.id, name: l.name, levels: [] });
         this.newLoresheetName = '';
       },
       removeLoresheet(id) {
@@ -3183,11 +3202,14 @@
         const sum = list => list
           .filter(x => !x.src)
           .reduce((acc, x) => acc + (x.dots || 0), 0);
+        // Loresheets: each picked entry costs its own level (non-cumulative).
+        const loresheetDots = this.loresheets.reduce(
+          (acc, ls) => acc + (ls.levels || []).reduce((a, l) => a + l, 0), 0);
         return {
           merits:      sum(this.merits),
           advantages:  sum(this.advantages),
           backgrounds: sum(this.backgrounds),
-          loresheets:  sum(this.loresheets),   // count toward the Advantages pool
+          loresheets:  loresheetDots,          // count toward the Advantages pool
           flaws:       sum(this.flaws),
         };
       },
