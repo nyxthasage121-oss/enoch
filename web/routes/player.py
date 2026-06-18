@@ -310,6 +310,13 @@ templates.env.globals["spend_trait_lists"] = {
     "formula":    [p["name"] for p in _DISCIPLINE_POWERS.get("disc_thin_blood_alchemy", [])],
     "advantage":  [m["name"] for m in _MERIT_CATALOG],
 }
+# Trait name → sheet key, so the spend form can auto-fill Current Dots from the
+# character's sheet (attributes / skills / disciplines).
+templates.env.globals["spend_trait_keys"] = {
+    **{lbl.lower(): k for _c, _tr in _V5_ATTRIBUTES for k, lbl in _tr},
+    **{lbl.lower(): k for _c, _tr in _V5_SKILLS for k, lbl in _tr},
+    **{lbl.lower(): k for k, lbl in _V5_DISCIPLINES},
+}
 
 
 _CLANS = [

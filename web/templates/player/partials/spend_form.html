@@ -3,7 +3,7 @@
    HTMX target: #spend-form (outerHTML swap). #}
 
 <div id="spend-form"
-     x-data="spendForm({{ spend_rules_json | safe | forceescape }}, {{ humanity_conditions | tojson | forceescape }})">
+     x-data="spendForm({{ spend_rules_json | safe | forceescape }}, {{ humanity_conditions | tojson | forceescape }}, {{ (spend_trait_keys | default({})) | tojson | forceescape }}, {{ ((char.sheet_json if char else {}) or {}) | tojson | forceescape }})">
 
   {% if not char.is_approved %}
   <div class="gilded p-6">
@@ -84,10 +84,10 @@
       <input id="spend-trait"
              type="text"
              name="trait_name"
+             x-model="traitName"
              :list="traitListId"
              autocomplete="off"
              placeholder="e.g. Dominate, Athletics, Presence…"
-             value="{{ spend_form.trait_name if spend_form else '' }}"
              class="w-full">
       <p x-show="traitListId" x-cloak class="font-garamond text-bone-600 text-xs mt-1 italic">
         Start typing — suggestions come from the V5 catalog for this category.
@@ -193,13 +193,16 @@
 </div>
 
 <script>
-function spendForm(rules, humanityConditions) {
+function spendForm(rules, humanityConditions, traitKeys, sheet) {
   return {
     category:     '{{ spend_form.category if spend_form else "" }}',
+    traitName:    {{ (spend_form.trait_name if spend_form and spend_form.trait_name else '') | tojson | forceescape }},
     currentDots:  {{ spend_form.current_dots if spend_form else 0 }},
     newDots:      {{ spend_form.new_dots if spend_form else 1 }},
     rules:        rules,
     humanityConditions: humanityConditions,
+    traitKeys:    traitKeys || {},
+    sheet:        sheet || {},
     checkedHC:    humanityConditions.map(() => false),
 
     init() {
@@ -207,6 +210,15 @@ function spendForm(rules, humanityConditions) {
       // (cost is level x multiplier). Zero it whenever such a category is
       // picked so the hidden field submits 0 and a level-1 (0->1) validates.
       this.$watch('category', () => { if (this.isLevelBased) this.currentDots = 0; });
+      // Auto-fill Current Dots from the sheet when the trait name resolves to
+      // an attribute / skill / discipline the character already has.
+      this.$watch('traitName', () => this._autofillCurrent());
+      this.$watch('category', () => this._autofillCurrent());
+    },
+    _autofillCurrent() {
+      if (this.isLevelBased || this.isNewSkill) return;   // these start at 0
+      const k = this.traitKeys[(this.traitName || '').trim().toLowerCase()];
+      if (k) this.currentDots = this.sheet[k] || 0;
     },
 
     get rule() { return this.rules[this.category] || null; },
