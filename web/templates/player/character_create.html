@@ -3860,6 +3860,19 @@
       get budgets() {
         const ct   = (this.charName.character_type || 'kindred');
         const tier = (this.charName.character_tier || 'neonate');
+        // In Memoriam Ancilla: the Advantage / Flaw budget is the dots the
+        // generation + eras granted (RAW Oceans of Time), not a tier allotment.
+        // Combined Advantages pool = advantageDots; Flaw budget = flawDots.
+        if (ct === 'kindred' && tier === 'ancilla'
+            && this.charName.ancilla_mode === 'in_memoriam') {
+          const g = this.imTotals;
+          return {
+            starting_xp: g.totalXp,
+            merits: 0, advantages: g.advantageDots, backgrounds: 0,
+            flaw_cap: g.flawDots,
+            homebrew: false, ruleset: 'in_memoriam', tierKey: 'ancilla',
+          };
+        }
         // Map the wizard's character_type + tier onto the chronicle's
         // 7 tier keys. Kindred uses the tier directly (fledgling,
         // thinblood, neonate, ancilla). A Kindred who has clan pinned
