@@ -649,12 +649,16 @@
                                   + (eraDef(era.type).gambitOther ? ' (' + eraDef(era.type).gambitOther + ')' : '')
                                   + ' · ' + eraDef(era.type).gambitRisk"></span>
                   <template x-if="era.gambit_taken">
-                    <label class="flex items-center gap-2">
+                    <div class="flex items-center gap-2">
                       <span class="font-cinzel text-[0.6rem] tracking-widest text-bone-700">d10 result</span>
                       <input type="number" min="1" max="10"
                              x-model.number="era.gambit_roll"
                              class="text-xs py-1 px-2 w-14 text-center">
-                    </label>
+                      <button type="button" @click="era.gambit_roll = rollD10()"
+                              class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2 py-1 whitespace-nowrap">
+                        Roll d10
+                      </button>
+                    </div>
                   </template>
                 </div>
               </template>
@@ -666,6 +670,10 @@
                   <input type="number" min="1" max="10"
                          x-model.number="era.gambit_roll"
                          class="text-xs py-1 px-2 w-14 text-center ml-1">
+                  <button type="button" @click="era.gambit_roll = rollD10()"
+                          class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2 py-1 ml-1 whitespace-nowrap">
+                    Roll d10
+                  </button>
                 </p>
               </template>
             </div>
@@ -716,11 +724,22 @@
            class="font-garamond text-[0.7rem] text-blood-400 italic mt-2">
           Warning: Humanity below 5 puts your character close to the Beast.
         </p>
+        <p x-show="imTotals.touchstonesToRemove > 0" x-cloak
+           class="font-garamond text-[0.7rem] text-mauve-400 italic mt-2">
+          Humanity is floored at 4 — replace
+          <span x-text="imTotals.touchstonesToRemove"></span>
+          Conviction<span x-show="imTotals.touchstonesToRemove > 1">s</span>
+          + Touchstone<span x-show="imTotals.touchstonesToRemove > 1">s</span>
+          lost to the Oceans of Time at the end.
+        </p>
       </div>
 
       <input type="hidden" name="im_generation"        :value="im.generation">
       <input type="hidden" name="im_discipline_spread" :value="im.discipline_spread">
       <input type="hidden" name="in_memoriam"          :value="JSON.stringify(im)">
+      {# The wizard owns the Oceans-of-Time math (RAW floor 4); post the result
+         so the server seeds Humanity from it instead of re-deriving. #}
+      <input type="hidden" name="im_computed_humanity" :value="imTotals.humanity">
 
       {% include "player/partials/wizard_nav.html" %}
     </div>
@@ -3105,8 +3124,17 @@
             // Dark Secret Flaw consequence handled narratively
           }
         }
-        return { totalXp, humanity: Math.max(0, 7 - humanityLoss) };
+        // RAW (Oceans of Time): starting Humanity can't drop below 4. Any loss
+        // beyond that removes a Conviction + its Touchstone instead — surfaced
+        // as touchstonesToRemove so the player knows how many to replace.
+        const rawHumanity = 7 - humanityLoss;
+        return {
+          totalXp,
+          humanity: Math.max(4, rawHumanity),
+          touchstonesToRemove: Math.max(0, 4 - rawHumanity),
+        };
       },
+      rollD10() { return Math.floor(Math.random() * 10) + 1; },
       goStep(n) {
         const dir = (n > this.step) ? 1 : -1;
         // Skip hidden steps in the direction of motion. Clamp to valid range.

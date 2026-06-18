@@ -696,13 +696,15 @@ async def character_create(
             else:
                 sheet["blood_potency"] = _tier_bp.get(character_tier, 1)
         if "humanity" not in sheet:
-            if ancilla_mode == "in_memoriam" and isinstance(in_memoriam, dict):
-                # In Memoriam derives Humanity from lived eras + embrace age,
-                # starting from the RAW base of 7 (not the tier shortcut).
-                loss = sum(int(e.get("humanity_loss") or 0) for e in (in_memoriam.get("eras") or []) if isinstance(e, dict))
-                age_id = in_memoriam.get("embrace_age")
-                age_loss = {"up_to_100": 0, "up_to_150": 1, "over_150": 2}.get(age_id, 0)
-                sheet["humanity"] = max(0, 7 - loss - age_loss)
+            if ancilla_mode == "in_memoriam":
+                # The wizard owns the Oceans-of-Time Humanity math (base 7 minus
+                # era + embrace-age losses, RAW floor 4). Trust its posted result
+                # — staff verify at approval — and clamp to the legal 4-10 band.
+                try:
+                    _im_h = int(form.get("im_computed_humanity") or 7)
+                except (TypeError, ValueError):
+                    _im_h = 7
+                sheet["humanity"] = max(4, min(10, _im_h))
             else:
                 sheet["humanity"] = _tier_humanity.get(character_tier, 7)
         if "hunger" not in sheet:
