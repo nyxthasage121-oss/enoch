@@ -706,12 +706,22 @@
         </div>
       </div>
 
-      {# Live totals #}
+      {# What the Oceans gave you — generation + era grants (V5 RAW) #}
       <div class="gilded-inset px-5 py-4 mb-5 border border-ink-700">
-        <div class="grid grid-cols-2 gap-4">
+        <p class="label-gold mb-3">What the Oceans Gave You</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
           <div>
-            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Era XP</p>
-            <p class="font-cinzel text-2xl text-gold-400" x-text="imTotals.totalXp"></p>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Advantage dots</p>
+            <p class="font-cinzel text-2xl text-gold-400" x-text="imTotals.advantageDots"></p>
+            <p class="font-garamond text-[0.6rem] text-bone-600">Merits + Backgrounds</p>
+          </div>
+          <div>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Flaw dots</p>
+            <p class="font-cinzel text-2xl text-blood-400" x-text="imTotals.flawDots"></p>
+          </div>
+          <div>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Free specialties</p>
+            <p class="font-cinzel text-2xl text-bone-300" x-text="imTotals.specialties"></p>
           </div>
           <div>
             <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Starting Humanity</p>
@@ -720,6 +730,28 @@
                x-text="imTotals.humanity"></p>
           </div>
         </div>
+        {# XP pools — each spent only within its own categories (RAW). #}
+        <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-2">
+          XP by pool <span class="text-bone-800 normal-case tracking-normal italic">— each spends only on its own traits</span>
+        </p>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="gilded px-3 py-2">
+            <p class="font-garamond text-[0.65rem] text-bone-500">Skills</p>
+            <p class="font-cinzel text-lg text-gold-400" x-text="imTotals.poolSkill"></p>
+          </div>
+          <div class="gilded px-3 py-2">
+            <p class="font-garamond text-[0.65rem] text-bone-500">Disciplines</p>
+            <p class="font-cinzel text-lg text-gold-400" x-text="imTotals.poolDisc"></p>
+          </div>
+          <div class="gilded px-3 py-2">
+            <p class="font-garamond text-[0.65rem] text-bone-500">Mental · Occult · Sorcery</p>
+            <p class="font-cinzel text-lg text-gold-400" x-text="imTotals.poolSorcery"></p>
+          </div>
+        </div>
+        <p class="font-garamond text-[0.65rem] text-bone-600 italic mt-2">
+          Total <span x-text="imTotals.totalXp"></span> XP. Place your dots in the Legacy step;
+          spend each XP pool in the Advance step.
+        </p>
         <p x-show="imTotals.humanity < 5" x-cloak
            class="font-garamond text-[0.7rem] text-blood-400 italic mt-2">
           Warning: Humanity below 5 puts your character close to the Beast.
@@ -3105,31 +3137,49 @@
         );
       },
       get imTotals() {
-        const opt = this.EMBRACE_AGES.find(o => o.id === this.im.embrace_age);
-        const ageHumanityLoss = opt ? opt.humanityLoss : 0;
-        let totalXp = 0, humanityLoss = ageHumanityLoss;
+        // Full Oceans-of-Time economy (V5 RAW): generation grants + per-era
+        // grants → dots the player places + category-restricted XP pools.
+        const g = this.im.generation;
+        // ── Generation (Ancilla Characters: Summary) ──
+        let genAdv = 0, genFlaw = 0, genSkillXp = 0;
+        if      (g === '12th')      { genAdv = 8; genSkillXp = 12; }
+        else if (g === '11th-10th') { genAdv = 8; genFlaw = 3; }
+        else if (g === '9th-8th')   { genFlaw = 5; }
+        // ── Eras (Table 1: Oceans of Time) ──
+        const ageOpt = this.EMBRACE_AGES.find(o => o.id === this.im.embrace_age);
+        let humanityLoss = ageOpt ? ageOpt.humanityLoss : 0;
+        let eraAdv = 0, eraFlaw = 0, eraMerit = 0, specialties = 0, removeFlaw = 0;
+        let poolSkill = genSkillXp, poolDisc = 0, poolSorcery = 0;
         for (const era of (this.im.eras || [])) {
           if (!era.type) continue;
           const def = this.eraDef(era.type);
-          totalXp      += def.baseXp || 0;
+          const took = !!era.gambit_taken;
+          const failed = (era.gambit_roll != null && era.gambit_roll <= 5);
           humanityLoss += def.baseHumanityLoss || 0;
-          if (era.gambit_taken) {
-            totalXp += def.gambitXp || 0;
-            if (era.gambit_roll != null && era.gambit_roll <= 5) {
-              humanityLoss += def.gambitHumanityOnFail || 0;
-            }
-          }
-          // Violence has an automatic risk, not a gambit
-          if (era.type === 'violence' && era.gambit_roll != null && era.gambit_roll <= 5) {
-            // Dark Secret Flaw consequence handled narratively
+          if (took && failed) humanityLoss += def.gambitHumanityOnFail || 0;
+          switch (era.type) {
+            case 'adversity': eraFlaw += 2; specialties += 1; poolSkill += 12; if (took) poolDisc += 10; break;
+            case 'calm':      specialties += 1; poolSkill += 6; if (took) poolSkill += 3; break;
+            case 'intrigue':  eraAdv += 2; specialties += 1; if (took) eraAdv += 2; break;
+            case 'excess':    eraMerit += 3; if (took) poolDisc += 10; break;
+            case 'violence':  poolDisc += 15; break;
+            case 'sorcery':   poolSorcery += 15; if (took) poolSorcery += 3; break;
+            case 'torpor':    removeFlaw += 1; if (took) removeFlaw += 2; break;
           }
         }
-        // RAW (Oceans of Time): starting Humanity can't drop below 4. Any loss
-        // beyond that removes a Conviction + its Touchstone instead — surfaced
-        // as touchstonesToRemove so the player knows how many to replace.
+        // RAW: starting Humanity can't drop below 4; further loss removes a
+        // Conviction + its Touchstone instead (surfaced as touchstonesToRemove).
         const rawHumanity = 7 - humanityLoss;
         return {
-          totalXp,
+          // Dots the player places. RAW lumps Backgrounds + Merits as Advantages.
+          advantageDots: genAdv + eraAdv + eraMerit,
+          flawDots: Math.max(0, genFlaw + eraFlaw - removeFlaw),
+          specialties,
+          genAdv, genFlaw, genSkillXp, eraAdv, eraFlaw, eraMerit, removeFlaw,
+          // XP pools — each restricted at spend time to its categories.
+          poolSkill, poolDisc, poolSorcery,
+          totalXp: poolSkill + poolDisc + poolSorcery,
+          // Humanity — RAW floor 4.
           humanity: Math.max(4, rawHumanity),
           touchstonesToRemove: Math.max(0, 4 - rawHumanity),
         };
