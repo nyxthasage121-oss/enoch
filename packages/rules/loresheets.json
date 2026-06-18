@@ -3070,6 +3070,11 @@
             "kind": "background",
             "name": "Influence",
             "dots": 2
+          },
+          {
+            "kind": "background",
+            "name": "Mawla",
+            "dots": 5
           }
         ]
       }
@@ -4089,8 +4094,8 @@
         "grants": [
           {
             "kind": "background",
-            "name": "Mawla",
-            "dots": 3
+            "name": "Allies",
+            "dots": 4
           }
         ]
       }
@@ -5467,19 +5472,7 @@
       {
         "dot": 3,
         "name": "Insider Connections",
-        "description": "Wauneka knows someone inside almost every industry in Chicago — usually the people that go unnoticed, like janitors, sanitation workers, or food workers. Once per story, Wauneka can hook you up with someone to get you inside or get you the info you need. This individual counts as Retainers (••) for one session, but remains Contacts (•) if you spend the required Experience.",
-        "grants": [
-          {
-            "kind": "background",
-            "name": "Retainers",
-            "dots": 2
-          },
-          {
-            "kind": "background",
-            "name": "Contacts",
-            "dots": 1
-          }
-        ]
+        "description": "Wauneka knows someone inside almost every industry in Chicago — usually the people that go unnoticed, like janitors, sanitation workers, or food workers. Once per story, Wauneka can hook you up with someone to get you inside or get you the info you need. This individual counts as Retainers (••) for one session, but remains Contacts (•) if you spend the required Experience."
       },
       {
         "dot": 4,
