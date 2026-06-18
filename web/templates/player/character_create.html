@@ -588,6 +588,21 @@
         </div>
       </div>
 
+      {# 9th/8th gen optional Humanity trade (RAW: Ancilla Summary) #}
+      <div x-show="im.generation === '9th-8th'" x-cloak
+           class="gilded-inset px-4 py-3 mb-4 border border-mauve-800">
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" x-model="im.humanity_sacrifice" class="accent-[#8B1A1A] mt-0.5">
+          <div>
+            <p class="font-cinzel text-xs text-bone-200">Sacrifice 1 Humanity for 2 Advantage dots</p>
+            <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">
+              9th/8th generation only — start one step lower on Humanity in
+              exchange for two more Advantage dots.
+            </p>
+          </div>
+        </label>
+      </div>
+
       {# Embrace age → number of eras + humanity loss #}
       <div class="gilded p-5 mb-4">
         <p class="label-gold mb-3 text-xs">Embrace Age</p>
@@ -3203,9 +3218,12 @@
         if      (g === '12th')      { genAdv = 8; genSkillXp = 12; }
         else if (g === '11th-10th') { genAdv = 8; genFlaw = 3; }
         else if (g === '9th-8th')   { genFlaw = 5; }
+        // 9th/8th gen may trade 1 Humanity for 2 Advantage dots (RAW, opt-in).
+        const humanityTrade = (g === '9th-8th' && !!this.im.humanity_sacrifice);
+        if (humanityTrade) genAdv += 2;
         // ── Eras (Table 1: Oceans of Time) ──
         const ageOpt = this.EMBRACE_AGES.find(o => o.id === this.im.embrace_age);
-        let humanityLoss = ageOpt ? ageOpt.humanityLoss : 0;
+        let humanityLoss = (ageOpt ? ageOpt.humanityLoss : 0) + (humanityTrade ? 1 : 0);
         let eraAdv = 0, eraFlaw = 0, eraMerit = 0, specialties = 0, removeFlaw = 0;
         let poolSkill = genSkillXp, poolDisc = 0, poolSorcery = 0;
         for (const era of (this.im.eras || [])) {
@@ -3228,10 +3246,16 @@
         // RAW: starting Humanity can't drop below 4; further loss removes a
         // Conviction + its Touchstone instead (surfaced as touchstonesToRemove).
         const rawHumanity = 7 - humanityLoss;
+        // RAW 6-Flaw cap: a character can't gain more than 6 Flaw dots; each Flaw
+        // dot past 6 instead subtracts 2 Advantage dots.
+        const grossFlaw = genFlaw + eraFlaw;
+        const flawExcess = Math.max(0, grossFlaw - 6);
         return {
           // Dots the player places. RAW lumps Backgrounds + Merits as Advantages.
-          advantageDots: genAdv + eraAdv + eraMerit,
-          flawDots: Math.max(0, genFlaw + eraFlaw - removeFlaw),
+          advantageDots: Math.max(0, genAdv + eraAdv + eraMerit - flawExcess * 2),
+          flawDots: Math.max(0, Math.min(grossFlaw, 6) - removeFlaw),
+          flawExcess,
+          humanityTraded: humanityTrade,
           specialties,
           genAdv, genFlaw, genSkillXp, eraAdv, eraFlaw, eraMerit, removeFlaw,
           // XP pools — each restricted at spend time to its categories.
@@ -3912,6 +3936,12 @@
           // Thin-Bloods can't leave with unfunded thin-blood Merits.
           const tbUnbalanced = this.isThinblood() && this.tbMeritCount() > this.tbFlawCount();
           return !advOver && u.flaws <= b.flaw_cap && !tbUnbalanced;
+        }
+        // In Memoriam: the base Discipline allocation (Curse step) must match the
+        // chosen spread (Focused 3+1+1 / Strategic 2+2+1+1) plus any predator free
+        // dot. The server validator is bypassed for IM, so enforce it here.
+        if (this.step === 9 && this.isInMemoriam) {
+          return this.discDotsPlaced === this.discDotsTarget;
         }
         return true;
       },

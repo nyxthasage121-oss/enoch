@@ -6,6 +6,7 @@ verify business logic deeply — that's for unit tests.
 
 Run with: .venv312\\Scripts\\python.exe -m pytest tests/test_smoke.py -v
 """
+import pytest
 
 
 # ── Public / anonymous routes ─────────────────────────────────────────────────
@@ -2015,6 +2016,41 @@ def test_ancilla_in_memoriam_submission_persists_blob(player):
             im_data = _j.loads(row["in_memoriam"])
             assert im_data["embrace_age"] == "up_to_100"
             assert len(im_data["eras"]) == 3
+        finally:
+            conn.execute("DELETE FROM characters WHERE id=?", (row["id"],))
+            upsert_settings(conn, in_memoriam_enabled=0)
+
+
+@pytest.mark.parametrize("posted,expected", [("4", 4), ("2", 4), ("11", 10), ("", 7)])
+def test_in_memoriam_humanity_seeded_from_computed(player, posted, expected):
+    """The IM character's Humanity is seeded from the wizard's computed value
+    (posted as im_computed_humanity, RAW floor 4, clamped 4-10), not re-derived
+    from a per-era field the wizard never stores."""
+    import json as _j
+    from web.db import get_db, upsert_settings
+    with get_db() as conn:
+        upsert_settings(conn, in_memoriam_enabled=1)
+    r = player.post(
+        "/characters/new",
+        data={
+            "_csrf": "dev-csrf-token", "name": "IM Humanity",
+            "clan": "brujah", "character_type": "kindred",
+            "character_tier": "ancilla", "ancilla_mode": "in_memoriam",
+            "im_generation": "9th-8th", "im_discipline_spread": "focused",
+            "im_computed_humanity": posted,
+            "in_memoriam": _j.dumps({"embrace_age": "over_150", "eras": []}),
+            "touchstones": _j.dumps(["A", "B"]),
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303, r.text
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id, sheet_json FROM characters WHERE name='IM Humanity' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        try:
+            sheet = _j.loads(row["sheet_json"])
+            assert sheet["humanity"] == expected
         finally:
             conn.execute("DELETE FROM characters WHERE id=?", (row["id"],))
             upsert_settings(conn, in_memoriam_enabled=0)
