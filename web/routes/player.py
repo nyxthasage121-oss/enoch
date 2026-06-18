@@ -301,6 +301,15 @@ templates.env.globals["ceremony_catalog"] = _CEREMONY_CATALOG
 templates.env.globals["loresheet_picker"] = _LORESHEET_PICKER
 templates.env.globals["loresheets_by_id"] = {l["id"]: l for l in _LORESHEET_CATALOG}
 templates.env.globals["loresheet_dot_xp"] = _LORESHEET_DOT_XP
+# Trait-name autocomplete lists for the XP-spend form, keyed by category type.
+templates.env.globals["spend_trait_lists"] = {
+    "attribute":  [lbl for _c, _tr in _V5_ATTRIBUTES for _k, lbl in _tr],
+    "skill":      [lbl for _c, _tr in _V5_SKILLS for _k, lbl in _tr],
+    "discipline": [lbl for _k, lbl in _V5_DISCIPLINES],
+    "ritual":     [r["name"] for r in _RITUAL_CATALOG],
+    "formula":    [p["name"] for p in _DISCIPLINE_POWERS.get("disc_thin_blood_alchemy", [])],
+    "advantage":  [m["name"] for m in _MERIT_CATALOG],
+}
 
 
 _CLANS = [

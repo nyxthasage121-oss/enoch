@@ -78,16 +78,26 @@
          x-text="ruleDescription"></p>
     </div>
 
-    {# Trait name #}
+    {# Trait name — autocompletes from the V5 catalog matching the category. #}
     <div>
       <label class="label-gold block mb-2" for="spend-trait">Trait Name</label>
       <input id="spend-trait"
              type="text"
              name="trait_name"
+             :list="traitListId"
+             autocomplete="off"
              placeholder="e.g. Dominate, Athletics, Presence…"
              value="{{ spend_form.trait_name if spend_form else '' }}"
              class="w-full">
+      <p x-show="traitListId" x-cloak class="font-garamond text-bone-600 text-xs mt-1 italic">
+        Start typing — suggestions come from the V5 catalog for this category.
+      </p>
     </div>
+    {% for key, names in spend_trait_lists.items() %}
+    <datalist id="spend-dl-{{ key }}">
+      {% for n in names %}<option value="{{ n }}"></option>{% endfor %}
+    </datalist>
+    {% endfor %}
 
     {# Dots — current + new. Rituals/formulas are flat-per-level, so the
        "current" field hides and "new" becomes the ritual/formula level. #}
@@ -202,6 +212,22 @@ function spendForm(rules, humanityConditions) {
     get rule() { return this.rules[this.category] || null; },
 
     get ruleDescription() { return this.rule ? this.rule.description : ''; },
+
+    // Which V5 catalog the Trait Name field autocompletes from, by category.
+    get traitList() {
+      const map = {
+        'Attribute': 'attribute',
+        'Skill': 'skill', 'New Skill': 'skill',
+        'Clan Discipline': 'discipline', 'Other Discipline': 'discipline',
+        'Caitiff Discipline': 'discipline', 'Ghoul Discipline': 'discipline',
+        'Ingrained Discipline': 'discipline',
+        'Blood Sorcery Ritual': 'ritual',
+        'Thin-Blood Alchemy Formula': 'formula',
+        'Advantage': 'advantage',
+      };
+      return map[this.category] || '';
+    },
+    get traitListId() { return this.traitList ? 'spend-dl-' + this.traitList : ''; },
 
     get maxDots() { return this.rule ? (this.rule.max_dots ?? 5) : 5; },
 
