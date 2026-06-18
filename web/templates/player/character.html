@@ -1098,6 +1098,15 @@
     </form>
   </div>
 
+  {# Shared trait-name autocomplete catalogs (spend-dl-*). Rendered once here so
+     the Spend form and the Wishlist pull from one source, and so they persist
+     across the Spend form's HTMX swap. #}
+  {% for key, names in spend_trait_lists.items() %}
+  <datalist id="spend-dl-{{ key }}">
+    {% for n in names %}<option value="{{ n }}"></option>{% endfor %}
+  </datalist>
+  {% endfor %}
+
   {# ══ Claim XP ══ #}
   <div x-show="tab === 'claim'" x-cloak>
     {% include "player/partials/claim_section.html" %}
@@ -1110,7 +1119,7 @@
 
   {# ══ Wishlist ══ #}
   <div x-show="tab === 'wishlist'" x-cloak
-       x-data="wishlistPlanner({{ char.id }}, {{ char.xp_available }}, '{{ csrf_token }}')">
+       x-data="wishlistPlanner({{ char.id }}, {{ char.xp_available }}, '{{ csrf_token }}', {{ spend_rules_json | safe | forceescape }})">
 
     <div class="gilded p-5 mb-4">
       <div class="flex items-baseline justify-between mb-1">
@@ -1150,7 +1159,9 @@
         </div>
         <div class="md:col-span-4">
           <label class="label-gold block mb-1 text-[0.7rem]">Trait Name</label>
-          <input type="text" x-model="newItem.trait" placeholder="e.g. Dominate, Athletics…" class="w-full text-xs">
+          <input type="text" x-model="newItem.trait"
+                 :list="traitListId(newItem.category)" autocomplete="off"
+                 placeholder="e.g. Dominate, Athletics…" class="w-full text-xs">
         </div>
         <div class="md:col-span-1">
           <label class="label-gold block mb-1 text-[0.7rem]">From</label>
@@ -1355,14 +1366,16 @@
 </div>
 
 <script>
-function wishlistPlanner(characterId, availableXp, csrfToken) {
+function wishlistPlanner(characterId, availableXp, csrfToken, spendRules) {
   const storageKey = 'enoch:wishlist:' + characterId;
-  const MULTIPLIER = {
-    attribute:        5,
-    skill:            3,
-    clan_discipline:  5,
-    other_discipline: 7,
-    blood_potency:   10,
+  // Which shared autocomplete catalog (spend-dl-*) each category draws from.
+  const TRAIT_LIST = {
+    attribute:        'spend-dl-attribute',
+    skill:            'spend-dl-skill',
+    clan_discipline:  'spend-dl-discipline',
+    other_discipline: 'spend-dl-discipline',
+    advantage:        'spend-dl-advantage',
+    // blood_potency (no trait) and specialty (free text) get no list.
   };
   const LABELS = {
     attribute:        'Attribute',
@@ -1396,6 +1409,7 @@ function wishlistPlanner(characterId, availableXp, csrfToken) {
   return {
     items: loadItems(),
     availableXp: availableXp,
+    rules: spendRules || {},
     addError: '',
     newItem: { category: 'skill', trait: '', current: 0, target: 1 },
     sendingIdx: null,
@@ -1414,6 +1428,9 @@ function wishlistPlanner(characterId, availableXp, csrfToken) {
     },
 
     categoryLabel(cat) { return LABELS[cat] || cat; },
+
+    // id of the shared <datalist> this category autocompletes from ('' = none).
+    traitListId(cat) { return TRAIT_LIST[cat] || ''; },
 
     canAdd() {
       return this.newItem.trait.trim().length > 0
@@ -1448,14 +1465,23 @@ function wishlistPlanner(characterId, availableXp, csrfToken) {
       this.save();
     },
 
+    // Cost from the same rules the server charges (packages/rules/xp_costs.json),
+    // looked up by the category's server name — one source of truth, so a wishlist
+    // estimate can never drift from what the spend form and staff review compute.
     costOf(item) {
-      if (item.category === 'specialty') return 3;
-      if (item.category === 'advantage') return 3 * (item.target - item.current);
-      const mult = MULTIPLIER[item.category];
-      if (!mult) return 0;
-      let cost = 0;
-      for (let d = item.current + 1; d <= item.target; d++) cost += d * mult;
-      return cost;
+      const rule = this.rules[SERVER_CATEGORY[item.category]];
+      if (!rule) return 0;
+      const cur = item.current, nw = item.target;
+      if (nw <= cur) return 0;
+      if (rule.flat_cost        !== undefined) return rule.flat_cost;
+      if (rule.flat_per_dot     !== undefined) return (nw - cur) * rule.flat_per_dot;
+      if (rule.level_multiplier !== undefined) return nw * rule.level_multiplier;
+      if (rule.multiplier       !== undefined) {
+        let cost = 0;
+        for (let d = cur + 1; d <= nw; d++) cost += d * rule.multiplier;
+        return cost;
+      }
+      return 0;
     },
 
     totalCost() {

@@ -93,11 +93,9 @@
         Start typing — suggestions come from the V5 catalog for this category.
       </p>
     </div>
-    {% for key, names in spend_trait_lists.items() %}
-    <datalist id="spend-dl-{{ key }}">
-      {% for n in names %}<option value="{{ n }}"></option>{% endfor %}
-    </datalist>
-    {% endfor %}
+    {# Autocomplete catalogs (spend-dl-*) are rendered once at the character-page
+       level so the Spend form and the Wishlist share one source — and so they
+       survive this form's HTMX swap. #}
 
     {# Dots — current + new. Rituals/formulas are flat-per-level, so the
        "current" field hides and "new" becomes the ritual/formula level. #}
@@ -131,11 +129,18 @@
       </div>
     </div>
 
-    {# Cost preview #}
+    {# Cost preview — the headline of the form, so make it unmissable. #}
     <div x-show="category && computedCost !== null" x-cloak
-         class="gilded-inset px-4 py-3 border border-gold-800 flex justify-between items-center">
-      <span class="label-gold">Calculated Cost</span>
-      <span class="font-cinzel text-xl text-gold-400" x-text="computedCost + ' XP'"></span>
+         class="gilded px-5 py-4 border-2 border-gold-700 flex justify-between items-center gap-4"
+         style="box-shadow: inset 0 0 22px rgba(201,168,107,0.16), 0 0 12px rgba(201,168,107,0.12);">
+      <div class="min-w-0">
+        <span class="label-gold block">Calculated Cost</span>
+        <span x-show="traitName.trim()" x-cloak
+              class="block font-garamond text-bone-500 text-xs truncate"
+              x-text="traitName.trim() + (isLevelBased ? (' · level ' + newDots) : (' · ' + currentDots + ' → ' + newDots + ' dots'))"></span>
+      </div>
+      <span class="font-cinzel text-4xl text-gold-300 whitespace-nowrap leading-none"
+            x-text="computedCost + ' XP'"></span>
     </div>
     <div x-show="category && computedCost === null" x-cloak
          class="gilded-inset px-4 py-2.5 border border-blood-900">
