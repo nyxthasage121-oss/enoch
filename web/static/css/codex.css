@@ -416,7 +416,9 @@ textarea {
   background:
     linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0) 40%),
     #120d0f;
-  border: 1px solid #2a1f22;
+  /* Border is legible at rest (was #2a1f22, near-invisible on the dark bg) so
+     every field reads as an input; brightens to gold on focus below. */
+  border: 1px solid #4a3c2e;
   box-shadow: inset 0 1px 6px rgba(0,0,0,0.6);
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
