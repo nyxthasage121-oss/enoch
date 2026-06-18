@@ -858,6 +858,18 @@ def validate_chargen_raw(
                     + _spread["blurb"]
                 )
 
+    # Ghouls (V5): at most 1 Discipline dot at creation, in a single Discipline
+    # drawn from the regnant's clan (staff verify which). More comes later via
+    # XP or at staff discretion.
+    elif character_type == "ghoul":
+        _ghoul_disc_dots = sum(base_trait_value(sheet, k) for k in _disc_keys())
+        if _ghoul_disc_dots > 1:
+            errors.append(
+                "A Ghoul starts with at most 1 Discipline dot at creation, in a "
+                "single Discipline drawn from the regnant's clan. Buy more later "
+                "with XP or at staff discretion."
+            )
+
     # Advantages — player-added (no `src`) Merits + Backgrounds + Advantages must
     # fit the pool; Flaws must hit the minimum and not exceed the cap. Auto-granted
     # entries (clan bane, predator grants) carry a `src` tag and don't count.

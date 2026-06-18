@@ -1399,10 +1399,9 @@
         <div class="gilded-inset px-4 py-3 mb-4 border border-ink-700">
           <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Ghoul Disciplines</p>
           <p class="font-garamond text-xs text-bone-400 leading-snug">
-            Start with 1 dot of a Discipline drawn from your regnant's clan.
-            Additional Discipline dots beyond that come at staff discretion
-            (typically capped at 3 dots total without extraordinary
-            circumstances).
+            Take <span class="text-bone-200">1 dot of a single Discipline</span>
+            drawn from your regnant's clan — that's your whole creation allotment.
+            More Discipline dots come later through XP or at staff discretion.
           </p>
         </div>
       </template>
@@ -3201,7 +3200,17 @@
       // Dot pip click — toggles highest = N OR N-1 if already at N
       togglePip(key, n) {
         const cur = this.sheet[key] || 0;
-        this.sheet[key] = cur === n ? n - 1 : n;
+        let val = cur === n ? n - 1 : n;
+        // Ghouls (V5): at most 1 Discipline dot at creation, in a single
+        // Discipline. Cap the dot here so the player can't over-allocate.
+        if (val > 0 && key.startsWith('disc_') && this.charName.character_type === 'ghoul') {
+          const otherDiscDots = Object.keys(this.sheet)
+            .filter(k => k.startsWith('disc_') && k !== key)
+            .reduce((s, k) => s + (this.sheet[k] || 0), 0);
+          if (otherDiscDots > 0) return;   // a Discipline dot already sits elsewhere
+          val = 1;                          // and this Discipline is capped at 1
+        }
+        this.sheet[key] = val;
       },
 
       // Skills + specialties

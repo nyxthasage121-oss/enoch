@@ -63,6 +63,11 @@ def _create(player, *, name, clan="brujah", character_type="kindred",
         "touchstones": _j.dumps(["Sister Maria", "Father Joseph"]),
         **_raw_traits("brujah"),
     }
+    # Ghouls take at most 1 Discipline dot at creation, not the Kindred 2+1
+    # spread the helper seeds — strip them so the ghoul validates.
+    if character_type == "ghoul":
+        for k in [k for k in data if k.startswith("disc_")]:
+            data[k] = 0
     return player.post("/characters/new", data=data, follow_redirects=False)
 
 

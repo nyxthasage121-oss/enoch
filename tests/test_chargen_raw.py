@@ -221,3 +221,27 @@ def test_predator_free_discipline_dot_allowed():
     s["disc_presence"] = 1       # ... + the predator's free dot (Brujah in-clan)
     assert validate_chargen_raw(
         s, character_type="kindred", clan="brujah", predator_type="Alleycat") == []
+
+
+def test_ghoul_one_discipline_dot_allowed():
+    """A Ghoul may take 1 dot in a single Discipline at creation (the regnant's)."""
+    from web.v5_traits import validate_chargen_raw
+    s = _valid_sheet()
+    s["disc_celerity"], s["disc_potence"] = 1, 0   # one dot, one Discipline
+    assert not any("Discipline" in e for e in
+                   validate_chargen_raw(s, character_type="ghoul", clan="brujah"))
+
+
+def test_ghoul_more_than_one_discipline_dot_rejected():
+    """A Ghoul can't take 2 dots, or dots in 2 Disciplines, at creation."""
+    from web.v5_traits import validate_chargen_raw
+    # Two dots in one Discipline.
+    s1 = _valid_sheet()
+    s1["disc_celerity"], s1["disc_potence"] = 2, 0
+    assert any("Discipline" in e for e in
+               validate_chargen_raw(s1, character_type="ghoul", clan="brujah"))
+    # One dot in each of two Disciplines.
+    s2 = _valid_sheet()
+    s2["disc_celerity"], s2["disc_potence"] = 1, 1
+    assert any("Discipline" in e for e in
+               validate_chargen_raw(s2, character_type="ghoul", clan="brujah"))
