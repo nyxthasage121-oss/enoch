@@ -152,8 +152,7 @@
           <div class="flex gap-2">
             <input type="url"
                    name="rp_links"
-                   :value="link"
-                   @input="links[idx] = $event.target.value"
+                   x-model="links[idx]"
                    placeholder="https://discord.com/channels/…"
                    class="flex-1 min-w-0">
             <button type="button"
