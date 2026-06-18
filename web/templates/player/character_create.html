@@ -1601,15 +1601,38 @@
               </div>
               <div class="ml-1 space-y-0.5">
                 <template x-for="d in loresheetDots(ls.id)" :key="d.dot">
-                  <button type="button" @click="toggleLoresheetLevel(ls, d.dot)"
-                          class="flex items-start gap-1.5 w-full text-left group">
-                    <span class="w-2.5 h-2.5 mt-0.5 rounded-full border shrink-0 transition-colors"
-                          :class="hasLoresheetLevel(ls, d.dot) ? 'bg-gold-500 border-gold-400' : 'border-bone-700 group-hover:border-bone-500'"></span>
-                    <span class="font-garamond text-[0.62rem] leading-snug"
-                          :class="hasLoresheetLevel(ls, d.dot) ? 'text-bone-300' : 'text-bone-600'">
-                      <span class="text-bone-700" x-text="'(' + d.dot + ') '"></span><span x-text="d.name"></span>
-                    </span>
-                  </button>
+                  <div>
+                    <button type="button" @click="toggleLoresheetLevel(ls, d.dot)"
+                            class="flex items-start gap-1.5 w-full text-left group">
+                      <span class="w-2.5 h-2.5 mt-0.5 rounded-full border shrink-0 transition-colors"
+                            :class="hasLoresheetLevel(ls, d.dot) ? 'bg-gold-500 border-gold-400' : 'border-bone-700 group-hover:border-bone-500'"></span>
+                      <span class="font-garamond text-[0.62rem] leading-snug"
+                            :class="hasLoresheetLevel(ls, d.dot) ? 'text-bone-300' : 'text-bone-600'">
+                        <span class="text-bone-700" x-text="'(' + d.dot + ') '"></span><span x-text="d.name"></span>
+                      </span>
+                    </button>
+                    {# "Distribute N dots among …" — shown when this entry is taken. #}
+                    <template x-if="hasLoresheetLevel(ls, d.dot) && choiceGrantFor(ls.id, d.dot)">
+                      <div class="ml-5 mt-1 mb-1.5 gilded-inset px-2 py-1.5">
+                        <p class="text-[0.55rem] text-bone-700 mb-1">
+                          Distribute <span x-text="choiceGrantFor(ls.id, d.dot).dots"></span> dots
+                          (<span class="text-gold-600" x-text="choiceAllocated(ls.id, d.dot)"></span>/<span x-text="choiceGrantFor(ls.id, d.dot).dots"></span>):
+                        </p>
+                        <template x-for="opt in choiceGrantFor(ls.id, d.dot).options" :key="opt">
+                          <div class="flex items-center gap-1.5 text-[0.6rem] py-0.5">
+                            <span class="flex-1 text-bone-400" x-text="opt"></span>
+                            <button type="button" @click="allocateChoice(ls.id, d.dot, opt, -1)"
+                                    class="w-4 h-4 border border-ink-600 text-bone-500 leading-none hover:text-blood-400">−</button>
+                            <span class="w-3 text-center text-gold-500" x-text="choiceOptionDots(ls.id, d.dot, opt)"></span>
+                            <button type="button" @click="allocateChoice(ls.id, d.dot, opt, 1)"
+                                    :disabled="choiceAllocated(ls.id, d.dot) >= choiceGrantFor(ls.id, d.dot).dots"
+                                    :class="choiceAllocated(ls.id, d.dot) >= choiceGrantFor(ls.id, d.dot).dots ? 'opacity-30 cursor-not-allowed' : 'hover:text-gold-400'"
+                                    class="w-4 h-4 border border-ink-600 text-bone-500 leading-none">+</button>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
                 </template>
               </div>
             </div>
@@ -3399,6 +3422,7 @@
       applyLoresheetGrants(id, dot) {
         const gkey = 'ls:' + id + ':' + dot;
         for (const g of this._loresheetDotGrants(id, dot)) {
+          if (g.kind === 'choice') continue;   // player distributes these
           const list = this._grantList(g.kind);
           if (list.some(x => x.gkey === gkey && x.name === g.name)) continue;
           list.push({ name: g.name, dots: g.dots || 1, src: 'loresheet', gkey });
@@ -3410,6 +3434,35 @@
           for (let i = list.length - 1; i >= 0; i--) {
             if (list[i].gkey === gkey) list.splice(i, 1);
           }
+        }
+      },
+      // "Distribute N dots among A/B/C" grants — the player allocates the dots
+      // across the option backgrounds (each tagged src:'loresheet' under the
+      // same gkey, so they're budget-free and clear on deselect).
+      choiceGrantFor(id, dot) {
+        return this._loresheetDotGrants(id, dot).find(g => g.kind === 'choice') || null;
+      },
+      choiceOptionDots(id, dot, name) {
+        const gkey = 'ls:' + id + ':' + dot;
+        const e = this.backgrounds.find(x => x.gkey === gkey && x.name === name);
+        return e ? e.dots : 0;
+      },
+      choiceAllocated(id, dot) {
+        const gkey = 'ls:' + id + ':' + dot;
+        return this.backgrounds.filter(x => x.gkey === gkey).reduce((s, x) => s + (x.dots || 0), 0);
+      },
+      allocateChoice(id, dot, name, delta) {
+        const grant = this.choiceGrantFor(id, dot);
+        if (!grant) return;
+        const gkey = 'ls:' + id + ':' + dot;
+        const e = this.backgrounds.find(x => x.gkey === gkey && x.name === name);
+        if (delta > 0) {
+          if (this.choiceAllocated(id, dot) >= grant.dots) return;
+          if (e) { if (e.dots < 5) e.dots += 1; }
+          else this.backgrounds.push({ name, dots: 1, src: 'loresheet', gkey });
+        } else if (delta < 0 && e) {
+          e.dots -= 1;
+          if (e.dots <= 0) this.backgrounds.splice(this.backgrounds.indexOf(e), 1);
         }
       },
       toggleLoresheetLevel(ls, level) {

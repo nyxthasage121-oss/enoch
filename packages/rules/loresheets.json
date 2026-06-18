@@ -815,7 +815,18 @@
       {
         "dot": 5,
         "name": "Bohemian Affinities",
-        "description": "Your influence with the reformist Revolutionary faction is extensive — you provided help to their cause or were Embraced in their group. You get five dots to distribute among Haven, Contacts, and Resources, and can access the Halls of Montmartre as a hideout from time to time."
+        "description": "Your influence with the reformist Revolutionary faction is extensive — you provided help to their cause or were Embraced in their group. You get five dots to distribute among Haven, Contacts, and Resources, and can access the Halls of Montmartre as a hideout from time to time.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 5,
+            "options": [
+              "Haven",
+              "Contacts",
+              "Resources"
+            ]
+          }
+        ]
       }
     ]
   },
@@ -1778,7 +1789,20 @@
       {
         "dot": 5,
         "name": "Conspicuous Consumption",
-        "description": "Your search for Eletria leads to Helena. You become part of the circle of vampires used to slake her thirst and keep the Beckoning at bay. Gain five dots to distribute between Mawla, Resources, Allies, Herd, and Contacts. You also have access to Helena once per story, although she has compelled you not to reveal her presence. If lucky, your perilous association may reveal Eletria's fate."
+        "description": "Your search for Eletria leads to Helena. You become part of the circle of vampires used to slake her thirst and keep the Beckoning at bay. Gain five dots to distribute between Mawla, Resources, Allies, Herd, and Contacts. You also have access to Helena once per story, although she has compelled you not to reveal her presence. If lucky, your perilous association may reveal Eletria's fate.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 5,
+            "options": [
+              "Mawla",
+              "Resources",
+              "Allies",
+              "Herd",
+              "Contacts"
+            ]
+          }
+        ]
       }
     ]
   },
@@ -1945,7 +1969,17 @@
       {
         "dot": 4,
         "name": "Send a Murderer",
-        "description": "You're a serial killer, or have spent a lot of time studying them. You get two extra dice on rolls to study murder scenes or track down killers. You have three dots to spend between Contacts with the police force, Contacts with investigators in Kindred society, and Status."
+        "description": "You're a serial killer, or have spent a lot of time studying them. You get two extra dice on rolls to study murder scenes or track down killers. You have three dots to spend between Contacts with the police force, Contacts with investigators in Kindred society, and Status.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 3,
+            "options": [
+              "Contacts",
+              "Status"
+            ]
+          }
+        ]
       },
       {
         "dot": 5,
@@ -2433,7 +2467,18 @@
       {
         "dot": 2,
         "name": "Fight Club",
-        "description": "You have established a flourishing Kindred dueling society in your domain. This society is a lucrative venture and excellent way for Kindred to settle their differences, but is frowned upon by the Prince and/or Primogen. Gain three dots to distribute between Resources, Allies, or Contacts reflecting the profits and connections made through your society."
+        "description": "You have established a flourishing Kindred dueling society in your domain. This society is a lucrative venture and excellent way for Kindred to settle their differences, but is frowned upon by the Prince and/or Primogen. Gain three dots to distribute between Resources, Allies, or Contacts reflecting the profits and connections made through your society.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 3,
+            "options": [
+              "Resources",
+              "Allies",
+              "Contacts"
+            ]
+          }
+        ]
       },
       {
         "dot": 3,
@@ -2692,7 +2737,18 @@
       {
         "dot": 3,
         "name": "Uncanny Kinship",
-        "description": "Due to persistent persecution from the High Clans, vampires of Low Clans feel inclined to stick together. You often mediate between Low Clan disputants, and you see the merit of the underworld's Kindred banding together against the hegemony of the High. You can select three dots from among Mawla or Status from other Low Clans in the domain."
+        "description": "Due to persistent persecution from the High Clans, vampires of Low Clans feel inclined to stick together. You often mediate between Low Clan disputants, and you see the merit of the underworld's Kindred banding together against the hegemony of the High. You can select three dots from among Mawla or Status from other Low Clans in the domain.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 3,
+            "options": [
+              "Mawla",
+              "Status",
+              "Domain"
+            ]
+          }
+        ]
       },
       {
         "dot": 4,
@@ -2954,7 +3010,18 @@
       {
         "dot": 3,
         "name": "The Revolution",
-        "description": "Minneapolis has a strong tradition of fighting for equal rights and representation. You were once an active force for change within your community, or have become familiar to those who are. You gain four dots to spend among Allies, Contacts, or Influence, representing affiliation with prominent grassroots movements, local leaders, or institutions. However, this activism has made you a target among your elite Camarilla enemies — you must take the Flaw Status: Shunned - Camarilla (*)."
+        "description": "Minneapolis has a strong tradition of fighting for equal rights and representation. You were once an active force for change within your community, or have become familiar to those who are. You gain four dots to spend among Allies, Contacts, or Influence, representing affiliation with prominent grassroots movements, local leaders, or institutions. However, this activism has made you a target among your elite Camarilla enemies — you must take the Flaw Status: Shunned - Camarilla (*).",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 4,
+            "options": [
+              "Allies",
+              "Contacts",
+              "Influence"
+            ]
+          }
+        ]
       },
       {
         "dot": 4,
@@ -3782,7 +3849,18 @@
       {
         "dot": 3,
         "name": "Wayward Daughter",
-        "description": "Whatever you've heard about Daughters of Cacophony, you turned it into your identity. You successfully (so far) pretend to be a Daughter in your domain and have convinced local Kindred society to treat you like a big deal. Receive four dots to distribute among Status, Herd, and Mawla. However, someone — like your sire — knows your secret and might use it against you. If exposed, lose your gained advantages and gain Flaw: Suspect among the faction you're most acquainted with."
+        "description": "Whatever you've heard about Daughters of Cacophony, you turned it into your identity. You successfully (so far) pretend to be a Daughter in your domain and have convinced local Kindred society to treat you like a big deal. Receive four dots to distribute among Status, Herd, and Mawla. However, someone — like your sire — knows your secret and might use it against you. If exposed, lose your gained advantages and gain Flaw: Suspect among the faction you're most acquainted with.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 4,
+            "options": [
+              "Status",
+              "Herd",
+              "Mawla"
+            ]
+          }
+        ]
       },
       {
         "dot": 4,
@@ -4335,7 +4413,17 @@
       {
         "dot": 2,
         "name": "Convention Attendee",
-        "description": "You attended the convention and navigated its web of intrigue successfully. Gain two dots to distribute between Allies and Contacts, and once per story ask the Storyteller for a piece of information related to the convention — either public record or a behind-the-scenes detail."
+        "description": "You attended the convention and navigated its web of intrigue successfully. Gain two dots to distribute between Allies and Contacts, and once per story ask the Storyteller for a piece of information related to the convention — either public record or a behind-the-scenes detail.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 2,
+            "options": [
+              "Allies",
+              "Contacts"
+            ]
+          }
+        ]
       },
       {
         "dot": 3,
@@ -4352,7 +4440,19 @@
       {
         "dot": 4,
         "name": "Formal Delegate",
-        "description": "You were one of the formal delegates to the convention and successfully prosecuted the objectives of your patron Prince or Primogen. Gain four dots to distribute among Allies, Contacts, Retainers, and Resources related to the convention. You also have a standing invitation to Elysium events in Chicago or your home domain."
+        "description": "You were one of the formal delegates to the convention and successfully prosecuted the objectives of your patron Prince or Primogen. Gain four dots to distribute among Allies, Contacts, Retainers, and Resources related to the convention. You also have a standing invitation to Elysium events in Chicago or your home domain.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 4,
+            "options": [
+              "Allies",
+              "Contacts",
+              "Retainers",
+              "Resources"
+            ]
+          }
+        ]
       },
       {
         "dot": 5,
@@ -4792,12 +4892,32 @@
       {
         "dot": 4,
         "name": "Diva",
-        "description": "You have been part of the Prince's troupe for as long as you can remember, surviving long years of hard work, abusive impresarios, and the jealousy of fellow players. Distribute three dots among Fame and Herd, and gain two additional dice to your performances while on stage. Gain Enemy (••) Stalker."
+        "description": "You have been part of the Prince's troupe for as long as you can remember, surviving long years of hard work, abusive impresarios, and the jealousy of fellow players. Distribute three dots among Fame and Herd, and gain two additional dice to your performances while on stage. Gain Enemy (••) Stalker.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 3,
+            "options": [
+              "Fame",
+              "Herd"
+            ]
+          }
+        ]
       },
       {
         "dot": 5,
         "name": "Impresario",
-        "description": "Long gone are the days of stage fright before a dead-hearted audience. You know the ins and outs of the Prince's court and exactly how to put together a show that brings results. Gain three dots to distribute among Influence and Status. Once per story, gain three dice to a Performance roll meant to sway the minds of others to your gain. A Messy Critical or Bestial Failure may end in disastrous consequences to your cause."
+        "description": "Long gone are the days of stage fright before a dead-hearted audience. You know the ins and outs of the Prince's court and exactly how to put together a show that brings results. Gain three dots to distribute among Influence and Status. Once per story, gain three dice to a Performance roll meant to sway the minds of others to your gain. A Messy Critical or Bestial Failure may end in disastrous consequences to your cause.",
+        "grants": [
+          {
+            "kind": "choice",
+            "dots": 3,
+            "options": [
+              "Influence",
+              "Status"
+            ]
+          }
+        ]
       }
     ]
   },

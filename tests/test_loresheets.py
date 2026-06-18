@@ -94,9 +94,16 @@ def test_loresheet_grants_resolve_to_real_traits():
         for d in ls["dots"]:
             for g in d.get("grants", []):
                 seen += 1
-                assert g["kind"] in {"merit", "background", "flaw"}, (ls["id"], g)
-                assert isinstance(g["name"], str) and g["name"]
+                assert g["kind"] in {"merit", "background", "flaw", "choice"}, (ls["id"], g)
                 assert 1 <= int(g["dots"]) <= 5
+                if g["kind"] == "choice":
+                    # "distribute N dots among …" — every option is a background.
+                    assert len(g["options"]) >= 2, (ls["id"], g)
+                    for opt in g["options"]:
+                        assert opt.lower() in bg_names, \
+                            f"{ls['id']} choice option {opt} is not a background"
+                    continue
+                assert isinstance(g["name"], str) and g["name"]
                 pool = (bg_names if g["kind"] == "background"
                         else flaw_names if g["kind"] == "flaw" else merit_names)
                 assert g["name"].lower() in pool, \
