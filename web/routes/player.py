@@ -474,6 +474,8 @@ def _wizard_extras() -> dict:
         "discipline_spreads": _V5_DISCIPLINE_SPREADS,
         "predator_free_disc_dots": _PREDATOR_FREE_DISCIPLINE_DOTS,
         "active_ruleset":     ruleset,
+        "in_memoriam_enabled": bool(s.get("in_memoriam_enabled", 0)),
+        "creation_mode":      (s.get("creation_mode") or "guided").lower(),
         "tier_budgets":       tier_budgets,
         # Default budget shape (neonate) — Alpine swaps in tier_budgets
         # when the player picks a different tier mid-wizard.
@@ -559,13 +561,14 @@ async def character_create(
     ancilla_mode     = ancilla_mode_raw if ancilla_mode_raw in {"standard", "in_memoriam"} else None
     if character_type != "kindred" or character_tier != "ancilla":
         ancilla_mode = None
-    # Chronicle-level ruleset overrides the per-character choice for
-    # Ancilla. When the chronicle runs In Memoriam, every Ancilla goes
-    # through the era builder regardless of what the form posted.
-    if character_tier == "ancilla":
-        _chronicle_ruleset = (_chronicle_settings().get("active_ruleset") or "standard").lower()
-        if _chronicle_ruleset == "in_memoriam":
-            ancilla_mode = "in_memoriam"
+    else:
+        # In Memoriam is now an opt-in the player CHOOSES (migration 040). Honor
+        # their pick, but fold it back to standard if the chronicle hasn't
+        # enabled the Era Builder; default a missing pick to standard.
+        if ancilla_mode == "in_memoriam" and not _chronicle_settings().get("in_memoriam_enabled"):
+            ancilla_mode = "standard"
+        elif ancilla_mode is None:
+            ancilla_mode = "standard"
     im_generation        = (form.get("im_generation") or "").strip() or None
     im_discipline_spread = (form.get("im_discipline_spread") or "").strip() or None
     try:
@@ -787,8 +790,12 @@ async def character_create(
     # under the standard ruleset (homebrew runs its own tier budgets).
     if not as_draft and require_sheet:
         _settings = _chronicle_settings()
+        _creation_mode = (_settings.get("creation_mode") or "guided").lower()
         _ruleset = (_settings.get("active_ruleset") or "standard").lower()
-        if _ruleset == "standard":
+        # Open mode = no enforcement (players just enter their sheet). In Memoriam
+        # characters follow the Era rules instead of the Standard spreads, so they
+        # skip this Standard RAW check too (IM validation lives in the Era flow).
+        if _creation_mode != "open" and _ruleset == "standard" and ancilla_mode != "in_memoriam":
             from ..db import tier_budget
             _bud = tier_budget(_settings, character_tier)
             raw_errors = _validate_chargen_raw(

@@ -1979,6 +1979,9 @@ def test_ancilla_in_memoriam_submission_persists_blob(player):
             {"type": "violence",  "gambit_taken": False, "gambit_roll": 8},
         ],
     }
+    from web.db import get_db, upsert_settings
+    with get_db() as conn:
+        upsert_settings(conn, in_memoriam_enabled=1)
     r = player.post(
         "/characters/new",
         data={
@@ -2014,6 +2017,7 @@ def test_ancilla_in_memoriam_submission_persists_blob(player):
             assert len(im_data["eras"]) == 3
         finally:
             conn.execute("DELETE FROM characters WHERE id=?", (row["id"],))
+            upsert_settings(conn, in_memoriam_enabled=0)
 
 
 def test_neonate_submission_clears_ancilla_fields(player):
@@ -4187,57 +4191,83 @@ def test_admin_settings_save_requires_permission(staff, player):
         set_staff_role(conn, "999999999999999999", "admin", actor_id="smoke-restore")
 
 
-def test_active_ruleset_in_memoriam_forces_ancilla_to_im(staff, player):
-    """When the chronicle's active_ruleset is 'in_memoriam', any Ancilla
-    character submitted with ancilla_mode='standard' should be coerced
-    to 'in_memoriam' on save — the chronicle setting wins."""
+def test_in_memoriam_is_a_player_choice_not_forced(staff, player):
+    """In Memoriam is an opt-in the player CHOOSES (migration 040), no longer
+    forced by a chronicle ruleset. With IM enabled a 'standard' Ancilla pick is
+    honored; with IM disabled an 'in_memoriam' pick folds back to standard.
+    (creation_mode='open' here so we exercise the mode logic, not RAW validation.)"""
     import json as _j
     from web.db import get_db, upsert_settings
 
-    # Flip the chronicle into IM mode
+    # IM enabled — a 'standard' pick must be honored (not coerced to IM).
     with get_db() as conn:
-        upsert_settings(conn, active_ruleset="in_memoriam")
-
-    # Submit an Ancilla character explicitly asking for standard mode
-    r = player.post(
+        upsert_settings(conn, in_memoriam_enabled=1, creation_mode="open")
+    r1 = player.post(
         "/characters/new",
         data={
             "_csrf": "dev-csrf-token",
-            "name": "IM Force Smoke",
+            "name": "IM Choice Smoke",
             "clan": "brujah",
             "character_type": "kindred",
             "character_tier": "ancilla",
-            "ancilla_mode": "standard",  # should be ignored
+            "ancilla_mode": "standard",
             "touchstones": _j.dumps(["Friend A", "Friend B"]),
         },
         follow_redirects=False,
     )
-    assert r.status_code == 303
+    assert r1.status_code == 303
+
+    # IM disabled — an 'in_memoriam' pick must fold back to standard.
+    with get_db() as conn:
+        upsert_settings(conn, in_memoriam_enabled=0)
+    r2 = player.post(
+        "/characters/new",
+        data={
+            "_csrf": "dev-csrf-token",
+            "name": "IM Disabled Smoke",
+            "clan": "brujah",
+            "character_type": "kindred",
+            "character_tier": "ancilla",
+            "ancilla_mode": "in_memoriam",
+            "touchstones": _j.dumps(["Friend A", "Friend B"]),
+        },
+        follow_redirects=False,
+    )
+    assert r2.status_code == 303
 
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT id, ancilla_mode FROM characters WHERE name='IM Force Smoke' ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-        assert row is not None
+        modes = {
+            row["name"]: row["ancilla_mode"]
+            for row in conn.execute(
+                "SELECT name, ancilla_mode FROM characters "
+                "WHERE name IN ('IM Choice Smoke', 'IM Disabled Smoke')"
+            ).fetchall()
+        }
         try:
-            assert row["ancilla_mode"] == "in_memoriam", \
-                "chronicle's IM ruleset must override the per-character form value"
+            assert modes.get("IM Choice Smoke") == "standard", \
+                "a 'standard' pick must be honored when IM is enabled"
+            assert modes.get("IM Disabled Smoke") == "standard", \
+                "an 'in_memoriam' pick must fold to standard when IM is disabled"
         finally:
-            conn.execute("DELETE FROM characters WHERE id=?", (row["id"],))
-            # Reset chronicle ruleset
-            upsert_settings(conn, active_ruleset="standard")
+            conn.execute(
+                "DELETE FROM characters WHERE name IN ('IM Choice Smoke', 'IM Disabled Smoke')"
+            )
+            upsert_settings(conn, creation_mode="guided")
 
 
 def test_active_ruleset_saves_and_round_trips(staff):
-    """The new three-way ruleset selector should persist correctly and
-    the legacy use_homebrew_rules flag stays in sync as a derived value."""
+    """Standard/Homebrew is the base ruleset; In Memoriam is a separate flag
+    (migration 040). use_homebrew_rules stays in sync, and a legacy
+    active_ruleset='in_memoriam' POST folds to a Standard base + the flag on."""
     from web.db import get_db, get_settings
+    # Homebrew base + In Memoriam flag on (they coexist now).
     r = staff.post(
         "/staff/admin/settings",
         data={
             "_csrf": "dev-csrf-token",
             "require_sheet_on_create": "on",
-            "active_ruleset": "in_memoriam",
+            "active_ruleset": "homebrew",
+            "in_memoriam_enabled": "on",
             "revenant_families": "",
         },
         follow_redirects=False,
@@ -4246,23 +4276,36 @@ def test_active_ruleset_saves_and_round_trips(staff):
 
     with get_db() as conn:
         s = get_settings(conn)
-    assert s["active_ruleset"] == "in_memoriam"
-    assert s["use_homebrew_rules"] == 0  # IM != homebrew
+    assert s["active_ruleset"] == "homebrew"
+    assert s["in_memoriam_enabled"] == 1
+    assert s["use_homebrew_rules"] == 1
 
-    # Switching to homebrew should flip the legacy flag back on
+    # A legacy 'in_memoriam' base value folds to a Standard base + flag on.
     staff.post(
         "/staff/admin/settings",
         data={
             "_csrf": "dev-csrf-token",
-            "active_ruleset": "homebrew",
+            "active_ruleset": "in_memoriam",
             "revenant_families": "",
         },
         follow_redirects=False,
     )
     with get_db() as conn:
         s = get_settings(conn)
-    assert s["active_ruleset"] == "homebrew"
-    assert s["use_homebrew_rules"] == 1
+    assert s["active_ruleset"] == "standard"
+    assert s["in_memoriam_enabled"] == 1
+    assert s["use_homebrew_rules"] == 0
+
+    # Reset to a clean Standard base, IM off.
+    staff.post(
+        "/staff/admin/settings",
+        data={
+            "_csrf": "dev-csrf-token",
+            "active_ruleset": "standard",
+            "revenant_families": "",
+        },
+        follow_redirects=False,
+    )
 
 
 def test_tier_budget_overrides_round_trip(staff):
@@ -4318,27 +4361,18 @@ def test_tier_budget_overrides_round_trip(staff):
 
 
 def test_tier_budget_honors_overrides_under_in_memoriam_ruleset(staff):
-    """An IM ruleset with per-tier homebrew budgets should keep using
-    the overrides. IM only controls the Ancilla flow; chronicles can
-    still customize budgets for every tier."""
+    """Per-tier homebrew overrides still apply when In Memoriam is enabled — IM
+    only adds the Ancilla Era path; the base ruleset (homebrew here) governs the
+    budgets for every tier."""
     from web.db import get_db, get_settings, tier_budget
-    # Save overrides under homebrew ruleset
+    # Homebrew base + an override + In Memoriam flag on (they coexist now).
     staff.post(
         "/staff/admin/settings",
         data={
             "_csrf": "dev-csrf-token",
             "active_ruleset": "homebrew",
+            "in_memoriam_enabled": "on",
             "tier_mortal_xp": "42",
-            "revenant_families": "",
-        },
-        follow_redirects=False,
-    )
-    # Switch to in_memoriam — overrides should still apply
-    staff.post(
-        "/staff/admin/settings",
-        data={
-            "_csrf": "dev-csrf-token",
-            "active_ruleset": "in_memoriam",
             "revenant_families": "",
         },
         follow_redirects=False,
@@ -4346,7 +4380,7 @@ def test_tier_budget_honors_overrides_under_in_memoriam_ruleset(staff):
     with get_db() as conn:
         s = get_settings(conn)
         mortal = tier_budget(s, "mortal")
-    assert mortal["xp"] == 42, "IM ruleset must honor stored per-tier overrides"
+    assert mortal["xp"] == 42, "homebrew overrides must still apply with IM enabled"
 
     # Reset to standard for subsequent tests
     staff.post(
@@ -4865,7 +4899,9 @@ def test_staff_detail_renders_type_tier_and_im_eras(player, staff):
     review — staff need that context to decide whether the build is
     legal under the chronicle's tier/ruleset settings."""
     import json as _j
-    from web.db import get_db
+    from web.db import get_db, upsert_settings
+    with get_db() as conn:
+        upsert_settings(conn, in_memoriam_enabled=1)
     im_blob = {
         "generation":        "9th-8th",
         "discipline_spread": "broad",
@@ -4913,6 +4949,7 @@ def test_staff_detail_renders_type_tier_and_im_eras(player, staff):
     finally:
         with get_db() as conn:
             conn.execute("DELETE FROM characters WHERE id=?", (cid,))
+            upsert_settings(conn, in_memoriam_enabled=0)
 
 
 def test_player_sheet_renders_edit_mode_toggle(player):

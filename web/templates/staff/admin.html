@@ -61,7 +61,9 @@
        Ancilla 35. #}
     {% set _tier_defaults = tier_defaults | default({}) %}
     <div class="gilded p-5" x-data="{
-           ruleset: '{{ _ruleset }}',
+           baseRuleset: '{{ _ruleset }}',
+           imEnabled: {{ 'true' if _cs.get('in_memoriam_enabled') else 'false' }},
+           creationMode: '{{ _cs.get('creation_mode', 'guided') }}',
            revenants: {{ 'true' if _cs.get('revenants_enabled') else 'false' }},
          }">
       <p class="label-gold mb-3">Chronicle Settings</p>
@@ -140,24 +142,14 @@
 
         <div class="divider-gold"></div>
 
-        {# Ruleset selector — two-way Standard vs Homebrew. The In
-           Memoriam path is now a SEPARATE checkbox below since it only
-           affects Ancilla characters and is orthogonal to whether
-           neonate/mortal/etc. use RAW or chronicle-tuned budgets.
-           Combinations:
-             Standard alone        → V5 RAW spreads; per-tier Sea-of-Time XP (Neonate 15, Ancilla 35)
-             Standard + IM         → V5 RAW for non-Ancilla, Era Builder for Ancilla
-             Homebrew alone        → custom budgets; Ancilla XP is the exact
-                                      configured total
-             Homebrew + IM         → custom budgets + Era Builder for Ancilla
-           The route writes active_ruleset='in_memoriam' when IM is on,
-           regardless of which base ruleset was picked, so the rest of
-           the codebase still treats IM as a discrete mode. The hidden
-           field below carries the combined value to the server. #}
-        <div x-data="{ baseRuleset: ruleset === 'in_memoriam' ? 'standard' : ruleset,
-                       imEnabled: ruleset === 'in_memoriam' }"
-             x-init="$watch('baseRuleset', v => { ruleset = imEnabled ? 'in_memoriam' : v; });
-                     $watch('imEnabled', v => { ruleset = v ? 'in_memoriam' : baseRuleset; });">
+        {# Ruleset selector — Standard vs Homebrew is the BASE budget ruleset.
+           In Memoriam is an ORTHOGONAL checkbox (migration 040): when on,
+           Ancilla players may CHOOSE the Era Builder in the creator. The radio
+           posts active_ruleset directly; the checkbox posts in_memoriam_enabled.
+             Standard       → V5 RAW spreads + per-tier Sea-of-Time XP
+             Homebrew       → chronicle-tuned per-tier budgets
+             + In Memoriam  → adds the Era Builder as an Ancilla choice #}
+        <div>
           <p class="font-cinzel text-xs text-bone-300 tracking-wide mb-2">Active Ruleset</p>
           <p class="font-garamond text-bone-500 text-sm mb-3 leading-relaxed">
             <strong class="text-bone-400">Standard</strong> uses V5 RAW.
@@ -171,7 +163,7 @@
             ] %}
             <label class="flex items-start gap-2 gilded-inset px-3 py-2 cursor-pointer hover:border-gold-700 transition-colors"
                    :class="baseRuleset === '{{ val }}' ? 'border-gold-700' : ''">
-              <input type="radio" value="{{ val }}"
+              <input type="radio" name="active_ruleset" value="{{ val }}"
                      x-model="baseRuleset"
                      class="accent-gold mt-0.5">
               <div>
@@ -182,22 +174,51 @@
             {% endfor %}
           </div>
 
-          {# In Memoriam toggle — orthogonal, Ancilla-only #}
+          {# In Memoriam — orthogonal, additive. Posts in_memoriam_enabled. #}
           <label class="flex items-start gap-3 gilded-inset px-3 py-2 cursor-pointer hover:border-mauve-700 transition-colors"
                  :class="imEnabled ? 'border-mauve-700' : ''">
-            <input type="checkbox" x-model="imEnabled" class="accent-[#8B1A1A] mt-0.5">
+            <input type="checkbox" name="in_memoriam_enabled" x-model="imEnabled" class="accent-[#8B1A1A] mt-0.5">
             <div>
               <p class="font-cinzel text-xs text-bone-200">In Memoriam (Ancilla)</p>
               <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">
-                Ancilla characters build their history era-by-era through the
-                Era Builder instead of taking the flat 35 XP Sea-of-Time pool. Layers on top
-                of either Standard or Homebrew above.
+                Offers Ancilla players the era-by-era Era Builder as a choice
+                (Standard vs In Memoriam) in the creator, instead of the flat
+                35 XP Sea-of-Time pool. Layers on top of Standard or Homebrew.
               </p>
             </div>
           </label>
+        </div>
 
-          {# Hidden field carries the combined value to the route. #}
-          <input type="hidden" name="active_ruleset" :value="ruleset">
+        <div class="divider-gold"></div>
+
+        {# Character-creation mode — Guided (enforced wizard) vs Open (free
+           sheet entry, nothing enforced). Launch on Open to drop in existing
+           sheets; switch to Guided when you want the creator to police RAW. #}
+        <div>
+          <p class="font-cinzel text-xs text-bone-300 tracking-wide mb-2">Character Creation</p>
+          <p class="font-garamond text-bone-500 text-sm mb-3 leading-relaxed">
+            <strong class="text-bone-400">Guided</strong> walks players through the
+            creator and enforces the active standard.
+            <strong class="text-bone-400">Open</strong> lets them enter a sheet freely
+            with no enforcement — use it to launch with existing or imported sheets.
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {% for val, label, desc in [
+              ('guided', 'Guided creation', 'Wizard enforces RAW / In Memoriam / Homebrew'),
+              ('open',   'Open entry',      'Players just enter their sheet — nothing enforced'),
+            ] %}
+            <label class="flex items-start gap-2 gilded-inset px-3 py-2 cursor-pointer hover:border-gold-700 transition-colors"
+                   :class="creationMode === '{{ val }}' ? 'border-gold-700' : ''">
+              <input type="radio" name="creation_mode" value="{{ val }}"
+                     x-model="creationMode"
+                     class="accent-gold mt-0.5">
+              <div>
+                <p class="font-cinzel text-xs text-bone-200">{{ label }}</p>
+                <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">{{ desc }}</p>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
         </div>
 
         {# Per-tier budgets — visible under homebrew + IM (both honor
@@ -208,12 +229,12 @@
            input. The save handler splits the value into all three legacy
            fields so the rest of the wizard sidebar / cost validator code
            keeps working — staff just see one box per tier. #}
-        <div x-show="ruleset !== 'standard'" x-cloak class="space-y-3">
+        <div x-show="baseRuleset === 'homebrew' || imEnabled" x-cloak class="space-y-3">
           <p class="label-gold text-[0.78rem]">Per-Tier Budgets</p>
           <p class="font-garamond text-bone-600 text-xs italic">
             Override the V5 RAW starting allotments per archetype. Blank fields fall back to defaults.
-            <span x-show="ruleset === 'in_memoriam'" class="text-mauve-500 ml-1">
-              Ancilla still defaults to In Memoriam flow regardless of XP override.
+            <span x-show="imEnabled" class="text-mauve-500 ml-1">
+              Ancilla who pick the In Memoriam path build XP from eras instead of this pool.
             </span>
           </p>
           <div class="overflow-x-auto">

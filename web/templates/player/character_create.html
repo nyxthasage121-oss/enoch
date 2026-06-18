@@ -22,6 +22,7 @@
        budgets:           {{ (budgets | default({})) | tojson | forceescape }},
        tierBudgets:       {{ (tier_budgets | default({})) | tojson | forceescape }},
        activeRuleset:     {{ (active_ruleset | default('standard')) | tojson | forceescape }},
+       inMemoriamEnabled: {{ (in_memoriam_enabled | default(false)) | tojson | forceescape }},
        clanInfo:          {{ (clan_info | default({})) | tojson | forceescape }},
        predatorInfo:      {{ (predator_info | default({})) | tojson | forceescape }},
        clanBaneFlaws:     {{ (clan_bane_flaws | default({})) | tojson | forceescape }},
@@ -466,7 +467,7 @@
                     : 'border-ink-800 hover:bg-ink-900/40'"
                   @click="charName.character_tier = '{{ slug }}';
                           if ('{{ slug }}' !== 'ancilla') charName.ancilla_mode = '';
-                          else if (activeRuleset === 'in_memoriam') charName.ancilla_mode = 'in_memoriam';
+                          else if (!charName.ancilla_mode) charName.ancilla_mode = 'standard';
                           // Thin-Blood auto-pins clan to 'thin-blood' since
                           // they're clanless in V5 RAW. Other tiers clear
                           // any prior thin-blood pin so the picker re-shows.
@@ -492,24 +493,12 @@
       </div>
 
       {# ── Ancilla mode picker (only for Ancilla) ──
-         When the chronicle ruleset is 'in_memoriam', IM is the only
-         path and the picker is hidden — a banner explains why. #}
+         Shown only when the chronicle enables In Memoriam, so the player
+         chooses Standard vs the Era Builder. Otherwise Ancilla stays Standard
+         (defaulted on tier pick) and no picker is needed. #}
       <div x-show="charName.character_type === 'kindred'
                    && charName.character_tier === 'ancilla'
-                   && activeRuleset === 'in_memoriam'"
-           x-cloak class="mb-5 gilded-inset px-4 py-3 border border-gold-800">
-        <p class="font-cinzel text-[0.6rem] tracking-widest uppercase text-gold-500 mb-1">
-          Chronicle Rule · In Memoriam
-        </p>
-        <p class="font-garamond text-bone-500 text-xs leading-relaxed">
-          This chronicle runs the In Memoriam ruleset. Every Ancilla character
-          builds their history era-by-era and earns XP from lived experience.
-        </p>
-      </div>
-
-      <div x-show="charName.character_type === 'kindred'
-                   && charName.character_tier === 'ancilla'
-                   && activeRuleset !== 'in_memoriam'"
+                   && inMemoriamEnabled"
            x-cloak class="mb-5">
         <p class="label-gold mb-3">Ancilla Path</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2390,6 +2379,7 @@
       },
       tierBudgets:       opts.tierBudgets || {},
       activeRuleset:     opts.activeRuleset || 'standard',
+      inMemoriamEnabled: !!opts.inMemoriamEnabled,
       // Draft tracking — when resuming, draft_id is pre-filled so the
       // POST handler updates this row instead of creating a new one.
       draftId:           initial.draft_id || '',

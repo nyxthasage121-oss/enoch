@@ -702,7 +702,10 @@ def get_settings(conn) -> dict | None:
 
 # Chronicle ruleset constants — gives the rest of the app a single place
 # to look up valid values + the V5 RAW defaults.
-RULESETS = ("standard", "homebrew", "in_memoriam")
+RULESETS = ("standard", "homebrew")  # base budget rulesets. In Memoriam is no
+# longer a mutually-exclusive ruleset value (migration 040) — it's an orthogonal
+# `in_memoriam_enabled` flag layered on top of either base, so a chronicle can
+# offer Standard AND In Memoriam and let Ancilla players choose.
 
 # Per-tier budget defaults used when the chronicle is on the standard
 # ruleset or hasn't customized that tier yet. Values reflect V5 RAW
@@ -795,10 +798,21 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "max_chars_per_player",
         # Project rolls per timeskip (migration 035)
         "rolls_per_timeskip",
+        # In Memoriam decoupled from active_ruleset + chargen mode (migration 040)
+        "in_memoriam_enabled", "creation_mode",
     }
+    # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
+    # migration 040. It's now an orthogonal flag — translate a legacy POST
+    # (Standard base + In Memoriam on) so old callers and stored rows don't error.
+    if kwargs.get("active_ruleset") == "in_memoriam":
+        kwargs = dict(kwargs)
+        kwargs["active_ruleset"] = "standard"
+        kwargs.setdefault("in_memoriam_enabled", 1)
     # Validate ruleset before persisting — guard against typo'd POSTs.
     if "active_ruleset" in kwargs and kwargs["active_ruleset"] not in RULESETS:
         raise ValueError(f"Unknown ruleset: {kwargs['active_ruleset']!r}")
+    if "creation_mode" in kwargs and kwargs["creation_mode"] not in ("guided", "open"):
+        raise ValueError(f"Unknown creation_mode: {kwargs['creation_mode']!r}")
     # Serialize lists/dicts before insert (revenant_families is a JSON column)
     safe_raw = {k: v for k, v in kwargs.items() if k in ALLOWED}
     if "revenant_families" in safe_raw and isinstance(safe_raw["revenant_families"], (list, dict)):

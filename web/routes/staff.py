@@ -2043,12 +2043,21 @@ async def admin_settings_save(
     # explicit active_ruleset, infer 'homebrew'.
     from ..db import RULESETS
     active_ruleset = (form.get("active_ruleset") or "").strip().lower()
+    # In Memoriam is now an orthogonal flag (migration 040). A legacy
+    # 'in_memoriam' base value means Standard base + IM on.
+    im_enabled = (form.get("in_memoriam_enabled") == "on") or (active_ruleset == "in_memoriam")
+    if active_ruleset == "in_memoriam":
+        active_ruleset = "standard"
     if not active_ruleset and form.get("use_homebrew_rules") == "on":
         active_ruleset = "homebrew"
     if not active_ruleset:
         active_ruleset = "standard"
     if active_ruleset not in RULESETS:
         active_ruleset = "standard"
+    # Creation mode — guided (wizard enforces the standard) vs open (free entry).
+    creation_mode = (form.get("creation_mode") or "guided").strip().lower()
+    if creation_mode not in ("guided", "open"):
+        creation_mode = "guided"
 
     payload: dict = {
         "require_sheet_on_create":   1 if form.get("require_sheet_on_create") == "on" else 0,
@@ -2058,6 +2067,8 @@ async def admin_settings_save(
         # still reading it doesn't break.
         "use_homebrew_rules":        1 if active_ruleset == "homebrew" else 0,
         "active_ruleset":            active_ruleset,
+        "in_memoriam_enabled":       1 if im_enabled else 0,
+        "creation_mode":             creation_mode,
         # Legacy homebrew budgets — kept for back-compat with the old
         # single-budget UI; superseded by homebrew_tier_budgets below.
         "homebrew_starting_xp":      form_int(form.get("homebrew_starting_xp"), 75, lo=0),
