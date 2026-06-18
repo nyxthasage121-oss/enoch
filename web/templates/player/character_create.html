@@ -1937,8 +1937,9 @@
         </p>
       </div>
 
-      {# XP pool tracker #}
-      <div class="gilded-inset px-5 py-4 mb-5 border border-ink-700 flex items-center justify-between flex-wrap gap-3">
+      {# XP pool tracker — flat pool for standard chargen. #}
+      <div x-show="!isInMemoriam" x-cloak
+           class="gilded-inset px-5 py-4 mb-5 border border-ink-700 flex items-center justify-between flex-wrap gap-3">
         <div>
           <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1">Starting XP spent</p>
           <p class="font-cinzel text-2xl">
@@ -1950,6 +1951,33 @@
         <p class="font-cinzel text-sm tracking-widest"
            :class="xpRemaining < 0 ? 'text-blood-400' : 'text-bone-400'">
           <span x-text="xpRemaining"></span> remaining
+        </p>
+      </div>
+
+      {# In Memoriam — three category-locked pools (RAW Oceans of Time). #}
+      <div x-show="isInMemoriam" x-cloak class="gilded-inset px-5 py-4 mb-5 border border-ink-700">
+        <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-2">
+          Era XP <span class="text-bone-800 normal-case tracking-normal italic">— each pool buys only its own traits</span>
+        </p>
+        <div class="grid grid-cols-3 gap-3">
+          <template x-for="p in [
+            {id:'skill',      label:'Skills',                   total: imTotals.poolSkill},
+            {id:'discipline', label:'Disciplines',              total: imTotals.poolDisc},
+            {id:'sorcery',    label:'Mental · Occult · Sorcery', total: imTotals.poolSorcery}
+          ]" :key="p.id">
+            <div class="gilded px-3 py-2">
+              <p class="font-garamond text-[0.65rem] text-bone-500" x-text="p.label"></p>
+              <p class="font-cinzel text-lg" :class="imPoolRemaining(p.id) < 0 ? 'text-blood-400' : 'text-gold-400'">
+                <span x-text="imPoolRemaining(p.id)"></span>
+                <span class="text-bone-700 text-xs"> / <span x-text="p.total"></span></span>
+              </p>
+            </div>
+          </template>
+        </div>
+        <p class="font-garamond text-[0.65rem] text-bone-600 italic mt-2">
+          Sorcery covers Mental Attributes, Occult, and Blood Sorcery / Oblivion. Place your
+          granted Advantage &amp; Flaw dots in the Legacy step — Physical &amp; Social Attributes
+          can't be raised with era XP.
         </p>
       </div>
 
@@ -1989,8 +2017,9 @@
       </div>
 
       {# Merits & Backgrounds — bought with XP (×3 / dot), separate from the
-         creation-pool ones in the Legacy step. #}
-      <div class="gilded p-5 mb-4">
+         creation-pool ones in the Legacy step. Hidden for In Memoriam, whose
+         Advantages are granted dots placed in the Legacy step, not era XP. #}
+      <div x-show="!isInMemoriam" x-cloak class="gilded p-5 mb-4">
         <p class="label-gold mb-3 text-xs">Merits &amp; Backgrounds
           <span class="text-bone-700 normal-case ml-1">×3 / dot</span></p>
         <template x-for="kind in ['merit','background']" :key="kind">
@@ -2037,8 +2066,9 @@
         <p x-show="newXpAdvError" x-cloak x-text="newXpAdvError" class="font-garamond text-blood-400 text-[0.6rem] mt-1"></p>
       </div>
 
-      {# Loresheets — buy individual entries with XP (entry level × 3). #}
-      <div class="gilded p-5 mb-5">
+      {# Loresheets — buy individual entries with XP (entry level × 3). Hidden
+         for In Memoriam (no free-XP pool for Advantages). #}
+      <div x-show="!isInMemoriam" x-cloak class="gilded p-5 mb-5">
         <p class="label-gold mb-3 text-xs">Loresheets
           <span class="text-bone-700 normal-case ml-1">entry level × 3 XP</span></p>
         <template x-for="ls in xpLoresheets()" :key="ls.id">
@@ -2100,7 +2130,7 @@
 
       {# Upgrade granted traits — e.g. Siren's free Beautiful → Stunning, paying
          only the XP delta. Shows only when a grant has a pricier exclusive option. #}
-      <template x-if="grantedUpgradeOptions().length">
+      <template x-if="!isInMemoriam && grantedUpgradeOptions().length">
         <div class="gilded p-5 mb-5">
           <p class="label-gold mb-1 text-xs">Upgrade Granted Traits</p>
           <p class="font-garamond text-[0.65rem] text-bone-700 italic mb-3">
@@ -2889,8 +2919,37 @@
         return next * 3;
       },
       boughtDots(key) { return this.xpBuys.filter(b => b.key === key).length; },
+
+      // ── In Memoriam: category-locked XP pools (RAW Oceans of Time) ──
+      get isInMemoriam() {
+        return this.charName.character_type === 'kindred'
+            && this.charName.character_tier === 'ancilla'
+            && this.charName.ancilla_mode === 'in_memoriam';
+      },
+      // Which era-XP pool a trait draws from. null = nothing feeds it, so it
+      // can't be raised with era XP (e.g. Physical/Social Attributes).
+      poolOf(cat, key) {
+        if (cat === 'skill') return key === 'skill_occult' ? 'sorcery' : 'skill';
+        if (cat === 'disc')  return (key === 'disc_blood_sorcery' || key === 'disc_oblivion') ? 'sorcery' : 'discipline';
+        if (cat === 'attr')  return (key === 'attr_intelligence' || key === 'attr_wits' || key === 'attr_resolve') ? 'sorcery' : null;
+        return null;   // advantages / loresheets aren't bought from the era pools
+      },
+      imPoolSpent(pool) {
+        return this.xpBuys.reduce((s, b) => s + (this.poolOf(b.cat, b.key) === pool ? (b.cost || 0) : 0), 0);
+      },
+      imPoolRemaining(pool) {
+        const total = { skill: this.imTotals.poolSkill, discipline: this.imTotals.poolDisc, sorcery: this.imTotals.poolSorcery }[pool] || 0;
+        return total - this.imPoolSpent(pool);
+      },
+
       canBuy(cat, key, max) {
         if ((this.sheet[key] || 0) >= (max || 5)) return false;
+        // In Memoriam: draw from the trait's category-locked pool. A trait with
+        // no pool (Physical/Social Attributes, advantages) can't be bought here.
+        if (this.isInMemoriam) {
+          const p = this.poolOf(cat, key);
+          return p != null && this.nextDotCost(cat, key) <= this.imPoolRemaining(p);
+        }
         return this.nextDotCost(cat, key) <= this.xpRemaining;
       },
       buyTrait(cat, key, label, max) {
