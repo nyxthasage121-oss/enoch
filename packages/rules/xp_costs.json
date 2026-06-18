@@ -7,15 +7,9 @@
   },
   "Skill": {
     "multiplier": 3,
-    "description": "New rating × 3 (raising an existing skill, rating 1+)",
-    "min_dots": 1,
-    "max_dots": 5
-  },
-  "New Skill": {
-    "flat_cost": 3,
-    "description": "3 XP flat (0 → 1)",
+    "description": "New rating × 3 (learned or raised, 0 → 5; a new skill's first dot is 1 × 3 = 3)",
     "min_dots": 0,
-    "max_dots": 1
+    "max_dots": 5
   },
   "Specialty": {
     "flat_cost": 3,

@@ -2083,7 +2083,7 @@ def _apply_spend_to_sheet(sheet: dict, category: str, trait_name: str, new_dots:
 
     Maps the spend's (category, trait_name, new_dots) onto the right
     sheet_json slot:
-      Attribute / Skill / New Skill           -> attr_* / sk_* int
+      Attribute / Skill (+ legacy "New Skill") -> attr_* / sk_* int
       Clan / Other / Caitiff / Ingrained Disc -> disc_* int
       Blood Sorcery Ritual                    -> rituals[]    {name, level}
       Thin-Blood Alchemy Formula              -> formulae[]   {name, level}

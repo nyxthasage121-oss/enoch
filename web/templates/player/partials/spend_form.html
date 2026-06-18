@@ -107,10 +107,9 @@
                type="number"
                name="current_dots"
                x-model.number="currentDots"
-               :min="isNewSkill ? 0 : minCurrentDots"
+               :min="minCurrentDots"
                :max="maxDots - 1"
-               :readonly="isNewSkill"
-               :value="isNewSkill ? 0 : ({{ spend_form.current_dots if spend_form else 0 }})"
+               :value="{{ spend_form.current_dots if spend_form else 0 }}"
                class="w-full"
                min="0" max="9">
       </div>
@@ -221,7 +220,7 @@ function spendForm(rules, humanityConditions, traitKeys, sheet) {
       this.$watch('category', () => this._autofillCurrent());
     },
     _autofillCurrent() {
-      if (this.isLevelBased || this.isNewSkill) return;   // these start at 0
+      if (this.isLevelBased) return;   // rituals/formulas start at 0
       const k = this.traitKeys[(this.traitName || '').trim().toLowerCase()];
       if (k) this.currentDots = this.sheet[k] || 0;
     },
@@ -234,7 +233,7 @@ function spendForm(rules, humanityConditions, traitKeys, sheet) {
     get traitList() {
       const map = {
         'Attribute': 'attribute',
-        'Skill': 'skill', 'New Skill': 'skill',
+        'Skill': 'skill',
         'Clan Discipline': 'discipline', 'Other Discipline': 'discipline',
         'Caitiff Discipline': 'discipline', 'Ghoul Discipline': 'discipline',
         'Ingrained Discipline': 'discipline',
@@ -250,7 +249,6 @@ function spendForm(rules, humanityConditions, traitKeys, sheet) {
 
     get minCurrentDots() { return this.rule ? (this.rule.min_dots ?? 0) : 0; },
 
-    get isNewSkill()  { return this.category === 'New Skill'; },
     get isHumanity()  { return this.category === 'Humanity'; },
     get isIngrained() { return this.category === 'Ingrained Discipline'; },
     get isLevelBased() { return !!(this.rule && this.rule.level_multiplier !== undefined); },

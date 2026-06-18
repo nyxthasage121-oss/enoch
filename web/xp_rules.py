@@ -15,7 +15,6 @@ INGRAINED_XP_CAP: int = RULES.get("Ingrained Discipline", {}).get("flaw_xp_cap",
 SPEND_CATEGORIES: list[str] = [
     "Attribute",
     "Skill",
-    "New Skill",
     "Specialty",
     "Clan Discipline",
     "Other Discipline",
