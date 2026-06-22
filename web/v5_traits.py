@@ -751,9 +751,24 @@ def _disc_alloc_ok(base_dots: list[int], spread_shape: list[int], free: int) -> 
     return False
 
 
+_DISC_LABEL_TO_KEY = {label: key for key, label in V5_DISCIPLINES}
+
+
+def _family_disc_keys(labels) -> set[str]:
+    """Map a revenant family's Discipline display names (from the seeded
+    revenant_families data) to sheet keys. Unknown names are dropped."""
+    out: set[str] = set()
+    for lbl in (labels or []):
+        k = _DISC_LABEL_TO_KEY.get(str(lbl).strip())
+        if k:
+            out.add(k)
+    return out
+
+
 def validate_chargen_raw(
     sheet: dict, *, character_type: str = "kindred",
     clan: str = "", predator_type: str | None = None,
+    family_disciplines: list[str] | None = None,
     advantage_pool: int | None = None, flaw_cap: int | None = None,
     flaw_min: int = 2,
 ) -> list[str]:
@@ -869,6 +884,33 @@ def validate_chargen_raw(
                 "single Discipline drawn from the regnant's clan. Buy more later "
                 "with XP or at staff discretion."
             )
+
+    # Revenants (NYbN house rules): 3 base Discipline dots — 2 across the
+    # family's Disciplines plus 1 in a single "domitor" Discipline (any clan).
+    # We only enforce the family split when the caller passes the family's
+    # Disciplines; total is always checked. The family Bane (Severity 1) and
+    # the Unbondable ban are handled here / at finalize.
+    elif character_type == "revenant":
+        _rev_base = {k: base_trait_value(sheet, k) for k in _disc_keys()}
+        _rev_total = sum(_rev_base.values())
+        _fam_keys = _family_disc_keys(family_disciplines)
+        _fam_dots = sum(v for k, v in _rev_base.items() if k in _fam_keys)
+        _nonfam = [k for k, v in _rev_base.items() if v > 0 and k not in _fam_keys]
+        _shape_ok = _rev_total == 3 and (
+            not _fam_keys or (_fam_dots >= 2 and len(_nonfam) <= 1)
+        )
+        if not _shape_ok:
+            errors.append(
+                "A Revenant starts with 3 base Discipline dots — 2 across the "
+                "family's Disciplines plus 1 in a single Discipline from the "
+                "domitor (before starting XP). Buy more later with XP."
+            )
+        # Revenants cannot take the Unbondable merit — their Blood already
+        # resists Bonds (NYbN rule).
+        if any(str(m.get("name", "")).strip().lower() == "unbondable"
+               for m in ((sheet.get("merits") or []) + (sheet.get("advantages") or []))
+               if isinstance(m, dict)):
+            errors.append("Revenants cannot take the Unbondable merit.")
 
     # Advantages — player-added (no `src`) Merits + Backgrounds + Advantages must
     # fit the pool; Flaws must hit the minimum and not exceed the cap. Auto-granted

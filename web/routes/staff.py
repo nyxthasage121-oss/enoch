@@ -590,11 +590,18 @@ async def char_detail(
     if (not char.get("is_approved")
             and (settings.get("active_ruleset") or "standard").lower() == "standard"):
         _bud = tier_budget(settings, char.get("character_tier"))
+        _fam_discs = None
+        if char.get("character_type") == "revenant" and char.get("revenant_family"):
+            _fam_discs = next(
+                (f.get("disciplines")
+                 for f in (settings.get("revenant_families") or [])
+                 if f.get("name") == char.get("revenant_family")), None)
         raw_errors = validate_chargen_raw(
             char.get("sheet_json") or {},
             character_type=char.get("character_type") or "kindred",
             clan=char.get("clan") or "",
             predator_type=char.get("predator_type"),
+            family_disciplines=_fam_discs,
             advantage_pool=_bud["merits"] + _bud["advantages"] + _bud["backgrounds"],
             flaw_cap=_bud["flaw_cap"],
         )

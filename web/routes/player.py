@@ -787,6 +787,18 @@ async def character_create(
         else:
             sheet.pop("bane_flaw_pool", None)
 
+    # Revenants get their family Bane at Bane Severity 1 (NYbN) — auto-applied
+    # free like a clan Bane (src='revenant_bane'); the full bane text lives in
+    # the seeded revenant_families data. Strip stale ones first so re-submits
+    # don't stack.
+    if character_type == "revenant" and revenant_family and (require_sheet or as_draft):
+        _rev_flaws = sheet.setdefault("flaws", [])
+        _rev_flaws[:] = [f for f in _rev_flaws
+                         if not (isinstance(f, dict) and f.get("src") == "revenant_bane")]
+        _rev_flaws.append({"name": f"{revenant_family} Bane", "dots": 1,
+                           "src": "revenant_bane"})
+        sheet["bane_severity"] = 1
+
     # V5 RAW chargen validation (Standard ruleset only). The base allocation —
     # attributes + skills before starting-XP buys — must follow the priority
     # spreads. Drafts stay tolerant; only full submissions are gated, and only
@@ -801,9 +813,18 @@ async def character_create(
         if _creation_mode != "open" and _ruleset == "standard" and ancilla_mode != "in_memoriam":
             from ..db import tier_budget
             _bud = tier_budget(_settings, character_tier)
+            # Revenants: resolve the family's Disciplines so the validator can
+            # enforce the 2-family + 1-domitor split.
+            _fam_discs = None
+            if character_type == "revenant" and revenant_family:
+                _fam_discs = next(
+                    (f.get("disciplines")
+                     for f in (_settings.get("revenant_families") or [])
+                     if f.get("name") == revenant_family), None)
             raw_errors = _validate_chargen_raw(
                 sheet, character_type=character_type,
                 clan=clan, predator_type=predator_type,
+                family_disciplines=_fam_discs,
                 advantage_pool=_bud["merits"] + _bud["advantages"] + _bud["backgrounds"],
                 flaw_cap=_bud["flaw_cap"],
             )
