@@ -251,6 +251,11 @@
              2026-05 per Steward direction. The standalone routes still
              redirect, but the sidebar entries are gone. #}
           <div class="pt-3">
+            <a href="/staff/alerts"
+               class="nav-link {{ 'active' if request.url.path.startswith('/staff/alerts') else '' }}">
+              Alerts
+              {% if n_active_alerts %}<span class="chip text-blood-400 border-blood-900 text-[0.5rem] ml-1.5">{{ n_active_alerts }}</span>{% endif %}
+            </a>
             <a href="/staff/audit"
                class="nav-link {{ 'active' if request.url.path.startswith('/staff/audit') else '' }}">
               Audit Log

@@ -4,7 +4,7 @@ import logging
 import discord
 from discord.ext import commands, tasks
 
-from ..api import ack_outbox, drain_outbox
+from ..api import ack_outbox, drain_outbox, report_alert
 from ..config import settings
 
 log = logging.getLogger(__name__)
@@ -336,6 +336,8 @@ class OutboxCog(commands.Cog):
             await ack_outbox(item["id"], success=True)
         except Exception as exc:
             log.error("Failed to process outbox %d (%s): %s", item["id"], cmd, exc)
+            await report_alert("error", "outbox",
+                               f"Failed to process outbox {item['id']} ({cmd}): {exc}")
             try:
                 await ack_outbox(item["id"], success=False, error=str(exc))
             except Exception:

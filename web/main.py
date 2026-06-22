@@ -164,6 +164,16 @@ def _ctx(request: Request, **extra) -> dict:
     flash = request.session.pop("flash", [])
     raw_role = request.session.get("staff_role") or ""
     cap_enabled, cap_amount = _xp_cap_settings()
+    # Active-alert count for the staff nav badge (staff renders only — cheap
+    # COUNT, but no point running it for players/anon).
+    n_active_alerts = 0
+    if request.session.get("is_staff"):
+        try:
+            from .db import get_db, count_active_alerts
+            with get_db() as conn:
+                n_active_alerts = count_active_alerts(conn)
+        except Exception:
+            n_active_alerts = 0
     from .db import STAFF_PERMISSIONS
     return {
         "request": request,
@@ -178,6 +188,7 @@ def _ctx(request: Request, **extra) -> dict:
         "static_url": static_url,
         "xp_cap_enabled": cap_enabled,
         "xp_cap_amount": cap_amount,
+        "n_active_alerts": n_active_alerts,
         **extra,
     }
 
@@ -214,6 +225,16 @@ async def forbidden(request: Request, exc):
 @app.exception_handler(500)
 async def server_error(request: Request, exc):
     log.exception("Unhandled server error")
+    # Persist it to the staff alerts page so the failure doesn't go silent.
+    try:
+        import traceback
+        from .db import log_alert
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        log_alert(source="web", level="error", event="unhandled",
+                  message=f"{request.url.path} — {type(exc).__name__}: {exc}",
+                  detail=tb)
+    except Exception:
+        log.exception("Failed to record alert for the server error")
     return templates.TemplateResponse(
         request, "errors/500.html", _ctx(request), status_code=500
     )

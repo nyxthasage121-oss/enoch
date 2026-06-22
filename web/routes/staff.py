@@ -251,6 +251,43 @@ async def complete_project_route(
     return _projects_table(request, err=err, ok="Project completed.")
 
 
+# ── Alerts (operational warn/error log) ───────────────────────────────────────
+
+@router.get("/alerts", response_class=HTMLResponse)
+async def alerts_page(request: Request, show: str = "active",
+                      user: dict = Depends(require_staff)):
+    from ..db import list_alerts
+    with get_db() as conn:
+        alerts = list_alerts(conn, include_dismissed=(show == "all"), limit=200)
+    return templates.TemplateResponse(
+        request, "staff/alerts.html", _ctx(request, alerts=alerts, show=show),
+    )
+
+
+@router.post("/alerts/{alert_id}/dismiss")
+async def dismiss_alert_route(
+    request: Request, alert_id: int,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    from ..db import dismiss_alert
+    with get_db() as conn:
+        dismiss_alert(conn, alert_id, user["id"])
+    return RedirectResponse(url="/staff/alerts", status_code=303)
+
+
+@router.post("/alerts/dismiss-all")
+async def dismiss_all_alerts_route(
+    request: Request,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    from ..db import dismiss_all_alerts
+    with get_db() as conn:
+        dismiss_all_alerts(conn, user["id"])
+    return RedirectResponse(url="/staff/alerts", status_code=303)
+
+
 # ── Data export ───────────────────────────────────────────────────────────────
 
 # Tables in the snapshot. Order is arbitrary — JSON keys preserve insertion.

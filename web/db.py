@@ -2391,6 +2391,63 @@ def write_audit(
     ))
 
 
+# ── App alerts (operational warn/error log) ──────────────────────────────────
+# Persisted warn/error entries from the web app (unhandled 500s) and the bot,
+# surfaced on a dismissable staff page so silent failures get noticed.
+
+_ALERT_LEVELS = {"warn", "error"}
+
+
+def log_alert(source: str, level: str, event: str, message: str,
+              detail: str = "") -> None:
+    """Persist an operational alert. Opens its own connection and never raises
+    — it runs on error paths, so a logging failure must not mask the original
+    error."""
+    try:
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO app_alerts (source, level, event, message, detail, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (source if source in ("web", "bot") else "web",
+                 level if level in _ALERT_LEVELS else "error",
+                 (event or "")[:80], (message or "")[:500],
+                 (detail or "")[:8000], _now()),
+            )
+    except Exception:
+        log.exception("Failed to persist app alert")
+
+
+def list_alerts(conn, *, include_dismissed: bool = False, limit: int = 100) -> list[dict]:
+    """Recent alerts — active (un-dismissed) first, then newest-first."""
+    q = "SELECT * FROM app_alerts"
+    if not include_dismissed:
+        q += " WHERE dismissed_at IS NULL"
+    q += " ORDER BY (dismissed_at IS NOT NULL), created_at DESC LIMIT ?"
+    return conn.execute(q, (limit,)).fetchall()
+
+
+def count_active_alerts(conn) -> int:
+    return conn.execute(
+        "SELECT COUNT(*) AS n FROM app_alerts WHERE dismissed_at IS NULL"
+    ).fetchone()["n"]
+
+
+def dismiss_alert(conn, alert_id: int, actor_id: str) -> None:
+    conn.execute(
+        "UPDATE app_alerts SET dismissed_at=?, dismissed_by=? "
+        "WHERE id=? AND dismissed_at IS NULL",
+        (_now(), actor_id, alert_id),
+    )
+
+
+def dismiss_all_alerts(conn, actor_id: str) -> int:
+    cur = conn.execute(
+        "UPDATE app_alerts SET dismissed_at=?, dismissed_by=? WHERE dismissed_at IS NULL",
+        (_now(), actor_id),
+    )
+    return cur.rowcount
+
+
 def list_audit(
     conn,
     target_type: str | None = None,

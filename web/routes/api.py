@@ -44,6 +44,7 @@ from ..db import (
     list_player_characters,
     list_spends_for_character,
     list_upcoming_periods,
+    log_alert,
     upsert_player,
     write_audit,
     update_character,
@@ -170,6 +171,15 @@ class ProjectRollIn(BaseModel):
     pool_size:  int  = Field(default=0, ge=0)
 
 
+class AlertIn(BaseModel):
+    """An operational alert reported by the bot (POST /api/alerts) — surfaced on
+    the staff alerts page alongside web-side errors."""
+    level:   str = Field(default="error", max_length=10)
+    event:   str = Field(default="", max_length=80)
+    message: str = Field(..., max_length=500)
+    detail:  str = Field(default="", max_length=8000)
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @router.get("/health")
@@ -183,6 +193,14 @@ async def health():
     except Exception as exc:
         log.warning("Health check DB error: %s", exc)
     return {"ok": db_ok, "service": "enoch"}
+
+
+@router.post("/alerts", dependencies=[Depends(_require_bot)])
+async def report_alert(body: AlertIn):
+    """The bot reports a warn/error here; it lands on the staff alerts page."""
+    log_alert(source="bot", level=body.level, event=body.event,
+              message=body.message, detail=body.detail)
+    return {"ok": True}
 
 
 # ── Outbox — drain / ack ──────────────────────────────────────────────────────

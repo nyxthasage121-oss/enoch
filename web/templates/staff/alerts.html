@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Alerts — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="flex items-end justify-between gap-4 mb-8 flex-wrap">
+    <div>
+      <p class="label-gold mb-1">Staff</p>
+      <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Alerts</h1>
+      <p class="font-garamond text-bone-600 text-sm mt-2 max-w-2xl">
+        Warnings and errors from the web app and the bot. Unhandled server errors
+        land here automatically; dismiss one once it's been handled.
+      </p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <a href="/staff/alerts?show=active"
+         class="font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 border {{ 'border-gold-700 text-gold-400' if show != 'all' else 'border-ink-700 text-bone-500 hover:text-gold-400' }}">Active</a>
+      <a href="/staff/alerts?show=all"
+         class="font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 border {{ 'border-gold-700 text-gold-400' if show == 'all' else 'border-ink-700 text-bone-500 hover:text-gold-400' }}">All</a>
+      {% set _active = alerts | rejectattr('dismissed_at') | list %}
+      {% if _active %}
+      <form method="POST" action="/staff/alerts/dismiss-all"
+            onsubmit="return confirm('Dismiss all {{ _active | length }} active alert(s)?');">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <button type="submit" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Dismiss all</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if alerts %}
+  <div class="space-y-3">
+    {% for a in alerts %}
+    <div class="gilded p-4 {{ 'opacity-60' if a.dismissed_at else '' }}">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            <span class="chip text-[0.55rem] {{ 'text-blood-400 border-blood-900' if a.level == 'error' else 'text-gold-400 border-gold-800' }}">{{ a.level }}</span>
+            <span class="chip text-[0.55rem] text-bone-500 border-ink-700">{{ a.source }}</span>
+            {% if a.event %}<span class="chip text-[0.55rem] text-bone-600 border-ink-700">{{ a.event }}</span>{% endif %}
+            <span class="font-garamond text-bone-700 text-[0.65rem]">{{ a.created_at[:16].replace('T',' ') }}</span>
+            {% if a.dismissed_at %}<span class="font-garamond text-bone-700 text-[0.6rem] italic">· dismissed</span>{% endif %}
+          </div>
+          <p class="font-garamond text-bone-200 text-sm break-words">{{ a.message }}</p>
+          {% if a.detail %}
+          <details class="mt-2">
+            <summary class="font-cinzel text-[0.55rem] tracking-widest text-bone-600 hover:text-gold-400 cursor-pointer">Detail</summary>
+            <pre class="mt-2 text-[0.65rem] text-bone-500 whitespace-pre-wrap break-words overflow-x-auto max-h-72 overflow-y-auto border-l border-ink-700 pl-3">{{ a.detail }}</pre>
+          </details>
+          {% endif %}
+        </div>
+        {% if not a.dismissed_at %}
+        <form method="POST" action="/staff/alerts/{{ a.id }}/dismiss" class="shrink-0">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <button type="submit" class="font-cinzel tracking-widest text-[0.6rem] text-bone-500 hover:text-gold-400">Dismiss</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="gilded p-8 text-center">
+    <p class="font-garamond text-bone-500 text-sm italic">
+      {{ 'No alerts — all clear.' if show != 'all' else 'No alerts recorded.' }}
+    </p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

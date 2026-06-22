@@ -18,6 +18,21 @@ def _base() -> str:
     return settings.WEB_URL.rstrip("/")
 
 
+async def report_alert(level: str, event: str, message: str, detail: str = "") -> None:
+    """Surface a bot-side warn/error on the web staff alerts page. Best-effort —
+    swallows all failures (it's called from error handlers and must never raise)."""
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            await client.post(
+                f"{_base()}/api/alerts",
+                json={"level": level, "event": event[:80],
+                      "message": message[:500], "detail": (detail or "")[:8000]},
+                headers=_headers(),
+            )
+    except Exception:
+        log.debug("report_alert failed", exc_info=True)
+
+
 # ── Players ───────────────────────────────────────────────────────────────────
 
 async def upsert_player(discord_id: str, username: str) -> dict:
