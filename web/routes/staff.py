@@ -162,7 +162,10 @@ def _projects_table(request: Request, err=None, ok=None, kind="success"):
 
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_admin(request: Request, user: dict = Depends(require_staff)):
+    from ..db import get_project_mode
     with get_db() as conn:
+        if get_project_mode(conn) == "off":
+            return RedirectResponse(url="/staff/", status_code=303)
         ctx = _projects_ctx(conn)
     return templates.TemplateResponse(request, "staff/projects.html", _ctx(request, **ctx))
 
@@ -2128,6 +2131,10 @@ async def admin_settings_save(
         payload["max_chars_per_player"] = form_int(form.get("max_chars_per_player"), 2, lo=0, hi=20)
     if "rolls_per_timeskip" in form:
         payload["rolls_per_timeskip"] = form_int(form.get("rolls_per_timeskip"), 8, lo=0, hi=99)
+    if "project_mode" in form:
+        from ..db import PROJECT_MODES
+        _pm = (form.get("project_mode") or "nybn").strip().lower()
+        payload["project_mode"] = _pm if _pm in PROJECT_MODES else "nybn"
 
     # Restricted predator types unlock list — Steward opt-in per
     # chronicle for normally-banned predator types like Blood Leech and

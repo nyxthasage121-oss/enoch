@@ -1831,7 +1831,10 @@ async def propose_project(
         char = get_character_for_player(conn, character_id, user["id"])
         if not char:
             raise HTTPException(status_code=404)
-        if not char.get("is_approved"):
+        from ..db import projects_enabled
+        if not projects_enabled(conn):
+            error = "Projects are turned off for this chronicle."
+        elif not char.get("is_approved"):
             error = "Your character must be approved before proposing projects."
         else:
             try:
@@ -2611,8 +2614,11 @@ async def propose_coterie_project(
         if actor is None:
             raise HTTPException(status_code=403, detail="Not a member of this coterie")
 
+        from ..db import projects_enabled
         flash_kind, flash_msg = "success", ""
-        if not actor.get("is_approved"):
+        if not projects_enabled(conn):
+            flash_kind, flash_msg = "error", "Projects are turned off for this chronicle."
+        elif not actor.get("is_approved"):
             flash_kind, flash_msg = "error", "Your character must be approved first."
         else:
             try:

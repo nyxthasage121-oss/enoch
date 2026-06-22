@@ -602,6 +602,9 @@ async def roll_project(project_id: int, body: ProjectRollIn):
         proj = get_project(conn, project_id)
         if not proj:
             raise HTTPException(status_code=404, detail="Project not found")
+        from ..db import projects_enabled
+        if not projects_enabled(conn):
+            raise HTTPException(status_code=403, detail="Projects are turned off.")
         if proj.get("coterie_id"):
             member_ids = {m["character_id"]
                           for m in list_coterie_members(conn, proj["coterie_id"])}

@@ -600,6 +600,7 @@
   </div>
   {% endif %}
 
+  {% if project_mode != 'off' %}
   {# ── 3. Coterie Projects (Phase D) ──
        Coterie-owned downtime endeavours. Any member proposes (staff approve);
        any member rolls an active one via the bot's /project roll, spending
@@ -693,6 +694,7 @@
     </form>
     {% endif %}
   </div>
+  {% endif %}
 
   {# ── 4. Advance Rating — one member pays personal XP to raise Chasse / Lien /
        Portillon by a dot (staff-approved). Ties to Projects: raising a rating to

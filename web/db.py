@@ -800,6 +800,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "rolls_per_timeskip",
         # In Memoriam decoupled from active_ruleset + chargen mode (migration 040)
         "in_memoriam_enabled", "creation_mode",
+        # Chronicle-wide project mode toggle (migration 043)
+        "project_mode",
     }
     # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
     # migration 040. It's now an orthogonal flag — translate a legacy POST
@@ -4466,6 +4468,20 @@ def add_project_note(conn, project_id: int, staff_id: str, text: str) -> dict:
         raise ValueError("Note text is required.")
     _project_log_append(conn, project_id, {"by": staff_id, "kind": "note", "text": text})
     return get_project(conn, project_id)
+
+
+PROJECT_MODES = {"nybn", "homebrew", "raw", "off"}
+
+
+def get_project_mode(conn) -> str:
+    """Chronicle-wide project ruleset (migration 043). Defaults to 'nybn'."""
+    mode = ((get_settings(conn) or {}).get("project_mode") or "nybn").strip().lower()
+    return mode if mode in PROJECT_MODES else "nybn"
+
+
+def projects_enabled(conn) -> bool:
+    """False when the chronicle has Projects turned off."""
+    return get_project_mode(conn) != "off"
 
 
 def get_rolls_per_timeskip(conn) -> int:

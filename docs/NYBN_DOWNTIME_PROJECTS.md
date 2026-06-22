@@ -183,3 +183,48 @@ home.
 **Progress:**
 **Synopsis**
 ```
+
+---
+
+## Project modes — chronicle-wide ruleset toggle (locked 2026-06-22)
+
+Owner wants the project rules selectable so the NYbN house rules can be stripped.
+Decision: a **chronicle-wide** setting `project_mode` (Admin → Settings) with four
+modes. Key insight from reviewing the V5 Appendix II "Projects" rules: **RAW and
+NYbN are different ENGINES, not different numbers** — so this is engine selection,
+not a values swap.
+
+- **NYbN** (current, default) — multi-stage extended test, staff-set stage DCs
+  (15/30/45 · coterie 30/45/60), crit/messy overflow, **bestial auto-bumps the
+  stage DC**, shared per-character timeskip roll budget. Unchanged.
+- **RAW** — V5 Appendix II: **Scope** (dots the goal adds) · **Launch roll**
+  Skill+Background vs Difficulty Scope+2 (no WP/surge; crit = no stake, win =
+  stake Scope+1−margin dots, min 1, dots tied up) · **Project Die** starts 10,
+  −1 per increment (time) · **Goal roll** = conflict vs a pool equal to the
+  current die value (plotter gets NO crits, opposition crits DO count), win
+  knocks the die down by margin, die <1 = success, lose = lose Background dots
+  from the stake, stake 0 = collapse. **PARKED** — owner chose "hold off." When
+  built, do it **engine-math + staff-apply** (engine tracks Scope/die/margins and
+  flags "stake N"/"lose N"; staff apply to the sheet — same as NYbN penalties),
+  NOT auto-locking real sheet dots.
+- **Homebrew** (designed, TO BUILD next) — owner's hybrid:
+  - **Launch roll = optional per chronicle** (`homebrew_launch_roll` on/off; some
+    servers run it, some don't). When on: a roll to *open* the project (win →
+    opens + the test begins; fail → retry next timeskip). When off: starts directly.
+  - **Goal + DC = staff-set, fully customizable** (NO baked-in formula — "leave it
+    free to whoever sets it"). Two goal flavors, both with a staff-set DC:
+    **dot-based** ("gain N dots in <trait>", with the dot-count shown as a hint),
+    or **free-text** (a non-dot narrative goal — staff write it + set the DC).
+  - **Extended test = cumulative** successes toward the goal DC, per timeskip.
+  - **Messy crit / bestial failure = PAUSE + flag the ST** (NOT auto-bump like
+    NYbN): the project pauses (no more rolls), gets a "Needs ST" flag in the staff
+    queue (can also surface on the Alerts page), the ST advises the player
+    out-of-band, then clears the pause to resume. Normal successes bank; a plain
+    failure just makes no progress.
+- **Off** ("No Projects") — hide the whole feature: the player Projects tab, the
+  coterie Projects panel, the staff Projects queue + nav, and block propose/roll.
+
+**Build order:** (1) foundation = the `project_mode` setting + Admin toggle + Off
+hiding + NYbN as the default working mode (RAW/Homebrew shown but not yet
+selectable/working); (2) the **Homebrew engine** (launch/goal-DC/cumulative/pause);
+(3) RAW later. Toggle is chronicle-wide (not per-project) per owner.

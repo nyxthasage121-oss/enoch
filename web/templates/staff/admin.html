@@ -130,6 +130,21 @@
         </div>
 
         <div>
+          <label class="label-gold block mb-1.5 text-[0.7rem]">Project mode</label>
+          {% set _pm = _cs.get('project_mode', 'nybn') %}
+          <select name="project_mode" class="w-64 text-sm py-1.5 px-2">
+            <option value="nybn" {{ 'selected' if _pm == 'nybn' else '' }}>NYbN — multi-stage extended test</option>
+            <option value="off"  {{ 'selected' if _pm == 'off' else '' }}>Off — Projects disabled</option>
+            <option value="homebrew" {{ 'selected' if _pm == 'homebrew' else '' }} {{ '' if _pm == 'homebrew' else 'disabled' }}>Homebrew — coming soon</option>
+            <option value="raw" {{ 'selected' if _pm == 'raw' else '' }} {{ '' if _pm == 'raw' else 'disabled' }}>RAW — coming soon</option>
+          </select>
+          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
+            How downtime Projects work chronicle-wide. "Off" hides Projects everywhere
+            (player tab, coterie panel, staff queue). Homebrew + RAW are in progress.
+          </p>
+        </div>
+
+        <div>
           <label class="label-gold block mb-1.5 text-[0.7rem]">Project rolls per timeskip</label>
           <input type="number" name="rolls_per_timeskip" min="0" max="99"
                  value="{{ _cs.get('rolls_per_timeskip', 8) }}"
