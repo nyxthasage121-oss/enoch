@@ -747,11 +747,18 @@ _TIER_DEFAULTS = {
 
 
 def tier_budget(settings: dict | None, tier: str) -> dict:
-    """Return the active budget for a tier, honoring the chronicle's
-    homebrew_tier_budgets overrides whenever they're present, regardless
-    of which ruleset is active. The IM ruleset is purely about Ancilla
-    flow — chronicles can still tune budgets for other tiers under it.
-    Falls back to V5 RAW defaults when no overrides are saved."""
+    """Return the active budget for a tier.
+
+    Per-tier overrides in homebrew_tier_budgets apply ONLY under the
+    'homebrew' ruleset. Under 'standard' the function returns pure V5 RAW
+    defaults and ignores any stored overrides — flipping to Standard is the
+    "reset to RAW" switch. In Memoriam is orthogonal to budgets (it only adds
+    the Ancilla Era-Builder choice), so it does NOT cause overrides to apply:
+    a Standard + In Memoriam chronicle still gets RAW defaults here. Falls
+    back to defaults for partial or missing overrides.
+
+    NOTE: the staff admin per-tier-budget table is shown only under Homebrew
+    for exactly this reason — keep that x-show in sync with this gating."""
     tier_key = (tier or "neonate").lower()
     defaults = dict(_TIER_DEFAULTS.get(tier_key, _TIER_DEFAULTS["neonate"]))
     if not settings:

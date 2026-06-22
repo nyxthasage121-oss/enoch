@@ -70,92 +70,40 @@
       <form method="post" action="/staff/admin/settings" class="space-y-5">
         <input type="hidden" name="_csrf" value="{{ csrf_token }}">
 
-        <label class="flex items-start gap-3 cursor-pointer group">
-          <div class="pt-0.5">
-            <input type="checkbox" name="require_sheet_on_create"
-                   {{ 'checked' if _cs.get('require_sheet_on_create', 1) else '' }}
-                   class="accent-[#8B1A1A]">
-          </div>
-          <div>
-            <p class="font-cinzel text-xs text-bone-300 tracking-wide group-hover:text-bone-200 transition-colors">
-              Require full sheet during character creation
-            </p>
-            <p class="font-garamond text-bone-500 text-sm mt-0.5 leading-relaxed">
-              When checked, the wizard walks the player through every sheet section.
-              When unchecked, the wizard stops after the basics — players fill in
-              the sheet later via the Sheet tab.
-            </p>
-          </div>
-        </label>
-
-        <label class="flex items-start gap-3 cursor-pointer group">
-          <div class="pt-0.5">
-            <input type="checkbox" name="xp_cap_enabled"
-                   {{ 'checked' if _cs.get('xp_cap_enabled', 1) else '' }}
-                   class="accent-[#8B1A1A]">
-          </div>
-          <div>
-            <p class="font-cinzel text-xs text-bone-300 tracking-wide group-hover:text-bone-200 transition-colors">
-              Enforce the XP cap
-            </p>
-            <p class="font-garamond text-bone-500 text-sm mt-0.5 leading-relaxed">
-              When checked, characters cap at 350 XP and the retirement window opens
-              on reaching it. When unchecked, claims award in full, the cap never
-              auto-retires a character, and the "/cap" figure is hidden in the UI.
-            </p>
-          </div>
-        </label>
-
-        <div class="pl-7">
-          <label class="label-gold block mb-1.5 text-[0.7rem]">XP cap amount</label>
-          <input type="number" name="xp_cap_amount" min="1" max="9999"
-                 value="{{ _cs.get('xp_cap_amount', 350) }}"
-                 class="w-28 text-sm py-1 px-2">
-          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
-            The XP each character can reach (used only when the cap above is enforced).
-          </p>
+        {# ─────────────────────── Character Creation ─────────────────────── #}
+        <div class="divider-gold">
+          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 whitespace-nowrap">Character Creation</span>
         </div>
 
-        <div class="divider-gold"></div>
-
+        {# Character-creation mode — Guided (enforced wizard) vs Open (free
+           sheet entry, nothing enforced). Launch on Open to drop in existing
+           sheets; switch to Guided when you want the creator to police RAW. #}
         <div>
-          <label class="label-gold block mb-1.5 text-[0.7rem]">Characters per player</label>
-          <input type="number" name="max_chars_per_player" min="0" max="20"
-                 value="{{ _cs.get('max_chars_per_player', 2) }}"
-                 class="w-28 text-sm py-1 px-2">
-          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
-            Max active + pending characters a player may hold (NYbN = 2). Set 0 for
-            unlimited. Retired and Final Death characters don't count.
+          <p class="font-cinzel text-xs text-bone-300 tracking-wide mb-2">Creation Mode</p>
+          <p class="font-garamond text-bone-500 text-sm mb-3 leading-relaxed">
+            <strong class="text-bone-400">Guided</strong> walks players through the
+            creator and enforces the active standard.
+            <strong class="text-bone-400">Open</strong> lets them enter a sheet freely
+            with no enforcement — use it to launch with existing or imported sheets.
           </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {% for val, label, desc in [
+              ('guided', 'Guided creation', 'Wizard enforces RAW / In Memoriam / Homebrew'),
+              ('open',   'Open entry',      'Players just enter their sheet — nothing enforced'),
+            ] %}
+            <label class="flex items-start gap-2 gilded-inset px-3 py-2 cursor-pointer hover:border-gold-700 transition-colors"
+                   :class="creationMode === '{{ val }}' ? 'border-gold-700' : ''">
+              <input type="radio" name="creation_mode" value="{{ val }}"
+                     x-model="creationMode"
+                     class="accent-gold mt-0.5">
+              <div>
+                <p class="font-cinzel text-xs text-bone-200">{{ label }}</p>
+                <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">{{ desc }}</p>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
         </div>
-
-        <div>
-          <label class="label-gold block mb-1.5 text-[0.7rem]">Project mode</label>
-          {% set _pm = _cs.get('project_mode', 'nybn') %}
-          <select name="project_mode" class="w-64 text-sm py-1.5 px-2">
-            <option value="nybn" {{ 'selected' if _pm == 'nybn' else '' }}>NYbN — multi-stage extended test</option>
-            <option value="off"  {{ 'selected' if _pm == 'off' else '' }}>Off — Projects disabled</option>
-            <option value="homebrew" {{ 'selected' if _pm == 'homebrew' else '' }} {{ '' if _pm == 'homebrew' else 'disabled' }}>Homebrew — coming soon</option>
-            <option value="raw" {{ 'selected' if _pm == 'raw' else '' }} {{ '' if _pm == 'raw' else 'disabled' }}>RAW — coming soon</option>
-          </select>
-          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
-            How downtime Projects work chronicle-wide. "Off" hides Projects everywhere
-            (player tab, coterie panel, staff queue). Homebrew + RAW are in progress.
-          </p>
-        </div>
-
-        <div>
-          <label class="label-gold block mb-1.5 text-[0.7rem]">Project rolls per timeskip</label>
-          <input type="number" name="rolls_per_timeskip" min="0" max="99"
-                 value="{{ _cs.get('rolls_per_timeskip', 8) }}"
-                 class="w-28 text-sm py-1 px-2">
-          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
-            Project rolls each character gets per timeskip (NYbN = 8), shared across
-            all of their projects.
-          </p>
-        </div>
-
-        <div class="divider-gold"></div>
 
         {# Ruleset selector — Standard vs Homebrew is the BASE budget ruleset.
            In Memoriam is an ORTHOGONAL checkbox (migration 040): when on,
@@ -204,47 +152,19 @@
           </label>
         </div>
 
-        <div class="divider-gold"></div>
-
-        {# Character-creation mode — Guided (enforced wizard) vs Open (free
-           sheet entry, nothing enforced). Launch on Open to drop in existing
-           sheets; switch to Guided when you want the creator to police RAW. #}
-        <div>
-          <p class="font-cinzel text-xs text-bone-300 tracking-wide mb-2">Character Creation</p>
-          <p class="font-garamond text-bone-500 text-sm mb-3 leading-relaxed">
-            <strong class="text-bone-400">Guided</strong> walks players through the
-            creator and enforces the active standard.
-            <strong class="text-bone-400">Open</strong> lets them enter a sheet freely
-            with no enforcement — use it to launch with existing or imported sheets.
-          </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {% for val, label, desc in [
-              ('guided', 'Guided creation', 'Wizard enforces RAW / In Memoriam / Homebrew'),
-              ('open',   'Open entry',      'Players just enter their sheet — nothing enforced'),
-            ] %}
-            <label class="flex items-start gap-2 gilded-inset px-3 py-2 cursor-pointer hover:border-gold-700 transition-colors"
-                   :class="creationMode === '{{ val }}' ? 'border-gold-700' : ''">
-              <input type="radio" name="creation_mode" value="{{ val }}"
-                     x-model="creationMode"
-                     class="accent-gold mt-0.5">
-              <div>
-                <p class="font-cinzel text-xs text-bone-200">{{ label }}</p>
-                <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">{{ desc }}</p>
-              </div>
-            </label>
-            {% endfor %}
-          </div>
-        </div>
-
-        {# Per-tier budgets — visible under homebrew + IM (both honor
-           the overrides). Hidden under standard ruleset where V5 RAW is
-           the law.
+        {# Per-tier budgets — visible ONLY under the Homebrew ruleset, because
+           that's the only mode tier_budget() (web/db.py) actually reads the
+           overrides in. Under Standard it returns pure V5 RAW and ignores any
+           stored values, so showing the table there (even with In Memoriam on)
+           would be misleading — staff would type numbers that do nothing.
+           In Memoriam is orthogonal to budgets: it only adds the Ancilla
+           Era-Builder choice, so it must NOT gate this table.
            Per Steward direction (2026-05): collapse the three Merits /
            Advantages / Backgrounds columns into a single combined pool
            input. The save handler splits the value into all three legacy
            fields so the rest of the wizard sidebar / cost validator code
            keeps working — staff just see one box per tier. #}
-        <div x-show="baseRuleset === 'homebrew' || imEnabled" x-cloak class="space-y-3">
+        <div x-show="baseRuleset === 'homebrew'" x-cloak class="space-y-3">
           <p class="label-gold text-[0.78rem]">Per-Tier Budgets</p>
           <p class="font-garamond text-bone-600 text-xs italic">
             Override the V5 RAW starting allotments per archetype. Blank fields fall back to defaults.
@@ -323,7 +243,30 @@
         <input type="hidden" name="homebrew_background_budget" value="{{ _cs.get('homebrew_background_budget', 5) }}">
         <input type="hidden" name="homebrew_flaw_cap"         value="{{ _cs.get('homebrew_flaw_cap', 2) }}">
 
-        <div class="divider-gold"></div>
+        {# Require full sheet — a creation-flow detail, grouped with the rest
+           of the character-creation knobs above. #}
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <div class="pt-0.5">
+            <input type="checkbox" name="require_sheet_on_create"
+                   {{ 'checked' if _cs.get('require_sheet_on_create', 1) else '' }}
+                   class="accent-[#8B1A1A]">
+          </div>
+          <div>
+            <p class="font-cinzel text-xs text-bone-300 tracking-wide group-hover:text-bone-200 transition-colors">
+              Require full sheet during character creation
+            </p>
+            <p class="font-garamond text-bone-500 text-sm mt-0.5 leading-relaxed">
+              When checked, the wizard walks the player through every sheet section.
+              When unchecked, the wizard stops after the basics — players fill in
+              the sheet later via the Sheet tab.
+            </p>
+          </div>
+        </label>
+
+        {# ──────────────────────── Character Types ───────────────────────── #}
+        <div class="divider-gold">
+          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 whitespace-nowrap">Character Types</span>
+        </div>
 
         {# Revenants #}
         <label class="flex items-start gap-3 cursor-pointer group">
@@ -372,8 +315,6 @@
           })();
         </script>
 
-        <div class="divider-gold"></div>
-
         {# ── Restricted predator types — per-chronicle opt-in ──
              Blood Leech and Tithe Collector are off by default per
              Steward direction. Check a box to unlock that type in the
@@ -415,6 +356,82 @@
             </label>
             {% endfor %}
           </div>
+        </div>
+
+        {# ───────────────────────── Roster & XP ──────────────────────────── #}
+        <div class="divider-gold">
+          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 whitespace-nowrap">Roster &amp; XP</span>
+        </div>
+
+        <div>
+          <label class="label-gold block mb-1.5 text-[0.7rem]">Characters per player</label>
+          <input type="number" name="max_chars_per_player" min="0" max="20"
+                 value="{{ _cs.get('max_chars_per_player', 2) }}"
+                 class="w-28 text-sm py-1 px-2">
+          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
+            Max active + pending characters a player may hold (NYbN = 2). Set 0 for
+            unlimited. Retired and Final Death characters don't count.
+          </p>
+        </div>
+
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <div class="pt-0.5">
+            <input type="checkbox" name="xp_cap_enabled"
+                   {{ 'checked' if _cs.get('xp_cap_enabled', 1) else '' }}
+                   class="accent-[#8B1A1A]">
+          </div>
+          <div>
+            <p class="font-cinzel text-xs text-bone-300 tracking-wide group-hover:text-bone-200 transition-colors">
+              Enforce the XP cap
+            </p>
+            <p class="font-garamond text-bone-500 text-sm mt-0.5 leading-relaxed">
+              When checked, characters cap at the XP amount set below and the
+              retirement window opens once they reach it. When unchecked, claims
+              award in full, the cap never auto-retires a character, and the
+              "spent / cap" figure is hidden in the UI.
+            </p>
+          </div>
+        </label>
+
+        <div class="pl-7">
+          <label class="label-gold block mb-1.5 text-[0.7rem]">XP cap amount</label>
+          <input type="number" name="xp_cap_amount" min="1" max="9999"
+                 value="{{ _cs.get('xp_cap_amount', 350) }}"
+                 class="w-28 text-sm py-1 px-2">
+          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
+            The XP each character can reach (used only when the cap above is enforced).
+          </p>
+        </div>
+
+        {# ─────────────────────── Downtime Projects ──────────────────────── #}
+        <div class="divider-gold">
+          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 whitespace-nowrap">Downtime Projects</span>
+        </div>
+
+        <div>
+          <label class="label-gold block mb-1.5 text-[0.7rem]">Project mode</label>
+          {% set _pm = _cs.get('project_mode', 'nybn') %}
+          <select name="project_mode" class="w-64 text-sm py-1.5 px-2">
+            <option value="nybn" {{ 'selected' if _pm == 'nybn' else '' }}>NYbN — multi-stage extended test</option>
+            <option value="off"  {{ 'selected' if _pm == 'off' else '' }}>Off — Projects disabled</option>
+            <option value="homebrew" {{ 'selected' if _pm == 'homebrew' else '' }} {{ '' if _pm == 'homebrew' else 'disabled' }}>Homebrew — coming soon</option>
+            <option value="raw" {{ 'selected' if _pm == 'raw' else '' }} {{ '' if _pm == 'raw' else 'disabled' }}>RAW — coming soon</option>
+          </select>
+          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
+            How downtime Projects work chronicle-wide. "Off" hides Projects everywhere
+            (player tab, coterie panel, staff queue). Homebrew + RAW are in progress.
+          </p>
+        </div>
+
+        <div>
+          <label class="label-gold block mb-1.5 text-[0.7rem]">Project rolls per timeskip</label>
+          <input type="number" name="rolls_per_timeskip" min="0" max="99"
+                 value="{{ _cs.get('rolls_per_timeskip', 8) }}"
+                 class="w-28 text-sm py-1 px-2">
+          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
+            Project rolls each character gets per timeskip (NYbN = 8), shared across
+            all of their projects.
+          </p>
         </div>
 
         <button type="submit" class="btn-ghost font-cinzel tracking-widest text-xs">
