@@ -96,9 +96,14 @@
 /* ── Body atmosphere ────────────────────────────────────────────── */
 body {
   background-color: #0a0708;
+  /* Atmosphere glows sized in viewport units so they scale with the window
+     (fit) instead of staying a fixed pixel size that overflows when the screen
+     is narrow and shrinks to a small blob when it's wide. no-repeat keeps each
+     a single wash rather than tiling on tall pages. */
   background-image:
-    radial-gradient(ellipse 1200px 600px at 50% -200px, rgba(138,36,36,0.18), transparent 60%),
-    radial-gradient(ellipse 800px 400px at 100% 100%, rgba(176,138,62,0.06), transparent 60%);
+    radial-gradient(ellipse 75vw 55vh at 50% -15vh, rgba(138,36,36,0.18), transparent 60%),
+    radial-gradient(ellipse 50vw 40vh at 100% 100%, rgba(176,138,62,0.06), transparent 60%);
+  background-repeat: no-repeat;
   color: #ece4d6;
 }
 
