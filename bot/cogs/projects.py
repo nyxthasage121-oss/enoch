@@ -113,7 +113,8 @@ class ProjectsCog(commands.Cog):
             e.description = "No projects yet. Propose one on your character page."
         else:
             for p in projects[:20]:
-                e.add_field(name=p["title"], value=_status_line(p), inline=False)
+                title = p["title"] + (" · coterie" if p.get("is_coterie") else "")
+                e.add_field(name=title, value=_status_line(p), inline=False)
         rolls = data.get("rolls") or {}
         if rolls.get("period_id"):
             e.set_footer(text=f"Project rolls this timeskip: "
@@ -139,7 +140,8 @@ class ProjectsCog(commands.Cog):
             t = (p.get("title") or "").strip()
             if not t or (cur and cur not in t.lower()):
                 continue
-            out.append(app_commands.Choice(name=t[:100], value=t[:100]))
+            label = (t + " (coterie)") if p.get("is_coterie") else t
+            out.append(app_commands.Choice(name=label[:100], value=t[:100]))
             if len(out) >= 25:
                 break
         return out

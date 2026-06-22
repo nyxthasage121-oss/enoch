@@ -94,4 +94,11 @@
       Propose Project
     </button>
   </form>
+
+  {% if coterie %}
+  <p class="font-garamond text-bone-600 text-[0.65rem] mt-3 pt-3 border-t border-ink-800">
+    In <span class="text-bone-400">{{ coterie.name }}</span>? Shared coterie projects are proposed and tracked on your
+    <a href="/coteries/{{ coterie.id }}" class="text-gold-500 hover:text-gold-400">coterie page</a>.
+  </p>
+  {% endif %}
 </div>

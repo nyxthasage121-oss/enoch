@@ -20,6 +20,7 @@ from ..db import (
     list_character_backgrounds,
     create_project,
     list_projects_for_character,
+    list_projects_for_coterie,
     timeskip_rolls_remaining,
     get_active_period,
     get_character,
@@ -1787,6 +1788,7 @@ def _projects_partial(request: Request, char: dict, conn, *,
             char=char,
             projects=list_projects_for_character(conn, char["id"]),
             proj_rolls=timeskip_rolls_remaining(conn, char["id"]),
+            coterie=get_coterie_for_character(conn, char["id"]),
             proj_notice=notice,
             proj_error=error,
         ),
@@ -2315,6 +2317,10 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
     shared_backgrounds = list_coterie_shared_backgrounds(conn, coterie_id) if coterie else []
     active_period = get_active_period(conn)
 
+    # Coterie projects (Phase D): any member proposes + rolls; rolls (via the
+    # bot's /project roll) spend each member's own per-character timeskip budget.
+    coterie_projects = list_projects_for_coterie(conn, coterie_id) if coterie else []
+
     # Free creation dots per member — only meaningful while the coterie is
     # still 'forming'. Surfaced for ALL members so a single assembler can
     # allocate on everyone's behalf (how coteries are built in practice).
@@ -2412,6 +2418,13 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
                             "already_shared": already,
                         })
 
+    # The viewer's own remaining project-roll budget (rolls on coterie projects
+    # spend it). Shown on the coterie projects panel.
+    viewer_proj_rolls = (
+        timeskip_rolls_remaining(conn, viewer_member_chars[0]["id"])
+        if viewer_member_chars else None
+    )
+
     return {"coterie": coterie, "members": members, "spends": spends,
             "advance_costs": advance_costs,
             "active_contribs": active_contribs,
@@ -2424,6 +2437,8 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
             "free_budget": free_budget,
             "coterie_flaws": coterie_flaws,
             "shared_backgrounds": shared_backgrounds,
+            "coterie_projects": coterie_projects,
+            "viewer_proj_rolls": viewer_proj_rolls,
             "active_period": active_period}
 
 
@@ -2547,6 +2562,44 @@ async def blank_coterie_background_route(
             )
         except ValueError as e:
             flash_kind, flash_msg = "error", str(e)
+
+        return _coterie_flash_response(request, conn, coterie_id, user["id"],
+                                       flash_msg, flash_kind)
+
+
+@router.post("/coteries/{coterie_id}/projects/propose", response_class=HTMLResponse)
+async def propose_coterie_project(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Any coterie member proposes a coterie project (staff still approve it).
+    The proposing member's character is recorded as the proposer; the coterie
+    owns it. Once active, any member rolls it via the bot's /project roll."""
+    form = await request.form()
+    title = (form.get("title") or "").strip()
+    description = (form.get("description") or "").strip()
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+        player_chars = list_player_characters(conn, user["id"])
+        members = list_coterie_members(conn, coterie_id)
+        actor = _resolve_member_char(player_chars, members, None)
+        if actor is None:
+            raise HTTPException(status_code=403, detail="Not a member of this coterie")
+
+        flash_kind, flash_msg = "success", ""
+        if not actor.get("is_approved"):
+            flash_kind, flash_msg = "error", "Your character must be approved first."
+        else:
+            try:
+                create_project(conn, actor["id"], title, description,
+                               proposed_by=user["id"], coterie_id=coterie_id)
+                flash_msg = "Coterie project proposed — staff will review it."
+            except ValueError as e:
+                flash_kind, flash_msg = "error", str(e)
 
         return _coterie_flash_response(request, conn, coterie_id, user["id"],
                                        flash_msg, flash_kind)

@@ -1,0 +1,69 @@
+{# coterie_donate_form.html — the "donate a sheet trait to the coterie" form.
+   Shared by the Coterie Creation block (while forming) and the Purchasing
+   section (while active) so the markup lives in one place. The own x-data
+   scope keeps `picked` local; $root resolves to this wrapper so the radios'
+   @change can populate the hidden fields below.
+   Expects in context: coterie, viewer_donatable, csrf_token. #}
+<div x-data="{ picked: '' }" class="space-y-3">
+  <p class="font-garamond text-bone-500 text-xs leading-relaxed">
+    Transfer an existing merit or background from a member's sheet to the
+    coterie. The trait stays on their sheet but gets flagged as
+    <em>shared with this coterie</em>. No XP cost. Reverts if they leave the coterie.
+  </p>
+  <form method="POST" action="/coteries/{{ coterie.id }}/donate" class="space-y-3">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+    <div>
+      <label class="label-gold block mb-2 text-[0.75rem]">Eligible Sheet Traits</label>
+      <div class="space-y-1.5">
+        {% for d in viewer_donatable %}
+        <label class="gilded-inset px-3 py-2 flex items-center gap-3 cursor-pointer"
+               :class="picked === '{{ d.char_id }}|{{ d.kind }}|{{ d.name }}|{{ d.dots }}' ? 'border-gold-700' : ''">
+          <input type="radio" name="_pick"
+                 value="{{ d.char_id }}|{{ d.kind }}|{{ d.name }}|{{ d.dots }}"
+                 x-model="picked"
+                 @change="
+                   $root.querySelector('[name=funded_by_character_id]').value = '{{ d.char_id }}';
+                   $root.querySelector('[name=target_kind]').value = '{{ d.kind }}';
+                   $root.querySelector('[name=target_name]').value = '{{ d.name }}';
+                   $root.querySelector('[name=dots]').value = '{{ d.dots }}';
+                 "
+                 class="accent-[#8B1A1A]">
+          <div class="flex-1 min-w-0">
+            <p class="font-cinzel text-xs text-bone-200">
+              {{ d.name }} <span class="text-bone-500">·</span>
+              <span class="text-gold-500">{{ d.dots }} dots</span>
+            </p>
+            <p class="font-garamond text-bone-600 text-[0.65rem]">
+              From {{ d.char_name }} · {{ d.kind }}
+              {% if d.already_shared %}
+              <span class="text-mauve-500 ml-1">· already shared here</span>
+              {% endif %}
+            </p>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# Hidden fields populated by the radio above. #}
+    <input type="hidden" name="funded_by_character_id" value="">
+    <input type="hidden" name="target_kind" value="">
+    <input type="hidden" name="target_name" value="">
+    <input type="hidden" name="dots" value="1">
+
+    <div>
+      <label class="label-gold block mb-1 text-[0.75rem]">
+        Justification <span class="text-bone-700 normal-case text-[0.6rem] ml-1">(optional)</span>
+      </label>
+      <textarea name="justification" rows="2" maxlength="800"
+                placeholder="What does the coterie do with this?"
+                class="w-full text-xs resize-y"></textarea>
+    </div>
+
+    <button type="submit" class="btn-send font-cinzel tracking-widest text-xs"
+            :disabled="!picked">
+      Donate to Coterie
+    </button>
+  </form>
+</div>

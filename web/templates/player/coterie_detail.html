@@ -3,6 +3,19 @@
 
 {% block content %}
 <div class="page-enter">
+  {# Catalog autocomplete for the creation / purchase / flaw inputs below.
+     Suggests canonical V5 merit/background/flaw names (same catalogs the chargen
+     wizard uses); coterie-specific or homebrew names stay free-text. #}
+  <datalist id="coterie-merits">
+    {% for m in merit_catalog if m.kind == 'merit' %}<option value="{{ m.name }}"></option>{% endfor %}
+  </datalist>
+  <datalist id="coterie-backgrounds">
+    {% for m in merit_catalog if m.kind == 'background' %}<option value="{{ m.name }}"></option>{% endfor %}
+  </datalist>
+  <datalist id="coterie-flaws">
+    {% for f in flaw_catalog %}<option value="{{ f.name }}"></option>{% endfor %}
+  </datalist>
+
   <div class="mb-6">
     <p class="label-gold mb-1">Coterie</p>
     <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">{{ coterie.name }}</h1>
@@ -24,6 +37,10 @@
     </p>
   </div>
   {% endif %}
+
+  {# ══════════════════════════════════════════════════════════════════════
+       THE COTERIE SHEET — what the coterie is right now (display).
+     ══════════════════════════════════════════════════════════════════════ #}
 
   {# ── Domain ──
        Each tile shows current dots + the single-funder XP cost to bump
@@ -93,6 +110,44 @@
   </div>
   {% endif %}
 
+  {# ── Coterie Flaws ── #}
+  {% if coterie_flaws %}
+  <div class="gilded p-5 mb-6">
+    <p class="label-gold text-xs mb-3">Coterie Flaws</p>
+    <div class="space-y-1">
+      {% for f in coterie_flaws %}
+      <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
+        <span class="font-cinzel text-xs text-blood-400">{{ f.target_name }}</span>
+        <span class="font-cinzel text-blood-400 text-xs">{{ f.dots }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Members ── #}
+  <div class="gilded p-5 mb-6">
+    <p class="label-gold text-xs mb-3">Members</p>
+    <div class="space-y-1">
+      {% for m in members %}
+      <div class="flex items-center justify-between py-1.5 border-b border-ink-800 last:border-0">
+        <div>
+          <a href="/profiles/{{ m.character_id }}"
+             class="font-cinzel text-xs text-bone-200 hover:text-gold-400 transition-colors">
+            {{ m.character_name }}
+          </a>
+          <span class="font-garamond text-bone-600 text-xs ml-2">
+            {{ m.character_clan | replace('-',' ') | title }}
+          </span>
+        </div>
+        {% if m.role == 'leader' %}
+        <span class="chip text-mauve-400 border-mauve-800 text-[0.55rem]">Leader</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
   {# ── Shared Backgrounds · nightly pool (migration 039) ──
        Donated backgrounds any member can "blank" for the night; blanked dots
        leave the pool for the WHOLE coterie until the next play period. #}
@@ -148,24 +203,9 @@
   </div>
   {% endif %}
 
-  {# ── Coterie Flaws ── #}
-  {% if coterie_flaws %}
-  <div class="gilded p-5 mb-6">
-    <p class="label-gold text-xs mb-3">Coterie Flaws</p>
-    <div class="space-y-1">
-      {% for f in coterie_flaws %}
-      <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
-        <span class="font-cinzel text-xs text-blood-400">{{ f.target_name }}</span>
-        <span class="font-cinzel text-blood-400 text-xs">{{ f.dots }}</span>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
   {# ── Donations & Funding — who contributed what, and how it was paid for.
        Fills the "XP donation display" gap: donated shares vs XP-funded dots,
-       each attributed to the funding member. #}
+       each attributed to the funding member. (Active contributions only.) #}
   {% set _funded = active_contribs
        | selectattr('contribution_type', 'in', ['donated', 'paid_xp', 'timeskip_advance', 'staff_grant'])
        | selectattr('target_name')
@@ -202,28 +242,46 @@
   </div>
   {% endif %}
 
-  {# ── Members ── #}
+  {# ── Contribution History — contributions that are no longer active because
+       the funding member went inactive (suspended) or left (removed). Shows
+       what a former contributor funded so a replacement can re-donate / re-buy
+       to restore the coterie trait. Data is the full ledger (all_contribs). ── #}
+  {% set _past = all_contribs | rejectattr('status', 'equalto', 'active') | list %}
+  {% if _past %}
+  {% set _hist_labels = {
+       'donated': 'Donated', 'paid_xp': 'XP', 'timeskip_advance': 'Timeskip XP',
+       'staff_grant': 'Staff grant', 'creation_free': 'Creation', 'flaw_bonus': 'Flaw bonus'} %}
   <div class="gilded p-5 mb-6">
-    <p class="label-gold text-xs mb-3">Members</p>
+    <p class="label-gold text-xs mb-1">Contribution History</p>
+    <p class="font-garamond text-bone-700 text-[0.65rem] mb-3 italic">
+      Dots from members who went inactive or left the coterie — no longer counting.
+      A replacement can re-donate or re-buy the same trait to restore it.
+    </p>
     <div class="space-y-1">
-      {% for m in members %}
-      <div class="flex items-center justify-between py-1.5 border-b border-ink-800 last:border-0">
-        <div>
-          <a href="/profiles/{{ m.character_id }}"
-             class="font-cinzel text-xs text-bone-200 hover:text-gold-400 transition-colors">
-            {{ m.character_name }}
-          </a>
-          <span class="font-garamond text-bone-600 text-xs ml-2">
-            {{ m.character_clan | replace('-',' ') | title }}
+      {% for c in _past %}
+      <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0 opacity-70">
+        <div class="min-w-0">
+          <span class="font-cinzel text-xs text-bone-300 line-through decoration-bone-700">
+            {{ c.target_name or (c.target_kind | title) }}
           </span>
+          <span class="font-garamond text-bone-600 text-[0.65rem] ml-1.5">· {{ c.target_kind }}</span>
+          {% if c.character_name %}
+          <span class="font-garamond text-bone-500 text-[0.65rem] ml-1.5">— {{ c.character_name }}</span>
+          {% endif %}
         </div>
-        {% if m.role == 'leader' %}
-        <span class="chip text-mauve-400 border-mauve-800 text-[0.55rem]">Leader</span>
-        {% endif %}
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="chip text-[0.5rem]
+            {{ 'text-blood-400 border-blood-900' if c.status == 'removed' else 'text-bone-500 border-ink-700' }}">
+            {{ 'Left' if c.status == 'removed' else 'Inactive' }}
+          </span>
+          <span class="chip text-[0.5rem] text-bone-600 border-ink-700">{{ _hist_labels.get(c.contribution_type, c.contribution_type) }}</span>
+          <span class="font-cinzel text-bone-500 text-xs">{{ c.dots }}</span>
+        </div>
       </div>
       {% endfor %}
     </div>
   </div>
+  {% endif %}
 
   {# ── Open proposals (single-funder spends awaiting staff approval) ── #}
   {% set open_spends = spends | selectattr('status', 'in', ['pending', 'funded']) | list %}
@@ -284,7 +342,11 @@
   </div>
   {% endif %}
 
-  {# ── Coterie creation (forming only) — assemble the sheet: creation dots
+  {# ══════════════════════════════════════════════════════════════════════
+       ACTIONS — Creation → Purchasing → Projects → Advance Rating.
+     ══════════════════════════════════════════════════════════════════════ #}
+
+  {# ── 1. Coterie creation (forming only) — assemble the sheet: creation dots
        (2/member + flaw bonus) toward Domain/Advantages/Backgrounds, plus
        flaws. Any member can fill in the whole sheet. ── #}
   {% if coterie.creation_state == 'forming' and viewer_member_chars %}
@@ -338,6 +400,7 @@
       <div x-show="kind === 'merit' || kind === 'background'" x-cloak>
         <label class="label-gold block text-[0.6rem] mb-1">Name</label>
         <input type="text" name="target_name" maxlength="80"
+               :list="kind === 'background' ? 'coterie-backgrounds' : 'coterie-merits'"
                placeholder="e.g. Haven, Allies" class="text-xs">
       </div>
       <div>
@@ -365,7 +428,7 @@
         <input type="hidden" name="_csrf" value="{{ csrf_token }}">
         <div>
           <label class="label-gold block text-[0.6rem] mb-1">Flaw</label>
-          <input type="text" name="flaw_name" maxlength="80" placeholder="e.g. Adversary" class="text-xs">
+          <input type="text" name="flaw_name" maxlength="80" list="coterie-flaws" placeholder="e.g. Adversary" class="text-xs">
         </div>
         <div>
           <label class="label-gold block text-[0.6rem] mb-1">Dots</label>
@@ -379,6 +442,16 @@
       <p class="font-garamond text-bone-600 text-xs italic">Maximum flaw dots taken.</p>
       {% endif %}
     </div>
+
+    {# Donate a member's existing sheet trait to the coterie — part of building
+       the sheet during creation. Also available later via the Purchasing
+       section once the coterie is active. #}
+    {% if viewer_donatable %}
+    <div class="pt-3 border-t border-ink-800 mt-3">
+      <p class="label-gold text-[0.7rem] mb-2">Donate a Trait from a Sheet</p>
+      {% include "player/partials/coterie_donate_form.html" %}
+    </div>
+    {% endif %}
 
     {# Allocations so far — removable while forming (undo mis-clicks) #}
     {% set _creation = active_contribs | selectattr('contribution_type', 'in', ['creation_free', 'flaw_bonus']) | list %}
@@ -417,22 +490,215 @@
   </div>
   {% endif %}
 
-  {# ── Single-funder spend flows (advance / buy / donate) ──
-       One member funds each action — same cost model as a character
-       merit (flat 3 XP / dot). Donations cost no XP but flag the
-       donating character's sheet entry as "shared with this coterie"
-       so both sides show the trait. Available while forming (creation
-       purchases) and active (ongoing advancement); frozen during
-       staff sign-off. #}
+  {# ── 2. Purchasing — buy a named coterie merit/background with one member's
+       XP, or donate one from a member's sheet. Same cost model as a character
+       merit (flat 3 XP / dot). Available while forming + active; frozen during
+       staff sign-off. ── #}
   {% if viewer_member_chars and coterie.creation_state != 'submitted' %}
   <div class="space-y-4 mb-6">
-    {% if coterie.creation_state == 'active' %}
-    <p class="label-gold text-xs">Advancement
-      <span class="text-bone-700 ml-2 normal-case">raise domain or add traits with a member's XP, or donate a trait</span>
+    <p class="label-gold text-xs">Purchasing
+      <span class="text-bone-700 ml-2 normal-case">buy a coterie trait with a member's XP{% if coterie.creation_state == 'active' %}, or donate one from a sheet{% endif %}</span>
+    </p>
+
+    {# ── BUY a named coterie merit or background with personal XP ── #}
+    <div class="gilded p-5"
+         x-data="{ open: false, kind: 'merit', funder: {{ viewer_member_chars[0].id }} }">
+      <button @click="open = !open" type="button"
+              class="w-full flex items-center justify-between">
+        <p class="label-gold text-xs">Buy Coterie Merit / Background</p>
+        <span class="font-cinzel text-bone-500 text-xs" x-text="open ? '▲' : '▼'"></span>
+      </button>
+      <div x-show="open" x-cloak class="mt-4 space-y-3">
+        <p class="font-garamond text-bone-500 text-xs leading-relaxed">
+          One member pays personal XP for a named trait (e.g. "Haven",
+          "Multilevel Lorekeeping"). Each named trait caps at
+          <span class="text-gold-500">{{ named_trait_cap }} dots</span>
+          total across all contributors — Steward house rule.
+        </p>
+        <form method="POST" action="/coteries/{{ coterie.id }}/buy-trait"
+              class="space-y-3">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+          <div>
+            <label class="label-gold block mb-2 text-[0.75rem]">Kind</label>
+            <div class="flex gap-2">
+              <label class="gilded-inset px-3 py-1.5 cursor-pointer"
+                     :class="kind === 'merit' ? 'border-gold-700' : ''">
+                <input type="radio" name="target_kind" value="merit"
+                       x-model="kind" class="sr-only">
+                <span class="font-cinzel text-xs text-bone-200">Merit</span>
+              </label>
+              <label class="gilded-inset px-3 py-1.5 cursor-pointer"
+                     :class="kind === 'background' ? 'border-gold-700' : ''">
+                <input type="radio" name="target_kind" value="background"
+                       x-model="kind" class="sr-only">
+                <span class="font-cinzel text-xs text-bone-200">Background</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="label-gold block mb-1 text-[0.75rem]">Trait Name</label>
+            <input type="text" name="target_name" maxlength="120" required
+                   :list="kind === 'background' ? 'coterie-backgrounds' : 'coterie-merits'"
+                   placeholder="e.g. Haven, Watchmen, Multilevel Lorekeeping"
+                   class="w-full text-sm">
+          </div>
+
+          <div>
+            <label class="label-gold block mb-1 text-[0.75rem]">Dots to Buy</label>
+            <input type="number" name="dots" min="1" max="{{ named_trait_cap }}" value="1"
+                   class="w-full text-sm">
+            <p class="font-garamond text-bone-700 text-[0.6rem] mt-1 italic">
+              Cost is 3 XP per dot (flat).
+            </p>
+          </div>
+
+          {% if viewer_member_chars | length > 1 %}
+          <div>
+            <label class="label-gold block mb-1 text-[0.75rem]">Funded By</label>
+            <select name="funded_by_character_id" x-model="funder" class="w-full text-sm">
+              {% for c in viewer_member_chars %}
+              <option value="{{ c.id }}">{{ c.name }} ({{ c.xp_available or 0 }} XP)</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% else %}
+          <input type="hidden" name="funded_by_character_id" value="{{ viewer_member_chars[0].id }}">
+          {% endif %}
+
+          <div>
+            <label class="label-gold block mb-1 text-[0.75rem]">
+              Justification <span class="text-bone-700 normal-case text-[0.6rem] ml-1">(optional)</span>
+            </label>
+            <textarea name="justification" rows="2" maxlength="800"
+                      class="w-full text-xs resize-y"></textarea>
+          </div>
+
+          <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
+            Submit Purchase
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {# ── DONATE a sheet trait — shown here only while ACTIVE (later additions).
+         During creation the same form lives in the Coterie Creation block. ── #}
+    {% if viewer_donatable and coterie.creation_state == 'active' %}
+    <div class="gilded p-5" x-data="{ open: false }">
+      <button @click="open = !open" type="button"
+              class="w-full flex items-center justify-between">
+        <p class="label-gold text-xs">Donate Trait from Sheet</p>
+        <span class="font-cinzel text-bone-500 text-xs" x-text="open ? '▲' : '▼'"></span>
+      </button>
+      <div x-show="open" x-cloak class="mt-4">
+        {% include "player/partials/coterie_donate_form.html" %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endif %}
+
+  {# ── 3. Coterie Projects (Phase D) ──
+       Coterie-owned downtime endeavours. Any member proposes (staff approve);
+       any member rolls an active one via the bot's /project roll, spending
+       their OWN per-character timeskip budget. Successes bank together.
+       Placed directly above Advance Rating because advancing a rating to 3+
+       dots ties to an approved project (see the note there). #}
+  <div class="gilded p-5 mb-6">
+    <div class="flex items-center justify-between gap-3 mb-1">
+      <p class="label-gold text-xs">Coterie Projects</p>
+      {% if viewer_proj_rolls and viewer_proj_rolls.period_id %}
+      <span class="font-garamond text-xs {{ 'text-gold-400' if viewer_proj_rolls.remaining else 'text-blood-400' }}">
+        Your rolls: {{ viewer_proj_rolls.remaining }}/{{ viewer_proj_rolls.cap }} this timeskip
+      </span>
+      {% endif %}
+    </div>
+    <p class="font-garamond text-bone-600 text-xs mb-4 leading-relaxed">
+      Shared downtime endeavours. Any member can work an active project with
+      <span class="text-bone-400">/project roll</span> — each roll spends that
+      member's own timeskip budget and the successes bank together. Coterie DCs
+      run higher (30 / 45 / 60).
+    </p>
+
+    {% if coterie_projects %}
+    <div class="space-y-3 mb-4">
+      {% for p in coterie_projects %}
+      <div class="gilded-inset px-4 py-3">
+        <div class="flex items-center justify-between gap-3">
+          <p class="font-cinzel text-sm text-bone-200">{{ p.title }}</p>
+          {% if p.status == 'proposed' %}
+          <span class="label-gold text-[0.6rem] text-bone-500">Pending review</span>
+          {% elif p.status == 'active' %}
+          <span class="label-gold text-[0.6rem] text-gold-400">{{ 'Ready' if p.target_reached else 'Active' }}</span>
+          {% elif p.status == 'complete' %}
+          <span class="label-gold text-[0.6rem] text-gold-400">Complete</span>
+          {% else %}
+          <span class="label-gold text-[0.6rem] text-blood-400">Returned</span>
+          {% endif %}
+        </div>
+        {% if p.description %}
+        <p class="font-garamond text-bone-600 text-xs mt-1">{{ p.description }}</p>
+        {% endif %}
+        <p class="font-garamond text-bone-700 text-[0.6rem] mt-1">Proposed by {{ p.character_name }}</p>
+        {% if p.status == 'active' and p.progress_type == 'roll' %}
+        <div class="mt-2">
+          <div class="flex items-center justify-between text-[0.6rem] label-gold mb-1">
+            {% if p.stages_json %}
+            {% set cur = p.stages_json[p.current_stage] %}
+            <span>{{ 'All stages done — awaiting staff' if p.target_reached else ('Stage ' ~ (p.current_stage + 1) ~ ' / ' ~ p.stage_count ~ ((' · ' ~ cur.label) if cur.label else '')) }}</span>
+            <span class="text-bone-400">{% if not p.target_reached %}{{ cur.progress }}/{{ cur.dc }}{% endif %}</span>
+            {% else %}
+            <span>{{ 'Target reached — awaiting staff' if p.target_reached else 'Extended test' }}</span>
+            <span class="text-bone-400">{{ p.progress_successes }}/{{ p.target_successes }}</span>
+            {% endif %}
+          </div>
+          <div style="height:6px;background:#221f1b;border-radius:1px">
+            <div style="height:6px;background:#c29b48;width:{{ p.progress_pct }}%;border-radius:1px"></div>
+          </div>
+        </div>
+        {% elif p.status == 'active' %}
+        <p class="font-garamond text-bone-600 text-xs mt-1 italic">Staff are tracking this project.</p>
+        {% elif p.status == 'complete' and p.reward_text %}
+        <p class="font-garamond text-gold-500 text-xs mt-1">Outcome · {{ p.reward_text }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="font-garamond text-bone-600 text-sm italic mb-4">
+      No coterie projects yet.{% if viewer_member_chars and coterie.creation_state == 'active' %} Propose one below.{% endif %}
     </p>
     {% endif %}
 
-    {# ── ADVANCE Chasse / Lien / Portillon ── #}
+    {# Propose — any member, once the coterie is active #}
+    {% if viewer_member_chars and coterie.creation_state == 'active' %}
+    <form method="POST" action="/coteries/{{ coterie.id }}/projects/propose"
+          class="space-y-2 pt-3 border-t border-ink-700">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div>
+        <label class="label-gold block mb-1 text-[0.6rem]">New coterie project</label>
+        <input type="text" name="title" maxlength="120" required
+               placeholder="Title — e.g. Establish a shared Elysium"
+               class="w-full py-1 text-sm">
+      </div>
+      <textarea name="description" rows="2"
+                placeholder="What is the coterie trying to accomplish? (optional)"
+                class="w-full py-1 text-sm resize-none"></textarea>
+      <button type="submit"
+              class="btn-send font-cinzel text-[0.55rem] tracking-widest px-3 py-1.5">
+        Propose Coterie Project
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  {# ── 4. Advance Rating — one member pays personal XP to raise Chasse / Lien /
+       Portillon by a dot (staff-approved). Ties to Projects: raising a rating to
+       3+ dots needs an approved coterie project (staff-coordinated, see above). ── #}
+  {% if viewer_member_chars and coterie.creation_state != 'submitted' %}
+  <div class="space-y-4 mb-6">
     <div class="gilded p-5"
          x-data="{ open: false, target: 'chasse', funder: {{ viewer_member_chars[0].id }} }">
       <button @click="open = !open" type="button"
@@ -446,6 +712,11 @@
           by one dot. Staff approval needed. Soft-warns staff if a
           second advance for the same rating is already in flight this
           time-skip.
+        </p>
+        <p class="font-garamond text-gold-600 text-[0.7rem] leading-relaxed border-l border-gold-800 pl-3">
+          Raising a rating to <span class="text-gold-400">3 dots or higher</span> needs an
+          approved <span class="text-gold-400">coterie project</span> first — propose one in
+          Coterie Projects above. (Staff-coordinated; the XP request and the project are tracked together.)
         </p>
         <form method="POST" action="/coteries/{{ coterie.id }}/advance"
               class="space-y-3">
@@ -504,165 +775,6 @@
         </form>
       </div>
     </div>
-
-    {# ── BUY a named coterie merit or background with personal XP ── #}
-    <div class="gilded p-5"
-         x-data="{ open: false, kind: 'merit', funder: {{ viewer_member_chars[0].id }} }">
-      <button @click="open = !open" type="button"
-              class="w-full flex items-center justify-between">
-        <p class="label-gold text-xs">Buy Coterie Merit / Background</p>
-        <span class="font-cinzel text-bone-500 text-xs" x-text="open ? '▲' : '▼'"></span>
-      </button>
-      <div x-show="open" x-cloak class="mt-4 space-y-3">
-        <p class="font-garamond text-bone-500 text-xs leading-relaxed">
-          One member pays personal XP for a named trait (e.g. "Haven",
-          "Multilevel Lorekeeping"). Each named trait caps at
-          <span class="text-gold-500">{{ named_trait_cap }} dots</span>
-          total across all contributors — Steward house rule.
-        </p>
-        <form method="POST" action="/coteries/{{ coterie.id }}/buy-trait"
-              class="space-y-3">
-          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-
-          <div>
-            <label class="label-gold block mb-2 text-[0.75rem]">Kind</label>
-            <div class="flex gap-2">
-              <label class="gilded-inset px-3 py-1.5 cursor-pointer"
-                     :class="kind === 'merit' ? 'border-gold-700' : ''">
-                <input type="radio" name="target_kind" value="merit"
-                       x-model="kind" class="sr-only">
-                <span class="font-cinzel text-xs text-bone-200">Merit</span>
-              </label>
-              <label class="gilded-inset px-3 py-1.5 cursor-pointer"
-                     :class="kind === 'background' ? 'border-gold-700' : ''">
-                <input type="radio" name="target_kind" value="background"
-                       x-model="kind" class="sr-only">
-                <span class="font-cinzel text-xs text-bone-200">Background</span>
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label class="label-gold block mb-1 text-[0.75rem]">Trait Name</label>
-            <input type="text" name="target_name" maxlength="120" required
-                   placeholder="e.g. Haven, Watchmen, Multilevel Lorekeeping"
-                   class="w-full text-sm">
-          </div>
-
-          <div>
-            <label class="label-gold block mb-1 text-[0.75rem]">Dots to Buy</label>
-            <input type="number" name="dots" min="1" max="{{ named_trait_cap }}" value="1"
-                   class="w-full text-sm">
-            <p class="font-garamond text-bone-700 text-[0.6rem] mt-1 italic">
-              Cost is 3 XP per dot (flat).
-            </p>
-          </div>
-
-          {% if viewer_member_chars | length > 1 %}
-          <div>
-            <label class="label-gold block mb-1 text-[0.75rem]">Funded By</label>
-            <select name="funded_by_character_id" x-model="funder" class="w-full text-sm">
-              {% for c in viewer_member_chars %}
-              <option value="{{ c.id }}">{{ c.name }} ({{ c.xp_available or 0 }} XP)</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% else %}
-          <input type="hidden" name="funded_by_character_id" value="{{ viewer_member_chars[0].id }}">
-          {% endif %}
-
-          <div>
-            <label class="label-gold block mb-1 text-[0.75rem]">
-              Justification <span class="text-bone-700 normal-case text-[0.6rem] ml-1">(optional)</span>
-            </label>
-            <textarea name="justification" rows="2" maxlength="800"
-                      class="w-full text-xs resize-y"></textarea>
-          </div>
-
-          <button type="submit" class="btn-send font-cinzel tracking-widest text-xs">
-            Submit Purchase
-          </button>
-        </form>
-      </div>
-    </div>
-
-    {# ── DONATE a merit/background from a character sheet ── #}
-    {% if viewer_donatable %}
-    <div class="gilded p-5"
-         x-data="{ open: false, picked: '' }">
-      <button @click="open = !open" type="button"
-              class="w-full flex items-center justify-between">
-        <p class="label-gold text-xs">Donate Trait from Sheet</p>
-        <span class="font-cinzel text-bone-500 text-xs" x-text="open ? '▲' : '▼'"></span>
-      </button>
-      <div x-show="open" x-cloak class="mt-4 space-y-3">
-        <p class="font-garamond text-bone-500 text-xs leading-relaxed">
-          Transfer an existing merit or background from your character
-          sheet to the coterie. The trait stays on your sheet but gets
-          flagged as <em>shared with this coterie</em>. No XP cost.
-          Reverts if you leave the coterie.
-        </p>
-        <form method="POST" action="/coteries/{{ coterie.id }}/donate"
-              class="space-y-3">
-          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-
-          <div>
-            <label class="label-gold block mb-2 text-[0.75rem]">Eligible Sheet Traits</label>
-            <div class="space-y-1.5">
-              {% for d in viewer_donatable %}
-              <label class="gilded-inset px-3 py-2 flex items-center gap-3 cursor-pointer"
-                     :class="picked === '{{ d.char_id }}|{{ d.kind }}|{{ d.name }}|{{ d.dots }}' ? 'border-gold-700' : ''">
-                <input type="radio" name="_pick"
-                       value="{{ d.char_id }}|{{ d.kind }}|{{ d.name }}|{{ d.dots }}"
-                       x-model="picked"
-                       @change="
-                         $root.querySelector('[name=funded_by_character_id]').value = '{{ d.char_id }}';
-                         $root.querySelector('[name=target_kind]').value = '{{ d.kind }}';
-                         $root.querySelector('[name=target_name]').value = '{{ d.name }}';
-                         $root.querySelector('[name=dots]').value = '{{ d.dots }}';
-                       "
-                       class="accent-[#8B1A1A]">
-                <div class="flex-1 min-w-0">
-                  <p class="font-cinzel text-xs text-bone-200">
-                    {{ d.name }} <span class="text-bone-500">·</span>
-                    <span class="text-gold-500">{{ d.dots }} dots</span>
-                  </p>
-                  <p class="font-garamond text-bone-600 text-[0.65rem]">
-                    From {{ d.char_name }} · {{ d.kind }}
-                    {% if d.already_shared %}
-                    <span class="text-mauve-500 ml-1">· already shared here</span>
-                    {% endif %}
-                  </p>
-                </div>
-              </label>
-              {% endfor %}
-            </div>
-          </div>
-
-          {# Hidden fields populated by the radio above. #}
-          <input type="hidden" name="funded_by_character_id" value="">
-          <input type="hidden" name="target_kind" value="">
-          <input type="hidden" name="target_name" value="">
-          <input type="hidden" name="dots" value="1">
-
-          <div>
-            <label class="label-gold block mb-1 text-[0.75rem]">
-              Justification <span class="text-bone-700 normal-case text-[0.6rem] ml-1">(optional)</span>
-            </label>
-            <textarea name="justification" rows="2" maxlength="800"
-                      placeholder="What does the coterie do with this?"
-                      class="w-full text-xs resize-y"></textarea>
-          </div>
-
-          <button type="submit" class="btn-send font-cinzel tracking-widest text-xs"
-                  :disabled="!picked">
-            Donate to Coterie
-          </button>
-        </form>
-      </div>
-    </div>
-    {% endif %}
-
   </div>
   {% endif %}
 

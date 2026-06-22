@@ -118,9 +118,51 @@ home.
   separately, per ST discretion. Phase C is considered DONE — no spend↔project
   code linkage. (If they ever want it enforced in code, the options were: gate a
   3+-dot spend on a linked project completing, or have the project replace XP.)
-- **D — Coterie projects**: coterie-owned, elevated DCs (30/45/60), multi-stage,
-  coterie-mates combine successes; retainers teamwork-only; benefit lost if the
-  coterie disbands (reclaimable by a member's regular project).
+- **D — Coterie projects ✅ DONE (2026-06-18, migration 041)**: coterie-owned,
+  elevated DCs (30/45/60), multi-stage, coterie-mates combine successes;
+  retainers teamwork-only; benefit lost if the coterie disbands (reclaimable by
+  a member's regular project).
+  - **Confirmed design (2026-06-18):**
+    - **Roll budget** → each member's roll on a coterie project spends from **their
+      own** per-character timeskip budget (the existing `rolls_per_timeskip` pool,
+      shared with their solo projects). No separate coterie budget.
+    - **Who acts** → **any** coterie member may propose it (staff still approve) and
+      **any** member may roll on it; successes accumulate cumulatively (existing
+      stage logic just keeps banking across members).
+  - **Build outline:** add nullable `coterie_id` to `projects` (a coterie project
+    sets `coterie_id`; `character_id` becomes the proposer / nullable for the owner).
+    Propose flow offers "coterie project" when the char is in a coterie. Roll flow
+    lets any member roll — **lift the one-roll-per-period-per-project block**
+    (`last_roll_period_id`) for coterie projects since multiple members roll the
+    same period; still decrement the rolling member's per-character budget. Staff
+    stage builder uses the coterie DC preset (30/45/60). Retainers = teamwork dice
+    only (existing `teamwork:`). On coterie disband, forfeit the coterie's projects
+    (reclaim = a member's new regular project, staff-coordinated — no auto-transfer).
+  - **What landed (2026-06-18):** migration 041 adds nullable `projects.coterie_id`
+    (set => coterie project; `character_id` stays the proposer). `create_project`
+    takes `coterie_id`; `list_projects_for_character` now excludes coterie rows; new
+    `list_projects_for_coterie`; the staff list queries carry `coterie_name`. The two
+    roll fns (`record_project_roll` / `resolve_project_roll`) take `actor_character_id`
+    and charge THAT member's per-character budget (any member rolls from their own
+    pool; successes bank cumulatively); coterie rolls are attributed by member name in
+    the log. Bot API `GET /api/characters/{id}/projects` merges the character's coterie
+    projects; `POST /api/projects/{id}/roll` resolves the acting member from
+    `requester_discord_id` + coterie membership (non-member → 403). Web: a member-gated
+    `POST /coteries/{id}/projects/propose`, a Coterie Projects panel on the coterie
+    detail page (list + propose form, gated on an active coterie), and a hint on the
+    character projects card. Staff queue tags coterie projects + uses the 30/45/60
+    preset in the stage builder. Tests `tests/test_coterie_projects.py` (9). Full
+    suite 463 green, ruff clean.
+    **Notes/decisions:** the stage engine was already a shared-per-character budget
+    (migration 035), so the old "lift the one-roll-per-period block" note was moot.
+    Coterie projects live on the **coterie detail page** (consistent with the other
+    coterie actions), not the character card. No disband flow exists yet, so "forfeit
+    on disband" is satisfied passively — `get_coterie_for_character` is active-only, so
+    a non-active coterie's projects stop surfacing to the bot. Structured payoff still
+    grants to the proposer's personal sheet; the staff form warns to use free-form +
+    the coterie's own tools for coterie-wide rewards. *Known edge:* `character_id` is
+    still `NOT NULL` with `ON DELETE CASCADE`, so hard-deleting the proposer's
+    character cascades the coterie project (rare — characters retire, not delete).
 - **E — Other downtime actions on the roll budget**: Hunting (1 roll; Resonance
   Negligible, or 2 rolls + Bloodhound for chosen Resonance); Willpower recovery
   (1 roll, scene with a Touchstone); cultivating Resonances (Manipulation + Insight/

@@ -4182,6 +4182,7 @@ def _project_view(row: dict | None) -> dict | None:
     if not isinstance(stages, list):
         stages = []
     row["stages_json"] = stages
+    row["is_coterie"] = row.get("coterie_id") is not None
 
     if stages:
         row["target_reached"] = all(s.get("done") for s in stages)
@@ -4209,9 +4210,26 @@ def get_project(conn, project_id: int) -> dict | None:
 
 
 def list_projects_for_character(conn, character_id: int) -> list[dict]:
+    """A character's *individual* projects only — coterie projects (coterie_id
+    set) are owned by the coterie and listed via list_projects_for_coterie."""
     rows = conn.execute(
-        "SELECT * FROM projects WHERE character_id=? ORDER BY created_at DESC",
+        "SELECT * FROM projects WHERE character_id=? AND coterie_id IS NULL "
+        "ORDER BY created_at DESC",
         (character_id,),
+    ).fetchall()
+    return [_project_view(r) for r in rows]
+
+
+def list_projects_for_coterie(conn, coterie_id: int) -> list[dict]:
+    """A coterie's projects (Phase D). character_name is the proposer."""
+    rows = conn.execute(
+        """
+        SELECT p.*, c.name AS character_name
+        FROM projects p JOIN characters c ON c.id = p.character_id
+        WHERE p.coterie_id=?
+        ORDER BY p.created_at DESC
+        """,
+        (coterie_id,),
     ).fetchall()
     return [_project_view(r) for r in rows]
 
@@ -4219,8 +4237,9 @@ def list_projects_for_character(conn, character_id: int) -> list[dict]:
 def list_pending_projects(conn) -> list[dict]:
     rows = conn.execute(
         """
-        SELECT p.*, c.name AS character_name
+        SELECT p.*, c.name AS character_name, co.name AS coterie_name
         FROM projects p JOIN characters c ON c.id = p.character_id
+        LEFT JOIN coteries co ON co.id = p.coterie_id
         WHERE p.status='proposed'
         ORDER BY p.created_at ASC
         """
@@ -4231,8 +4250,9 @@ def list_pending_projects(conn) -> list[dict]:
 def list_active_projects(conn) -> list[dict]:
     rows = conn.execute(
         """
-        SELECT p.*, c.name AS character_name
+        SELECT p.*, c.name AS character_name, co.name AS coterie_name
         FROM projects p JOIN characters c ON c.id = p.character_id
+        LEFT JOIN coteries co ON co.id = p.coterie_id
         WHERE p.status='active'
         ORDER BY p.updated_at DESC
         """
@@ -4243,8 +4263,9 @@ def list_active_projects(conn) -> list[dict]:
 def list_recent_finished_projects(conn, limit: int = 10) -> list[dict]:
     rows = conn.execute(
         """
-        SELECT p.*, c.name AS character_name
+        SELECT p.*, c.name AS character_name, co.name AS coterie_name
         FROM projects p JOIN characters c ON c.id = p.character_id
+        LEFT JOIN coteries co ON co.id = p.coterie_id
         WHERE p.status IN ('complete','rejected')
         ORDER BY p.reviewed_at DESC, p.updated_at DESC
         LIMIT ?
@@ -4267,17 +4288,21 @@ def _project_log_append(conn, project_id: int, entry: dict) -> None:
 
 
 def create_project(conn, character_id: int, title: str, description: str,
-                   proposed_by: str) -> dict:
+                   proposed_by: str, coterie_id: int | None = None) -> dict:
+    """Propose a project. coterie_id set => a Phase D coterie project owned by
+    that coterie (character_id is the proposing member); None => an individual
+    project owned by character_id."""
     title = (title or "").strip()[:120]
     if not title:
         raise ValueError("A project title is required.")
     cur = conn.execute(
         """
-        INSERT INTO projects (character_id, title, description, status,
+        INSERT INTO projects (character_id, coterie_id, title, description, status,
                               proposed_by, created_at, updated_at)
-        VALUES (?, ?, ?, 'proposed', ?, ?, ?)
+        VALUES (?, ?, ?, ?, 'proposed', ?, ?, ?)
         """,
-        (character_id, title, (description or "").strip(), proposed_by, _now(), _now()),
+        (character_id, coterie_id, title, (description or "").strip(),
+         proposed_by, _now(), _now()),
     )
     return get_project(conn, cur.lastrowid)
 
@@ -4429,10 +4454,15 @@ def consume_timeskip_roll(conn, character_id: int, period_id: int) -> None:
 
 
 def record_project_roll(conn, project_id: int, *, successes: int, outcome: str,
-                        period_id: int | None) -> dict:
+                        period_id: int | None,
+                        actor_character_id: int | None = None) -> dict:
     """Accumulate a downtime roll's successes toward a roll project's target.
-    One roll per active play period. Returns the updated project; the caller
-    reads `target_reached`. Raises ValueError on any invalid state."""
+    Returns the updated project; the caller reads `target_reached`. Raises
+    ValueError on any invalid state.
+
+    `actor_character_id` is the character actually rolling — for a coterie
+    project (Phase D) any member may roll and the roll is charged to that
+    member's own timeskip budget. Defaults to the project's owner."""
     proj = get_project(conn, project_id)
     if proj is None:
         raise ValueError("Project not found.")
@@ -4441,12 +4471,13 @@ def record_project_roll(conn, project_id: int, *, successes: int, outcome: str,
     if period_id is None:
         raise ValueError("There is no active play period to roll in.")
     # NYbN: each character has a shared pool of project rolls per timeskip
-    # (not one per project). Enforce + consume from that pool.
+    # (not one per project). The roller spends from their OWN pool.
+    roller   = actor_character_id or proj["character_id"]
     cap  = get_rolls_per_timeskip(conn)
-    used = get_timeskip_rolls_used(conn, proj["character_id"], period_id)
+    used = get_timeskip_rolls_used(conn, roller, period_id)
     if used >= cap:
         raise ValueError(f"No project rolls left this timeskip ({used}/{cap} used).")
-    consume_timeskip_roll(conn, proj["character_id"], period_id)
+    consume_timeskip_roll(conn, roller, period_id)
     gain = max(0, int(successes))
     new_prog = int(proj["progress_successes"] or 0) + gain
     conn.execute(
@@ -4455,15 +4486,25 @@ def record_project_roll(conn, project_id: int, *, successes: int, outcome: str,
         (new_prog, period_id, _now(), project_id),
     )
     _project_log_append(conn, project_id,
-                        {"by": "player", "kind": "roll",
+                        {"by": "player", "kind": "roll", "char": _project_roller_name(conn, proj, roller),
                          "successes": gain, "outcome": outcome, "progress": new_prog})
     return get_project(conn, project_id)
+
+
+def _project_roller_name(conn, proj: dict, roller_id: int) -> str | None:
+    """For a coterie project, the name of the member who rolled (so the staff
+    log can attribute each roll). None for an individual project."""
+    if not proj.get("coterie_id"):
+        return None
+    ch = get_character(conn, roller_id)
+    return ch.get("name") if ch else None
 
 
 def resolve_project_roll(conn, project_id: int, *, successes: int,
                          critical: bool = False, messy: bool = False,
                          hunger_one: bool = False, pool_size: int = 0,
-                         period_id: int | None) -> dict:
+                         period_id: int | None,
+                         actor_character_id: int | None = None) -> dict:
     """Apply one downtime roll to a multi-stage roll project's *current* stage,
     consuming one timeskip roll. Handles cumulative progress, stage completion
     with overflow spill into the next stage, and the crit/messy/bestial outcomes
@@ -4490,11 +4531,14 @@ def resolve_project_roll(conn, project_id: int, *, successes: int,
         raise ValueError("This project has no stages to roll against.")
     if period_id is None:
         raise ValueError("There is no active play period to roll in.")
+    # The roller spends from their own per-character timeskip budget; for a
+    # coterie project (Phase D) that's whichever member is rolling tonight.
+    roller = actor_character_id or proj["character_id"]
     cap  = get_rolls_per_timeskip(conn)
-    used = get_timeskip_rolls_used(conn, proj["character_id"], period_id)
+    used = get_timeskip_rolls_used(conn, roller, period_id)
     if used >= cap:
         raise ValueError(f"No project rolls left this timeskip ({used}/{cap} used).")
-    consume_timeskip_roll(conn, proj["character_id"], period_id)
+    consume_timeskip_roll(conn, roller, period_id)
 
     idx   = max(0, min(int(proj.get("current_stage") or 0), len(stages) - 1))
     stage = stages[idx]
@@ -4549,6 +4593,7 @@ def resolve_project_roll(conn, project_id: int, *, successes: int,
     )
     _project_log_append(conn, project_id, {
         "by": "player", "kind": "roll", "successes": succ,
+        "char": _project_roller_name(conn, proj, roller),
         "outcome": result["outcome"], "stage": idx + 1, "flags": flags,
     })
     return {"project": get_project(conn, project_id), "result": result}

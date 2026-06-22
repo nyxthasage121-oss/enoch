@@ -12,8 +12,10 @@
       {% for p in pending_projects %}
       <div class="gilded p-5" x-data="{ prog: 'staged', payoff: 'freeform', rejecting: false, stages: [{label:'', dc:30}] }">
         <div class="mb-3">
-          <p class="font-cinzel text-lg text-bone-200">{{ p.title }}</p>
-          <p class="label-gold text-[0.6rem] text-bone-500 mt-0.5">{{ p.character_name }}</p>
+          <p class="font-cinzel text-lg text-bone-200">{{ p.title }}
+            {% if p.coterie_id %}<span class="chip text-mauve-400 border-mauve-800 text-[0.55rem] ml-2 align-middle">Coterie · {{ p.coterie_name }}</span>{% endif %}
+          </p>
+          <p class="label-gold text-[0.6rem] text-bone-500 mt-0.5">{% if p.coterie_id %}proposed by {% endif %}{{ p.character_name }}</p>
         </div>
         {% if p.description %}
         <p class="font-garamond text-bone-400 text-sm mb-4 leading-relaxed">{{ p.description }}</p>
@@ -50,8 +52,8 @@
             </div>
             <div>
               <div class="flex items-center justify-between mb-1">
-                <label class="label-gold text-[0.6rem]">Stages — rolled in order (DC presets: 15 / 30 / 45+)</label>
-                <button type="button" @click="stages.push({label:'', dc:30})"
+                <label class="label-gold text-[0.6rem]">Stages — rolled in order (DC presets: {{ '30 / 45 / 60 (coterie)' if p.coterie_id else '15 / 30 / 45+' }})</label>
+                <button type="button" @click="stages.push({label:'', dc:{{ 30 if p.coterie_id else 30 }}})"
                         class="font-cinzel text-[0.55rem] tracking-widest text-gold-400 hover:text-gold-300">+ Add stage</button>
               </div>
               <template x-for="(s, i) in stages" :key="i">
@@ -61,7 +63,7 @@
                          class="flex-1 text-sm py-1">
                   <input type="number" x-model.number="s.dc" min="1" max="200"
                          style="width:4rem" class="text-center text-sm py-1">
-                  <template x-for="dc in [15,30,45]" :key="dc">
+                  <template x-for="dc in {{ '[30,45,60]' if p.coterie_id else '[15,30,45]' }}" :key="dc">
                     <button type="button" @click="s.dc = dc"
                             class="font-cinzel text-[0.55rem] px-1.5 py-1 border border-ink-700 text-bone-500 hover:text-gold-400 hover:border-gold-800"
                             x-text="dc"></button>
@@ -84,6 +86,12 @@
 
           {# Structured reward config (shown when payoff = structured) #}
           <div x-show="payoff === 'structured'" x-cloak class="grid grid-cols-2 sm:grid-cols-4 gap-3 gilded-inset px-3 py-3">
+            {% if p.coterie_id %}
+            <p class="col-span-2 sm:col-span-4 font-garamond text-bone-600 text-[0.65rem] italic leading-relaxed">
+              Heads up — a structured grant lands on the proposer's personal sheet ({{ p.character_name }}).
+              For a coterie-wide reward, use Free-form and apply it via the coterie's tools.
+            </p>
+            {% endif %}
             <div class="col-span-2 sm:col-span-1">
               <label class="label-gold block mb-1 text-[0.6rem]">Category</label>
               <select name="reward_category" class="w-full text-sm py-1.5">
@@ -143,8 +151,10 @@
       <div class="gilded p-5 {{ 'border border-gold-800' if p.target_reached else '' }}" x-data="{ completing: false }">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <p class="font-cinzel text-base text-bone-200">{{ p.title }}</p>
-            <p class="label-gold text-[0.6rem] text-bone-500 mt-0.5">{{ p.character_name }} · {{ p.progress_type }} · {{ p.payoff_type }}</p>
+            <p class="font-cinzel text-base text-bone-200">{{ p.title }}
+              {% if p.coterie_id %}<span class="chip text-mauve-400 border-mauve-800 text-[0.55rem] ml-1 align-middle">Coterie</span>{% endif %}
+            </p>
+            <p class="label-gold text-[0.6rem] text-bone-500 mt-0.5">{% if p.coterie_id %}{{ p.coterie_name }} · {% endif %}{{ p.character_name }} · {{ p.progress_type }} · {{ p.payoff_type }}</p>
           </div>
           {% if p.progress_type == 'roll' %}
           <span class="font-cinzel text-sm whitespace-nowrap {{ 'text-gold-400' if p.target_reached else 'text-bone-400' }}">
@@ -177,7 +187,7 @@
           {% for e in p.log_json[-4:] %}
           <p class="font-garamond text-bone-600 text-[0.7rem]">
             <span class="text-bone-700">{{ e.at[5:16].replace('T',' ') }}</span>
-            {% if e.kind == 'roll' %}— roll: {{ e.successes }} success(es){% if e.stage %} on stage {{ e.stage }}{% endif %}{% if e.flags %} <span class="text-gold-500">[{{ e.flags | join(', ') }}]</span>{% endif %}
+            {% if e.kind == 'roll' %}— roll: {{ e.successes }} success(es){% if e.char %} by {{ e.char }}{% endif %}{% if e.stage %} on stage {{ e.stage }}{% endif %}{% if e.flags %} <span class="text-gold-500">[{{ e.flags | join(', ') }}]</span>{% endif %}
             {% elif e.kind == 'note' %}— {{ e.text }}
             {% elif e.kind == 'approved' %}— activated ({{ e.text }})
             {% endif %}
@@ -228,7 +238,7 @@
     <div class="space-y-2">
       {% for p in finished_projects %}
       <div class="gilded-inset px-4 py-2 flex items-center justify-between gap-3">
-        <span class="font-garamond text-sm text-bone-400">{{ p.title }}<span class="text-bone-700"> · {{ p.character_name }}</span></span>
+        <span class="font-garamond text-sm text-bone-400">{{ p.title }}<span class="text-bone-700"> · {% if p.coterie_id %}{{ p.coterie_name }} (coterie){% else %}{{ p.character_name }}{% endif %}</span></span>
         <span class="label-gold text-[0.55rem] {{ 'text-gold-400' if p.status == 'complete' else 'text-blood-400' }}">{{ p.status }}</span>
       </div>
       {% endfor %}

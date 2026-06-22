@@ -29,6 +29,7 @@ from ..db import (
     get_project,
     list_character_backgrounds,
     list_projects_for_character,
+    list_projects_for_coterie,
     record_project_roll,
     resolve_project_roll,
     timeskip_rolls_remaining,
@@ -544,12 +545,18 @@ async def blank_background(character_id: int, body: BackgroundBlankIn):
 @router.get("/characters/{character_id}/projects", dependencies=[Depends(_require_bot)])
 async def get_projects(character_id: int):
     """List a character's projects (the bot's `/project list` + `/project roll`).
-    Each project carries `can_roll_now` for whether it can be rolled this night."""
+    Includes the character's own individual projects plus any projects owned by
+    their coterie (Phase D) — any member may roll those. Each project carries
+    `can_roll_now` for whether it can be rolled this night (against the rolling
+    character's own timeskip budget)."""
     with get_db() as conn:
         char = get_character(conn, character_id)
         if not char:
             raise HTTPException(status_code=404, detail="Character not found")
         projects = list_projects_for_character(conn, character_id)
+        coterie  = get_coterie_for_character(conn, character_id)
+        if coterie:
+            projects = projects + list_projects_for_coterie(conn, coterie["id"])
         active   = get_active_period(conn)
         rolls    = timeskip_rolls_remaining(conn, character_id)
     can_roll = active is not None and rolls["remaining"] > 0
@@ -569,15 +576,29 @@ async def get_projects(character_id: int):
 @router.post("/projects/{project_id}/roll", dependencies=[Depends(_require_bot)])
 async def roll_project(project_id: int, body: ProjectRollIn):
     """Accumulate a downtime extended-test roll's successes toward a roll
-    project. Validates that the requester owns the project's character and that
-    it hasn't already been rolled this period (400 on any invalid state)."""
+    project. For an individual project the requester must own the project's
+    character; for a coterie project (Phase D) the requester must own a member
+    character of the owning coterie, and the roll is charged to that member's
+    own timeskip budget (400 on any invalid state)."""
     with get_db() as conn:
         proj = get_project(conn, project_id)
         if not proj:
             raise HTTPException(status_code=404, detail="Project not found")
-        char = get_character(conn, proj["character_id"])
-        if not char or char.get("discord_id") != body.requester_discord_id:
-            raise HTTPException(status_code=403, detail="That isn't your project.")
+        if proj.get("coterie_id"):
+            member_ids = {m["character_id"]
+                          for m in list_coterie_members(conn, proj["coterie_id"])}
+            actor = next(
+                (c for c in list_player_characters(conn, body.requester_discord_id)
+                 if c["id"] in member_ids), None)
+            if actor is None:
+                raise HTTPException(
+                    status_code=403, detail="You're not a member of this coterie.")
+            roller_id = actor["id"]
+        else:
+            char = get_character(conn, proj["character_id"])
+            if not char or char.get("discord_id") != body.requester_discord_id:
+                raise HTTPException(status_code=403, detail="That isn't your project.")
+            roller_id = proj["character_id"]
         active    = get_active_period(conn)
         period_id = active["id"] if active else None
         try:
@@ -586,13 +607,14 @@ async def roll_project(project_id: int, body: ProjectRollIn):
                     conn, project_id, successes=body.successes,
                     critical=body.critical, messy=body.messy,
                     hunger_one=body.hunger_one, pool_size=body.pool_size,
-                    period_id=period_id,
+                    period_id=period_id, actor_character_id=roller_id,
                 )
                 project, result = res["project"], res["result"]
             else:
                 project = record_project_roll(
                     conn, project_id, successes=body.successes,
                     outcome=body.outcome, period_id=period_id,
+                    actor_character_id=roller_id,
                 )
                 result = {"outcome": body.outcome or "progress"}
         except ValueError as exc:
