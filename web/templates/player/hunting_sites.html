@@ -13,7 +13,7 @@
     <form method="GET" action="/hunting-sites"
           class="flex flex-wrap gap-2 items-end">
       <div>
-        <label class="label-gold block mb-1 text-[0.75rem]">Borough</label>
+        <label class="label-gold block mb-1 text-[0.75rem]">Area</label>
         <select name="borough" class="text-xs py-1.5 px-2">
           <option value="">All</option>
           {% for b in boroughs %}
@@ -58,8 +58,16 @@
   {% endif %}
 
   {% if sites %}
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    {% for s in sites %}
+  <div class="space-y-8">
+    {% for zone, zone_sites in sites | groupby('borough') %}
+    <div>
+      <div class="flex items-baseline gap-3 mb-3">
+        <h2 class="font-cinzel text-lg text-gold-400 tracking-wide">{{ zone or 'Unzoned' }}</h2>
+        <span class="font-garamond text-bone-700 text-xs">{{ zone_sites | length }} site{{ 's' if zone_sites | length != 1 else '' }}</span>
+        <div class="h-px flex-1 bg-ink-800/80"></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for s in zone_sites %}
     {% set _your_dc = s.predator_dcs.get(selected_char.predator_type) if (selected_char and selected_char.predator_type and s.predator_dcs) else None %}
     {% set _your_eff = s.effective_dcs.get(selected_char.predator_type) if (selected_char and selected_char.predator_type and s.effective_dcs) else None %}
     {% set _owns = selected_coterie_id and selected_coterie_id == s.coterie_id %}
@@ -100,6 +108,9 @@
       </p>
       {% endif %}
     </a>
+        {% endfor %}
+      </div>
+    </div>
     {% endfor %}
   </div>
   {% else %}

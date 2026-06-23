@@ -16,7 +16,13 @@
         </tr>
       </thead>
       <tbody>
-        {% for s in sites %}
+        {% for zone, zone_sites in sites | groupby('borough') %}
+        <tr class="bg-ink-900/60">
+          <td colspan="7" class="px-4 py-2 font-cinzel text-[0.65rem] tracking-[0.2em] uppercase text-gold-500">
+            {{ zone or 'Unzoned' }}<span class="text-bone-700 normal-case ml-2">{{ zone_sites | length }} site{{ 's' if zone_sites | length != 1 else '' }}</span>
+          </td>
+        </tr>
+        {% for s in zone_sites %}
         <tr class="border-b border-ink-800 align-top {{ 'opacity-40' if not s.active }}"
             x-data="{ editing: false }">
 
@@ -134,6 +140,7 @@
             </div>
           </td>
         </tr>
+        {% endfor %}
         {% else %}
         <tr>
           <td colspan="7" class="px-4 py-8 text-center font-garamond text-bone-700 italic">
