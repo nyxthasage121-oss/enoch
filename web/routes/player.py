@@ -300,7 +300,6 @@ from ..v5_traits import (
     MORTAL_TEMPLATES as _MORTAL_TEMPLATES,
     RETAINER_DOTS_TO_TEMPLATE as _RETAINER_DOTS_TO_TEMPLATE,
     validate_retainer_template as _validate_retainer_template,
-    validate_mawla_kindred as _validate_mawla_kindred,
 )
 
 # Make the V5 reference catalogs available to every template render (the chargen
@@ -2002,31 +2001,10 @@ async def companion_create(
                 return RedirectResponse(
                     url=f"/characters/{character_id}/companions", status_code=303)
         elif kind == "mawla":
-            clan = (form.get("clan") or "").strip().lower()
-            dots = max(1, min(5, form_int(form.get("dots"), 2)))
-            if clan not in {s for s, _ in _CLANS}:
-                errors.append("Choose the Mawla's clan.")
-            # BP / Humanity live on the kindred sheet (the sanitizer drops them).
-            sheet["blood_potency"] = max(0, min(10, form_int(form.get("blood_potency"), 1)))
-            sheet["humanity"]      = max(0, min(10, form_int(form.get("humanity"), 7)))
-            # Enforce the standard kindred spreads (attrs / skills / in-clan 2+1)
-            # under the standard ruleset; homebrew + open creation trust the
-            # builder and staff verify at the parent's approval. Advantages/Flaws
-            # are skipped (advantage_pool=None) — a Mawla is a mentor NPC.
-            _s     = _chronicle_settings()
-            _mode  = (_s.get("creation_mode") or "guided").lower()
-            _rules = (_s.get("active_ruleset") or "standard").lower()
-            if not errors and _mode != "open" and _rules == "standard":
-                errors += _validate_mawla_kindred(sheet, clan)
-            if not errors:
-                create_companion(
-                    conn, parent_character_id=character_id, kind="mawla",
-                    name=name, dots=dots, template=None, is_ghoul=False,
-                    clan=clan, concept=concept, description=description,
-                    sheet_json=sheet)
-                conn.commit()
-                return RedirectResponse(
-                    url=f"/characters/{character_id}/companions", status_code=303)
+            # On hold — elders create differently and the builder isn't final.
+            # The page shows a "coming soon" panel; validate_mawla_kindred() and
+            # its builder data stay ready for when we re-enable this.
+            errors.append("Mawla creation is coming soon.")
         else:
             errors.append("Unknown companion type.")
         return _companions_ctx(request, char, conn, create_errors=errors, form=form)

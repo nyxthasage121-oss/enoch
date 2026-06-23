@@ -249,35 +249,16 @@ def test_mawla_out_of_clan_discipline_rejected():
     assert validate_mawla_kindred(s, "ventrue")
 
 
-def test_create_mawla_via_route(player):
+def test_mawla_creation_disabled(player):
+    """Mawla creation is on hold (coming soon) — a POST must not create one."""
     import json as _json
     from web.db import get_db, list_companions
     r = player.post("/characters/1/companions", data={
         "_csrf": "dev-csrf-token", "kind": "mawla", "name": "QA Bishop",
-        "clan": "ventrue", "dots": "3", "concept": "patron",
-        "blood_potency": "2", "humanity": "6",
+        "clan": "ventrue", "dots": "3",
         "sheet_json": _json.dumps(_mawla_sheet("ventrue")),
     }, follow_redirects=False)
-    assert r.status_code == 303
+    assert r.status_code == 200            # re-rendered, not created/redirected
+    assert "coming soon" in r.text.lower()
     with get_db() as conn:
-        mine = [c for c in list_companions(conn, 1) if c["name"] == "QA Bishop"]
-    assert len(mine) == 1
-    m = mine[0]
-    assert m["kind"] == "mawla" and m["clan"] == "ventrue"
-    assert m["sheet_json"].get("blood_potency") == 2
-    assert m["sheet_json"].get("humanity") == 6
-    player.post(f"/companions/{m['id']}/delete",
-                data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
-    with get_db() as conn:
-        assert not [c for c in list_companions(conn, 1) if c["id"] == m["id"]]
-
-
-def test_mawla_requires_clan(player):
-    import json as _json
-    r = player.post("/characters/1/companions", data={
-        "_csrf": "dev-csrf-token", "kind": "mawla", "name": "QA No Clan",
-        "clan": "", "dots": "2",
-        "sheet_json": _json.dumps(_mawla_sheet("ventrue")),
-    }, follow_redirects=False)
-    assert r.status_code == 200
-    assert "Couldn't save" in r.text
+        assert not [c for c in list_companions(conn, 1) if c["name"] == "QA Bishop"]

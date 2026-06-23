@@ -23,7 +23,7 @@
   <p class="font-garamond text-bone-600 text-sm mb-6 max-w-2xl leading-relaxed">
     The people who serve and counsel you. A <span class="text-bone-400">Retainer</span> is built
     from the V5 Mortals Template its rating selects (● Weak, ●● Average, ●●● Gifted); a
-    <span class="text-bone-400">Mawla</span> is a Kindred mentor built on your chronicle's rules.
+    <span class="text-bone-400">Mawla</span> is a Kindred mentor (coming soon).
     Companions ride this character's approval — no separate review.
   </p>
 
@@ -148,7 +148,7 @@
     </div>
     {% else %}
     <div class="gilded-inset border border-dashed border-ink-600 px-4 py-6 text-center">
-      <p class="font-cinzel text-bone-400 text-sm tracking-wide mb-1">No retainers or mawlas yet</p>
+      <p class="font-cinzel text-bone-400 text-sm tracking-wide mb-1">No retainers yet</p>
       <p class="font-garamond text-bone-600 text-xs italic">Build one below.</p>
     </div>
     {% endfor %}
@@ -165,7 +165,7 @@
       <button type="button" @click="builderKind = 'mawla'"
               :class="builderKind === 'mawla' ? 'text-mauve-300 border-mauve-600' : 'text-bone-600 border-transparent hover:text-bone-400'"
               class="font-cinzel text-[0.65rem] tracking-[0.2em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors">
-        Build a Mawla
+        Mawla
       </button>
     </div>
 
@@ -332,187 +332,25 @@
       </div>
     </div>
 
-    {# ─── Mawla builder ─── #}
+    {# ─── Mawla (coming soon) ─── #}
     <div x-show="builderKind === 'mawla'" x-cloak>
-      <script id="mawla-data" type="application/json">
-        {{ {
-          "attrGroups": v5_attributes,
-          "skillGroups": v5_skills,
-          "disciplines": v5_disciplines,
-          "attrSpread": attribute_spread,
-          "skillSpreads": skill_spreads,
-          "discSpread": discipline_spreads['standard']['levels'],
-          "clanDiscMap": all_clan_disciplines,
-          "clans": clans
-        } | tojson }}
-      </script>
-
-      <div class="gilded p-5" x-data="mawlaBuilder()">
-        <div class="flex items-center justify-between mb-1">
-          <p class="label-gold">Mawla</p>
-          <span class="font-garamond text-bone-600 text-xs">Kindred mentor · standard spreads</span>
+      <div class="gilded p-5">
+        <p class="label-gold mb-3">Mawla</p>
+        <div class="gilded-inset border border-dashed border-ink-600 px-4 py-8 text-center">
+          <p class="font-cinzel text-bone-300 text-sm tracking-wide mb-2">Coming soon</p>
+          <p class="font-garamond text-bone-600 text-xs italic max-w-md mx-auto leading-relaxed">
+            Mawla creation is still being worked out. Many Mawlas are elders, whose
+            creation differs from a standard Kindred — we'll wire up the builder once
+            those details are settled.
+          </p>
         </div>
-        <p class="font-garamond text-bone-600 text-xs mb-4">
-          A Kindred built on the standard spread — one Attribute at 4, three at 3, four at 2, one at 1;
-          a Skill distribution; and two in-clan Disciplines (2 + 1). Advantages are left to staff/play.
-        </p>
-
-        <form method="post" :action="'/characters/{{ char.id }}/companions'" @submit="syncPayload()">
-          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-          <input type="hidden" name="kind" value="mawla">
-          <input type="hidden" name="dots" :value="dots">
-          <input type="hidden" name="clan" :value="clan">
-          <input type="hidden" name="blood_potency" :value="bp">
-          <input type="hidden" name="humanity" :value="humanity">
-          <input type="hidden" name="sheet_json" x-ref="sheetField">
-
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
-            <div>
-              <label class="label-gold block mb-1 text-[0.6rem]">Name</label>
-              <input type="text" name="name" x-model="name" required placeholder="e.g. Bishop Aldous" class="w-full py-1.5 text-sm">
-            </div>
-            <div>
-              <label class="label-gold block mb-1 text-[0.6rem]">Clan</label>
-              <select x-model="clan" class="w-full py-1.5 text-sm">
-                <option value="">— Clan —</option>
-                <template x-for="cl in clans" :key="cl[0]">
-                  <option :value="cl[0]" x-text="cl[1]"></option>
-                </template>
-              </select>
-            </div>
-            <div>
-              <label class="label-gold block mb-1 text-[0.6rem]">Rating</label>
-              <select x-model.number="dots" class="w-full py-1.5 text-sm">
-                <template x-for="n in 5" :key="n"><option :value="n" x-text="'●'.repeat(n)"></option></template>
-              </select>
-            </div>
-            <div>
-              <label class="label-gold block mb-1 text-[0.6rem]">Concept</label>
-              <input type="text" name="concept" x-model="concept" placeholder="advisor, patron…" class="w-full py-1.5 text-sm">
-            </div>
-          </div>
-
-          {# Blood Potency + Humanity + skill spread #}
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-            <div>
-              <label class="label-gold block mb-1 text-[0.6rem]">Blood Potency</label>
-              <input type="number" x-model.number="bp" min="0" max="10" class="w-full py-1.5 text-sm">
-            </div>
-            <div>
-              <label class="label-gold block mb-1 text-[0.6rem]">Humanity</label>
-              <input type="number" x-model.number="humanity" min="0" max="10" class="w-full py-1.5 text-sm">
-            </div>
-            <div>
-              <label class="label-gold block mb-1 text-[0.6rem]">Skill Distribution</label>
-              <select x-model="skillSpread" class="w-full py-1.5 text-sm">
-                <template x-for="(sp, key) in skillSpreads" :key="key">
-                  <option :value="key" x-text="sp.label"></option>
-                </template>
-              </select>
-            </div>
-          </div>
-
-          {# Attributes #}
-          <div class="mb-5">
-            <div class="flex items-baseline justify-between mb-2">
-              <p class="label-gold text-[0.65rem]">Attributes</p>
-              <span class="font-garamond text-xs" :class="attrOk ? 'text-gold-500' : 'text-bone-600'">
-                <span x-show="attrOk">✓ standard spread</span>
-                <span x-show="!attrOk" x-text="'Need: ' + describe(attrTarget)"></span>
-              </span>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8">
-              <template x-for="grp in attrGroups" :key="grp[0]">
-                <div>
-                  <p class="font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-700 mb-1" x-text="grp[0]"></p>
-                  <template x-for="t in grp[1]" :key="t[0]">
-                    <div class="flex items-center justify-between py-0.5">
-                      <span class="font-garamond text-xs text-bone-400" x-text="t[1]"></span>
-                      <span class="flex gap-1">
-                        <template x-for="n in 5" :key="n">
-                          <button type="button" @click="setAttr(t[0], n)"
-                                  class="w-3 h-3 rounded-full border transition-colors"
-                                  :class="attrs[t[0]] >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
-                        </template>
-                      </span>
-                    </div>
-                  </template>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          {# Skills #}
-          <div class="mb-5">
-            <div class="flex items-baseline justify-between mb-2">
-              <p class="label-gold text-[0.65rem]">Skills</p>
-              <span class="font-garamond text-xs" :class="skillOk ? 'text-gold-500' : 'text-bone-600'">
-                <span x-show="skillOk">✓ matches distribution</span>
-                <span x-show="!skillOk" x-text="'Need: ' + describe(skillTarget)"></span>
-              </span>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8">
-              <template x-for="grp in skillGroups" :key="grp[0]">
-                <div>
-                  <p class="font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-700 mb-1" x-text="grp[0]"></p>
-                  <template x-for="t in grp[1]" :key="t[0]">
-                    <div class="flex items-center justify-between py-0.5">
-                      <span class="font-garamond text-xs text-bone-400" x-text="t[1]"></span>
-                      <span class="flex gap-1">
-                        <template x-for="n in 5" :key="n">
-                          <button type="button" @click="setSkill(t[0], n)"
-                                  class="w-3 h-3 rounded-full border transition-colors"
-                                  :class="skills[t[0]] >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
-                        </template>
-                      </span>
-                    </div>
-                  </template>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          {# Disciplines (in-clan, 2 + 1) #}
-          <div class="mb-5">
-            <div class="flex items-baseline justify-between mb-2">
-              <p class="label-gold text-[0.65rem]">Disciplines <span class="text-bone-700 normal-case">(in-clan, 2 + 1)</span></p>
-              <span class="font-garamond text-xs" :class="discOk ? 'text-gold-500' : 'text-bone-600'">
-                <span x-show="discOk">✓ 2 + 1</span>
-                <span x-show="!discOk && clan" x-text="'Need: ' + describe(discSpreadCounts)"></span>
-                <span x-show="!clan" class="text-bone-700">pick a clan first</span>
-              </span>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8" x-show="clan" x-cloak>
-              <template x-for="dk in inClanDisc" :key="dk">
-                <div class="flex items-center justify-between py-0.5">
-                  <span class="font-garamond text-xs text-bone-400" x-text="discLabels[dk] || dk"></span>
-                  <span class="flex gap-1">
-                    <template x-for="n in 5" :key="n">
-                      <button type="button" @click="setDisc(dk, n)"
-                              class="w-3 h-3 rounded-full border transition-colors"
-                              :class="(discs[dk] || 0) >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
-                    </template>
-                  </span>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-3 pt-3 border-t border-ink-700">
-            <button type="submit" :disabled="!ready"
-                    class="btn-send font-cinzel tracking-widest text-xs px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed">
-              Add Mawla
-            </button>
-            <span class="font-garamond text-bone-700 text-xs" x-show="!ready">Finish the build above to enable.</span>
-          </div>
-        </form>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-function _companionHelpers(attrKeys, skillKeys) {
+function _companionHelpers() {
   const WORDS = {1:'one',2:'two',3:'three',4:'four',5:'five',6:'six',7:'seven',8:'eight',9:'nine',10:'ten'};
   return {
     countList(values) {
@@ -536,7 +374,7 @@ function retainerBuilder() {
   const attrKeys  = D.attrGroups.flatMap(g => g[1].map(t => t[0]));
   const skillKeys = D.skillGroups.flatMap(g => g[1].map(t => t[0]));
   const discLabels = Object.fromEntries(D.disciplines);
-  const H = _companionHelpers(attrKeys, skillKeys);
+  const H = _companionHelpers();
   return {
     attrGroups: D.attrGroups, skillGroups: D.skillGroups,
     templates: D.templates, dotsToTemplate: D.dotsToTemplate,
@@ -577,50 +415,6 @@ function retainerBuilder() {
       skillKeys.forEach(k => { if (+this.skills[k] > 0) s[k] = +this.skills[k]; });
       if (this.isGhoul && this.ghoulDisc) s[this.ghoulDisc] = 1;
       s.specialties = this.specialties.filter(sp => sp.name && sp.name.trim());
-      this.$refs.sheetField.value = JSON.stringify(s);
-    },
-  };
-}
-
-function mawlaBuilder() {
-  const D = JSON.parse(document.getElementById('mawla-data').textContent);
-  const attrKeys  = D.attrGroups.flatMap(g => g[1].map(t => t[0]));
-  const skillKeys = D.skillGroups.flatMap(g => g[1].map(t => t[0]));
-  const discLabels = Object.fromEntries(D.disciplines);
-  const H = _companionHelpers(attrKeys, skillKeys);
-  const toCounts = obj => { const c = {}; for (const [k, v] of Object.entries(obj)) c[+k] = v; return c; };
-  return {
-    attrGroups: D.attrGroups, skillGroups: D.skillGroups,
-    skillSpreads: D.skillSpreads, clanDiscMap: D.clanDiscMap, clans: D.clans, discLabels,
-    attrSpreadList: D.attrSpread,
-    discSpreadCounts: toCounts(D.discSpread),
-    name: '', concept: '', description: '', clan: '', dots: 2,
-    skillSpread: 'balanced', bp: 1, humanity: 7,
-    attrs: {}, skills: {}, discs: {},
-
-    init() {
-      this.attrs  = Object.fromEntries(attrKeys.map(k => [k, 0]));
-      this.skills = Object.fromEntries(skillKeys.map(k => [k, 0]));
-    },
-    get inClanDisc() { return this.clanDiscMap[this.clan] || []; },
-    countList: H.countList, sameCounts: H.sameCounts, describe: H.describe,
-    get attrTarget() { return this.countList(this.attrSpreadList); },
-    get attrHave()   { return this.countList(attrKeys.map(k => this.attrs[k])); },
-    get attrOk()     { return this.sameCounts(this.attrHave, this.attrTarget); },
-    get skillTarget(){ return toCounts(this.skillSpreads[this.skillSpread].levels); },
-    get skillHave()  { return this.countList(skillKeys.map(k => this.skills[k])); },
-    get skillOk()    { return this.sameCounts(this.skillHave, this.skillTarget); },
-    get discHave()   { return this.countList(this.inClanDisc.map(k => this.discs[k] || 0)); },
-    get discOk()     { return !!this.clan && this.sameCounts(this.discHave, this.discSpreadCounts); },
-    get ready()      { return !!this.name.trim() && !!this.clan && this.attrOk && this.skillOk && this.discOk; },
-    setAttr(k, n)  { this.attrs[k]  = (this.attrs[k]  === n ? n - 1 : n); },
-    setSkill(k, n) { this.skills[k] = (this.skills[k] === n ? n - 1 : n); },
-    setDisc(k, n)  { this.discs[k]  = ((this.discs[k] || 0) === n ? n - 1 : n); },
-    syncPayload() {
-      const s = {};
-      attrKeys.forEach(k  => { if (+this.attrs[k]  > 0) s[k] = +this.attrs[k]; });
-      skillKeys.forEach(k => { if (+this.skills[k] > 0) s[k] = +this.skills[k]; });
-      this.inClanDisc.forEach(k => { if (+this.discs[k] > 0) s[k] = +this.discs[k]; });
       this.$refs.sheetField.value = JSON.stringify(s);
     },
   };
