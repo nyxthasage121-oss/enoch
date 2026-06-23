@@ -2217,6 +2217,9 @@ def _apply_spend_to_sheet(sheet: dict, category: str, trait_name: str, new_dots:
     if cat == "blood sorcery ritual":
         _upsert_list("rituals", "level", int(new_dots), label)
         return sheet
+    if cat == "oblivion ceremony":
+        _upsert_list("ceremonies", "level", int(new_dots), label)
+        return sheet
     if cat == "thin-blood alchemy formula":
         _upsert_list("formulae", "level", int(new_dots), label)
         return sheet

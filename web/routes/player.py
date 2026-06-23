@@ -2203,6 +2203,21 @@ async def submit_spend(
             effective_char = dict(char)
             effective_char["xp_available"] = max(0, char["xp_available"] - pending_total)
             verified_cost, spend_errors = validate_spend(category, current_dots, new_dots, effective_char)
+            # V5: the first Level-1 Blood Sorcery ritual / Oblivion ceremony is
+            # free — it comes with the discipline. Zero its cost and drop any
+            # "insufficient XP" error, gated on having none yet (sheet + pending).
+            if category in ("Blood Sorcery Ritual", "Oblivion Ceremony") and new_dots == 1 and verified_cost > 0:
+                _lk = "rituals" if category == "Blood Sorcery Ritual" else "ceremonies"
+                _have_rit = (char.get("sheet_json") or {}).get(_lk) or []
+                _pending_free = conn.execute(
+                    "SELECT 1 FROM spend_requests WHERE character_id=? AND category=? "
+                    "AND status='pending' AND verified_cost=0 LIMIT 1",
+                    (character_id, category),
+                ).fetchone()
+                if not _have_rit and not _pending_free:
+                    verified_cost = 0
+                    spend_errors = [e for e in spend_errors if not e.startswith("Insufficient XP")]
+                    note = (note + " " if note else "") + "[free first one — V5]"
             if spend_errors and pending_total > 0:
                 # Make the error explain WHY available is less than they expect
                 spend_errors = [
