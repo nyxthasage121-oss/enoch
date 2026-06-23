@@ -32,18 +32,20 @@ If an idea can't clear the bar yet, write down *what would make it clear* (its t
 | **reject → private re-draft** (keep editing instead of hard reject) | Web · review loop | A rejection forces a player to rebuild from scratch and it stings | S | ◐ smoother player + staff loop |
 | **Staff-role Discord sync** | Bot + Web | *Only if* NYbN starts maintaining tiered staff roles in Discord — conflicts with the current "roles are manual" design, so likely stays parked | M | ◐ saves manual staff adds |
 | **Loresheet cost label** | Web · spend form | If loresheets ever need their own spend line vs. being treated as Backgrounds | S | ✗ clarity only |
-| **Chargen table DRY** (one source for the XP-cost / tier numbers) | Internal | A rules change forces editing the same numbers in ~4 places and one drifts | S | ✗ cuts *your* maintenance, not staff's |
-| **Staff-role label DRY** (role names live in 4 spots: `db.py`, `main.py`, `admin.html`, the bot cog) | Internal | A role rename/add forces editing all four and one drifts | S | ✗ maintenance |
-| **Numeric-field hardening** (malformed direct POST 500s) | Internal | Low-risk today; only if you ever expose forms outside the app | S | ✗ robustness |
 
 *Effort is rough: **S** = an afternoon, **M** = a focused day or two.*
 *A couple of smaller internal chargen cleanups exist too (step-machine refactor, a JS↔Python preview contract test) — pull them in only if chargen starts fighting you.*
+
+**Resolved 2026-06-23 — the internal DRY/tech-debt trio is cleared:**
+- **Staff-role label DRY** → one source `db.STAFF_ROLE_LABELS` (main.py's `_ctx` + the Admin role picker import it; the bot keeps a documented static mirror since slash-command Choices must be import-time). Also fixed stale Admin help text.
+- **Chargen table DRY** → the tier numbers were already single-sourced (`db._TIER_DEFAULTS` → `tier_budget()` feeds the wizard *and* the staff admin); fixed only a stale dead `_budgetsSeed` JS fallback.
+- **Numeric-field hardening** → not actually an issue: the routes use `form_int()` / try-except throughout, so a malformed POST falls back to a default instead of 500-ing.
 
 ---
 
 ## Already in flight — don't duplicate here
 
-- **Downtime system, Phases B–E** → fully specced in [`NYBN_DOWNTIME_PROJECTS.md`](./NYBN_DOWNTIME_PROJECTS.md). Phase B MVP and Phase C are in; **D** (coterie projects) and **E** (other downtime actions, resonances) are the next real chunks. That doc is their home — refine there, not here.
+- **Downtime system, Phases B–E** → fully specced in [`NYBN_DOWNTIME_PROJECTS.md`](./NYBN_DOWNTIME_PROJECTS.md). Phases B, C, **and D (coterie projects)** are in; **E** (other downtime actions, resonances) is the next chunk — its first action, generic **Hunting** (spend a timeskip roll), shipped 2026-06-23. The **Homebrew project engine** (the `project_mode` variant) is the other designed-but-unbuilt piece. That doc is their home — refine there, not here.
 - **Inconnu port ("Irad")** → [`INCONNU_PORT_SURVEY.md`](./INCONNU_PORT_SURVEY.md). Lifting Inconnu's MIT V5 logic into Enoch; **B1 bulk-XP** is the first target and merges with the bulk-import row above.
 
 ## Required for launch — NOT optional
