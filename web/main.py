@@ -16,6 +16,7 @@ from .db import (
     sweep_period_closing_soon, auto_create_next_period_if_due,
     release_due_background_blanks,
     release_due_coterie_background_blanks,
+    STAFF_ROLE_LABELS,
 )
 from .deps import LoginRequired
 
@@ -111,14 +112,6 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 
-_STAFF_ROLE_LABELS = {
-    "admin":       "Admin",
-    "moderator":   "Moderator",
-    "storyteller": "Storyteller",
-    "helper":      "Helper",
-}
-
-
 # ── Asset cache-busting ──────────────────────────────────────────
 # Static assets are served at fixed paths, so browsers cache them hard.
 # `static_url` appends a short content hash as ?v= so a *changed* CSS/JS
@@ -183,7 +176,8 @@ def _ctx(request: Request, **extra) -> dict:
         "current_user": user,
         "is_staff": request.session.get("is_staff", False),
         "staff_role": raw_role,
-        "staff_role_label": _STAFF_ROLE_LABELS.get(raw_role, ""),
+        "staff_role_label": STAFF_ROLE_LABELS.get(raw_role, ""),
+        "staff_role_labels": STAFF_ROLE_LABELS,
         "viewer_perms": STAFF_PERMISSIONS.get(raw_role, set()),
         "csrf_token": request.session.get("_csrf", ""),
         "flash_messages": flash,

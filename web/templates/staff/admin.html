@@ -503,10 +503,9 @@
       <p class="font-garamond text-bone-500 text-xs leading-relaxed">
         <strong class="text-bone-400">Staff roles</strong> gate what each ST can do
         once the Discord role grants them dashboard access.
-        <strong class="text-mauve-400">Lead ST</strong>: every permission, including role management.
-        <strong class="text-mauve-400">Co-ST</strong>: all chronicle work except role management.
-        <strong class="text-mauve-400">Reviewer</strong>: approve/reject claims + spends only.
-        <strong class="text-mauve-400">Helper</strong>: read-only dashboard access.
+        <strong class="text-mauve-400">Admin</strong>: every permission, including settings + role management.
+        <strong class="text-mauve-400">Moderator</strong> / <strong class="text-mauve-400">Storyteller</strong>: full XP + chronicle management, but not settings or roles.
+        <strong class="text-mauve-400">Helper</strong>: spend approvals only.
       </p>
       <p class="font-garamond text-bone-500 text-xs leading-relaxed">
         <strong class="text-gold-400">Settings Admin</strong> is a separate, stricter
@@ -544,12 +543,7 @@
                         class="text-[0.65rem] py-1 px-1.5"
                         title="Set this player's staff role">
                   <option value="" {{ 'selected' if not p.staff_role else '' }}>— none —</option>
-                  {% for role_key, role_label in [
-                    ('admin',       'Admin'),
-                    ('moderator',   'Moderator'),
-                    ('storyteller', 'Storyteller'),
-                    ('helper',      'Helper'),
-                  ] %}
+                  {% for role_key, role_label in staff_role_labels.items() %}
                   <option value="{{ role_key }}"
                           {{ 'selected' if p.staff_role == role_key else '' }}>
                     {{ role_label }}

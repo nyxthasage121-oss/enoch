@@ -164,6 +164,16 @@ def get_player(conn, discord_id: str) -> dict | None:
 # authority first (order drives the admin dropdown).
 STAFF_ROLES = ("admin", "moderator", "storyteller", "helper")
 
+# Display labels for the staff roles — the SINGLE source of truth for the web
+# side (main.py's _ctx + the Admin role picker import this; the bot mirrors it
+# in bot/cogs/staff.py since slash-command choices must be static at import).
+STAFF_ROLE_LABELS: dict[str, str] = {
+    "admin":       "Admin",
+    "moderator":   "Moderator",
+    "storyteller": "Storyteller",
+    "helper":      "Helper",
+}
+
 # Full game-staff permission set: everything a Storyteller needs to run XP and
 # the chronicle, short of chronicle-wide settings + role management.
 _STORYTELLER_PERMS: set[str] = {
