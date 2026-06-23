@@ -25,6 +25,12 @@ from ..db import (
     get_active_period,
     get_character,
     list_companions,
+    list_character_familiars,
+    list_familiars,
+    get_familiar,
+    create_familiar,
+    update_familiar,
+    delete_familiar,
     get_coterie,
     get_db,
     get_ledger,
@@ -624,6 +630,7 @@ async def char_detail(
         spends = list_spends_for_character(conn, character_id)
         ledger = get_ledger(conn, character_id, limit=50)
         companions = list_companions(conn, character_id)
+        char_familiars = list_character_familiars(conn, character_id)
         settings = dict(get_settings(conn) or {})
 
     # RAW chargen lint — only meaningful before approval. Once approved a
@@ -654,6 +661,7 @@ async def char_detail(
         request, "staff/character_detail.html",
         _ctx(request, char=char, claims=claims, spends=spends, ledger=ledger,
              raw_errors=raw_errors, companions=companions,
+             char_familiars=char_familiars,
              v5_attributes=V5_ATTRIBUTES, v5_skills=V5_SKILLS,
              v5_disciplines=V5_DISCIPLINES,
              active_bane=active_clan_bane(
@@ -2533,6 +2541,94 @@ def _all_coteries_for_picker(conn) -> list[dict]:
         WHERE status NOT IN ('rejected', 'disbanded')
         ORDER BY name COLLATE NOCASE
     """).fetchall()
+
+
+# ── Familiars catalog (the bestiary) ──────────────────────────────────────────
+# Reuses `manage_site` — the bestiary is the same kind of staff-curated reference
+# catalog as Hunting Sites, so whoever manages sites manages animals too.
+
+def _parse_exceptional_pools(text: str) -> dict:
+    """Parse 'Awareness 6, Brawl 5, Stealth 7' into {pool: rating}."""
+    out: dict = {}
+    for seg in (text or "").split(","):
+        seg = seg.strip()
+        if not seg:
+            continue
+        parts = seg.rsplit(None, 1)
+        if len(parts) == 2 and parts[1].lstrip("+").isdigit():
+            out[parts[0].strip()] = int(parts[1])
+        else:
+            out[seg] = 0
+    return out
+
+
+@router.get("/familiars", response_class=HTMLResponse)
+async def familiars_admin(request: Request, user: dict = Depends(require_staff)):
+    with get_db() as conn:
+        catalog = list_familiars(conn)
+    return templates.TemplateResponse(
+        request, "staff/familiars.html", _ctx(request, catalog=catalog))
+
+
+@router.post("/familiars")
+async def create_familiar_route(
+    request: Request,
+    user: dict = Depends(require_permission("manage_site")),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    name = (form.get("name") or "").strip()
+    if name:
+        with get_db() as conn:
+            create_familiar(
+                conn, name=name,
+                description=(form.get("description") or "").strip() or None,
+                physical=form_int(form.get("physical"), 1),
+                social=form_int(form.get("social"), 1),
+                mental=form_int(form.get("mental"), 1),
+                health=form_int(form.get("health"), 1),
+                willpower=form_int(form.get("willpower"), 1),
+                exceptional=_parse_exceptional_pools(form.get("exceptional") or ""),
+                special=(form.get("special") or "").strip() or None,
+                created_by=f"staff:{user.get('username') or user['id']}")
+    return RedirectResponse(url="/staff/familiars", status_code=303)
+
+
+@router.post("/familiars/{familiar_id}/edit")
+async def edit_familiar_route(
+    request: Request,
+    familiar_id: int,
+    user: dict = Depends(require_permission("manage_site")),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    with get_db() as conn:
+        cat = get_familiar(conn, familiar_id)
+        if cat and not cat["is_standard"]:        # V5 standards are read-only
+            update_familiar(
+                conn, familiar_id,
+                name=(form.get("name") or "").strip() or cat["name"],
+                description=(form.get("description") or "").strip() or None,
+                physical=form_int(form.get("physical"), cat["physical"]),
+                social=form_int(form.get("social"), cat["social"]),
+                mental=form_int(form.get("mental"), cat["mental"]),
+                health=form_int(form.get("health"), cat["health"]),
+                willpower=form_int(form.get("willpower"), cat["willpower"]),
+                exceptional=_parse_exceptional_pools(form.get("exceptional") or ""),
+                special=(form.get("special") or "").strip() or None)
+    return RedirectResponse(url="/staff/familiars", status_code=303)
+
+
+@router.post("/familiars/{familiar_id}/delete")
+async def delete_familiar_route(
+    request: Request,
+    familiar_id: int,
+    user: dict = Depends(require_permission("manage_site")),
+    _: None = Depends(csrf_protect),
+):
+    with get_db() as conn:
+        delete_familiar(conn, familiar_id)       # no-ops on protected standards
+    return RedirectResponse(url="/staff/familiars", status_code=303)
 
 
 @router.get("/sites", response_class=HTMLResponse)

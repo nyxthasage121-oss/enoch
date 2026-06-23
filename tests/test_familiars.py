@@ -132,6 +132,58 @@ def test_bond_and_release_with_animalism(player):
             conn.commit()
 
 
+def test_staff_sheet_shows_familiars(staff):
+    from web.db import get_db, list_familiars, bond_familiar, unbond_familiar
+    with get_db() as conn:
+        wolf = next(f for f in list_familiars(conn) if f["name"] == "Wolf")
+        bond = bond_familiar(conn, character_id=1, familiar_id=wolf["id"],
+                             name="StaffSeesFang")
+        conn.commit()
+    try:
+        r = staff.get("/staff/characters/1")
+        assert r.status_code == 200 and "StaffSeesFang" in r.text
+    finally:
+        with get_db() as conn:
+            unbond_familiar(conn, bond["id"])
+            conn.commit()
+
+
+def test_staff_bestiary_lists_catalog(staff):
+    r = staff.get("/staff/familiars")
+    assert r.status_code == 200
+    assert "Bestiary" in r.text and "Wolf" in r.text and "Add a Custom Animal" in r.text
+
+
+def test_staff_create_and_delete_custom(staff):
+    from web.db import get_db, list_familiars
+    r = staff.post("/staff/familiars", data={
+        "_csrf": "dev-csrf-token", "name": "QA Catalog Raven", "description": "test",
+        "physical": "4", "social": "1", "mental": "2", "health": "3", "willpower": "2",
+        "exceptional": "Awareness 6, Stealth 5", "special": "Mimics speech.",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    with get_db() as conn:
+        raven = next((f for f in list_familiars(conn) if f["name"] == "QA Catalog Raven"), None)
+    assert raven and raven["is_standard"] is False
+    assert raven["exceptional"].get("Awareness") == 6 and raven["physical"] == 4
+    r2 = staff.post(f"/staff/familiars/{raven['id']}/delete",
+                    data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+    assert r2.status_code == 303
+    with get_db() as conn:
+        assert not any(f["name"] == "QA Catalog Raven" for f in list_familiars(conn))
+
+
+def test_staff_cannot_delete_standard(staff):
+    from web.db import get_db, list_familiars
+    with get_db() as conn:
+        wolf = next(f for f in list_familiars(conn) if f["name"] == "Wolf")
+    r = staff.post(f"/staff/familiars/{wolf['id']}/delete",
+                   data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+    assert r.status_code == 303                    # redirects, but delete is a no-op
+    with get_db() as conn:
+        assert any(f["name"] == "Wolf" for f in list_familiars(conn))
+
+
 def test_familiars_cascade_on_character_delete(_client):
     from web.db import (get_db, upsert_player, create_character, list_familiars,
                         bond_familiar, list_character_familiars, delete_character)

@@ -250,6 +250,10 @@
              class="nav-link {{ 'active' if request.url.path.startswith('/hunting-sites') else '' }}">
             Hunting Sites
           </a>
+          <a href="/staff/familiars"
+             class="nav-link {{ 'active' if request.url.path.startswith('/staff/familiars') else '' }}">
+            Bestiary
+          </a>
           {% if project_mode != 'off' %}
           <a href="/staff/projects"
              class="nav-link {{ 'active' if request.url.path.startswith('/staff/projects') else '' }}">

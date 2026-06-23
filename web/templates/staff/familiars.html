@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Bestiary — Enoch{% endblock %}
+
+{% macro pools_text(a) %}{% for pool, rating in a.exceptional.items() %}{{ pool }} {{ rating }}{% if not loop.last %}, {% endif %}{% endfor %}{% endmacro %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-6">
+    <p class="label-gold mb-1">Familiars</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Bestiary</h1>
+    <p class="font-garamond text-bone-600 text-sm mt-2 max-w-2xl leading-relaxed">
+      The shared catalog of animal stat blocks players reference and bond via
+      Animalism • (Bond Famulus). The seven V5 standards are read-only; add your
+      own custom animals below.
+    </p>
+  </div>
+
+  {# ── Catalog ── #}
+  <div class="space-y-3 mb-8">
+    {% for a in catalog %}
+    <div class="gilded p-4" x-data="{ editing: false }">
+      {# View #}
+      <div x-show="!editing">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-cinzel text-base text-bone-200 tracking-wide">{{ a.name }}</span>
+            {% if a.is_standard %}
+            <span class="chip text-bone-500 border-ink-600 text-[0.5rem]">Standard</span>
+            {% else %}
+            <span class="chip text-mauve-300 border-mauve-800 text-[0.5rem]">Custom</span>
+            {% endif %}
+          </div>
+          {% if not a.is_standard %}
+          <div class="flex items-center gap-2 shrink-0">
+            <button @click="editing = true" class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1">Edit</button>
+            <form method="post" action="/staff/familiars/{{ a.id }}/delete"
+                  x-data="{ sure: false }" @submit="if(!sure){$event.preventDefault(); sure=true}">
+              <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+              <button type="submit" class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1 text-blood-500 hover:text-blood-300" x-text="sure ? 'Confirm?' : 'Delete'"></button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+        {% if a.description %}<p class="font-garamond text-xs text-bone-500 mt-1 leading-snug">{{ a.description }}</p>{% endif %}
+        <div class="grid grid-cols-3 sm:grid-cols-5 gap-x-3 gap-y-1 mt-2">
+          {% for label, val in [('Physical', a.physical), ('Social', a.social), ('Mental', a.mental), ('Health', a.health), ('Willpower', a.willpower)] %}
+          <div class="flex items-baseline gap-1.5">
+            <span class="font-cinzel text-[0.5rem] tracking-[0.15em] uppercase text-bone-700">{{ label }}</span>
+            <span class="font-cinzel text-sm text-gold-400">{{ val }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% if a.exceptional %}<p class="font-garamond text-xs text-bone-500 mt-2"><span class="label-gold text-[0.55rem] mr-1">Exceptional</span>{{ pools_text(a) }}</p>{% endif %}
+        {% if a.special %}<p class="font-garamond text-xs text-bone-500 mt-1"><span class="label-gold text-[0.55rem] mr-1">Special</span>{{ a.special }}</p>{% endif %}
+      </div>
+
+      {# Edit (custom only) #}
+      {% if not a.is_standard %}
+      <form x-show="editing" x-cloak method="post" action="/staff/familiars/{{ a.id }}/edit" class="space-y-3">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="label-gold block mb-1 text-[0.6rem]">Name</label>
+            <input type="text" name="name" value="{{ a.name }}" required class="w-full py-1.5 text-sm">
+          </div>
+          <div>
+            <label class="label-gold block mb-1 text-[0.6rem]">Description</label>
+            <input type="text" name="description" value="{{ a.description or '' }}" class="w-full py-1.5 text-sm">
+          </div>
+        </div>
+        <div class="grid grid-cols-5 gap-2">
+          {% for key, label, val in [('physical','Phys',a.physical),('social','Soc',a.social),('mental','Men',a.mental),('health','Health',a.health),('willpower','WP',a.willpower)] %}
+          <div>
+            <label class="label-gold block mb-1 text-[0.55rem]">{{ label }}</label>
+            <input type="number" name="{{ key }}" value="{{ val }}" min="0" max="15" class="w-full py-1.5 text-sm text-center">
+          </div>
+          {% endfor %}
+        </div>
+        <div>
+          <label class="label-gold block mb-1 text-[0.6rem]">Exceptional pools <span class="text-bone-700 normal-case">(e.g. "Awareness 6, Stealth 5")</span></label>
+          <input type="text" name="exceptional" value="{{ pools_text(a) }}" class="w-full py-1.5 text-sm">
+        </div>
+        <div>
+          <label class="label-gold block mb-1 text-[0.6rem]">Special</label>
+          <input type="text" name="special" value="{{ a.special or '' }}" class="w-full py-1.5 text-sm">
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="btn-send font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Save</button>
+          <button type="button" @click="editing = false" class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Cancel</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {# ── Add custom animal ── #}
+  <div class="gilded p-5 max-w-3xl">
+    <p class="label-gold mb-3">Add a Custom Animal</p>
+    <form method="post" action="/staff/familiars" class="space-y-3">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="label-gold block mb-1 text-[0.6rem]">Name</label>
+          <input type="text" name="name" required placeholder="e.g. Raven" class="w-full py-1.5 text-sm">
+        </div>
+        <div>
+          <label class="label-gold block mb-1 text-[0.6rem]">Description <span class="text-bone-700 normal-case">(optional)</span></label>
+          <input type="text" name="description" placeholder="A short note" class="w-full py-1.5 text-sm">
+        </div>
+      </div>
+      <div class="grid grid-cols-5 gap-2">
+        {% for key, label in [('physical','Phys'),('social','Soc'),('mental','Men'),('health','Health'),('willpower','WP')] %}
+        <div>
+          <label class="label-gold block mb-1 text-[0.55rem]">{{ label }}</label>
+          <input type="number" name="{{ key }}" value="1" min="0" max="15" class="w-full py-1.5 text-sm text-center">
+        </div>
+        {% endfor %}
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.6rem]">Exceptional pools <span class="text-bone-700 normal-case">(e.g. "Awareness 6, Stealth 5")</span></label>
+        <input type="text" name="exceptional" placeholder="Awareness 6, Stealth 5" class="w-full py-1.5 text-sm">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.6rem]">Special <span class="text-bone-700 normal-case">(optional)</span></label>
+        <input type="text" name="special" placeholder="e.g. Add +1 to damage on bites." class="w-full py-1.5 text-sm">
+      </div>
+      <button type="submit" class="btn-send font-cinzel tracking-widest text-xs px-4 py-2">Add Animal</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
