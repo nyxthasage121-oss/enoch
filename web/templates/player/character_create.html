@@ -2463,11 +2463,12 @@
       disciplineSpread:  initial.discipline_spread || '',
       revenantsEnabled:  !!opts.revenantsEnabled,
       revenantFamilies:  opts.revenantFamilies || [],
-      // Default ("seed") budget — only used if tierBudgets is missing.
-      // budgets is now a *computed* getter below that picks the right
-      // tier dict based on character_type + character_tier.
+      // Default ("seed") budget — a dead fallback. The route ALWAYS passes
+      // `budgets` (computed server-side from db._TIER_DEFAULTS via tier_budget),
+      // so this only guards a missing-context edge; kept matching the neonate
+      // defaults so it's never actively wrong.
       _budgetsSeed:      opts.budgets || {
-        starting_xp: 15, merits: 7, advantages: 2, backgrounds: 5, flaw_cap: 2, homebrew: false,
+        starting_xp: 15, merits: 2, advantages: 2, backgrounds: 3, flaw_cap: 2, homebrew: false,
       },
       tierBudgets:       opts.tierBudgets || {},
       activeRuleset:     opts.activeRuleset || 'standard',
