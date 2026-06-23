@@ -4902,6 +4902,39 @@ def consume_timeskip_roll(conn, character_id: int, period_id: int) -> None:
     )
 
 
+# ── Downtime actions (spend a timeskip roll — hunting, etc.) ──────────────────
+
+def log_downtime_action(conn, character_id: int, period_id: int | None,
+                        kind: str, note: str | None = None) -> None:
+    conn.execute(
+        "INSERT INTO downtime_actions (character_id, period_id, kind, note, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (character_id, period_id, kind, note, _now()))
+
+
+def list_downtime_actions(conn, character_id: int, period_id: int,
+                          kind: str | None = None) -> list[dict]:
+    sql = ("SELECT * FROM downtime_actions WHERE character_id=? AND period_id=?"
+           + (" AND kind=?" if kind else "") + " ORDER BY created_at")
+    args = (character_id, period_id, kind) if kind else (character_id, period_id)
+    return [dict(r) for r in conn.execute(sql, args).fetchall()]
+
+
+def hunt_downtime(conn, character_id: int, note: str | None = None) -> dict:
+    """Spend one timeskip roll to hunt this period. Generic for now — decrements
+    the shared roll budget and logs the action; the actual outcome is ST/bot
+    resolved. Returns {ok, error, remaining}."""
+    rolls = timeskip_rolls_remaining(conn, character_id)
+    if not rolls["period_id"]:
+        return {"ok": False, "error": "No active timeskip right now.", "remaining": 0}
+    if rolls["remaining"] < 1:
+        return {"ok": False, "error": "No project rolls left this timeskip.",
+                "remaining": 0}
+    consume_timeskip_roll(conn, character_id, rolls["period_id"])
+    log_downtime_action(conn, character_id, rolls["period_id"], "hunt", note)
+    return {"ok": True, "error": None, "remaining": rolls["remaining"] - 1}
+
+
 def record_project_roll(conn, project_id: int, *, successes: int, outcome: str,
                         period_id: int | None,
                         actor_character_id: int | None = None) -> dict:

@@ -34,6 +34,8 @@ from ..db import (
     list_projects_for_character,
     list_projects_for_coterie,
     timeskip_rolls_remaining,
+    hunt_downtime,
+    list_downtime_actions,
     get_active_period,
     get_character,
     get_claim,
@@ -1724,6 +1726,8 @@ async def character_detail(
         char_familiars  = list_character_familiars(conn, character_id)
         projects        = list_projects_for_character(conn, character_id)
         proj_rolls      = timeskip_rolls_remaining(conn, character_id)
+        downtime_hunts  = (list_downtime_actions(conn, character_id, proj_rolls["period_id"], "hunt")
+                           if proj_rolls["period_id"] else [])
 
     p_criteria     = _player_criteria(all_criteria)
     period_claimed = (
@@ -1755,6 +1759,7 @@ async def character_detail(
             char_familiars=char_familiars,
             projects=projects,
             proj_rolls=proj_rolls,
+            downtime_hunts=downtime_hunts,
             spend_categories=SPEND_CATEGORIES,
             spend_rules_json=json.dumps(RULES),
             humanity_conditions=HUMANITY_CONDITIONS,
@@ -2226,13 +2231,17 @@ async def familiar_unbond_route(
 def _projects_partial(request: Request, char: dict, conn, *,
                       notice: str | None = None, error: str | None = None):
     """Re-render the projects card for an HTMX swap."""
+    rolls = timeskip_rolls_remaining(conn, char["id"])
+    downtime = (list_downtime_actions(conn, char["id"], rolls["period_id"], "hunt")
+                if rolls["period_id"] else [])
     return templates.TemplateResponse(
         request, "player/partials/projects.html",
         _ctx(
             request,
             char=char,
             projects=list_projects_for_character(conn, char["id"]),
-            proj_rolls=timeskip_rolls_remaining(conn, char["id"]),
+            proj_rolls=rolls,
+            downtime_hunts=downtime,
             coterie=get_coterie_for_character(conn, char["id"]),
             proj_notice=notice,
             proj_error=error,
@@ -2267,6 +2276,34 @@ async def propose_project(
                 notice = "Project proposed — staff will review it."
             except ValueError as exc:
                 error = str(exc)
+        return _projects_partial(request, char, conn, notice=notice, error=error)
+
+
+@router.post("/characters/{character_id}/downtime/hunt", response_class=HTMLResponse)
+async def hunt_downtime_route(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Spend one timeskip roll to hunt (generic — outcome is ST/bot resolved)."""
+    notice = error = None
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        from ..db import projects_enabled
+        if not projects_enabled(conn):
+            error = "Projects are turned off for this chronicle."
+        elif not char.get("is_approved"):
+            error = "Your character must be approved first."
+        else:
+            res = hunt_downtime(conn, character_id)
+            if res["ok"]:
+                notice = (f"Spent a roll to hunt — {res['remaining']} "
+                          f"roll{'s' if res['remaining'] != 1 else ''} left this timeskip.")
+            else:
+                error = res["error"]
         return _projects_partial(request, char, conn, notice=notice, error=error)
 
 

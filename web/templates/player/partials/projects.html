@@ -75,6 +75,27 @@
   </p>
   {% endif %}
 
+  {# Downtime · Hunt — spend one roll to hunt this timeskip (generic; staff/bot resolve) #}
+  {% if proj_rolls and proj_rolls.period_id %}
+  <div class="flex items-center justify-between gap-3 pt-3 border-t border-ink-700 mb-1">
+    <div class="min-w-0">
+      <p class="label-gold text-[0.6rem] mb-0.5">Downtime · Hunt</p>
+      <p class="font-garamond text-bone-600 text-[0.7rem] leading-snug">
+        Spend a roll to hunt this timeskip — staff resolve the result.
+        {% if downtime_hunts %}<span class="text-bone-400">Hunted {{ downtime_hunts | length }}× so far.</span>{% endif %}
+      </p>
+    </div>
+    <form hx-post="/characters/{{ char.id }}/downtime/hunt"
+          hx-target="#projects-card" hx-swap="outerHTML" class="shrink-0">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <button type="submit" {% if not proj_rolls.remaining %}disabled{% endif %}
+              class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+        Hunt · 1 roll
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
   {# Propose a project #}
   <form hx-post="/characters/{{ char.id }}/projects/propose"
         hx-target="#projects-card" hx-swap="outerHTML"
