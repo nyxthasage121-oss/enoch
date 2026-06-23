@@ -3726,14 +3726,18 @@
       sumAttrs() {
         let total = 0;
         for (const k of Object.keys(this.sheet)) {
-          if (k.startsWith('attr_')) total += this.sheet[k] || 0;
+          // Only sum numeric trait dots — the sheet also holds string keys like
+          // skill_spread, so guard against "19" + "specialist" concatenation / NaN.
+          if (k.startsWith('attr_')) { const v = Number(this.sheet[k]); if (!isNaN(v)) total += v; }
         }
         return total;
       },
       sumSkills() {
         let total = 0;
         for (const k of Object.keys(this.sheet)) {
-          if (k.startsWith('skill_')) total += this.sheet[k] || 0;
+          // skill_spread ("specialist"/"balanced"/"jack") also matches skill_* —
+          // sum only numeric skill dots so it doesn't concatenate into the total.
+          if (k.startsWith('skill_')) { const v = Number(this.sheet[k]); if (!isNaN(v)) total += v; }
         }
         return total;
       },

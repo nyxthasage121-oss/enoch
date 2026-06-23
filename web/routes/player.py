@@ -702,6 +702,14 @@ async def character_create(
     def _rerender_wizard(errs):
         # Keep only string fields — the profile_image UploadFile is not
         # JSON-serializable and would 500 the wizard's `initialForm | tojson`.
+        _form = {k: v for k, v in form.items() if isinstance(v, str)}
+        # Re-hydrate the wizard's sheet so a validation error doesn't wipe all
+        # the player's progress. The Alpine init reads initialForm.sheet (the
+        # draft-resume path); rebuild that object from the flat posted fields.
+        try:
+            _form["sheet"] = _parse_sheet_from_form(form, base={})
+        except Exception:
+            pass
         return templates.TemplateResponse(
             request, "player/character_create.html",
             _ctx(request, clans=_CLANS, predator_types=_available_predator_types(),
@@ -710,7 +718,7 @@ async def character_create(
                  v5_disciplines=_V5_DISCIPLINES,
                  clan_disciplines=_CLAN_DISCIPLINES,
                  errors=errs,
-                 form={k: v for k, v in form.items() if isinstance(v, str)},
+                 form=_form,
                  **_wizard_extras()),
         )
 
