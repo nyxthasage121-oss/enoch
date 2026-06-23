@@ -488,12 +488,12 @@ def list_characters_near_cap(conn, threshold_xp: int = 30) -> list[dict]:
     return conn.execute(
         """
         SELECT c.*, pp.username AS player_username,
-               (? - c.xp_total) AS xp_to_cap
+               (? - (c.xp_total - c.creation_xp)) AS xp_to_cap
         FROM characters c
         LEFT JOIN player_profiles pp ON pp.discord_id = c.discord_id
         WHERE c.is_approved = 1
           AND c.status = 'active'
-          AND (? - c.xp_total) BETWEEN 0 AND ?
+          AND (? - (c.xp_total - c.creation_xp)) BETWEEN 0 AND ?
         ORDER BY xp_to_cap ASC, c.name
         """,
         (cap_amount, cap_amount, threshold_xp),
@@ -624,23 +624,41 @@ def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
         WHERE id=?
     """, (reviewer_id, now, now, character_id))
     char = get_character(conn, character_id)
-    # Record the Character Creation (CC) XP spend as ONE clean ledger entry —
-    # the per-trait breakdown stays in sheet_json for staff; the ledger just
-    # notes the lump spend so the XP history isn't cluttered. Posted once,
-    # when the character first goes active (guarded against re-approval).
+    # Character Creation (CC) XP accounting — posted ONCE when the character
+    # first goes active (guarded against re-approval). The per-trait breakdown
+    # stays in sheet_json for staff; here we (a) note the lump spend, and (b)
+    # carry any LEFTOVER pool XP into the running total. Leftover XP is tracked
+    # in creation_xp so it stays exempt from the chronicle XP cap.
     _sheet = char.get("sheet_json") if isinstance(char.get("sheet_json"), dict) else {}
     try:
         _cc_spent = int(_sheet.get("xp_spent") or 0)
     except (TypeError, ValueError):
         _cc_spent = 0
-    if _cc_spent > 0:
-        _exists = conn.execute(
-            "SELECT 1 FROM ledger_entries WHERE character_id=? AND entry_type='creation' LIMIT 1",
-            (character_id,),
-        ).fetchone()
-        if not _exists:
+    try:
+        _pool = int(_sheet.get("starting_xp_pool") or 0)
+    except (TypeError, ValueError):
+        _pool = 0
+    if _pool <= 0:
+        # Fall back to the tier's finishing-touches XP when the sheet didn't
+        # record a pool (older / staff-seeded characters).
+        _pool = int((tier_budget(get_settings(conn), char.get("character_tier")) or {}).get("xp") or 0)
+    _leftover = max(0, _pool - _cc_spent)
+    _exists = conn.execute(
+        "SELECT 1 FROM ledger_entries WHERE character_id=? AND entry_type='creation' LIMIT 1",
+        (character_id,),
+    ).fetchone()
+    if not _exists:
+        if _cc_spent > 0:
             append_ledger_entry(conn, character_id, "creation", -_cc_spent, reviewer_id,
-                                note="Character Creation XP")
+                                note="Character Creation XP spent")
+        if _leftover > 0:
+            conn.execute(
+                "UPDATE characters SET xp_total = xp_total + ?, creation_xp = ? WHERE id=?",
+                (_leftover, _leftover, character_id),
+            )
+            append_ledger_entry(conn, character_id, "creation", _leftover, reviewer_id,
+                                note="Leftover creation XP — does not count toward the cap")
+            char = get_character(conn, character_id)
     write_audit(conn, reviewer_id, "approve_character", "character", character_id,
                 after={"is_approved": 1, "status": "active"})
     enqueue_bot(conn, "character_approved", {
@@ -1921,7 +1939,9 @@ def approve_claim(conn, claim_id: int, reviewer_id: str) -> dict:
     cap_on     = bool((settings or {}).get("xp_cap_enabled", 1))
     cap_amount = int((settings or {}).get("xp_cap_amount", 350) or 350)
     if cap_on:
-        cap_room = max(0, cap_amount - char["xp_total"])
+        # Creation XP is cap-exempt — only EARNED XP counts toward the cap.
+        _earned  = char["xp_total"] - (char.get("creation_xp") or 0)
+        cap_room = max(0, cap_amount - _earned)
         awarded  = min(claim["xp_claimed"], cap_room)
     else:
         awarded  = claim["xp_claimed"]
@@ -1934,7 +1954,7 @@ def approve_claim(conn, claim_id: int, reviewer_id: str) -> dict:
     if awarded > 0:
         new_total    = char["xp_total"] + awarded
         retirement   = char.get("retirement_eligible_at")
-        if cap_on and new_total >= cap_amount and not retirement:
+        if cap_on and (new_total - (char.get("creation_xp") or 0)) >= cap_amount and not retirement:
             retirement = now
         conn.execute("""
             UPDATE characters SET xp_total=?, retirement_eligible_at=?, updated_at=?

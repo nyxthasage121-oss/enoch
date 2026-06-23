@@ -150,7 +150,7 @@
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-500">{{ char.clan | replace('-',' ') | title }}</td>
             <td class="px-4 py-2.5 font-garamond text-xs text-bone-600">{{ char.player_username or char.discord_id }}</td>
             <td class="px-4 py-2.5 font-cinzel text-xs text-bone-400 text-right">
-              {% if xp_cap_enabled %}{{ char.xp_total }} / {{ xp_cap_amount }}{% else %}{{ char.xp_total }}{% endif %}
+              {% if xp_cap_enabled %}{{ char.xp_total - (char.creation_xp or 0) }} / {{ xp_cap_amount }}{% else %}{{ char.xp_total }}{% endif %}
             </td>
             <td class="px-4 py-2.5 font-cinzel text-xs text-gold-500 text-right">{{ char.xp_available }}</td>
             <td class="px-4 py-2.5 font-cinzel text-[0.6rem] text-bone-600 text-right">

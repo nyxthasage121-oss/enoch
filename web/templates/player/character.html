@@ -91,11 +91,13 @@
 
     {# XP bar. The cap figure + progress bar + retirement notice only show
        when the chronicle enforces the XP cap (migration 027). #}
+    {# Cap counts EARNED XP only — leftover creation XP (creation_xp) is exempt. #}
+    {% set _earned = char.xp_total - (char.creation_xp or 0) %}
     <div class="px-6 pb-5">
       <div class="flex justify-between items-center mb-1.5">
         <span class="font-cinzel text-[0.6rem] text-bone-600 tracking-[0.2em] uppercase">Experience</span>
         <span class="font-cinzel text-[0.65rem] text-bone-500">
-          <span x-data="counter(0, {{ char.xp_total }})" x-text="value"></span>{% if xp_cap_enabled %} / {{ xp_cap_amount }}{% else %} XP total{% endif %}
+          <span x-data="counter(0, {{ _earned if xp_cap_enabled else char.xp_total }})" x-text="value"></span>{% if xp_cap_enabled %} / {{ xp_cap_amount }}{% else %} XP total{% endif %}
           {% if char.xp_available > 0 %}
             <span class="text-gold-500 ml-2">
               <span x-data="counter(0, {{ char.xp_available }}, 700)" x-text="value"></span> available
@@ -104,11 +106,11 @@
         </span>
       </div>
       {% if xp_cap_enabled %}
-      {% set pct = [(char.xp_total / xp_cap_amount * 100)|int, 100]|min %}
+      {% set pct = [(_earned / xp_cap_amount * 100)|int, 100]|min %}
       <div class="h-0.5 bg-ink-800 w-full overflow-hidden aurora-beam">
         <div class="xp-fill-anim" style="--xp-target: {{ pct }}%"></div>
       </div>
-      {% if char.xp_total >= xp_cap_amount %}
+      {% if _earned >= xp_cap_amount %}
         <p class="text-right font-cinzel text-[0.6rem] text-gold-600 mt-1">
           Cap reached — retirement window open
         </p>
