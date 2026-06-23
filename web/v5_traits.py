@@ -912,6 +912,45 @@ def validate_retainer_template(
     return errors
 
 
+def validate_mawla_kindred(sheet: dict, clan: str) -> list[str]:
+    """Validate a Mawla (Kindred mentor) against the standard V5 spreads —
+    Attributes 4/3/3/3/2/2/2/2/1, one of the three Skill distributions, in-clan
+    Disciplines in the standard 2 + 1 shape, and the no-5-at-creation cap.
+    Specialties / Advantages / Flaws are left to staff and play — a Mawla is a
+    mentor NPC, not a full PC. Returns human-readable errors ([] == valid)."""
+    errors: list[str] = []
+
+    attrs = sorted((int(sheet.get(k, 0) or 0) for k in _ATTR_KEYS), reverse=True)
+    if attrs != sorted(V5_ATTRIBUTE_SPREAD, reverse=True):
+        errors.append("Attributes must use the V5 spread — one at 4, three at 3, "
+                      "four at 2, one at 1.")
+
+    skill_vals = sorted((v for v in (int(sheet.get(k, 0) or 0) for k in _SKILL_KEYS)
+                         if v > 0), reverse=True)
+    if skill_vals not in [_spread_shape(spr["levels"]) for spr in V5_SKILL_SPREADS.values()]:
+        errors.append("Skills must match one of the three distributions — "
+                      "Jack-of-all-Trades, Balanced, or Specialist.")
+
+    inclan = CLAN_DISCIPLINES.get(clan)
+    if inclan is not None:
+        disc_labels = dict(V5_DISCIPLINES)
+        for k in _disc_keys():
+            if int(sheet.get(k, 0) or 0) > 0 and k not in set(inclan):
+                errors.append(f"{disc_labels.get(k, k)} isn't in-clan for "
+                              f"{clan or 'this clan'} — a Mawla's Disciplines must be in-clan.")
+    base_disc = [int(sheet.get(k, 0) or 0) for k in _disc_keys()]
+    if not _disc_alloc_ok(base_disc,
+                          _spread_shape(V5_DISCIPLINE_SPREADS["standard"]["levels"]), 0):
+        errors.append("Disciplines must follow the standard 2 + 1 spread — "
+                      "two in one in-clan Discipline, one in another.")
+
+    if any(int(sheet.get(k, 0) or 0) >= 5
+           for k in (_ATTR_KEYS + _SKILL_KEYS + _disc_keys())):
+        errors.append("Nothing can be raised to 5 at creation.")
+
+    return errors
+
+
 def validate_chargen_raw(
     sheet: dict, *, character_type: str = "kindred",
     clan: str = "", predator_type: str | None = None,

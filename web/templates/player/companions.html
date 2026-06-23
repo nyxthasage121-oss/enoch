@@ -23,8 +23,8 @@
   <p class="font-garamond text-bone-600 text-sm mb-6 max-w-2xl leading-relaxed">
     The people who serve and counsel you. A <span class="text-bone-400">Retainer</span> is built
     from the V5 Mortals Template its rating selects (● Weak, ●● Average, ●●● Gifted); a
-    <span class="text-bone-400">Mawla</span> is a Kindred mentor. Companions ride this character's
-    approval — no separate review.
+    <span class="text-bone-400">Mawla</span> is a Kindred mentor built on your chronicle's rules.
+    Companions ride this character's approval — no separate review.
   </p>
 
   {% if create_errors %}
@@ -54,12 +54,14 @@
               {% endfor %}
             </span>
           </div>
-          {% if c.template %}
           <p class="font-garamond text-bone-600 text-[0.7rem] mt-0.5">
-            {{ mortal_templates[c.template].label if c.template in mortal_templates else c.template | title }}
-            {% if c.is_ghoul and c.clan %}· domitor: {{ c.clan | replace('-', ' ') | title }}{% endif %}
+            {% if c.kind == 'mawla' %}
+              {{ c.clan | replace('-', ' ') | title if c.clan else 'Kindred' }} mentor
+            {% elif c.template %}
+              {{ mortal_templates[c.template].label if c.template in mortal_templates else c.template | title }}
+              {% if c.is_ghoul and c.clan %}· domitor: {{ c.clan | replace('-', ' ') | title }}{% endif %}
+            {% endif %}
           </p>
-          {% endif %}
           {% if c.concept %}<p class="font-garamond text-bone-400 text-sm mt-1 italic">{{ c.concept }}</p>{% endif %}
         </div>
         <div class="flex items-center gap-2 shrink-0">
@@ -86,7 +88,6 @@
         <div>
           <p class="label-gold mb-2 text-[0.65rem]">Attributes</p>
           {% for cat, traits in v5_attributes %}
-          {% set _rows = traits | selectattr('0', 'in', sheet) | list %}
           {% for key, label in traits if sheet.get(key) %}
           <div class="flex items-center justify-between py-0.5">
             <span class="font-garamond text-xs text-bone-400">{{ label }}</span>
@@ -96,6 +97,16 @@
           </div>
           {% endfor %}
           {% endfor %}
+          {% if c.kind == 'mawla' %}
+          <div class="flex items-center justify-between py-0.5 mt-2 pt-2 border-t border-ink-800">
+            <span class="font-garamond text-xs text-bone-500">Blood Potency</span>
+            <span class="font-cinzel text-xs text-gold-400">{{ sheet.get('blood_potency', 0) }}</span>
+          </div>
+          <div class="flex items-center justify-between py-0.5">
+            <span class="font-garamond text-xs text-bone-500">Humanity</span>
+            <span class="font-cinzel text-xs text-gold-400">{{ sheet.get('humanity', 7) }}</span>
+          </div>
+          {% endif %}
         </div>
         {# Skills #}
         <div>
@@ -143,192 +154,393 @@
     {% endfor %}
   </div>
 
-  {# ══ Retainer builder ══ #}
-  <script id="retainer-data" type="application/json">
-    {{ {
-      "attrGroups": v5_attributes,
-      "skillGroups": v5_skills,
-      "disciplines": v5_disciplines,
-      "templates": mortal_templates,
-      "dotsToTemplate": retainer_dots_to_template,
-      "clanDisc": clan_disciplines,
-      "clanName": char.clan | replace('-', ' ') | title
-    } | tojson }}
-  </script>
-
-  <div class="gilded p-5" x-data="retainerBuilder()">
-    <div class="flex items-center justify-between mb-1">
-      <p class="label-gold">Build a Retainer</p>
-      <span class="font-garamond text-bone-600 text-xs" x-text="templateLabel"></span>
+  {# ══ Builders (Retainer / Mawla) ══ #}
+  <div x-data="{ builderKind: 'retainer' }">
+    <div class="flex gap-2 mb-4 border-b border-ink-700">
+      <button type="button" @click="builderKind = 'retainer'"
+              :class="builderKind === 'retainer' ? 'text-gold-400 border-clan' : 'text-bone-600 border-transparent hover:text-bone-400'"
+              class="font-cinzel text-[0.65rem] tracking-[0.2em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors">
+        Build a Retainer
+      </button>
+      <button type="button" @click="builderKind = 'mawla'"
+              :class="builderKind === 'mawla' ? 'text-mauve-300 border-mauve-600' : 'text-bone-600 border-transparent hover:text-bone-400'"
+              class="font-cinzel text-[0.65rem] tracking-[0.2em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors">
+        Build a Mawla
+      </button>
     </div>
-    <p class="font-garamond text-bone-600 text-xs mb-4" x-text="template.blurb"></p>
 
-    <form method="post" :action="'/characters/{{ char.id }}/companions'" @submit="syncPayload()">
-      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-      <input type="hidden" name="kind" value="retainer">
-      <input type="hidden" name="dots" :value="dots">
-      <input type="hidden" name="is_ghoul" :value="isGhoul ? 'on' : ''">
-      <input type="hidden" name="sheet_json" x-ref="sheetField">
+    {# ─── Retainer builder ─── #}
+    <div x-show="builderKind === 'retainer'">
+      <script id="retainer-data" type="application/json">
+        {{ {
+          "attrGroups": v5_attributes,
+          "skillGroups": v5_skills,
+          "disciplines": v5_disciplines,
+          "templates": mortal_templates,
+          "dotsToTemplate": retainer_dots_to_template,
+          "clanDisc": clan_disciplines,
+          "clanName": char.clan | replace('-', ' ') | title
+        } | tojson }}
+      </script>
 
-      {# Identity #}
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-        <div>
-          <label class="label-gold block mb-1 text-[0.6rem]">Name</label>
-          <input type="text" name="name" x-model="name" required placeholder="e.g. Marcus Vale" class="w-full py-1.5 text-sm">
+      <div class="gilded p-5" x-data="retainerBuilder()">
+        <div class="flex items-center justify-between mb-1">
+          <p class="label-gold">Retainer</p>
+          <span class="font-garamond text-bone-600 text-xs" x-text="templateLabel"></span>
         </div>
-        <div>
-          <label class="label-gold block mb-1 text-[0.6rem]">Rating</label>
-          <select x-model.number="dots" class="w-full py-1.5 text-sm">
-            <option value="1">● Weak Mortal</option>
-            <option value="2">●● Average Mortal / Ghoul</option>
-            <option value="3">●●● Gifted Mortal / Ghoul</option>
-          </select>
-        </div>
-        <div>
-          <label class="label-gold block mb-1 text-[0.6rem]">Concept</label>
-          <input type="text" name="concept" x-model="concept" placeholder="driver, fixer, lover…" class="w-full py-1.5 text-sm">
-        </div>
-      </div>
+        <p class="font-garamond text-bone-600 text-xs mb-4" x-text="template.blurb"></p>
 
-      {# Ghoul toggle (●● / ●●● only) #}
-      <div class="mb-5" x-show="dots >= 2" x-cloak>
-        <label class="inline-flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" x-model="isGhoul" class="accent-gold">
-          <span class="font-garamond text-sm text-bone-300">This Retainer is a ghoul (1 Discipline dot from your clan)</span>
-        </label>
-        <div x-show="isGhoul" x-cloak class="mt-2 max-w-xs">
-          <select x-model="ghoulDisc" class="w-full py-1.5 text-sm">
-            <option value="">— Discipline —</option>
-            <template x-for="dk in clanDisc" :key="dk">
-              <option :value="dk" x-text="discLabels[dk] || dk"></option>
-            </template>
-          </select>
-          <p x-show="!clanDisc.length" class="font-garamond text-bone-700 text-[0.7rem] mt-1 italic">
-            Your clan has no in-clan Disciplines listed — pick a ghoul rating of ● instead, or have staff set the dot.
-          </p>
-        </div>
-      </div>
+        <form method="post" :action="'/characters/{{ char.id }}/companions'" @submit="syncPayload()">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <input type="hidden" name="kind" value="retainer">
+          <input type="hidden" name="dots" :value="dots">
+          <input type="hidden" name="is_ghoul" :value="isGhoul ? 'on' : ''">
+          <input type="hidden" name="sheet_json" x-ref="sheetField">
 
-      {# Attributes #}
-      <div class="mb-5">
-        <div class="flex items-baseline justify-between mb-2">
-          <p class="label-gold text-[0.65rem]">Attributes</p>
-          <span class="font-garamond text-xs" :class="attrOk ? 'text-gold-500' : 'text-bone-600'">
-            <span x-show="attrOk">✓ matches template</span>
-            <span x-show="!attrOk" x-text="'Need: ' + describe(attrTargetCounts)"></span>
-          </span>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8">
-          <template x-for="grp in attrGroups" :key="grp[0]">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
             <div>
-              <p class="font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-700 mb-1" x-text="grp[0]"></p>
-              <template x-for="t in grp[1]" :key="t[0]">
-                <div class="flex items-center justify-between py-0.5">
-                  <span class="font-garamond text-xs text-bone-400" x-text="t[1]"></span>
-                  <span class="flex gap-1">
-                    <template x-for="n in 5" :key="n">
-                      <button type="button" @click="setAttr(t[0], n)"
-                              class="w-3 h-3 rounded-full border transition-colors"
-                              :class="attrs[t[0]] >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
-                    </template>
-                  </span>
-                </div>
-              </template>
+              <label class="label-gold block mb-1 text-[0.6rem]">Name</label>
+              <input type="text" name="name" x-model="name" required placeholder="e.g. Marcus Vale" class="w-full py-1.5 text-sm">
             </div>
-          </template>
-        </div>
-      </div>
-
-      {# Skills #}
-      <div class="mb-5">
-        <div class="flex items-baseline justify-between mb-2">
-          <p class="label-gold text-[0.65rem]">Skills</p>
-          <span class="font-garamond text-xs" :class="skillOk ? 'text-gold-500' : 'text-bone-600'">
-            <span x-show="skillOk">✓ matches template</span>
-            <span x-show="!skillOk" x-text="'Need: ' + describe(skillTargetCounts)"></span>
-          </span>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8">
-          <template x-for="grp in skillGroups" :key="grp[0]">
             <div>
-              <p class="font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-700 mb-1" x-text="grp[0]"></p>
-              <template x-for="t in grp[1]" :key="t[0]">
-                <div class="flex items-center justify-between py-0.5">
-                  <span class="font-garamond text-xs text-bone-400" x-text="t[1]"></span>
-                  <span class="flex gap-1">
-                    <template x-for="n in 5" :key="n">
-                      <button type="button" @click="setSkill(t[0], n)"
-                              class="w-3 h-3 rounded-full border transition-colors"
-                              :class="skills[t[0]] >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
-                    </template>
-                  </span>
-                </div>
-              </template>
+              <label class="label-gold block mb-1 text-[0.6rem]">Rating</label>
+              <select x-model.number="dots" class="w-full py-1.5 text-sm">
+                <option value="1">● Weak Mortal</option>
+                <option value="2">●● Average Mortal / Ghoul</option>
+                <option value="3">●●● Gifted Mortal / Ghoul</option>
+              </select>
             </div>
-          </template>
-        </div>
-      </div>
-
-      {# Specialties #}
-      <div class="mb-5" x-show="specNeed > 0 || specialties.length" x-cloak>
-        <div class="flex items-baseline justify-between mb-2">
-          <p class="label-gold text-[0.65rem]">Specialties</p>
-          <span class="font-garamond text-xs" :class="specOk ? 'text-gold-500' : 'text-bone-600'"
-                x-text="specOk ? '✓' : ('Need ' + specNeed)"></span>
-        </div>
-        <template x-for="(sp, i) in specialties" :key="i">
-          <div class="flex items-center gap-2 mb-1.5">
-            <select x-model="sp.skill" class="py-1 text-xs" style="width:11rem">
-              <option value="">— Skill —</option>
-              <template x-for="grp in skillGroups" :key="grp[0]">
-                <template x-for="t in grp[1]" :key="t[0]">
-                  <option :value="t[0]" x-text="t[1]"></option>
-                </template>
-              </template>
-            </select>
-            <input type="text" x-model="sp.name" placeholder="specialty" class="flex-1 py-1 text-xs">
-            <button type="button" @click="removeSpec(i)" class="text-bone-700 hover:text-blood-400 px-1">×</button>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Concept</label>
+              <input type="text" name="concept" x-model="concept" placeholder="driver, fixer, lover…" class="w-full py-1.5 text-sm">
+            </div>
           </div>
-        </template>
-        <button type="button" @click="addSpec()"
-                class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1 mt-1">+ Specialty</button>
-      </div>
 
-      {# Advantage allowance note #}
-      <p class="font-garamond text-bone-700 text-[0.7rem] mb-4 italic" x-show="template.advantage_points > 0">
-        This template allows up to <span x-text="template.advantage_points"></span> Advantage points
-        (max <span x-text="template.flaw_max"></span> Flaws) — add Merits/Backgrounds later via XP if desired.
-      </p>
+          <div class="mb-5" x-show="dots >= 2" x-cloak>
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" x-model="isGhoul" class="accent-gold">
+              <span class="font-garamond text-sm text-bone-300">This Retainer is a ghoul (1 Discipline dot from your clan)</span>
+            </label>
+            <div x-show="isGhoul" x-cloak class="mt-2 max-w-xs">
+              <select x-model="ghoulDisc" class="w-full py-1.5 text-sm">
+                <option value="">— Discipline —</option>
+                <template x-for="dk in clanDisc" :key="dk">
+                  <option :value="dk" x-text="discLabels[dk] || dk"></option>
+                </template>
+              </select>
+              <p x-show="!clanDisc.length" class="font-garamond text-bone-700 text-[0.7rem] mt-1 italic">
+                Your clan has no in-clan Disciplines listed — use a ● rating, or have staff set the dot.
+              </p>
+            </div>
+          </div>
 
-      <div class="flex items-center gap-3 pt-3 border-t border-ink-700">
-        <button type="submit" :disabled="!ready"
-                class="btn-send font-cinzel tracking-widest text-xs px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed">
-          Add Retainer
-        </button>
-        <span class="font-garamond text-bone-700 text-xs" x-show="!ready">
-          Finish the spread above to enable.
-        </span>
+          <div class="mb-5">
+            <div class="flex items-baseline justify-between mb-2">
+              <p class="label-gold text-[0.65rem]">Attributes</p>
+              <span class="font-garamond text-xs" :class="attrOk ? 'text-gold-500' : 'text-bone-600'">
+                <span x-show="attrOk">✓ matches template</span>
+                <span x-show="!attrOk" x-text="'Need: ' + describe(attrTargetCounts)"></span>
+              </span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8">
+              <template x-for="grp in attrGroups" :key="grp[0]">
+                <div>
+                  <p class="font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-700 mb-1" x-text="grp[0]"></p>
+                  <template x-for="t in grp[1]" :key="t[0]">
+                    <div class="flex items-center justify-between py-0.5">
+                      <span class="font-garamond text-xs text-bone-400" x-text="t[1]"></span>
+                      <span class="flex gap-1">
+                        <template x-for="n in 5" :key="n">
+                          <button type="button" @click="setAttr(t[0], n)"
+                                  class="w-3 h-3 rounded-full border transition-colors"
+                                  :class="attrs[t[0]] >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
+                        </template>
+                      </span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="mb-5">
+            <div class="flex items-baseline justify-between mb-2">
+              <p class="label-gold text-[0.65rem]">Skills</p>
+              <span class="font-garamond text-xs" :class="skillOk ? 'text-gold-500' : 'text-bone-600'">
+                <span x-show="skillOk">✓ matches template</span>
+                <span x-show="!skillOk" x-text="'Need: ' + describe(skillTargetCounts)"></span>
+              </span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8">
+              <template x-for="grp in skillGroups" :key="grp[0]">
+                <div>
+                  <p class="font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-700 mb-1" x-text="grp[0]"></p>
+                  <template x-for="t in grp[1]" :key="t[0]">
+                    <div class="flex items-center justify-between py-0.5">
+                      <span class="font-garamond text-xs text-bone-400" x-text="t[1]"></span>
+                      <span class="flex gap-1">
+                        <template x-for="n in 5" :key="n">
+                          <button type="button" @click="setSkill(t[0], n)"
+                                  class="w-3 h-3 rounded-full border transition-colors"
+                                  :class="skills[t[0]] >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
+                        </template>
+                      </span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="mb-5" x-show="specNeed > 0 || specialties.length" x-cloak>
+            <div class="flex items-baseline justify-between mb-2">
+              <p class="label-gold text-[0.65rem]">Specialties</p>
+              <span class="font-garamond text-xs" :class="specOk ? 'text-gold-500' : 'text-bone-600'"
+                    x-text="specOk ? '✓' : ('Need ' + specNeed)"></span>
+            </div>
+            <template x-for="(sp, i) in specialties" :key="i">
+              <div class="flex items-center gap-2 mb-1.5">
+                <select x-model="sp.skill" class="py-1 text-xs" style="width:11rem">
+                  <option value="">— Skill —</option>
+                  <template x-for="grp in skillGroups" :key="grp[0]">
+                    <template x-for="t in grp[1]" :key="t[0]">
+                      <option :value="t[0]" x-text="t[1]"></option>
+                    </template>
+                  </template>
+                </select>
+                <input type="text" x-model="sp.name" placeholder="specialty" class="flex-1 py-1 text-xs">
+                <button type="button" @click="removeSpec(i)" class="text-bone-700 hover:text-blood-400 px-1">×</button>
+              </div>
+            </template>
+            <button type="button" @click="addSpec()"
+                    class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1 mt-1">+ Specialty</button>
+          </div>
+
+          <p class="font-garamond text-bone-700 text-[0.7rem] mb-4 italic" x-show="template.advantage_points > 0">
+            This template allows up to <span x-text="template.advantage_points"></span> Advantage points
+            (max <span x-text="template.flaw_max"></span> Flaws) — add Merits/Backgrounds later via XP if desired.
+          </p>
+
+          <div class="flex items-center gap-3 pt-3 border-t border-ink-700">
+            <button type="submit" :disabled="!ready"
+                    class="btn-send font-cinzel tracking-widest text-xs px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed">
+              Add Retainer
+            </button>
+            <span class="font-garamond text-bone-700 text-xs" x-show="!ready">Finish the spread above to enable.</span>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
+
+    {# ─── Mawla builder ─── #}
+    <div x-show="builderKind === 'mawla'" x-cloak>
+      <script id="mawla-data" type="application/json">
+        {{ {
+          "attrGroups": v5_attributes,
+          "skillGroups": v5_skills,
+          "disciplines": v5_disciplines,
+          "attrSpread": attribute_spread,
+          "skillSpreads": skill_spreads,
+          "discSpread": discipline_spreads['standard']['levels'],
+          "clanDiscMap": all_clan_disciplines,
+          "clans": clans
+        } | tojson }}
+      </script>
+
+      <div class="gilded p-5" x-data="mawlaBuilder()">
+        <div class="flex items-center justify-between mb-1">
+          <p class="label-gold">Mawla</p>
+          <span class="font-garamond text-bone-600 text-xs">Kindred mentor · standard spreads</span>
+        </div>
+        <p class="font-garamond text-bone-600 text-xs mb-4">
+          A Kindred built on the standard spread — one Attribute at 4, three at 3, four at 2, one at 1;
+          a Skill distribution; and two in-clan Disciplines (2 + 1). Advantages are left to staff/play.
+        </p>
+
+        <form method="post" :action="'/characters/{{ char.id }}/companions'" @submit="syncPayload()">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <input type="hidden" name="kind" value="mawla">
+          <input type="hidden" name="dots" :value="dots">
+          <input type="hidden" name="clan" :value="clan">
+          <input type="hidden" name="blood_potency" :value="bp">
+          <input type="hidden" name="humanity" :value="humanity">
+          <input type="hidden" name="sheet_json" x-ref="sheetField">
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Name</label>
+              <input type="text" name="name" x-model="name" required placeholder="e.g. Bishop Aldous" class="w-full py-1.5 text-sm">
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Clan</label>
+              <select x-model="clan" class="w-full py-1.5 text-sm">
+                <option value="">— Clan —</option>
+                <template x-for="cl in clans" :key="cl[0]">
+                  <option :value="cl[0]" x-text="cl[1]"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Rating</label>
+              <select x-model.number="dots" class="w-full py-1.5 text-sm">
+                <template x-for="n in 5" :key="n"><option :value="n" x-text="'●'.repeat(n)"></option></template>
+              </select>
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Concept</label>
+              <input type="text" name="concept" x-model="concept" placeholder="advisor, patron…" class="w-full py-1.5 text-sm">
+            </div>
+          </div>
+
+          {# Blood Potency + Humanity + skill spread #}
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Blood Potency</label>
+              <input type="number" x-model.number="bp" min="0" max="10" class="w-full py-1.5 text-sm">
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Humanity</label>
+              <input type="number" x-model.number="humanity" min="0" max="10" class="w-full py-1.5 text-sm">
+            </div>
+            <div>
+              <label class="label-gold block mb-1 text-[0.6rem]">Skill Distribution</label>
+              <select x-model="skillSpread" class="w-full py-1.5 text-sm">
+                <template x-for="(sp, key) in skillSpreads" :key="key">
+                  <option :value="key" x-text="sp.label"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+
+          {# Attributes #}
+          <div class="mb-5">
+            <div class="flex items-baseline justify-between mb-2">
+              <p class="label-gold text-[0.65rem]">Attributes</p>
+              <span class="font-garamond text-xs" :class="attrOk ? 'text-gold-500' : 'text-bone-600'">
+                <span x-show="attrOk">✓ standard spread</span>
+                <span x-show="!attrOk" x-text="'Need: ' + describe(attrTarget)"></span>
+              </span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8">
+              <template x-for="grp in attrGroups" :key="grp[0]">
+                <div>
+                  <p class="font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-700 mb-1" x-text="grp[0]"></p>
+                  <template x-for="t in grp[1]" :key="t[0]">
+                    <div class="flex items-center justify-between py-0.5">
+                      <span class="font-garamond text-xs text-bone-400" x-text="t[1]"></span>
+                      <span class="flex gap-1">
+                        <template x-for="n in 5" :key="n">
+                          <button type="button" @click="setAttr(t[0], n)"
+                                  class="w-3 h-3 rounded-full border transition-colors"
+                                  :class="attrs[t[0]] >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
+                        </template>
+                      </span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          {# Skills #}
+          <div class="mb-5">
+            <div class="flex items-baseline justify-between mb-2">
+              <p class="label-gold text-[0.65rem]">Skills</p>
+              <span class="font-garamond text-xs" :class="skillOk ? 'text-gold-500' : 'text-bone-600'">
+                <span x-show="skillOk">✓ matches distribution</span>
+                <span x-show="!skillOk" x-text="'Need: ' + describe(skillTarget)"></span>
+              </span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8">
+              <template x-for="grp in skillGroups" :key="grp[0]">
+                <div>
+                  <p class="font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-700 mb-1" x-text="grp[0]"></p>
+                  <template x-for="t in grp[1]" :key="t[0]">
+                    <div class="flex items-center justify-between py-0.5">
+                      <span class="font-garamond text-xs text-bone-400" x-text="t[1]"></span>
+                      <span class="flex gap-1">
+                        <template x-for="n in 5" :key="n">
+                          <button type="button" @click="setSkill(t[0], n)"
+                                  class="w-3 h-3 rounded-full border transition-colors"
+                                  :class="skills[t[0]] >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
+                        </template>
+                      </span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          {# Disciplines (in-clan, 2 + 1) #}
+          <div class="mb-5">
+            <div class="flex items-baseline justify-between mb-2">
+              <p class="label-gold text-[0.65rem]">Disciplines <span class="text-bone-700 normal-case">(in-clan, 2 + 1)</span></p>
+              <span class="font-garamond text-xs" :class="discOk ? 'text-gold-500' : 'text-bone-600'">
+                <span x-show="discOk">✓ 2 + 1</span>
+                <span x-show="!discOk && clan" x-text="'Need: ' + describe(discSpreadCounts)"></span>
+                <span x-show="!clan" class="text-bone-700">pick a clan first</span>
+              </span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8" x-show="clan" x-cloak>
+              <template x-for="dk in inClanDisc" :key="dk">
+                <div class="flex items-center justify-between py-0.5">
+                  <span class="font-garamond text-xs text-bone-400" x-text="discLabels[dk] || dk"></span>
+                  <span class="flex gap-1">
+                    <template x-for="n in 5" :key="n">
+                      <button type="button" @click="setDisc(dk, n)"
+                              class="w-3 h-3 rounded-full border transition-colors"
+                              :class="(discs[dk] || 0) >= n ? 'bg-clan border-clan' : 'border-bone-700 hover:border-gold-700'"></button>
+                    </template>
+                  </span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 pt-3 border-t border-ink-700">
+            <button type="submit" :disabled="!ready"
+                    class="btn-send font-cinzel tracking-widest text-xs px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed">
+              Add Mawla
+            </button>
+            <span class="font-garamond text-bone-700 text-xs" x-show="!ready">Finish the build above to enable.</span>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
-
-  <p class="font-garamond text-bone-700 text-xs mt-4 italic">
-    Mawla (Kindred mentor) creation is coming next.
-  </p>
 </div>
 
 <script>
+function _companionHelpers(attrKeys, skillKeys) {
+  const WORDS = {1:'one',2:'two',3:'three',4:'four',5:'five',6:'six',7:'seven',8:'eight',9:'nine',10:'ten'};
+  return {
+    countList(values) {
+      const c = {};
+      values.forEach(v => { v = +v; if (v > 0) c[v] = (c[v] || 0) + 1; });
+      return c;
+    },
+    sameCounts(a, b) {
+      const ak = Object.keys(a), bk = Object.keys(b);
+      return ak.length === bk.length && ak.every(k => a[k] === b[k]);
+    },
+    describe(counts) {
+      return Object.keys(counts).map(Number).sort((a, b) => b - a)
+        .map(lvl => `${WORDS[counts[lvl]] || counts[lvl]} at ${lvl}`).join(', ');
+    },
+  };
+}
+
 function retainerBuilder() {
   const D = JSON.parse(document.getElementById('retainer-data').textContent);
   const attrKeys  = D.attrGroups.flatMap(g => g[1].map(t => t[0]));
   const skillKeys = D.skillGroups.flatMap(g => g[1].map(t => t[0]));
   const discLabels = Object.fromEntries(D.disciplines);
-  const WORDS = {1:'one',2:'two',3:'three',4:'four',5:'five',6:'six',7:'seven',8:'eight',9:'nine'};
+  const H = _companionHelpers(attrKeys, skillKeys);
   return {
     attrGroups: D.attrGroups, skillGroups: D.skillGroups,
     templates: D.templates, dotsToTemplate: D.dotsToTemplate,
     clanDisc: D.clanDisc, clanName: D.clanName, discLabels,
-
     name: '', concept: '', description: '',
     dots: 2, isGhoul: false, ghoulDisc: '',
     attrs: {}, skills: {}, specialties: [],
@@ -337,15 +549,9 @@ function retainerBuilder() {
       this.attrs  = Object.fromEntries(attrKeys.map(k => [k, 0]));
       this.skills = Object.fromEntries(skillKeys.map(k => [k, 0]));
     },
-
     get template() { return this.templates[this.dotsToTemplate[this.dots] || 'weak']; },
     get templateLabel() { return this.template.label; },
-
-    countList(values) {
-      const c = {};
-      values.forEach(v => { v = +v; if (v > 0) c[v] = (c[v] || 0) + 1; });
-      return c;
-    },
+    countList: H.countList, sameCounts: H.sameCounts, describe: H.describe,
     get attrTargetCounts() { return this.countList(this.template.attributes); },
     get attrHaveCounts()   { return this.countList(attrKeys.map(k => this.attrs[k])); },
     get skillTargetCounts() {
@@ -354,11 +560,6 @@ function retainerBuilder() {
       return o;
     },
     get skillHaveCounts() { return this.countList(skillKeys.map(k => this.skills[k])); },
-
-    sameCounts(a, b) {
-      const ak = Object.keys(a), bk = Object.keys(b);
-      return ak.length === bk.length && ak.every(k => a[k] === b[k]);
-    },
     get attrOk()  { return this.sameCounts(this.attrHaveCounts, this.attrTargetCounts); },
     get skillOk() { return this.sameCounts(this.skillHaveCounts, this.skillTargetCounts); },
     get specNeed() { return this.template.specialties || 0; },
@@ -366,23 +567,60 @@ function retainerBuilder() {
     get specOk()  { return this.specHave >= this.specNeed; },
     get discOk()  { return this.isGhoul ? !!this.ghoulDisc : true; },
     get ready()   { return !!this.name.trim() && this.attrOk && this.skillOk && this.specOk && this.discOk; },
-
     setAttr(k, n)  { this.attrs[k]  = (this.attrs[k]  === n ? n - 1 : n); },
     setSkill(k, n) { this.skills[k] = (this.skills[k] === n ? n - 1 : n); },
-
-    describe(counts) {
-      return Object.keys(counts).map(Number).sort((a, b) => b - a)
-        .map(lvl => `${WORDS[counts[lvl]] || counts[lvl]} at ${lvl}`).join(', ');
-    },
     addSpec()    { this.specialties.push({ skill: '', name: '' }); },
     removeSpec(i){ this.specialties.splice(i, 1); },
-
     syncPayload() {
       const s = {};
       attrKeys.forEach(k  => { if (+this.attrs[k]  > 0) s[k] = +this.attrs[k]; });
       skillKeys.forEach(k => { if (+this.skills[k] > 0) s[k] = +this.skills[k]; });
       if (this.isGhoul && this.ghoulDisc) s[this.ghoulDisc] = 1;
       s.specialties = this.specialties.filter(sp => sp.name && sp.name.trim());
+      this.$refs.sheetField.value = JSON.stringify(s);
+    },
+  };
+}
+
+function mawlaBuilder() {
+  const D = JSON.parse(document.getElementById('mawla-data').textContent);
+  const attrKeys  = D.attrGroups.flatMap(g => g[1].map(t => t[0]));
+  const skillKeys = D.skillGroups.flatMap(g => g[1].map(t => t[0]));
+  const discLabels = Object.fromEntries(D.disciplines);
+  const H = _companionHelpers(attrKeys, skillKeys);
+  const toCounts = obj => { const c = {}; for (const [k, v] of Object.entries(obj)) c[+k] = v; return c; };
+  return {
+    attrGroups: D.attrGroups, skillGroups: D.skillGroups,
+    skillSpreads: D.skillSpreads, clanDiscMap: D.clanDiscMap, clans: D.clans, discLabels,
+    attrSpreadList: D.attrSpread,
+    discSpreadCounts: toCounts(D.discSpread),
+    name: '', concept: '', description: '', clan: '', dots: 2,
+    skillSpread: 'balanced', bp: 1, humanity: 7,
+    attrs: {}, skills: {}, discs: {},
+
+    init() {
+      this.attrs  = Object.fromEntries(attrKeys.map(k => [k, 0]));
+      this.skills = Object.fromEntries(skillKeys.map(k => [k, 0]));
+    },
+    get inClanDisc() { return this.clanDiscMap[this.clan] || []; },
+    countList: H.countList, sameCounts: H.sameCounts, describe: H.describe,
+    get attrTarget() { return this.countList(this.attrSpreadList); },
+    get attrHave()   { return this.countList(attrKeys.map(k => this.attrs[k])); },
+    get attrOk()     { return this.sameCounts(this.attrHave, this.attrTarget); },
+    get skillTarget(){ return toCounts(this.skillSpreads[this.skillSpread].levels); },
+    get skillHave()  { return this.countList(skillKeys.map(k => this.skills[k])); },
+    get skillOk()    { return this.sameCounts(this.skillHave, this.skillTarget); },
+    get discHave()   { return this.countList(this.inClanDisc.map(k => this.discs[k] || 0)); },
+    get discOk()     { return !!this.clan && this.sameCounts(this.discHave, this.discSpreadCounts); },
+    get ready()      { return !!this.name.trim() && !!this.clan && this.attrOk && this.skillOk && this.discOk; },
+    setAttr(k, n)  { this.attrs[k]  = (this.attrs[k]  === n ? n - 1 : n); },
+    setSkill(k, n) { this.skills[k] = (this.skills[k] === n ? n - 1 : n); },
+    setDisc(k, n)  { this.discs[k]  = ((this.discs[k] || 0) === n ? n - 1 : n); },
+    syncPayload() {
+      const s = {};
+      attrKeys.forEach(k  => { if (+this.attrs[k]  > 0) s[k] = +this.attrs[k]; });
+      skillKeys.forEach(k => { if (+this.skills[k] > 0) s[k] = +this.skills[k]; });
+      this.inClanDisc.forEach(k => { if (+this.discs[k] > 0) s[k] = +this.discs[k]; });
       this.$refs.sheetField.value = JSON.stringify(s);
     },
   };

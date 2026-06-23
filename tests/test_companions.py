@@ -206,3 +206,78 @@ def test_invalid_retainer_rejected_via_route(player):
 
 def test_companions_ownership_enforced(player):
     assert player.get("/characters/999999/companions").status_code == 404
+
+
+# ── Mawla (Kindred mentor) ───────────────────────────────────────────────────
+
+def _mawla_sheet(clan: str) -> dict:
+    """A standard-spread Kindred stat block for the given clan (Balanced skills,
+    in-clan 2 + 1 Disciplines)."""
+    from web.v5_traits import (_ATTR_KEYS, _SKILL_KEYS, V5_ATTRIBUTE_SPREAD,
+                               V5_SKILL_SPREADS, CLAN_DISCIPLINES)
+    sheet: dict = {}
+    for k, v in zip(_ATTR_KEYS, sorted(V5_ATTRIBUTE_SPREAD, reverse=True)):
+        sheet[k] = v
+    flat: list[int] = []
+    for lvl, n in sorted(V5_SKILL_SPREADS["balanced"]["levels"].items(), reverse=True):
+        flat += [lvl] * n
+    for k, v in zip(_SKILL_KEYS, flat):
+        sheet[k] = v
+    discs = CLAN_DISCIPLINES[clan]
+    sheet[discs[0]] = 2
+    sheet[discs[1]] = 1
+    return sheet
+
+
+def test_mawla_valid_passes():
+    from web.v5_traits import validate_mawla_kindred
+    assert validate_mawla_kindred(_mawla_sheet("ventrue"), "ventrue") == []
+
+
+def test_mawla_bad_attributes_rejected():
+    from web.v5_traits import validate_mawla_kindred
+    s = _mawla_sheet("ventrue")
+    s["attr_strength"] = 5
+    assert validate_mawla_kindred(s, "ventrue")
+
+
+def test_mawla_out_of_clan_discipline_rejected():
+    from web.v5_traits import validate_mawla_kindred, CLAN_DISCIPLINES, _disc_keys
+    s = _mawla_sheet("ventrue")
+    out = next(k for k in _disc_keys() if k not in set(CLAN_DISCIPLINES["ventrue"]))
+    s[out] = 1
+    assert validate_mawla_kindred(s, "ventrue")
+
+
+def test_create_mawla_via_route(player):
+    import json as _json
+    from web.db import get_db, list_companions
+    r = player.post("/characters/1/companions", data={
+        "_csrf": "dev-csrf-token", "kind": "mawla", "name": "QA Bishop",
+        "clan": "ventrue", "dots": "3", "concept": "patron",
+        "blood_potency": "2", "humanity": "6",
+        "sheet_json": _json.dumps(_mawla_sheet("ventrue")),
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    with get_db() as conn:
+        mine = [c for c in list_companions(conn, 1) if c["name"] == "QA Bishop"]
+    assert len(mine) == 1
+    m = mine[0]
+    assert m["kind"] == "mawla" and m["clan"] == "ventrue"
+    assert m["sheet_json"].get("blood_potency") == 2
+    assert m["sheet_json"].get("humanity") == 6
+    player.post(f"/companions/{m['id']}/delete",
+                data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+    with get_db() as conn:
+        assert not [c for c in list_companions(conn, 1) if c["id"] == m["id"]]
+
+
+def test_mawla_requires_clan(player):
+    import json as _json
+    r = player.post("/characters/1/companions", data={
+        "_csrf": "dev-csrf-token", "kind": "mawla", "name": "QA No Clan",
+        "clan": "", "dots": "2",
+        "sheet_json": _json.dumps(_mawla_sheet("ventrue")),
+    }, follow_redirects=False)
+    assert r.status_code == 200
+    assert "Couldn't save" in r.text
