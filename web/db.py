@@ -643,8 +643,11 @@ def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
         # record a pool (older / staff-seeded characters).
         _pool = int((tier_budget(get_settings(conn), char.get("character_tier")) or {}).get("xp") or 0)
     _leftover = max(0, _pool - _cc_spent)
+    # Guard on EITHER kind of creation-time entry so a character that spent no
+    # CC-XP (only carried leftover) still can't double-post on re-approval.
     _exists = conn.execute(
-        "SELECT 1 FROM ledger_entries WHERE character_id=? AND entry_type='creation' LIMIT 1",
+        "SELECT 1 FROM ledger_entries WHERE character_id=? "
+        "AND entry_type IN ('creation','carryover') LIMIT 1",
         (character_id,),
     ).fetchone()
     if not _exists:
@@ -656,7 +659,9 @@ def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
                 "UPDATE characters SET xp_total = xp_total + ?, creation_xp = ? WHERE id=?",
                 (_leftover, _leftover, character_id),
             )
-            append_ledger_entry(conn, character_id, "creation", _leftover, reviewer_id,
+            # Distinct entry_type so the CC spend stays a single clean "creation"
+            # entry; this leftover is carried into the total but stays cap-exempt.
+            append_ledger_entry(conn, character_id, "carryover", _leftover, reviewer_id,
                                 note="Leftover creation XP — does not count toward the cap")
             char = get_character(conn, character_id)
     write_audit(conn, reviewer_id, "approve_character", "character", character_id,
