@@ -352,6 +352,25 @@ def test_edit_page_prefills_builder(player):
                     data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
 
 
+def test_staff_sheet_shows_companions(staff):
+    """The staff character-detail sheet lists a character's companions."""
+    from web.db import get_db, create_companion, delete_companion
+    with get_db() as conn:
+        comp = create_companion(conn, parent_character_id=1, kind="retainer",
+                                name="StaffView Retainer", dots=2, template="average",
+                                sheet_json=_template_sheet("average"))
+        conn.commit()
+    try:
+        r = staff.get("/staff/characters/1")
+        assert r.status_code == 200
+        assert "Retainers &amp; Mawlas" in r.text
+        assert "StaffView Retainer" in r.text
+    finally:
+        with get_db() as conn:
+            delete_companion(conn, comp["id"])
+            conn.commit()
+
+
 def test_named_retainer_suppresses_generic_background(_client):
     """A named retainer claims dots from the generic 'Retainer' background so it
     isn't double-counted in the blanking card."""
