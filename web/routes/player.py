@@ -17,7 +17,9 @@ from ..db import (
     delete_character,
     create_companion,
     list_companions,
+    get_companion,
     get_companion_for_player,
+    update_companion,
     delete_companion,
     set_character_background,
     blank_character_background,
@@ -1944,7 +1946,7 @@ def _sanitize_companion_sheet(raw: dict) -> dict:
 
 
 def _companions_ctx(request: Request, char: dict, conn, *,
-                    create_errors=None, form=None):
+                    create_errors=None, form=None, edit_companion=None):
     """Render the Retainers & Mawlas management page."""
     return templates.TemplateResponse(
         request, "player/companions.html",
@@ -1952,6 +1954,7 @@ def _companions_ctx(request: Request, char: dict, conn, *,
             request,
             char=char,
             companions=list_companions(conn, char["id"]),
+            edit_companion=edit_companion,
             v5_attributes=_V5_ATTRIBUTES,
             v5_skills=_V5_SKILLS,
             v5_disciplines=_V5_DISCIPLINES,
@@ -1975,13 +1978,21 @@ def _companions_ctx(request: Request, char: dict, conn, *,
 async def companions_page(
     request: Request,
     character_id: int,
+    edit: int = 0,
     user: dict = Depends(require_auth),
 ):
     with get_db() as conn:
         char = get_character_for_player(conn, character_id, user["id"])
         if not char:
             raise HTTPException(status_code=404)
-        return _companions_ctx(request, char, conn)
+        edit_companion = None
+        if edit:
+            cand = get_companion(conn, edit)
+            # Only a retainer that belongs to this character is editable.
+            if (cand and cand["parent_character_id"] == character_id
+                    and cand["kind"] == "retainer"):
+                edit_companion = cand
+        return _companions_ctx(request, char, conn, edit_companion=edit_companion)
 
 
 @router.post("/characters/{character_id}/companions")
@@ -2033,6 +2044,60 @@ async def companion_create(
         else:
             errors.append("Unknown companion type.")
         return _companions_ctx(request, char, conn, create_errors=errors, form=form)
+
+
+@router.post("/companions/{companion_id}/edit")
+async def companion_edit(
+    request: Request,
+    companion_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    name        = (form.get("name") or "").strip()
+    concept     = (form.get("concept") or "").strip() or None
+    description = (form.get("description") or "").strip() or None
+    try:
+        raw_sheet = json.loads(form.get("sheet_json") or "{}")
+    except (ValueError, TypeError):
+        raw_sheet = {}
+    sheet = _sanitize_companion_sheet(raw_sheet)
+
+    with get_db() as conn:
+        comp = get_companion_for_player(conn, companion_id, user["id"])
+        if not comp:
+            raise HTTPException(status_code=404)
+        parent_id = comp["parent_character_id"]
+        char = get_character(conn, parent_id)
+        errors: list[str] = []
+        if not name:
+            errors.append("Give your companion a name.")
+        if comp["kind"] == "retainer":
+            dots     = max(1, min(3, form_int(form.get("dots"), comp["dots"])))
+            template = _RETAINER_DOTS_TO_TEMPLATE.get(dots, "weak")
+            is_ghoul = form.get("is_ghoul") == "on"
+            errors += _validate_retainer_template(sheet, template, is_ghoul=is_ghoul)
+            if not errors:
+                # On rename, drop the old blanking row before the re-sync adds
+                # the new-named one.
+                if comp["name"] != name:
+                    try:
+                        set_character_background(conn, parent_id, comp["name"], 0,
+                                                 "system:companion-renamed")
+                    except ValueError:
+                        pass
+                update_companion(
+                    conn, companion_id, name=name, dots=dots, template=template,
+                    is_ghoul=is_ghoul, clan=(char["clan"] if is_ghoul else None),
+                    concept=concept, description=description, sheet_json=sheet)
+                _sync_backgrounds_from_sheet(conn, char)
+                conn.commit()
+                return RedirectResponse(
+                    url=f"/characters/{parent_id}/companions", status_code=303)
+        else:
+            errors.append("This companion can't be edited yet.")
+        return _companions_ctx(request, char, conn, create_errors=errors,
+                               edit_companion=get_companion(conn, companion_id))
 
 
 @router.post("/companions/{companion_id}/delete")

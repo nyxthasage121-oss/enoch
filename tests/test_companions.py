@@ -288,6 +288,70 @@ def test_retainer_shows_up_in_blanking(player):
         assert not [c for c in list_companions(conn, 1) if c["id"] == comp["id"]]
 
 
+def _make_retainer(player, name, template="average", dots="2"):
+    import json as _json
+    from web.db import get_db, list_companions
+    player.post("/characters/1/companions", data={
+        "_csrf": "dev-csrf-token", "kind": "retainer", "name": name,
+        "dots": dots, "sheet_json": _json.dumps(_template_sheet(template)),
+    }, follow_redirects=False)
+    with get_db() as conn:
+        return next(c for c in list_companions(conn, 1) if c["name"] == name)
+
+
+def test_edit_retainer_rename_and_restat(player):
+    import json as _json
+    from web.db import get_db, get_companion, list_character_backgrounds
+    comp = _make_retainer(player, "QA Edit Orig", "average", "2")
+    cid = comp["id"]
+    try:
+        r = player.post(f"/companions/{cid}/edit", data={
+            "_csrf": "dev-csrf-token", "name": "QA Edit Renamed",
+            "dots": "3", "concept": "fixer",
+            "sheet_json": _json.dumps(_template_sheet("gifted")),
+        }, follow_redirects=False)
+        assert r.status_code == 303
+        with get_db() as conn:
+            c2 = get_companion(conn, cid)
+            bgs = [b["name"] for b in list_character_backgrounds(conn, 1)]
+        assert c2["name"] == "QA Edit Renamed" and c2["dots"] == 3
+        assert c2["template"] == "gifted" and c2["concept"] == "fixer"
+        # rename moved the blankable row
+        assert "QA Edit Renamed" in bgs and "QA Edit Orig" not in bgs
+    finally:
+        player.post(f"/companions/{cid}/delete",
+                    data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+
+
+def test_edit_invalid_spread_rejected(player):
+    import json as _json
+    comp = _make_retainer(player, "QA Edit Bad", "average", "2")
+    cid = comp["id"]
+    try:
+        bad = _template_sheet("average")
+        bad["attr_strength"] = 5
+        r = player.post(f"/companions/{cid}/edit", data={
+            "_csrf": "dev-csrf-token", "name": "QA Edit Bad", "dots": "2",
+            "sheet_json": _json.dumps(bad),
+        }, follow_redirects=False)
+        assert r.status_code == 200 and "Couldn't save" in r.text
+    finally:
+        player.post(f"/companions/{cid}/delete",
+                    data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+
+
+def test_edit_page_prefills_builder(player):
+    comp = _make_retainer(player, "QA Prefill", "average", "2")
+    cid = comp["id"]
+    try:
+        r = player.get(f"/characters/1/companions?edit={cid}")
+        assert r.status_code == 200
+        assert 'id="retainer-edit-data"' in r.text and "QA Prefill" in r.text
+    finally:
+        player.post(f"/companions/{cid}/delete",
+                    data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+
+
 def test_named_retainer_suppresses_generic_background(_client):
     """A named retainer claims dots from the generic 'Retainer' background so it
     isn't double-counted in the blanking card."""

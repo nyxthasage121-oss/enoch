@@ -68,6 +68,10 @@
           <button @click="open = !open"
                   class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1"
                   x-text="open ? 'Hide' : 'Sheet'"></button>
+          {% if c.kind == 'retainer' %}
+          <a href="/characters/{{ char.id }}/companions?edit={{ c.id }}#builder"
+             class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1">Edit</a>
+          {% endif %}
           <form method="post" action="/companions/{{ c.id }}/delete"
                 x-data="{ sure: false }" @submit="if(!sure){$event.preventDefault(); sure=true}">
             <input type="hidden" name="_csrf" value="{{ csrf_token }}">
@@ -170,7 +174,7 @@
     </div>
 
     {# ─── Retainer builder ─── #}
-    <div x-show="builderKind === 'retainer'">
+    <div x-show="builderKind === 'retainer'" id="builder">
       <script id="retainer-data" type="application/json">
         {{ {
           "attrGroups": v5_attributes,
@@ -182,15 +186,28 @@
           "clanName": char.clan | replace('-', ' ') | title
         } | tojson }}
       </script>
+      {% if edit_companion %}
+      <script id="retainer-edit-data" type="application/json">
+        {{ {
+          "id": edit_companion.id,
+          "name": edit_companion.name,
+          "dots": edit_companion.dots,
+          "isGhoul": edit_companion.is_ghoul,
+          "concept": edit_companion.concept or "",
+          "description": edit_companion.description or "",
+          "sheet": edit_companion.sheet_json or {}
+        } | tojson }}
+      </script>
+      {% endif %}
 
       <div class="gilded p-5" x-data="retainerBuilder()">
         <div class="flex items-center justify-between mb-1">
-          <p class="label-gold">Retainer</p>
+          <p class="label-gold" x-text="editId ? 'Edit Retainer' : 'Retainer'"></p>
           <span class="font-garamond text-bone-600 text-xs" x-text="templateLabel"></span>
         </div>
         <p class="font-garamond text-bone-600 text-xs mb-4" x-text="template.blurb"></p>
 
-        <form method="post" :action="'/characters/{{ char.id }}/companions'" @submit="syncPayload()">
+        <form method="post" :action="editId ? ('/companions/' + editId + '/edit') : '/characters/{{ char.id }}/companions'" @submit="syncPayload()">
           <input type="hidden" name="_csrf" value="{{ csrf_token }}">
           <input type="hidden" name="kind" value="retainer">
           <input type="hidden" name="dots" :value="dots">
@@ -214,6 +231,14 @@
               <label class="label-gold block mb-1 text-[0.6rem]">Concept</label>
               <input type="text" name="concept" x-model="concept" placeholder="driver, fixer, lover…" class="w-full py-1.5 text-sm">
             </div>
+          </div>
+
+          <div class="mb-5">
+            <label class="label-gold block mb-1 text-[0.6rem]">Description
+              <span class="text-bone-700 normal-case">(optional)</span></label>
+            <textarea name="description" x-model="description" rows="2"
+                      placeholder="A line or two about this retainer…"
+                      class="w-full py-1.5 text-sm resize-y"></textarea>
           </div>
 
           <div class="mb-5" x-show="dots >= 2" x-cloak>
@@ -323,9 +348,8 @@
 
           <div class="flex items-center gap-3 pt-3 border-t border-ink-700">
             <button type="submit" :disabled="!ready"
-                    class="btn-send font-cinzel tracking-widest text-xs px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed">
-              Add Retainer
-            </button>
+                    class="btn-send font-cinzel tracking-widest text-xs px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                    x-text="editId ? 'Save Changes' : 'Add Retainer'"></button>
             <span class="font-garamond text-bone-700 text-xs" x-show="!ready">Finish the spread above to enable.</span>
           </div>
         </form>
@@ -380,12 +404,26 @@ function retainerBuilder() {
     templates: D.templates, dotsToTemplate: D.dotsToTemplate,
     clanDisc: D.clanDisc, clanName: D.clanName, discLabels,
     name: '', concept: '', description: '',
-    dots: 2, isGhoul: false, ghoulDisc: '',
+    dots: 2, isGhoul: false, ghoulDisc: '', editId: null,
     attrs: {}, skills: {}, specialties: [],
 
     init() {
       this.attrs  = Object.fromEntries(attrKeys.map(k => [k, 0]));
       this.skills = Object.fromEntries(skillKeys.map(k => [k, 0]));
+      const ed = document.getElementById('retainer-edit-data');
+      if (ed) {                                   // pre-fill for editing
+        const e = JSON.parse(ed.textContent), sh = e.sheet || {};
+        this.editId = e.id;
+        this.name = e.name || '';
+        this.dots = e.dots || 2;
+        this.isGhoul = !!e.isGhoul;
+        this.concept = e.concept || '';
+        this.description = e.description || '';
+        attrKeys.forEach(k => { if (sh[k]) this.attrs[k] = sh[k]; });
+        skillKeys.forEach(k => { if (sh[k]) this.skills[k] = sh[k]; });
+        Object.keys(sh).forEach(k => { if (k.indexOf('disc_') === 0 && sh[k]) this.ghoulDisc = k; });
+        this.specialties = (sh.specialties || []).map(s => ({ skill: s.skill || '', name: s.name || '' }));
+      }
     },
     get template() { return this.templates[this.dotsToTemplate[this.dots] || 'weak']; },
     get templateLabel() { return this.template.label; },
