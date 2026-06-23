@@ -713,6 +713,7 @@ def delete_character(conn, character_id: int) -> None:
     conn.execute("DELETE FROM xp_claims WHERE character_id=?", (character_id,))
     conn.execute("DELETE FROM coterie_memberships WHERE character_id=?", (character_id,))
     conn.execute("DELETE FROM companions WHERE parent_character_id=?", (character_id,))
+    conn.execute("DELETE FROM character_familiars WHERE character_id=?", (character_id,))
     conn.execute("DELETE FROM characters WHERE id=?", (character_id,))
 
 
@@ -799,6 +800,140 @@ def update_companion(conn, companion_id: int, **fields) -> dict | None:
 
 def delete_companion(conn, companion_id: int) -> None:
     conn.execute("DELETE FROM companions WHERE id=?", (companion_id,))
+
+
+# ── Familiars (Animalism • Bond Famulus) ─────────────────────────────────────
+
+def _familiar_view(row: dict | None) -> dict | None:
+    """Parse a familiars row's exceptional-pools JSON + coerce the flag."""
+    row = _parse(row, "exceptional")
+    if row is None:
+        return None
+    if not isinstance(row.get("exceptional"), dict):
+        row["exceptional"] = {}
+    if "is_standard" in row:
+        row["is_standard"] = bool(row.get("is_standard"))
+    return row
+
+
+def list_familiars(conn) -> list[dict]:
+    """The global animal catalog — V5 standards first, then staff customs."""
+    rows = conn.execute(
+        "SELECT * FROM familiars ORDER BY is_standard DESC, sort_order, name").fetchall()
+    return [_familiar_view(r) for r in rows]
+
+
+def get_familiar(conn, familiar_id: int) -> dict | None:
+    return _familiar_view(
+        conn.execute("SELECT * FROM familiars WHERE id=?", (familiar_id,)).fetchone())
+
+
+def create_familiar(conn, *, name: str, description: str | None = None,
+                    physical: int = 1, social: int = 1, mental: int = 1,
+                    health: int = 1, willpower: int = 1, exceptional: dict | None = None,
+                    special: str | None = None, created_by: str = "") -> dict:
+    """Add a custom animal to the global catalog (is_standard=0)."""
+    nxt = conn.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM familiars").fetchone()
+    cur = conn.execute("""
+        INSERT INTO familiars
+            (name, description, physical, social, mental, health, willpower,
+             exceptional, special, is_standard, sort_order, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+    """, (name, description, int(physical), int(social), int(mental), int(health),
+          int(willpower), _j(exceptional or {}), special,
+          (nxt["n"] if nxt else 1), created_by, _now()))
+    return get_familiar(conn, cur.lastrowid)
+
+
+def update_familiar(conn, familiar_id: int, **fields) -> dict | None:
+    """Patch a custom catalog animal. Whitelisted columns only."""
+    allowed = {"name", "description", "physical", "social", "mental", "health",
+               "willpower", "exceptional", "special"}
+    sets, vals = [], []
+    for k, v in fields.items():
+        if k not in allowed:
+            continue
+        if k == "exceptional":
+            v = _j(v or {})
+        elif k in ("physical", "social", "mental", "health", "willpower"):
+            v = int(v or 0)
+        sets.append(f"{k}=?")
+        vals.append(v)
+    if sets:
+        vals.append(familiar_id)
+        conn.execute(f"UPDATE familiars SET {', '.join(sets)} WHERE id=?", vals)
+    return get_familiar(conn, familiar_id)
+
+
+def delete_familiar(conn, familiar_id: int) -> bool:
+    """Delete a CUSTOM catalog animal — V5 standards are protected. Returns True
+    if a row was removed."""
+    row = conn.execute("SELECT is_standard FROM familiars WHERE id=?",
+                       (familiar_id,)).fetchone()
+    if not row or row.get("is_standard"):
+        return False
+    conn.execute("DELETE FROM familiars WHERE id=?", (familiar_id,))
+    return True
+
+
+def _character_familiar_view(row: dict | None) -> dict | None:
+    row = _parse(row, "exceptional")
+    if row is None:
+        return None
+    if not isinstance(row.get("exceptional"), dict):
+        row["exceptional"] = {}
+    # Animal-type label: the live catalog name, else the denormalized snapshot.
+    row["animal"] = row.get("catalog_name") or row.get("animal_name") or "Unknown animal"
+    return row
+
+
+_CHAR_FAMILIAR_SELECT = """
+    SELECT cf.id, cf.character_id, cf.familiar_id, cf.name, cf.notes,
+           cf.animal_name, cf.created_at,
+           f.name AS catalog_name, f.description, f.physical, f.social,
+           f.mental, f.health, f.willpower, f.exceptional, f.special
+    FROM character_familiars cf
+    LEFT JOIN familiars f ON f.id = cf.familiar_id
+"""
+
+
+def list_character_familiars(conn, character_id: int) -> list[dict]:
+    """A character's bonded famuli, each merged with its catalog stat block."""
+    rows = conn.execute(
+        _CHAR_FAMILIAR_SELECT + " WHERE cf.character_id=? ORDER BY cf.created_at",
+        (character_id,)).fetchall()
+    return [_character_familiar_view(r) for r in rows]
+
+
+def get_character_familiar(conn, bond_id: int) -> dict | None:
+    return _character_familiar_view(
+        conn.execute(_CHAR_FAMILIAR_SELECT + " WHERE cf.id=?", (bond_id,)).fetchone())
+
+
+def get_character_familiar_for_player(conn, bond_id: int, discord_id: str) -> dict | None:
+    """A bond row only if its character belongs to the player (ownership gate)."""
+    return conn.execute(
+        "SELECT cf.* FROM character_familiars cf "
+        "JOIN characters ch ON ch.id = cf.character_id "
+        "WHERE cf.id=? AND ch.discord_id=?", (bond_id, discord_id)).fetchone()
+
+
+def bond_familiar(conn, *, character_id: int, familiar_id: int, name: str,
+                  notes: str | None = None) -> dict | None:
+    """Bond a catalog animal to a character as a named famulus."""
+    cat = get_familiar(conn, familiar_id)
+    if not cat:
+        return None
+    cur = conn.execute("""
+        INSERT INTO character_familiars
+            (character_id, familiar_id, animal_name, name, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (character_id, familiar_id, cat["name"], name, notes, _now()))
+    return get_character_familiar(conn, cur.lastrowid)
+
+
+def unbond_familiar(conn, bond_id: int) -> None:
+    conn.execute("DELETE FROM character_familiars WHERE id=?", (bond_id,))
 
 
 # ── Chronicle Settings ────────────────────────────────────────────────────────
