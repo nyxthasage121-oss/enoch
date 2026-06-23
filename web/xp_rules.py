@@ -22,6 +22,7 @@ SPEND_CATEGORIES: list[str] = [
     "Ghoul Discipline",
     "Ingrained Discipline",
     "Blood Sorcery Ritual",
+    "Oblivion Ceremony",
     "Thin-Blood Alchemy Formula",
     "Advantage",
     # Loresheets count as Backgrounds in this chronicle — purchased

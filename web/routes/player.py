@@ -308,6 +308,7 @@ templates.env.globals["spend_trait_lists"] = {
     "skill":      [lbl for _c, _tr in _V5_SKILLS for _k, lbl in _tr],
     "discipline": [lbl for _k, lbl in _V5_DISCIPLINES],
     "ritual":     [r["name"] for r in _RITUAL_CATALOG],
+    "ceremony":   [c["name"] for c in _CEREMONY_CATALOG],
     "formula":    [p["name"] for p in _DISCIPLINE_POWERS.get("disc_thin_blood_alchemy", [])],
     "advantage":  [m["name"] for m in _MERIT_CATALOG],
 }
@@ -2185,6 +2186,14 @@ async def submit_spend(
             errors.append("Trait name is required.")
         if not category:
             errors.append("Category is required.")
+
+        # Blood Sorcery Rituals / Oblivion Ceremonies require the discipline —
+        # you can't learn them without at least one dot of the power.
+        _sheet = char.get("sheet_json") or {}
+        if category == "Blood Sorcery Ritual" and int(_sheet.get("disc_blood_sorcery") or 0) < 1:
+            errors.append("Your character needs at least 1 dot of Blood Sorcery to learn rituals.")
+        elif category == "Oblivion Ceremony" and int(_sheet.get("disc_oblivion") or 0) < 1:
+            errors.append("Your character needs at least 1 dot of Oblivion to learn ceremonies.")
 
         if category and not errors:
             # Account for already-pending spends — they don't deduct xp_spent until

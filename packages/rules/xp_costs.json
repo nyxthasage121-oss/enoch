@@ -55,6 +55,12 @@
     "min_dots": 0,
     "max_dots": 5
   },
+  "Oblivion Ceremony": {
+    "level_multiplier": 3,
+    "description": "Ceremony level × 3 (learned at its level, 0 → N)",
+    "min_dots": 0,
+    "max_dots": 5
+  },
   "Thin-Blood Alchemy Formula": {
     "level_multiplier": 3,
     "description": "Formula level × 3 (learned at its level, 0 → N)",
