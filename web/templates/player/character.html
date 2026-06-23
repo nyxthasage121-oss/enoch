@@ -1152,11 +1152,17 @@
           <select x-model="newItem.category" class="w-full text-xs">
             <option value="attribute">Attribute</option>
             <option value="skill">Skill</option>
+            <option value="specialty">Specialty (flat 3 XP)</option>
             <option value="clan_discipline">Clan Discipline</option>
             <option value="other_discipline">Other Discipline</option>
-            <option value="blood_potency">Blood Potency</option>
-            <option value="specialty">Specialty (flat 3 XP)</option>
+            <option value="caitiff_discipline">Caitiff Discipline</option>
+            <option value="ghoul_discipline">Ghoul Discipline</option>
+            <option value="ingrained_discipline">Ingrained Discipline</option>
+            <option value="blood_sorcery_ritual">Blood Sorcery Ritual</option>
+            <option value="thin_blood_formula">Thin-Blood Alchemy Formula</option>
             <option value="advantage">Advantage (3 XP/dot)</option>
+            <option value="blood_potency">Blood Potency</option>
+            <option value="humanity">Humanity</option>
           </select>
         </div>
         <div class="md:col-span-4">
@@ -1372,31 +1378,48 @@ function wishlistPlanner(characterId, availableXp, csrfToken, spendRules) {
   const storageKey = 'enoch:wishlist:' + characterId;
   // Which shared autocomplete catalog (spend-dl-*) each category draws from.
   const TRAIT_LIST = {
-    attribute:        'spend-dl-attribute',
-    skill:            'spend-dl-skill',
-    clan_discipline:  'spend-dl-discipline',
-    other_discipline: 'spend-dl-discipline',
-    advantage:        'spend-dl-advantage',
-    // blood_potency (no trait) and specialty (free text) get no list.
+    attribute:            'spend-dl-attribute',
+    skill:                'spend-dl-skill',
+    clan_discipline:      'spend-dl-discipline',
+    other_discipline:     'spend-dl-discipline',
+    caitiff_discipline:   'spend-dl-discipline',
+    ghoul_discipline:     'spend-dl-discipline',
+    ingrained_discipline: 'spend-dl-discipline',
+    blood_sorcery_ritual: 'spend-dl-ritual',
+    thin_blood_formula:   'spend-dl-formula',
+    advantage:            'spend-dl-advantage',
+    // blood_potency, specialty (free text), and humanity get no list.
   };
   const LABELS = {
-    attribute:        'Attribute',
-    skill:            'Skill',
-    clan_discipline:  'Clan Discipline',
-    other_discipline: 'Other Discipline',
-    blood_potency:    'Blood Potency',
-    specialty:        'Specialty',
-    advantage:        'Advantage',
+    attribute:            'Attribute',
+    skill:                'Skill',
+    clan_discipline:      'Clan Discipline',
+    other_discipline:     'Other Discipline',
+    caitiff_discipline:   'Caitiff Discipline',
+    ghoul_discipline:     'Ghoul Discipline',
+    ingrained_discipline: 'Ingrained Discipline',
+    blood_sorcery_ritual: 'Blood Sorcery Ritual',
+    thin_blood_formula:   'Thin-Blood Alchemy Formula',
+    blood_potency:        'Blood Potency',
+    specialty:            'Specialty',
+    advantage:            'Advantage',
+    humanity:             'Humanity',
   };
   // Map wishlist category keys -> server-side category strings (xp_rules.SPEND_CATEGORIES)
   const SERVER_CATEGORY = {
-    attribute:        'Attribute',
-    skill:            'Skill',
-    clan_discipline:  'Clan Discipline',
-    other_discipline: 'Other Discipline',
-    blood_potency:    'Blood Potency',
-    specialty:        'Specialty',
-    advantage:        'Advantage',
+    attribute:            'Attribute',
+    skill:                'Skill',
+    clan_discipline:      'Clan Discipline',
+    other_discipline:     'Other Discipline',
+    caitiff_discipline:   'Caitiff Discipline',
+    ghoul_discipline:     'Ghoul Discipline',
+    ingrained_discipline: 'Ingrained Discipline',
+    blood_sorcery_ritual: 'Blood Sorcery Ritual',
+    thin_blood_formula:   'Thin-Blood Alchemy Formula',
+    blood_potency:        'Blood Potency',
+    specialty:            'Specialty',
+    advantage:            'Advantage',
+    humanity:             'Humanity',
   };
 
   function loadItems() {
