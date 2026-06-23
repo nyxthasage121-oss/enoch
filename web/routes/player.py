@@ -2234,6 +2234,21 @@ async def coteries_list(request: Request, user: dict = Depends(require_auth)):
                     spends  = list_coterie_spends(conn, coterie["id"])
                     break
 
+        # Merits/backgrounds the coterie holds, summed per trait — an
+        # at-a-glance list for the summary card (active contributions only).
+        coterie_merits: list[dict] = []
+        if coterie:
+            from ..db import list_coterie_contributions
+            _agg: dict[tuple, int] = {}
+            for _co in list_coterie_contributions(conn, coterie["id"], status="active"):
+                if _co["target_kind"] in ("merit", "background"):
+                    _k = (_co["target_kind"], _co["target_name"])
+                    _agg[_k] = _agg.get(_k, 0) + int(_co["dots"] or 0)
+            coterie_merits = [
+                {"kind": k[0], "name": k[1], "dots": v}
+                for k, v in sorted(_agg.items(), key=lambda x: (-x[1], x[0][1]))
+            ]
+
         # Characters eligible to include in a formation request
         eligible = [
             c for c in chars
@@ -2250,6 +2265,7 @@ async def coteries_list(request: Request, user: dict = Depends(require_auth)):
             coterie=coterie,
             members=members,
             spends=spends,
+            coterie_merits=coterie_merits,
             eligible_chars=eligible,
             roster=roster,
             hunting_sites=sites,
@@ -2472,6 +2488,31 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
         if viewer_member_chars else None
     )
 
+    # Leader controls — the coterie leader may PROPOSE new members (staff
+    # approve). Flag whether the viewer leads, and which active+approved
+    # characters are eligible to add (not already members).
+    viewer_char_ids = {c["id"] for c in viewer_member_chars}
+    viewer_is_leader = any(
+        m["role"] == "leader" and m["character_id"] in viewer_char_ids
+        for m in members
+    )
+    eligible_new_members: list[dict] = []
+    if viewer_is_leader:
+        member_char_ids = {m["character_id"] for m in members}
+        _active = list(list_characters(conn, status="active"))
+        # One character per player: exclude anyone whose owning player already
+        # has a character in the coterie (add_coterie_member would reject it).
+        member_owner_ids = {
+            c["discord_id"] for c in _active
+            if c["id"] in member_char_ids and c.get("discord_id")
+        }
+        for c in _active:
+            if (c.get("is_approved") and c["id"] not in member_char_ids
+                    and c.get("discord_id") not in member_owner_ids):
+                eligible_new_members.append(
+                    {"id": c["id"], "name": c["name"], "clan": c.get("clan")}
+                )
+
     return {"coterie": coterie, "members": members, "spends": spends,
             "advance_costs": advance_costs,
             "active_contribs": active_contribs,
@@ -2479,6 +2520,8 @@ def _coterie_detail_ctx(conn, coterie_id: int, viewer_discord_id: str | None = N
             "named_trait_cap": COTERIE_NAMED_TRAIT_CAP,
             "viewer_member_chars": viewer_member_chars,
             "viewer_donatable": viewer_donatable,
+            "viewer_is_leader": viewer_is_leader,
+            "eligible_new_members": eligible_new_members,
             "coterie_free_dots": coterie_free_dots,
             "free_dots_per_member": CREATION_FREE_DOTS_PER_MEMBER,
             "free_budget": free_budget,
@@ -2612,6 +2655,49 @@ async def blank_coterie_background_route(
 
         return _coterie_flash_response(request, conn, coterie_id, user["id"],
                                        flash_msg, flash_kind)
+
+
+@router.post("/coteries/{coterie_id}/members/propose", response_class=HTMLResponse)
+async def propose_coterie_member(
+    request: Request,
+    coterie_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """A coterie LEADER proposes adding a character; staff approve before the
+    character actually joins (mirrors coterie formation requests)."""
+    from ..db import create_coterie_member_request, has_pending_member_request
+    form = await request.form()
+    character_id = form_int(form.get("character_id"))
+    note = (form.get("note") or "").strip() or None
+
+    with get_db() as conn:
+        coterie = get_coterie(conn, coterie_id)
+        if not coterie:
+            raise HTTPException(status_code=404)
+        ctx = _coterie_detail_ctx(conn, coterie_id, viewer_discord_id=user["id"])
+        if not ctx["viewer_member_chars"]:
+            raise HTTPException(status_code=403, detail="Not a member of this coterie")
+
+        msg, kind = None, "success"
+        if not ctx["viewer_is_leader"]:
+            msg, kind = "Only the coterie leader can propose new members.", "error"
+        elif not character_id:
+            msg, kind = "Pick a character to propose.", "error"
+        else:
+            target = get_character(conn, character_id)
+            member_ids = {m["character_id"] for m in ctx["members"]}
+            if not target or target.get("status") != "active" or not target.get("is_approved"):
+                msg, kind = "That isn't an active, approved character.", "error"
+            elif character_id in member_ids:
+                msg, kind = "That character is already in the coterie.", "error"
+            elif has_pending_member_request(conn, coterie_id, character_id):
+                msg, kind = "There's already a pending request for that character.", "error"
+            else:
+                create_coterie_member_request(conn, coterie_id, character_id,
+                                              user["id"], note)
+                msg = f"Proposed {target['name']} — staff will review and approve."
+        return _coterie_flash_response(request, conn, coterie_id, user["id"], msg, kind)
 
 
 @router.post("/coteries/{coterie_id}/projects/propose", response_class=HTMLResponse)

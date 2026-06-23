@@ -38,6 +38,7 @@ from ..db import (
     list_hunting_sites,
     list_pending_claims,
     list_pending_coterie_requests,
+    list_pending_coterie_member_requests,
     list_pending_coterie_spends,
     list_pending_spends,
     list_claims_history,
@@ -113,6 +114,7 @@ async def dashboard(request: Request, user: dict = Depends(require_staff)):
         upcoming_periods  = list_upcoming_periods(conn, limit=3)
         recent_periods    = list_recent_closed_periods(conn, limit=2)
         coterie_requests  = list_pending_coterie_requests(conn)
+        coterie_member_reqs = list_pending_coterie_member_requests(conn)
         pending_projects  = list_pending_projects(conn)
 
     pending_chars = [c for c in all_chars if not c["is_approved"] and not c.get("is_draft")]
@@ -128,7 +130,7 @@ async def dashboard(request: Request, user: dict = Depends(require_staff)):
             n_active=len(active_chars),
             n_near_cap=len(near_cap),
             near_cap_list=near_cap[:5],
-            n_coterie_reqs=len(coterie_requests),
+            n_coterie_reqs=len(coterie_requests) + len(coterie_member_reqs),
             n_project_reqs=len(pending_projects),
             active_period=active_period,
             upcoming_periods=upcoming_periods,
@@ -1496,9 +1498,11 @@ def _coterie_ctx(conn) -> dict:
     from ..db import list_coteries_awaiting_signoff
     coteries  = list_coteries(conn, status="active")
     requests  = list_pending_coterie_requests(conn)
+    member_requests = list_pending_coterie_member_requests(conn)
     co_spends = list_pending_coterie_spends(conn)
     awaiting  = list_coteries_awaiting_signoff(conn)
-    return {"coteries": coteries, "requests": requests, "co_spends": co_spends,
+    return {"coteries": coteries, "requests": requests,
+            "member_requests": member_requests, "co_spends": co_spends,
             "coteries_awaiting_signoff": awaiting}
 
 
@@ -1552,6 +1556,54 @@ async def reject_coterie_req(
         request, "staff/partials/coterie_requests_table.html", _ctx(request, **ctx)
     )
     _toast(resp, err or "Formation request rejected.", "error" if err else "info")
+    return resp
+
+
+@router.post("/coteries/member-requests/{request_id}/approve", response_class=HTMLResponse)
+async def approve_coterie_member_req(
+    request: Request,
+    request_id: int,
+    user: dict = Depends(require_permission("manage_coterie")),
+    _: None = Depends(csrf_protect),
+):
+    from ..db import approve_coterie_member_request
+    err = None
+    try:
+        with get_db() as conn:
+            approve_coterie_member_request(conn, request_id, user["id"])
+    except ValueError as e:
+        err = str(e)
+    with get_db() as conn:
+        ctx = _coterie_ctx(conn)
+    resp = templates.TemplateResponse(
+        request, "staff/partials/coterie_member_requests_table.html", _ctx(request, **ctx)
+    )
+    _toast(resp, err or "Member added to the coterie.", "error" if err else "success")
+    return resp
+
+
+@router.post("/coteries/member-requests/{request_id}/reject", response_class=HTMLResponse)
+async def reject_coterie_member_req(
+    request: Request,
+    request_id: int,
+    user: dict = Depends(require_permission("manage_coterie")),
+    _: None = Depends(csrf_protect),
+):
+    from ..db import reject_coterie_member_request
+    form   = await request.form()
+    reason = (form.get("reason") or "").strip() or "No reason provided"
+    err = None
+    try:
+        with get_db() as conn:
+            reject_coterie_member_request(conn, request_id, user["id"], reason)
+    except ValueError as e:
+        err = str(e)
+    with get_db() as conn:
+        ctx = _coterie_ctx(conn)
+    resp = templates.TemplateResponse(
+        request, "staff/partials/coterie_member_requests_table.html", _ctx(request, **ctx)
+    )
+    _toast(resp, err or "Member request rejected.", "error" if err else "info")
     return resp
 
 

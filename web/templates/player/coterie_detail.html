@@ -148,6 +148,37 @@
     </div>
   </div>
 
+  {# ── Add a member (leader proposes → staff approve) ── #}
+  {% if viewer_is_leader %}
+  <div class="gilded p-5 mb-6">
+    <p class="label-gold text-xs mb-1">Add a Member</p>
+    <p class="font-garamond text-bone-700 text-[0.65rem] mb-3 italic">
+      Propose a character to join. Staff review and approve before they're added.
+    </p>
+    {% if eligible_new_members %}
+    <form method="POST" action="/coteries/{{ coterie.id }}/members/propose"
+          class="flex flex-wrap items-end gap-2">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div class="flex-1 min-w-[12rem]">
+        <label class="label-gold block mb-1 text-[0.6rem]">Character</label>
+        <select name="character_id" required
+                class="w-full bg-ink-900 border border-ink-700 rounded text-bone-300 text-xs px-2 py-1.5">
+          <option value="">— Select a character —</option>
+          {% for c in eligible_new_members %}
+          <option value="{{ c.id }}">{{ c.name }}{% if c.clan %} · {{ c.clan | replace('-',' ') | title }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn-send font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
+        Propose
+      </button>
+    </form>
+    {% else %}
+    <p class="font-garamond text-bone-600 text-xs italic">No eligible characters to add right now.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# ── Shared Backgrounds · nightly pool (migration 039) ──
        Donated backgrounds any member can "blank" for the night; blanked dots
        leave the pool for the WHOLE coterie until the next play period. #}

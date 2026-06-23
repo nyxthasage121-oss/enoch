@@ -18,6 +18,14 @@
     </div>
   </div>
 
+  {# ── Member-add requests (leader proposed → staff approve) ── #}
+  <div class="mb-8">
+    <p class="label-gold mb-3">Pending Member Requests
+      {% if member_requests %}<span class="chip text-blood-400 border-blood-900 text-[0.55rem] ml-2">{{ member_requests | length }}</span>{% endif %}
+    </p>
+    {% include "staff/partials/coterie_member_requests_table.html" %}
+  </div>
+
   {# ── Coterie sheets awaiting sign-off ── #}
   <div class="mb-8">
     <p class="label-gold mb-3">Coterie Sheets Awaiting Sign-off

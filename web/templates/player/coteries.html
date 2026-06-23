@@ -56,6 +56,20 @@
       </div>
     </div>
 
+    {# Merits & backgrounds the coterie holds — at a glance #}
+    {% if coterie_merits %}
+    <div class="mb-4">
+      <p class="label-gold text-xs mb-2">Merits &amp; Backgrounds</p>
+      <div class="flex flex-wrap gap-1.5">
+        {% for m in coterie_merits %}
+        <span class="chip text-bone-300 border-ink-600 text-[0.6rem]">
+          {{ m.name }} <span class="text-gold-500 ml-0.5">{{ m.dots }}</span>
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <a href="/coteries/{{ coterie.id }}"
        class="btn-ghost font-cinzel text-xs tracking-widest">
       View Details & Manage

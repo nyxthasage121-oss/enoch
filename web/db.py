@@ -3447,6 +3447,100 @@ def reject_coterie_request(conn, request_id: int, reviewer_id: str, reason: str)
     return get_coterie_request(conn, request_id)
 
 
+# ── Coterie member-add requests (migration 044) ──────────────────────────────
+# A coterie leader proposes adding a character to their existing coterie; staff
+# approve, which runs add_coterie_member. Mirrors the formation-request flow.
+
+def get_coterie_member_request(conn, request_id: int) -> dict | None:
+    row = conn.execute(
+        "SELECT * FROM coterie_member_requests WHERE id=?", (request_id,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def has_pending_member_request(conn, coterie_id: int, character_id: int) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM coterie_member_requests "
+        "WHERE coterie_id=? AND character_id=? AND status='pending' LIMIT 1",
+        (coterie_id, character_id),
+    ).fetchone() is not None
+
+
+def list_pending_coterie_member_requests(conn) -> list[dict]:
+    rows = conn.execute("""
+        SELECT mr.*, co.name AS coterie_name,
+               ch.name AS character_name, ch.clan AS character_clan,
+               pp.username AS player_username
+        FROM coterie_member_requests mr
+        JOIN coteries        co ON co.id = mr.coterie_id
+        JOIN characters      ch ON ch.id = mr.character_id
+        LEFT JOIN player_profiles pp ON pp.discord_id = ch.discord_id
+        WHERE mr.status='pending'
+        ORDER BY mr.submitted_at ASC
+    """).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_coterie_member_request(conn, coterie_id: int, character_id: int,
+                                  requested_by: str, note: str | None = None) -> dict:
+    cur = conn.execute("""
+        INSERT INTO coterie_member_requests
+            (coterie_id, character_id, requested_by, note, status, submitted_at)
+        VALUES (?, ?, ?, ?, 'pending', ?)
+    """, (coterie_id, character_id, requested_by, note, _now()))
+    return get_coterie_member_request(conn, cur.lastrowid)
+
+
+def approve_coterie_member_request(conn, request_id: int, reviewer_id: str) -> dict:
+    req = get_coterie_member_request(conn, request_id)
+    if req is None:
+        raise ValueError(f"Member request {request_id} not found")
+    if req["status"] != "pending":
+        raise ValueError(f"Request {request_id} is not pending")
+    # add_coterie_member enforces the member cap + one-char-per-player; let it
+    # raise so the staff route can surface the message.
+    add_coterie_member(conn, req["coterie_id"], req["character_id"])
+    conn.execute("""
+        UPDATE coterie_member_requests
+        SET status='approved', reviewed_by=?, reviewed_at=?
+        WHERE id=?
+    """, (reviewer_id, _now(), request_id))
+    write_audit(conn, reviewer_id, "approve_coterie_member_request",
+                "coterie_member_request", request_id,
+                after={"coterie_id": req["coterie_id"],
+                       "character_id": req["character_id"]})
+    char    = get_character(conn, req["character_id"])
+    coterie = get_coterie(conn, req["coterie_id"])
+    if char and char.get("discord_id"):
+        enqueue_bot(conn, "coterie_member_added", {
+            "discord_id":   char["discord_id"],
+            "coterie_name": coterie["name"] if coterie else "",
+            "coterie_id":   req["coterie_id"],
+        })
+    return get_coterie_member_request(conn, request_id)
+
+
+def reject_coterie_member_request(conn, request_id: int, reviewer_id: str,
+                                  reason: str) -> dict:
+    req = get_coterie_member_request(conn, request_id)
+    if req is None:
+        raise ValueError(f"Member request {request_id} not found")
+    if req["status"] != "pending":
+        raise ValueError(f"Request {request_id} is not pending")
+    conn.execute("""
+        UPDATE coterie_member_requests
+        SET status='rejected', reviewed_by=?, reviewed_at=?, review_reason=?
+        WHERE id=?
+    """, (reviewer_id, _now(), reason, request_id))
+    write_audit(conn, reviewer_id, "reject_coterie_member_request",
+                "coterie_member_request", request_id, after={"reason": reason})
+    enqueue_bot(conn, "coterie_member_request_rejected", {
+        "discord_id": req["requested_by"],
+        "reason":     reason,
+    })
+    return get_coterie_member_request(conn, request_id)
+
+
 def update_coterie(conn, coterie_id: int, **fields) -> dict:
     """Update whitelisted coterie fields (name, chasse, lien, portillon, status)."""
     allowed = {"name", "chasse", "lien", "portillon", "status", "discord_role_id"}
