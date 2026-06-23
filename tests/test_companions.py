@@ -262,3 +262,60 @@ def test_mawla_creation_disabled(player):
     assert "coming soon" in r.text.lower()
     with get_db() as conn:
         assert not [c for c in list_companions(conn, 1) if c["name"] == "QA Bishop"]
+
+
+# ── Blanking tie-in ──────────────────────────────────────────────────────────
+
+def test_retainer_shows_up_in_blanking(player):
+    """A created retainer appears as a named, blankable background; deleting it
+    removes that row."""
+    import json as _json
+    from web.db import get_db, list_character_backgrounds, list_companions
+    r = player.post("/characters/1/companions", data={
+        "_csrf": "dev-csrf-token", "kind": "retainer", "name": "QA Blank Retainer",
+        "dots": "2", "sheet_json": _json.dumps(_template_sheet("average")),
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    with get_db() as conn:
+        bgs = [b for b in list_character_backgrounds(conn, 1) if b["name"] == "QA Blank Retainer"]
+        comp = next(c for c in list_companions(conn, 1) if c["name"] == "QA Blank Retainer")
+    assert len(bgs) == 1 and bgs[0]["dots"] == 2
+
+    player.post(f"/companions/{comp['id']}/delete",
+                data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+    with get_db() as conn:
+        assert not [b for b in list_character_backgrounds(conn, 1) if b["name"] == "QA Blank Retainer"]
+        assert not [c for c in list_companions(conn, 1) if c["id"] == comp["id"]]
+
+
+def test_named_retainer_suppresses_generic_background(_client):
+    """A named retainer claims dots from the generic 'Retainer' background so it
+    isn't double-counted in the blanking card."""
+    from web.db import (get_db, upsert_player, create_character, create_companion,
+                        get_character, list_character_backgrounds, delete_character)
+    from web.routes.player import _sync_backgrounds_from_sheet
+    with get_db() as conn:
+        upsert_player(conn, discord_id="772222772222772222", username="BlankSuppress")
+        ch = create_character(conn, discord_id="772222772222772222",
+                              name="Suppress Probe", clan="ventrue",
+                              sheet_json={"advantages": [{"name": "Retainer", "dots": 2}]})
+        cid = ch["id"]
+    try:
+        with get_db() as conn:
+            ch = get_character(conn, cid)
+            _sync_backgrounds_from_sheet(conn, ch)
+            generic = {b["name"]: b["dots"] for b in list_character_backgrounds(conn, cid)}
+            assert generic.get("Retainer") == 2          # no companion → generic shows
+
+            create_companion(conn, parent_character_id=cid, kind="retainer",
+                             name="Marcus", dots=2, template="average",
+                             sheet_json=_template_sheet("average"))
+            _sync_backgrounds_from_sheet(conn, ch)
+            after = {b["name"]: b["dots"] for b in list_character_backgrounds(conn, cid)}
+            assert after.get("Marcus") == 2              # named retainer shows
+            assert "Retainer" not in after               # generic fully claimed → gone
+            conn.commit()
+    finally:
+        with get_db() as conn:
+            delete_character(conn, cid)
+            conn.commit()

@@ -1800,10 +1800,33 @@ def _sheet_backgrounds(char: dict) -> list[dict]:
 
 
 def _sync_backgrounds_from_sheet(conn, char: dict) -> None:
-    """Upsert the character's sheet backgrounds into the blanking table so they
-    appear automatically. Non-destructive — manually-tracked rows stay, and
-    set_character_background preserves any active blank when the dots change."""
+    """Upsert the character's blankable backgrounds into the blanking table so
+    they appear automatically. Sources: the sheet's backgrounds, plus each named
+    Retainer/Mawla companion — a companion claims dots from (and suppresses) the
+    generic 'Retainer'/'Mawla' background, so a named 'Marcus ●●' is what blanks
+    rather than a faceless 'Retainer ●●'. Non-destructive — set_character_background
+    preserves any active blank when the dots change."""
+    claimed = {"retainer": 0, "mawla": 0}
+    comp_rows: list[dict] = []
+    for c in list_companions(conn, char["id"]):
+        dots = int(c.get("dots") or 0)
+        claimed[c["kind"]] = claimed.get(c["kind"], 0) + dots
+        if dots > 0:
+            comp_rows.append({"name": c["name"], "dots": dots})
+
+    merged: list[dict] = []
     for bg in _sheet_backgrounds(char):
+        low = bg["name"].strip().lower()
+        if low in ("retainer", "mawla"):
+            # Named companions claim dots; emit the remainder so the table
+            # reflects the suppression (0 dots removes the generic row).
+            merged.append({"name": bg["name"],
+                           "dots": max(0, bg["dots"] - claimed.get(low, 0))})
+        else:
+            merged.append(bg)
+    merged.extend(comp_rows)
+
+    for bg in merged:
         try:
             set_character_background(conn, char["id"], bg["name"], bg["dots"],
                                      "system:sheet-sync")
@@ -1997,6 +2020,8 @@ async def companion_create(
                     name=name, dots=dots, template=template, is_ghoul=is_ghoul,
                     clan=(char["clan"] if is_ghoul else None),
                     concept=concept, description=description, sheet_json=sheet)
+                # Surface the new retainer in the Blanking Backgrounds card.
+                _sync_backgrounds_from_sheet(conn, char)
                 conn.commit()
                 return RedirectResponse(
                     url=f"/characters/{character_id}/companions", status_code=303)
@@ -2022,7 +2047,17 @@ async def companion_delete(
         if not comp:
             raise HTTPException(status_code=404)
         parent_id = comp["parent_character_id"]
+        # Drop its blanking row, then re-sync so any generic Retainer/Mawla dots
+        # it had claimed come back.
+        try:
+            set_character_background(conn, parent_id, comp["name"], 0,
+                                     "system:companion-removed")
+        except ValueError:
+            pass
         delete_companion(conn, companion_id)
+        char = get_character(conn, parent_id)
+        if char:
+            _sync_backgrounds_from_sheet(conn, char)
         conn.commit()
     return RedirectResponse(url=f"/characters/{parent_id}/companions", status_code=303)
 
