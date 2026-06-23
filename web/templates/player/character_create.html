@@ -178,23 +178,41 @@
             {# ── Trait spreads — base allocation vs the V5 target. Bought
                (Starting-XP) dots are excluded so buying doesn't read as
                "over" the spread. #}
-            <li class="flex items-center justify-between gap-2">
-              <span class="text-bone-500">Attributes</span>
-              <span :class="attrSpreadDots > attrDotsTarget ? 'text-blood-400'
-                              : (attrSpreadDots === attrDotsTarget ? 'text-gold-400' : 'text-bone-400')">
-                <span x-text="attrSpreadDots"></span>
-                <span class="text-bone-700">/</span>
-                <span x-text="attrDotsTarget"></span>
-              </span>
+            {# Attributes — placed/needed per priority level (the V5 spread),
+               not an opaque dot total. Each chip golds when its slot is filled. #}
+            <li>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-bone-500">Attributes</span>
+                <span class="font-garamond text-[0.6rem] normal-case tracking-normal"
+                      :class="attrSpreadComplete ? 'text-gold-500' : 'text-bone-700'"
+                      x-text="attrSpreadComplete ? '✓ spread set' : 'by priority'"></span>
+              </div>
+              <div class="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1 text-[0.6rem] tracking-normal">
+                <template x-for="lvl in [4, 3, 2, 1]" :key="'a' + lvl">
+                  <span :class="spreadLevelClass(attrLevelCounts[lvl] || 0, attrSpreadTarget[lvl])">
+                    <span class="text-bone-700">@</span><span x-text="lvl"></span>
+                    <span x-text="' ' + (attrLevelCounts[lvl] || 0) + '/' + attrSpreadTarget[lvl]"></span>
+                  </span>
+                </template>
+              </div>
             </li>
-            <li class="flex items-center justify-between gap-2">
-              <span class="text-bone-500">Skills</span>
-              <span :class="skillDotsTarget && skillSpreadDots > skillDotsTarget ? 'text-blood-400'
-                              : (skillDotsTarget && skillSpreadDots === skillDotsTarget ? 'text-gold-400' : 'text-bone-400')">
-                <span x-text="skillSpreadDots"></span>
-                <span class="text-bone-700">/</span>
-                <span x-text="skillDotsTarget || '—'"></span>
-              </span>
+            {# Skills — same idea, against the chosen distribution; prompt to
+               pick one if they haven't yet. #}
+            <li>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-bone-500">Skills</span>
+                <span class="font-garamond text-[0.6rem] normal-case tracking-normal"
+                      :class="skillSpreadComplete ? 'text-gold-500' : 'text-bone-700'"
+                      x-text="!skillSpreadTarget ? 'pick a spread' : (skillSpreadComplete ? '✓ spread set' : 'by priority')"></span>
+              </div>
+              <div class="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1 text-[0.6rem] tracking-normal" x-show="skillSpreadTarget" x-cloak>
+                <template x-for="lvl in skillSpreadLevels" :key="'s' + lvl">
+                  <span :class="spreadLevelClass(skillLevelCounts[lvl] || 0, skillSpreadTarget[lvl])">
+                    <span class="text-bone-700">@</span><span x-text="lvl"></span>
+                    <span x-text="' ' + (skillLevelCounts[lvl] || 0) + '/' + skillSpreadTarget[lvl]"></span>
+                  </span>
+                </template>
+              </div>
             </li>
             <li class="flex items-center justify-between gap-2">
               <span class="text-bone-500">Specialties
@@ -3841,6 +3859,52 @@
       // budget trackers measure the base allocation, not bought dots.
       get attrSpreadDots()  { return this.sumAttrs()  - this.xpBuys.filter(b => b.cat === 'attr').length; },
       get skillSpreadDots() { return this.sumSkills() - this.xpBuys.filter(b => b.cat === 'skill').length; },
+
+      // ── Budget sidebar: per-priority-level spread fill ────────────────────
+      // Show the V5 priority spread the way players place it (how many traits
+      // at each dot level vs. the target), not an opaque "22 dots" total. Base
+      // allocation only — Starting-XP buys are subtracted back out.
+      _baseLevelCounts(prefix) {
+        const bought = {};
+        this.xpBuys.forEach(b => { if (b && b.key) bought[b.key] = (bought[b.key] || 0) + 1; });
+        const counts = {};
+        for (const k of Object.keys(this.sheet)) {
+          if (!k.startsWith(prefix)) continue;
+          const v = Number(this.sheet[k]);          // skips skill_spread ("specialist" → NaN)
+          if (isNaN(v)) continue;
+          const base = Math.max(0, v - (bought[k] || 0));
+          if (base > 0) counts[base] = (counts[base] || 0) + 1;
+        }
+        return counts;
+      },
+      get attrSpreadTarget() { return { 4: 1, 3: 3, 2: 4, 1: 1 }; },  // V5 fixed spread
+      get attrLevelCounts()  { return this._baseLevelCounts('attr_'); },
+      get skillSpreadTarget() {
+        const spr = this.skillSpreads[this.skillSpread];
+        if (!spr || !spr.levels) return null;       // no distribution chosen yet
+        const out = {}; Object.entries(spr.levels).forEach(([l, n]) => { out[+l] = n; });
+        return out;
+      },
+      get skillLevelCounts()  { return this._baseLevelCounts('skill_'); },
+      get skillSpreadLevels() {
+        const t = this.skillSpreadTarget;
+        return t ? Object.keys(t).map(Number).sort((a, b) => b - a) : [];
+      },
+      spreadLevelClass(have, need) {
+        if (have === (need || 0)) return need ? 'text-gold-500' : 'text-bone-700';
+        return have > (need || 0) ? 'text-blood-400' : 'text-bone-500';
+      },
+      get attrSpreadComplete() {
+        const t = this.attrSpreadTarget, c = this.attrLevelCounts;
+        return Object.keys(t).every(l => (c[l] || 0) === t[l])
+            && Object.keys(c).every(l => t[l] != null);
+      },
+      get skillSpreadComplete() {
+        const t = this.skillSpreadTarget; if (!t) return false;
+        const c = this.skillLevelCounts;
+        return Object.keys(t).every(l => (c[l] || 0) === t[l])
+            && Object.keys(c).every(l => t[l] != null);
+      },
 
       // Form submit safety — make sure hidden inputs reflect Alpine state.
       // Alpine bindings already do this, but a defensive sync on submit
