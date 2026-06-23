@@ -45,7 +45,7 @@ If an idea can't clear the bar yet, write down *what would make it clear* (its t
 
 ## Already in flight — don't duplicate here
 
-- **Downtime system, Phases B–E** → fully specced in [`NYBN_DOWNTIME_PROJECTS.md`](./NYBN_DOWNTIME_PROJECTS.md). Phases B, C, **and D (coterie projects)** are in; **E** (other downtime actions, resonances) is the next chunk — its first action, generic **Hunting** (spend a timeskip roll), shipped 2026-06-23. The **Homebrew project engine** (the `project_mode` variant) is the other designed-but-unbuilt piece. That doc is their home — refine there, not here.
+- **Downtime system, Phases B–E** → fully specced in [`NYBN_DOWNTIME_PROJECTS.md`](./NYBN_DOWNTIME_PROJECTS.md). Phases B, C, **and D (coterie projects)** are in; **E** (other downtime actions, resonances) is the next chunk — its first action, generic **Hunting** (spend a timeskip roll), shipped 2026-06-23. The **Homebrew project engine** (`project_mode`) also shipped 2026-06-23 (migration 050); **RAW** remains the only parked engine. That doc is their home — refine there, not here.
 - **Inconnu port ("Irad")** → [`INCONNU_PORT_SURVEY.md`](./INCONNU_PORT_SURVEY.md). Lifting Inconnu's MIT V5 logic into Enoch; **B1 bulk-XP** is the first target and merges with the bulk-import row above.
 
 ## Required for launch — NOT optional

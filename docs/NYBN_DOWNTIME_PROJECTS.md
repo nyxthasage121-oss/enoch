@@ -207,7 +207,14 @@ not a values swap.
   built, do it **engine-math + staff-apply** (engine tracks Scope/die/margins and
   flags "stake N"/"lose N"; staff apply to the sheet — same as NYbN penalties),
   NOT auto-locking real sheet dots.
-- **Homebrew** (designed, TO BUILD next) — owner's hybrid:
+- **Homebrew ✅ BUILT (2026-06-23, migration 050)** — owner's hybrid. The Admin
+  toggle is live (with the launch-roll checkbox); approval takes a single Goal DC
+  (no stages); `resolve_homebrew_roll` runs the cumulative test, the optional
+  launch roll, and the pause-and-flag-ST on messy/bestial; staff Resume clears
+  the pause. One nuance vs. the spec below: the goal "flavor" reuses the existing
+  payoff (structured dot-grant vs. free-form text) rather than a separate
+  goal_type field — the Goal DC + Payoff together express dot-based or narrative
+  goals. Owner's hybrid spec:
   - **Launch roll = optional per chronicle** (`homebrew_launch_roll` on/off; some
     servers run it, some don't). When on: a roll to *open* the project (win →
     opens + the test begins; fail → retry next timeskip). When off: starts directly.
@@ -224,7 +231,7 @@ not a values swap.
 - **Off** ("No Projects") — hide the whole feature: the player Projects tab, the
   coterie Projects panel, the staff Projects queue + nav, and block propose/roll.
 
-**Build order:** (1) foundation = the `project_mode` setting + Admin toggle + Off
-hiding + NYbN as the default working mode (RAW/Homebrew shown but not yet
-selectable/working); (2) the **Homebrew engine** (launch/goal-DC/cumulative/pause);
-(3) RAW later. Toggle is chronicle-wide (not per-project) per owner.
+**Build order:** (1) foundation ✅ (`project_mode` + Admin toggle + Off hiding +
+NYbN default); (2) the **Homebrew engine** ✅ (2026-06-23, migration 050 —
+launch/goal-DC/cumulative/pause); (3) **RAW** — still parked. Toggle is
+chronicle-wide (not per-project) per owner.
