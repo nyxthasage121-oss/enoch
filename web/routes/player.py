@@ -48,7 +48,6 @@ from ..db import (
     validate_coterie_named_trait,
 )
 from ..xp_rules import calculate_cost as _calculate_cost
-from ..config import settings
 from ..deps import csrf_protect, require_auth
 from ..main import _ctx
 from ..xp_rules import (

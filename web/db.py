@@ -712,7 +712,93 @@ def delete_character(conn, character_id: int) -> None:
     conn.execute("DELETE FROM spend_requests WHERE character_id=?", (character_id,))
     conn.execute("DELETE FROM xp_claims WHERE character_id=?", (character_id,))
     conn.execute("DELETE FROM coterie_memberships WHERE character_id=?", (character_id,))
+    conn.execute("DELETE FROM companions WHERE parent_character_id=?", (character_id,))
     conn.execute("DELETE FROM characters WHERE id=?", (character_id,))
+
+
+# ── Companions (Retainers & Mawlas) ─────────────────────────────────────────
+
+def _companion_view(row: dict | None) -> dict | None:
+    """Parse a companions row's JSON + coerce the ghoul flag to bool."""
+    row = _parse(row, "sheet_json")
+    if row is None:
+        return None
+    if not isinstance(row.get("sheet_json"), dict):
+        row["sheet_json"] = {}
+    row["is_ghoul"] = bool(row.get("is_ghoul"))
+    return row
+
+
+def list_companions(conn, character_id: int, kind: str | None = None) -> list[dict]:
+    """All companions for a character, optionally filtered to 'retainer'/'mawla'."""
+    if kind:
+        rows = conn.execute(
+            "SELECT * FROM companions WHERE parent_character_id=? AND kind=? "
+            "ORDER BY kind, name", (character_id, kind)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM companions WHERE parent_character_id=? "
+            "ORDER BY kind, name", (character_id,)).fetchall()
+    return [_companion_view(r) for r in rows]
+
+
+def get_companion(conn, companion_id: int) -> dict | None:
+    return _companion_view(
+        conn.execute("SELECT * FROM companions WHERE id=?", (companion_id,)).fetchone())
+
+
+def get_companion_for_player(conn, companion_id: int, discord_id: str) -> dict | None:
+    """A companion only if its parent character belongs to the given player —
+    the ownership gate for player-side companion routes."""
+    return _companion_view(conn.execute(
+        "SELECT c.* FROM companions c "
+        "JOIN characters ch ON ch.id = c.parent_character_id "
+        "WHERE c.id=? AND ch.discord_id=?", (companion_id, discord_id)).fetchone())
+
+
+def create_companion(conn, *, parent_character_id: int, kind: str, name: str,
+                     dots: int = 1, template: str | None = None,
+                     is_ghoul: bool = False, clan: str | None = None,
+                     concept: str | None = None, description: str | None = None,
+                     sheet_json: dict | None = None, bg_key: str | None = None) -> dict:
+    """Insert a companion (rides the parent's approval — no separate review)."""
+    now = _now()
+    cur = conn.execute("""
+        INSERT INTO companions
+            (parent_character_id, kind, name, dots, template, is_ghoul, clan,
+             concept, description, sheet_json, bg_key, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (parent_character_id, kind, name, int(dots or 0), template,
+          int(bool(is_ghoul)), clan, concept, description,
+          _j(sheet_json or {}), bg_key, now, now))
+    return get_companion(conn, cur.lastrowid)
+
+
+def update_companion(conn, companion_id: int, **fields) -> dict | None:
+    """Patch a companion. Only whitelisted columns are writable."""
+    allowed = {"kind", "name", "dots", "template", "is_ghoul", "clan",
+               "concept", "description", "sheet_json", "bg_key"}
+    sets, vals = [], []
+    for k, v in fields.items():
+        if k not in allowed:
+            continue
+        if k == "sheet_json":
+            v = _j(v or {})
+        elif k == "is_ghoul":
+            v = int(bool(v))
+        elif k == "dots":
+            v = int(v or 0)
+        sets.append(f"{k}=?")
+        vals.append(v)
+    if sets:
+        sets.append("updated_at=?")
+        vals.extend([_now(), companion_id])
+        conn.execute(f"UPDATE companions SET {', '.join(sets)} WHERE id=?", vals)
+    return get_companion(conn, companion_id)
+
+
+def delete_companion(conn, companion_id: int) -> None:
+    conn.execute("DELETE FROM companions WHERE id=?", (companion_id,))
 
 
 # ── Chronicle Settings ────────────────────────────────────────────────────────

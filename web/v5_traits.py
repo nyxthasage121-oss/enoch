@@ -675,6 +675,56 @@ V5_DISCIPLINE_SPREADS: dict[str, dict] = {
 PREDATOR_FREE_DISCIPLINE_DOTS = 1
 
 
+# ── Mortals Templates (V5 Core) — Retainer stat blocks ──────────────────────
+# Storyteller-character templates used to build Retainers. The Retainer
+# background rating selects the template: ● Weak, ●● Average, ●●● Gifted.
+# "Deadly" has no Retainer rating (a Retainer maxes at ●●●) and is offered for
+# staff-built / special NPCs only. Each template fixes an Attribute multiset
+# (all 9 Attributes) and a Skill multiset ({dot_level: count}); unrated Skills
+# stay at 0. `advantage_points` / `flaw_max` bound optional Advantage spending
+# ("If desired, use Advantage points to buy more Skills"). `specialties` is the
+# number of free Specialties the template grants.
+MORTAL_TEMPLATES: dict[str, dict] = {
+    "weak": {
+        "label": "Weak Mortal", "retainer_dots": 1,
+        "attributes": [2, 2, 1, 1, 1, 1, 1, 1, 1],
+        "skills": {2: 3, 1: 5},
+        "advantage_points": 0, "flaw_max": 0, "specialties": 0,
+        "blurb": "Two Attributes at 2, the rest at 1; three Skills at 2, five at 1. No Advantages.",
+    },
+    "average": {
+        "label": "Average Mortal", "retainer_dots": 2,
+        "attributes": [3, 3, 2, 2, 2, 1, 1, 1, 1],
+        "skills": {3: 3, 2: 4, 1: 5},
+        "advantage_points": 3, "flaw_max": 2, "specialties": 0,
+        "blurb": "Two Attributes at 3, three at 2, the rest at 1; three Skills at 3, "
+                 "four at 2, five at 1. Up to 3 Advantage points (max 2 Flaws).",
+    },
+    "gifted": {
+        "label": "Gifted Mortal", "retainer_dots": 3,
+        "attributes": [4, 3, 3, 2, 2, 1, 1, 1, 1],
+        "skills": {4: 2, 3: 4, 2: 4, 1: 4},
+        "advantage_points": 10, "flaw_max": 4, "specialties": 1,
+        "blurb": "One Attribute at 4, two at 3, two at 2, the rest at 1; two Skills at 4 "
+                 "(one with a Specialty), four at 3, four at 2, four at 1. Up to 10 "
+                 "Advantage points (max 4 Flaws).",
+    },
+    "deadly": {
+        "label": "Deadly Mortal", "retainer_dots": None,
+        "attributes": [5, 5, 4, 4, 3, 3, 2, 2, 2],
+        "skills": {5: 1, 4: 3, 3: 5, 2: 6},
+        "advantage_points": 15, "flaw_max": 0, "specialties": 3,
+        "blurb": "Two Attributes at 5, two at 4, two at 3, the rest at 2; one Skill at 5, "
+                 "three at 4, five at 3, six at 2; three Specialties. Up to 15 Advantage "
+                 "points (no Flaws).",
+    },
+}
+
+# Retainer background rating → Mortals Template. A Retainer maxes at ●●●; Deadly
+# is staff-only (no rating maps to it).
+RETAINER_DOTS_TO_TEMPLATE: dict[int, str] = {1: "weak", 2: "average", 3: "gifted"}
+
+
 # ── Chargen RAW validation (Standard ruleset) ───────────────────────────────
 # Enforce the V5 priority-allocation spreads server-side. These check the BASE
 # allocation — a trait's dots BEFORE starting-XP purchases — because the wizard
@@ -763,6 +813,103 @@ def _family_disc_keys(labels) -> set[str]:
         if k:
             out.add(k)
     return out
+
+
+# ── Retainer (Mortals Template) validation ──────────────────────────────────
+_COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five",
+                6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}
+
+
+def _level_counts(values) -> dict[int, int]:
+    """Tally a sequence of dot values into {dot_level: count}."""
+    out: dict[int, int] = {}
+    for v in values:
+        out[int(v)] = out.get(int(v), 0) + 1
+    return out
+
+
+def _describe_levels(levels: dict) -> str:
+    """{3: 3, 2: 4, 1: 5} → 'three at 3, four at 2, five at 1'."""
+    return ", ".join(
+        f"{_COUNT_WORDS.get(int(n), n)} at {lvl}"
+        for lvl, n in sorted(levels.items(), key=lambda kv: int(kv[0]), reverse=True)
+    )
+
+
+def _player_advantage_dots(sheet: dict, list_keys) -> int:
+    """Sum player-added (no `src` tag) dots across the given sheet list keys."""
+    total = 0
+    for lk in list_keys:
+        for it in (sheet.get(lk) or []):
+            if isinstance(it, dict) and not it.get("src"):
+                try:
+                    total += int(it.get("dots") or it.get("level") or 0)
+                except (TypeError, ValueError):
+                    pass
+    return total
+
+
+def validate_retainer_template(
+    sheet: dict, template: str, *, is_ghoul: bool = False,
+) -> list[str]:
+    """Validate a Retainer stat block against a V5 Mortals Template.
+
+    The Attribute multiset and Skill multiset must match the template
+    (Weak / Average / Gifted / Deadly) exactly, the Specialty count must meet
+    the template's grant, Disciplines must be 0 (mortal) or exactly 1 dot
+    (ghoul, from the domitor's clan), and Advantage / Flaw points must stay
+    within the template's bounds. Returns human-readable errors ([] == valid).
+    """
+    tpl = MORTAL_TEMPLATES.get((template or "").lower())
+    if not tpl:
+        return [f"Unknown Retainer template '{template}'."]
+    errors: list[str] = []
+
+    # Attributes — the 9 values (sorted desc) must equal the template multiset.
+    attrs = sorted((int(sheet.get(k, 0) or 0) for k in _ATTR_KEYS), reverse=True)
+    if attrs != sorted(tpl["attributes"], reverse=True):
+        errors.append(
+            f"Attributes must be {_describe_levels(_level_counts(tpl['attributes']))} "
+            f"for a {tpl['label']}."
+        )
+
+    # Skills — counts at each dot level must match the template.
+    have = _level_counts(v for v in (int(sheet.get(k, 0) or 0) for k in _SKILL_KEYS) if v > 0)
+    want = {int(k): int(v) for k, v in tpl["skills"].items()}
+    if have != want:
+        errors.append(f"Skills must be {_describe_levels(want)} for a {tpl['label']}.")
+
+    # Specialties — at least the template's granted count.
+    spec_n = len([s for s in (sheet.get("specialties") or [])
+                  if isinstance(s, dict) and s.get("name")])
+    if spec_n < tpl["specialties"]:
+        noun = "Specialty" if tpl["specialties"] == 1 else "Specialties"
+        errors.append(f"A {tpl['label']} has {tpl['specialties']} {noun} (you have {spec_n}).")
+
+    # Disciplines — mortal 0, ghoul exactly 1 dot.
+    disc_total = sum(int(sheet.get(k, 0) or 0) for k in _disc_keys())
+    if is_ghoul:
+        if disc_total != 1:
+            errors.append("A ghoul Retainer has exactly 1 Discipline dot "
+                          "(from the domitor's clan).")
+    elif disc_total > 0:
+        errors.append("A mortal Retainer has no Disciplines — mark it a ghoul "
+                      "to grant one dot.")
+
+    # Advantage / Flaw point bounds.
+    adv = _player_advantage_dots(sheet, ("merits", "advantages", "backgrounds"))
+    if adv > tpl["advantage_points"]:
+        errors.append(f"Advantages total {adv} points — a {tpl['label']} allows "
+                      f"up to {tpl['advantage_points']}.")
+    flaws = _player_advantage_dots(sheet, ("flaws",))
+    if flaws > tpl["flaw_max"]:
+        if tpl["flaw_max"] == 0:
+            errors.append(f"A {tpl['label']} takes no Flaws (you have {flaws}).")
+        else:
+            errors.append(f"Flaws total {flaws} points — a {tpl['label']} allows "
+                          f"up to {tpl['flaw_max']}.")
+
+    return errors
 
 
 def validate_chargen_raw(
