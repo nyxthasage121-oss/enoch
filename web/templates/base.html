@@ -156,8 +156,8 @@
          portals, so give them one persistent control to jump between the
          two rather than scanning for the right section. Hidden for plain
          players (they only have the player portal). #}
+      {% set _in_staff = is_staff and request.url.path.startswith('/staff') %}
       {% if is_staff %}
-      {% set _in_staff = request.url.path.startswith('/staff') %}
       <div class="px-3 pt-3 pb-1">
         <div class="grid grid-cols-2 gap-1.5">
           <a href="/characters"
@@ -178,7 +178,12 @@
 
       {# Navigation #}
       <div class="flex-1 px-2 py-3 space-y-0.5">
-        {% if current_user %}
+        {% if not current_user %}
+          <a href="/auth/login" class="nav-link">Sign In</a>
+        {% elif not _in_staff %}
+          {# Player-portal nav — also the only nav a plain player sees. Hidden
+             while staff are in the Staff portal so the top stays focused on
+             staff work. #}
           <a href="/characters"
              class="nav-link {{ 'active' if request.url.path.startswith('/characters') else '' }}">
             My Characters
@@ -187,15 +192,9 @@
              class="nav-link {{ 'active' if request.url.path.startswith('/coteries') else '' }}">
             Coterie
           </a>
-          <a href="/hunting-sites"
-             class="nav-link {{ 'active' if request.url.path.startswith('/hunting-sites') else '' }}">
-            Hunting Sites
-          </a>
-        {% else %}
-          <a href="/auth/login" class="nav-link">Sign In</a>
         {% endif %}
 
-        {% if is_staff %}
+        {% if _in_staff %}
         <div class="pt-4 mt-3 border-t border-ink-800">
           <p class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase px-3 mb-2" style="color:#c29b48;">Staff</p>
 
