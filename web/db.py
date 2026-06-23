@@ -700,6 +700,18 @@ def get_settings(conn) -> dict | None:
                   "unlocked_predator_types")
 
 
+def coterie_max_members(conn) -> int:
+    """The chronicle's coterie member cap (migration 045) — a per-chronicle
+    setting that falls back to the COTERIE_MAX_MEMBERS config constant when
+    unset or invalid."""
+    val = (get_settings(conn) or {}).get("coterie_max_members")
+    try:
+        val = int(val)
+    except (TypeError, ValueError):
+        val = 0
+    return val if val > 0 else settings.COTERIE_MAX_MEMBERS
+
+
 # Chronicle ruleset constants — gives the rest of the app a single place
 # to look up valid values + the V5 RAW defaults.
 RULESETS = ("standard", "homebrew")  # base budget rulesets. In Memoriam is no
@@ -809,6 +821,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "in_memoriam_enabled", "creation_mode",
         # Chronicle-wide project mode toggle (migration 043)
         "project_mode",
+        # Per-chronicle coterie member cap (migration 045)
+        "coterie_max_members",
     }
     # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
     # migration 040. It's now an orthogonal flag — translate a legacy POST
@@ -2635,9 +2649,10 @@ def add_coterie_member(conn, coterie_id: int, character_id: int, role: str = "me
             "SELECT COUNT(*) AS n FROM coterie_memberships WHERE coterie_id=?",
             (coterie_id,),
         ).fetchone()["n"]
-        if count >= settings.COTERIE_MAX_MEMBERS:
+        cap = coterie_max_members(conn)
+        if count >= cap:
             raise ValueError(
-                f"Coterie is full — max {settings.COTERIE_MAX_MEMBERS} members."
+                f"Coterie is full — max {cap} members."
             )
         # One character per player: a player can't have two of their own
         # characters in the same coterie.
@@ -3373,10 +3388,11 @@ def approve_coterie_request(conn, request_id: int, reviewer_id: str) -> dict:
         raise ValueError(f"Request {request_id} is not pending")
 
     member_ids = req["member_ids"] or []
-    if len(member_ids) > settings.COTERIE_MAX_MEMBERS:
+    _cap = coterie_max_members(conn)
+    if len(member_ids) > _cap:
         raise ValueError(
             f"Cannot approve — request has {len(member_ids)} members "
-            f"(max {settings.COTERIE_MAX_MEMBERS})."
+            f"(max {_cap})."
         )
 
     coterie = create_coterie(conn, req["proposed_name"], creation_state="forming")

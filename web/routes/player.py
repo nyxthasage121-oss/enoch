@@ -2249,6 +2249,9 @@ async def coteries_list(request: Request, user: dict = Depends(require_auth)):
                 for k, v in sorted(_agg.items(), key=lambda x: (-x[1], x[0][1]))
             ]
 
+        from ..db import coterie_max_members
+        coterie_member_cap = coterie_max_members(conn)
+
         # Characters eligible to include in a formation request
         eligible = [
             c for c in chars
@@ -2266,6 +2269,7 @@ async def coteries_list(request: Request, user: dict = Depends(require_auth)):
             members=members,
             spends=spends,
             coterie_merits=coterie_merits,
+            coterie_member_cap=coterie_member_cap,
             eligible_chars=eligible,
             roster=roster,
             hunting_sites=sites,
@@ -2302,9 +2306,12 @@ async def submit_coterie_request(
         except Exception:
             errors.append("Invalid member list — please try again.")
 
-    if len(member_ids) > settings.COTERIE_MAX_MEMBERS:
+    from ..db import coterie_max_members
+    with get_db() as conn:
+        _cap = coterie_max_members(conn)
+    if len(member_ids) > _cap:
         errors.append(
-            f"A coterie can have at most {settings.COTERIE_MAX_MEMBERS} members."
+            f"A coterie can have at most {_cap} members."
         )
 
     if errors:

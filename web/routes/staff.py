@@ -2181,6 +2181,8 @@ async def admin_settings_save(
     # partial settings save (or API call) doesn't silently reset it.
     if "max_chars_per_player" in form:
         payload["max_chars_per_player"] = form_int(form.get("max_chars_per_player"), 2, lo=0, hi=20)
+    if "coterie_max_members" in form:
+        payload["coterie_max_members"] = form_int(form.get("coterie_max_members"), 6, lo=1, hi=50)
     if "rolls_per_timeskip" in form:
         payload["rolls_per_timeskip"] = form_int(form.get("rolls_per_timeskip"), 8, lo=0, hi=99)
     if "project_mode" in form:

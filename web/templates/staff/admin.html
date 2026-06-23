@@ -374,6 +374,17 @@
           </p>
         </div>
 
+        <div>
+          <label class="label-gold block mb-1.5 text-[0.7rem]">Members per coterie</label>
+          <input type="number" name="coterie_max_members" min="1" max="50"
+                 value="{{ _cs.get('coterie_max_members', 6) }}"
+                 class="w-28 text-sm py-1 px-2">
+          <p class="font-garamond text-bone-600 text-xs mt-1 italic">
+            Max characters allowed in one coterie (default 6). Enforced on new
+            joins and on member-add approvals.
+          </p>
+        </div>
+
         <label class="flex items-start gap-3 cursor-pointer group">
           <div class="pt-0.5">
             <input type="checkbox" name="xp_cap_enabled"
