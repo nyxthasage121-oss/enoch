@@ -158,8 +158,10 @@
         {% endif %}
       </div>
 
-      {# ── Profile image — avatar + management, relocated into About ── #}
-      <div class="flex items-center gap-4 mb-5">
+      {# ── Profile image — avatar + management. Shown only while editing so the
+           portrait doesn't duplicate the header avatar in the normal view; here
+           it's a reference for the upload/replace controls beside it. ── #}
+      <div x-show="editing" x-cloak class="flex items-center gap-4 mb-5">
         <div class="aurora-portrait w-20 h-20 shrink-0">
           <div class="w-full h-full border border-clan
                       bg-ink-900 flex items-center justify-center overflow-hidden">

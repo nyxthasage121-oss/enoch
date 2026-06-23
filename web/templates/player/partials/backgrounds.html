@@ -61,9 +61,12 @@
     </tbody>
   </table>
   {% else %}
-  <p class="font-garamond text-bone-600 text-sm italic mb-4">
-    No backgrounds tracked yet. Add one below to start blanking per night.
-  </p>
+  <div class="gilded-inset border border-dashed border-ink-600 px-4 py-5 mb-4 text-center">
+    <p class="font-cinzel text-bone-400 text-sm tracking-wide mb-1">No backgrounds yet</p>
+    <p class="font-garamond text-bone-600 text-xs italic leading-relaxed">
+      Add one below (Allies, Resources, Herd…) to start tracking dots and blanking per night.
+    </p>
+  </div>
   {% endif %}
 
   {# Set / update / remove a tracked background (0 dots removes it) #}
