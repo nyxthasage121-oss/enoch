@@ -156,7 +156,7 @@
          portals, so give them one persistent control to jump between the
          two rather than scanning for the right section. Hidden for plain
          players (they only have the player portal). #}
-      {% set _in_staff = is_staff and request.url.path.startswith('/staff') %}
+      {% set _in_staff = is_staff and (request.url.path.startswith('/staff') or request.url.path.startswith('/hunting-sites')) %}
       {% if is_staff %}
       <div class="px-3 pt-3 pb-1">
         <div class="grid grid-cols-2 gap-1.5">
@@ -191,6 +191,10 @@
           <a href="/coteries"
              class="nav-link {{ 'active' if request.url.path.startswith('/coteries') else '' }}">
             Coterie
+          </a>
+          <a href="/hunting-sites"
+             class="nav-link {{ 'active' if request.url.path.startswith('/hunting-sites') else '' }}">
+            Hunting Sites
           </a>
         {% endif %}
 
@@ -241,6 +245,10 @@
           <a href="/staff/coteries"
              class="nav-link {{ 'active' if request.url.path.startswith('/staff/coteries') else '' }}">
             Coteries
+          </a>
+          <a href="/hunting-sites"
+             class="nav-link {{ 'active' if request.url.path.startswith('/hunting-sites') else '' }}">
+            Hunting Sites
           </a>
           {% if project_mode != 'off' %}
           <a href="/staff/projects"
