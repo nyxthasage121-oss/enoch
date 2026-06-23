@@ -623,7 +623,16 @@ async def roll_project(project_id: int, body: ProjectRollIn):
         active    = get_active_period(conn)
         period_id = active["id"] if active else None
         try:
-            if proj.get("stages_json"):
+            from ..db import get_project_mode, resolve_homebrew_roll
+            if get_project_mode(conn) == "homebrew":
+                res = resolve_homebrew_roll(
+                    conn, project_id, successes=body.successes,
+                    critical=body.critical, messy=body.messy,
+                    hunger_one=body.hunger_one, pool_size=body.pool_size,
+                    period_id=period_id, actor_character_id=roller_id,
+                )
+                project, result = res["project"], res["result"]
+            elif proj.get("stages_json"):
                 res = resolve_project_roll(
                     conn, project_id, successes=body.successes,
                     critical=body.critical, messy=body.messy,

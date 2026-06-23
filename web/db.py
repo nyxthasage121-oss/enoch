@@ -1075,6 +1075,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "in_memoriam_enabled", "creation_mode",
         # Chronicle-wide project mode toggle (migration 043)
         "project_mode",
+        # Homebrew project engine: optional launch roll (migration 050)
+        "homebrew_launch_roll",
         # Per-chronicle coterie member cap (migration 045)
         "coterie_max_members",
     }
@@ -2680,21 +2682,28 @@ def write_audit(
 _ALERT_LEVELS = {"warn", "error"}
 
 
+def _insert_alert(conn, source: str, level: str, event: str, message: str,
+                  detail: str = "") -> None:
+    """Insert an alert via an EXISTING connection — use this when already inside
+    a transaction (a fresh connection would deadlock on SQLite's write lock)."""
+    conn.execute(
+        "INSERT INTO app_alerts (source, level, event, message, detail, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (source if source in ("web", "bot") else "web",
+         level if level in _ALERT_LEVELS else "error",
+         (event or "")[:80], (message or "")[:500],
+         (detail or "")[:8000], _now()),
+    )
+
+
 def log_alert(source: str, level: str, event: str, message: str,
               detail: str = "") -> None:
     """Persist an operational alert. Opens its own connection and never raises
     — it runs on error paths, so a logging failure must not mask the original
-    error."""
+    error. Inside an open transaction, use `_insert_alert(conn, …)` instead."""
     try:
         with get_db() as conn:
-            conn.execute(
-                "INSERT INTO app_alerts (source, level, event, message, detail, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (source if source in ("web", "bot") else "web",
-                 level if level in _ALERT_LEVELS else "error",
-                 (event or "")[:80], (message or "")[:500],
-                 (detail or "")[:8000], _now()),
-            )
+            _insert_alert(conn, source, level, event, message, detail)
     except Exception:
         log.exception("Failed to persist app alert")
 
@@ -4618,6 +4627,9 @@ def _project_view(row: dict | None) -> dict | None:
         stages = []
     row["stages_json"] = stages
     row["is_coterie"] = row.get("coterie_id") is not None
+    # Homebrew engine flags (migration 050) — harmless on NYbN projects.
+    row["paused"]   = bool(row.get("paused"))
+    row["launched"] = bool(row.get("launched", 1))
 
     if stages:
         row["target_reached"] = all(s.get("done") for s in stages)
@@ -4749,7 +4761,8 @@ def approve_project(conn, project_id: int, reviewer_id: str, *,
                     stages: list | None = None,
                     reward_category: str | None = None,
                     reward_trait: str | None = None,
-                    reward_dots: int = 0, reward_xp: int = 0) -> dict:
+                    reward_dots: int = 0, reward_xp: int = 0,
+                    launched: int = 1) -> dict:
     proj = get_project(conn, project_id)
     if proj is None:
         raise ValueError(f"Project {project_id} not found")
@@ -4781,13 +4794,14 @@ def approve_project(conn, project_id: int, reviewer_id: str, *,
         """
         UPDATE projects SET status='active', progress_type=?, payoff_type=?,
             roll_pool=?, roll_difficulty=?, target_successes=?,
-            stages_json=?, current_stage=0,
+            stages_json=?, current_stage=0, launched=?, paused=0,
             reward_category=?, reward_trait=?, reward_dots=?, reward_xp=?,
             reviewed_by=?, reviewed_at=?, updated_at=?
         WHERE id=?
         """,
         (progress_type, payoff_type, (roll_pool or "").strip(),
          max(0, int(roll_difficulty)), total_target, _j(norm_stages),
+         int(bool(launched)),
          reward_category, reward_trait, max(0, int(reward_dots)),
          max(0, int(reward_xp)), reviewer_id, _now(), _now(), project_id),
     )
@@ -4858,6 +4872,12 @@ def get_project_mode(conn) -> str:
 def projects_enabled(conn) -> bool:
     """False when the chronicle has Projects turned off."""
     return get_project_mode(conn) != "off"
+
+
+def get_homebrew_launch_roll(conn) -> bool:
+    """Whether the Homebrew engine requires a launch roll to open a project
+    (migration 050). Off by default — some chronicles run it, some don't."""
+    return bool((get_settings(conn) or {}).get("homebrew_launch_roll", 0))
 
 
 def get_rolls_per_timeskip(conn) -> int:
@@ -5079,6 +5099,104 @@ def resolve_project_roll(conn, project_id: int, *, successes: int,
         "outcome": result["outcome"], "stage": idx + 1, "flags": flags,
     })
     return {"project": get_project(conn, project_id), "result": result}
+
+
+def resolve_homebrew_roll(conn, project_id: int, *, successes: int,
+                          critical: bool = False, messy: bool = False,
+                          hunger_one: bool = False, pool_size: int = 0,
+                          period_id: int | None,
+                          actor_character_id: int | None = None) -> dict:
+    """Apply one downtime roll under the Homebrew engine (project_mode='homebrew').
+
+    A single staff-set goal DC (target_successes) cumulative extended test — no
+    stages. Two homebrew-specific rules:
+      * if the project still needs a launch roll (launched=0), THIS roll opens it
+        — any success launches the test; a plain failure just retries next
+        timeskip;
+      * a messy crit or a bestial failure (a Hunger-die 1 with zero successes)
+        PAUSES the project and flags the ST (an alert), instead of NYbN's DC
+        auto-bump. Normal successes bank toward the goal; a plain failure makes
+        no progress. Returns {project, result}; raises ValueError on bad state."""
+    proj = get_project(conn, project_id)
+    if proj is None:
+        raise ValueError("Project not found.")
+    if proj["status"] != "active" or proj.get("progress_type") != "roll":
+        raise ValueError("This project isn't an active roll project.")
+    if proj.get("paused"):
+        raise ValueError("This project is paused for ST review.")
+    if period_id is None:
+        raise ValueError("There is no active play period to roll in.")
+    roller = actor_character_id or proj["character_id"]
+    cap  = get_rolls_per_timeskip(conn)
+    used = get_timeskip_rolls_used(conn, roller, period_id)
+    if used >= cap:
+        raise ValueError(f"No project rolls left this timeskip ({used}/{cap} used).")
+    consume_timeskip_roll(conn, roller, period_id)
+
+    succ    = max(0, int(successes))
+    bestial = bool(hunger_one) and succ == 0
+    char    = _project_roller_name(conn, proj, roller)
+
+    def _pause(phase_note: str, extra_set: str = "", extra_args: tuple = ()):
+        conn.execute(
+            f"UPDATE projects SET paused=1{extra_set}, updated_at=? WHERE id=?",
+            (*extra_args, _now(), project_id))
+        _insert_alert(conn, "web", "warn", "project_needs_st",
+                      f"Project “{proj['title']}” paused on a "
+                      f"{'bestial' if bestial else 'messy'} result",
+                      f"{char or 'A player'} needs ST review — clear the pause to "
+                      "let them resume.")
+        _project_log_append(conn, project_id,
+                            {"by": "player", "kind": "roll", "char": char,
+                             "outcome": "paused", "phase": phase_note})
+
+    # ── Launch roll — opens the test (only when homebrew_launch_roll is on) ──
+    if not proj.get("launched"):
+        if messy or bestial:
+            _pause("launch")
+        elif succ > 0:
+            conn.execute("UPDATE projects SET launched=1, updated_at=? WHERE id=?",
+                         (_now(), project_id))
+            _project_log_append(conn, project_id,
+                                {"by": "player", "kind": "roll", "char": char,
+                                 "successes": succ, "outcome": "launched", "phase": "launch"})
+        else:
+            _project_log_append(conn, project_id,
+                                {"by": "player", "kind": "roll", "char": char,
+                                 "successes": succ, "outcome": "launch_failed", "phase": "launch"})
+        outcome = ("paused" if (messy or bestial) else
+                   ("launched" if succ > 0 else "launch_failed"))
+        return {"project": get_project(conn, project_id),
+                "result": {"outcome": outcome, "phase": "launch"}}
+
+    # ── Extended test — bank successes toward the goal DC ──
+    target   = max(0, int(proj.get("target_successes") or 0))
+    new_prog = int(proj.get("progress_successes") or 0) + succ
+    if messy or bestial:
+        _pause("test", ", progress_successes=?, last_roll_period_id=?",
+               (new_prog, period_id))
+        outcome = "paused"
+    else:
+        conn.execute(
+            "UPDATE projects SET progress_successes=?, last_roll_period_id=?, "
+            "updated_at=? WHERE id=?", (new_prog, period_id, _now(), project_id))
+        outcome = ("goal_reached" if (target > 0 and new_prog >= target)
+                   else ("progress" if succ > 0 else "no_progress"))
+        _project_log_append(conn, project_id,
+                            {"by": "player", "kind": "roll", "char": char,
+                             "successes": succ, "outcome": outcome, "progress": new_prog})
+    return {"project": get_project(conn, project_id),
+            "result": {"outcome": outcome, "gained": succ,
+                       "progress": new_prog, "target": target}}
+
+
+def set_project_paused(conn, project_id: int, paused: bool, actor_id: str) -> dict:
+    """Pause / resume a project (the ST clears a homebrew 'needs review' pause)."""
+    conn.execute("UPDATE projects SET paused=?, updated_at=? WHERE id=?",
+                 (int(bool(paused)), _now(), project_id))
+    _project_log_append(conn, project_id,
+                        {"by": actor_id, "kind": "paused" if paused else "resumed"})
+    return get_project(conn, project_id)
 
 
 def complete_project(conn, project_id: int, staff_id: str,
