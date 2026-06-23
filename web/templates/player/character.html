@@ -383,6 +383,37 @@
     </div>
     {% endif %}
 
+    {# ── Retainers & Mawlas ── #}
+    <div class="gilded p-5">
+      <div class="flex items-center justify-between mb-3">
+        <p class="label-gold">Retainers &amp; Mawlas</p>
+        <a href="/characters/{{ char.id }}/companions"
+           class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1">Manage</a>
+      </div>
+      {% if companions %}
+      <div class="space-y-1.5">
+        {% for c in companions %}
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="chip {{ 'text-mauve-300 border-mauve-800' if c.kind == 'mawla' else 'text-gold-400 border-gold-800' }} text-[0.5rem]">
+              {{ 'Mawla' if c.kind == 'mawla' else ('Ghoul' if c.is_ghoul else 'Retainer') }}
+            </span>
+            <span class="font-garamond text-sm text-bone-300 truncate">{{ c.name }}</span>
+          </div>
+          <span class="flex gap-0.5 shrink-0">
+            {% for n in range(1, 6) %}<span class="w-1.5 h-1.5 rounded-full {{ 'bg-clan' if n <= c.dots else 'border border-bone-800' }}"></span>{% endfor %}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="font-garamond text-bone-600 text-xs italic">
+        No retainers or mawlas yet.
+        <a href="/characters/{{ char.id }}/companions" class="text-gold-500 hover:text-gold-300 no-underline">Build one →</a>
+      </p>
+      {% endif %}
+    </div>
+
     {% if char.is_approved %}
     {% include "player/partials/backgrounds.html" %}
     {% endif %}

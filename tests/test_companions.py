@@ -157,3 +157,52 @@ def test_companions_cascade_on_character_delete(_client):
         delete_character(conn, cid)
         assert list_companions(conn, cid) == []
         conn.commit()
+
+
+# ── Player routes (char 1 = Valeria Morano, owned by the dev TestPlayer) ─────
+
+def test_companions_page_loads(player):
+    r = player.get("/characters/1/companions")
+    assert r.status_code == 200
+    assert "Retainers" in r.text and "Build a Retainer" in r.text
+
+
+def test_create_and_delete_retainer_via_route(player):
+    import json as _json
+    from web.db import get_db, list_companions
+    r = player.post("/characters/1/companions", data={
+        "_csrf": "dev-csrf-token", "kind": "retainer", "name": "QA Retainer",
+        "dots": "2", "concept": "driver",
+        "sheet_json": _json.dumps(_template_sheet("average")),
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    with get_db() as conn:
+        mine = [c for c in list_companions(conn, 1) if c["name"] == "QA Retainer"]
+    assert len(mine) == 1 and mine[0]["template"] == "average"
+    cid = mine[0]["id"]
+    assert "QA Retainer" in player.get("/characters/1/companions").text
+
+    r2 = player.post(f"/companions/{cid}/delete",
+                     data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+    assert r2.status_code == 303
+    with get_db() as conn:
+        assert not [c for c in list_companions(conn, 1) if c["id"] == cid]
+
+
+def test_invalid_retainer_rejected_via_route(player):
+    import json as _json
+    from web.db import get_db, list_companions
+    bad = _template_sheet("average")
+    bad["attr_strength"] = 5                      # breaks the multiset
+    r = player.post("/characters/1/companions", data={
+        "_csrf": "dev-csrf-token", "kind": "retainer", "name": "QA Bad Spread",
+        "dots": "2", "sheet_json": _json.dumps(bad),
+    }, follow_redirects=False)
+    assert r.status_code == 200                   # re-rendered with errors
+    assert "Couldn't save" in r.text
+    with get_db() as conn:
+        assert not [c for c in list_companions(conn, 1) if c["name"] == "QA Bad Spread"]
+
+
+def test_companions_ownership_enforced(player):
+    assert player.get("/characters/999999/companions").status_code == 404

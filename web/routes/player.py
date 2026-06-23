@@ -15,6 +15,10 @@ from ..db import (
     create_coterie_single_funder_spend,
     create_spend,
     delete_character,
+    create_companion,
+    list_companions,
+    get_companion_for_player,
+    delete_companion,
     set_character_background,
     blank_character_background,
     list_character_backgrounds,
@@ -292,6 +296,9 @@ from ..v5_traits import (
     SHEET_TRAIT_KEYS as _SHEET_TRAIT_KEYS,
     SHEET_LIMITS    as _SHEET_LIMITS,
     validate_chargen_raw as _validate_chargen_raw,
+    MORTAL_TEMPLATES as _MORTAL_TEMPLATES,
+    RETAINER_DOTS_TO_TEMPLATE as _RETAINER_DOTS_TO_TEMPLATE,
+    validate_retainer_template as _validate_retainer_template,
 )
 
 # Make the V5 reference catalogs available to every template render (the chargen
@@ -1704,6 +1711,7 @@ async def character_detail(
         coterie         = get_coterie_for_character(conn, character_id)
         _sync_backgrounds_from_sheet(conn, char)
         backgrounds     = list_character_backgrounds(conn, character_id)
+        companions      = list_companions(conn, character_id)
         projects        = list_projects_for_character(conn, character_id)
         proj_rolls      = timeskip_rolls_remaining(conn, character_id)
 
@@ -1733,6 +1741,7 @@ async def character_detail(
             coterie=coterie,
             default_tab=tab,
             backgrounds=backgrounds,
+            companions=companions,
             projects=projects,
             proj_rolls=proj_rolls,
             spend_categories=SPEND_CATEGORIES,
@@ -1866,6 +1875,144 @@ async def blank_background(
         except ValueError as exc:
             error = str(exc)
         return _backgrounds_partial(request, char, conn, notice=notice, error=error)
+
+
+# ── Companions (Retainers & Mawlas) ───────────────────────────────────────────
+
+_COMPANION_TRAIT_KEYS = (
+    {k for _c, _tr in _V5_ATTRIBUTES for k, _ in _tr}
+    | {k for _c, _tr in _V5_SKILLS for k, _ in _tr}
+    | {k for k, _ in _V5_DISCIPLINES}
+)
+
+
+def _sanitize_companion_sheet(raw: dict) -> dict:
+    """Keep only known trait keys (clamped 0–5) + specialties / merits / flaws
+    from a client-posted companion sheet — never trust the client's JSON whole."""
+    sheet: dict = {"specialties": []}
+    if not isinstance(raw, dict):
+        return sheet
+    for k in _COMPANION_TRAIT_KEYS:
+        try:
+            v = int(raw.get(k, 0) or 0)
+        except (TypeError, ValueError):
+            v = 0
+        if v > 0:
+            sheet[k] = max(0, min(5, v))
+    specs = []
+    for s in (raw.get("specialties") or []):
+        if isinstance(s, dict) and str(s.get("name") or "").strip():
+            specs.append({"skill": str(s.get("skill") or ""),
+                          "name": str(s.get("name")).strip()})
+    sheet["specialties"] = specs
+    for lk in ("merits", "flaws"):
+        items = []
+        for it in (raw.get(lk) or []):
+            if isinstance(it, dict) and str(it.get("name") or "").strip():
+                try:
+                    d = int(it.get("dots") or 0)
+                except (TypeError, ValueError):
+                    d = 0
+                items.append({"name": str(it["name"]).strip(), "dots": max(0, min(5, d))})
+        if items:
+            sheet[lk] = items
+    return sheet
+
+
+def _companions_ctx(request: Request, char: dict, conn, *,
+                    create_errors=None, form=None):
+    """Render the Retainers & Mawlas management page."""
+    return templates.TemplateResponse(
+        request, "player/companions.html",
+        _ctx(
+            request,
+            char=char,
+            companions=list_companions(conn, char["id"]),
+            v5_attributes=_V5_ATTRIBUTES,
+            v5_skills=_V5_SKILLS,
+            v5_disciplines=_V5_DISCIPLINES,
+            clan_disciplines=sorted(_CLAN_DISCIPLINES.get(char["clan"], [])),
+            mortal_templates=_MORTAL_TEMPLATES,
+            retainer_dots_to_template=_RETAINER_DOTS_TO_TEMPLATE,
+            create_errors=create_errors or [],
+            form=form or {},
+        ),
+    )
+
+
+@router.get("/characters/{character_id}/companions", response_class=HTMLResponse)
+async def companions_page(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+):
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        return _companions_ctx(request, char, conn)
+
+
+@router.post("/characters/{character_id}/companions")
+async def companion_create(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    kind        = (form.get("kind") or "retainer").strip().lower()
+    name        = (form.get("name") or "").strip()
+    concept     = (form.get("concept") or "").strip() or None
+    description = (form.get("description") or "").strip() or None
+    try:
+        raw_sheet = json.loads(form.get("sheet_json") or "{}")
+    except (ValueError, TypeError):
+        raw_sheet = {}
+    sheet = _sanitize_companion_sheet(raw_sheet)
+
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        errors: list[str] = []
+        if not name:
+            errors.append("Give your companion a name.")
+        if kind == "retainer":
+            dots     = max(1, min(3, form_int(form.get("dots"), 2)))
+            template = _RETAINER_DOTS_TO_TEMPLATE.get(dots, "weak")
+            is_ghoul = form.get("is_ghoul") == "on"
+            errors += _validate_retainer_template(sheet, template, is_ghoul=is_ghoul)
+            if not errors:
+                create_companion(
+                    conn, parent_character_id=character_id, kind="retainer",
+                    name=name, dots=dots, template=template, is_ghoul=is_ghoul,
+                    clan=(char["clan"] if is_ghoul else None),
+                    concept=concept, description=description, sheet_json=sheet)
+                conn.commit()
+                return RedirectResponse(
+                    url=f"/characters/{character_id}/companions", status_code=303)
+        else:
+            # The Mawla (Kindred) builder lands in the next phase.
+            errors.append("Mawla creation is coming next — Retainers only for now.")
+        return _companions_ctx(request, char, conn, create_errors=errors, form=form)
+
+
+@router.post("/companions/{companion_id}/delete")
+async def companion_delete(
+    request: Request,
+    companion_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    with get_db() as conn:
+        comp = get_companion_for_player(conn, companion_id, user["id"])
+        if not comp:
+            raise HTTPException(status_code=404)
+        parent_id = comp["parent_character_id"]
+        delete_companion(conn, companion_id)
+        conn.commit()
+    return RedirectResponse(url=f"/characters/{parent_id}/companions", status_code=303)
 
 
 # ── Projects (downtime endeavours) ────────────────────────────────────────────
