@@ -1435,65 +1435,19 @@
       </template>
 
       <div class="mb-4">
-        <div class="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
-          <p class="label-gold text-xs">Disciplines</p>
-          <p class="font-garamond text-[0.65rem] text-bone-700 italic">Tap a power to add it — it unlocks once you have the dots and any lower-level powers.</p>
-        </div>
-        {% set disc_labels = dict(v5_disciplines) %}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <p class="label-gold mb-3 text-xs">Disciplines</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
           {% for key, label in v5_disciplines %}
-          {% set _powers = discipline_powers.get(key, []) | sort(attribute='level') %}
-          <div class="gilded-inset overflow-hidden flex flex-col"
-               x-show="isDiscPickable('{{ key }}')" x-cloak
-               x-data="{ moreDisc: false }"
-               :class="isInClan('{{ key }}') ? 'border-gold-800' : 'border-ink-700'">
-            {# Header — name + In-Clan tag + the dot tracker #}
-            <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-ink-800"
-                 :class="(sheet['{{ key }}'] || 0) > 0 ? 'bg-[#1a1012]' : ''">
-              <div class="min-w-0">
-                <p class="font-cinzel text-sm tracking-wide truncate"
-                   :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-gold-300' : 'text-bone-300'">{{ label }}</p>
-                <span x-show="isInClan('{{ key }}')"
-                      class="font-cinzel text-[0.5rem] tracking-[0.2em] text-gold-500 uppercase">In-Clan</span>
-              </div>
-              {% set tplkey = key %}
-              {% include "player/partials/wizard_pips.html" %}
-            </div>
-
-            {# Powers preview — browse what the Discipline offers; powers above
-               your current dots dim out, brightening as you allocate. #}
-            {% if _powers %}
-            <div class="px-2 py-2 flex-1">
-              {% for p in _powers %}
-              {% set _pn = p.name | tojson | forceescape %}
-              <div class="px-2 py-1.5 rounded transition-colors"
-                   {% if loop.index > 5 %}x-show="moreDisc" x-cloak{% endif %}
-                   :class="isPowerSelected('{{ key }}', {{ _pn }})
-                     ? 'bg-[#241a12] border-l-2 border-gold-700 cursor-pointer'
-                     : (powerAddable('{{ key }}', {{ _pn }}, {{ p.level }}) ? 'cursor-pointer hover:bg-ink-800' : 'opacity-40 cursor-not-allowed')"
-                   @click="powerAddable('{{ key }}', {{ _pn }}, {{ p.level }}) && togglePower('{{ key }}', {{ _pn }}, {{ p.level }})">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="flex items-center gap-1.5 min-w-0">
-                    <span x-show="isPowerSelected('{{ key }}', {{ _pn }})" x-cloak class="text-gold-500 text-[0.6rem] shrink-0">✦</span>
-                    <span class="font-garamond text-xs truncate"
-                          :class="isPowerSelected('{{ key }}', {{ _pn }}) ? 'text-gold-300' : 'text-bone-300'">{{ p.name }}</span>
-                  </span>
-                  <span class="font-cinzel text-[0.6rem] text-bone-600 shrink-0">{{ p.level }}</span>
-                </div>
-                {% if p.amalgam %}
-                <span class="block font-cinzel text-[0.5rem] tracking-wide text-mauve-400 mt-0.5">{% for am in p.amalgam %}Amalgam · {{ disc_labels.get(am.discipline, am.discipline) }} ({{ am.level }}){% if not loop.last %} · {% endif %}{% endfor %}</span>
-                {% endif %}
-              </div>
-              {% endfor %}
-              {% if _powers | length > 5 %}
-              <button type="button" @click="moreDisc = !moreDisc"
-                      class="w-full text-center font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-600 hover:text-gold-400 pt-1.5">
-                <span x-show="!moreDisc">+{{ (_powers | length) - 5 }} more powers</span>
-                <span x-show="moreDisc" x-cloak>Show fewer</span>
-              </button>
-              {% endif %}
-            </div>
-            {% endif %}
+          <div class="flex items-center justify-between py-1.5 border-b border-ink-800"
+               x-show="isDiscPickable('{{ key }}')" x-cloak>
+            <span class="font-garamond text-sm"
+                  :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-gold-300' : 'text-bone-300'">
+              {{ label }}
+              <span x-show="isInClan('{{ key }}')" x-cloak
+                    class="font-cinzel text-[0.5rem] tracking-[0.2em] text-gold-500 uppercase ml-1">In-Clan</span>
+            </span>
+            {% set tplkey = key %}
+            {% include "player/partials/wizard_pips.html" %}
           </div>
           {% endfor %}
         </div>
@@ -1519,10 +1473,10 @@
          filtered to the character's dots; homebrew free text still allowed. #}
       <div class="gilded p-5 mb-5" x-show="learnedDisciplines().length > 0" x-cloak>
         <div class="flex items-baseline justify-between mb-3">
-          <p class="label-gold text-xs">Selected Powers</p>
+          <p class="label-gold text-xs">Powers</p>
           <p class="font-garamond text-[0.65rem] text-bone-700 italic">
-            Tap powers on the cards above to add them. Use the box below to type a
-            custom (homebrew) power not in the catalog.
+            The list shows only powers you can take now — a level-N power needs one
+            at each lower level, and amalgams need their other Discipline.
           </p>
         </div>
 
@@ -3401,31 +3355,6 @@
       },
       powersFor(disc) {
         return this.powers.filter(p => p.discipline === disc);
-      },
-      // ── Card-driven power selection (tap a power on its discipline card) ──
-      isPowerSelected(disc, name) {
-        const n = (name || '').toLowerCase();
-        return this.powers.some(p => p.discipline === disc && (p.name || '').toLowerCase() === n);
-      },
-      // A power is "addable" when it's at/under your dots AND its level + amalgam
-      // prerequisites are met. Already-selected powers count as addable so their
-      // card row stays bright + clickable (to remove).
-      powerAddable(disc, name, level) {
-        if (this.isPowerSelected(disc, name)) return true;
-        const cat = this.catalogPower(disc, name);
-        const lv = cat ? cat.level : level;
-        if ((this.sheet[disc] || 0) < lv) return false;
-        return !this.powerBlockReason(disc, lv, cat);
-      },
-      togglePower(disc, name, level) {
-        if (this.isPowerSelected(disc, name)) { this.removePower(disc, name); return; }
-        const cat = this.catalogPower(disc, name);
-        const lv = cat ? cat.level : level;
-        if ((this.sheet[disc] || 0) < lv) return;
-        const reason = this.powerBlockReason(disc, lv, cat);
-        if (reason) { this.powerError = (cat ? cat.name : name) + ' — ' + reason + '.'; return; }
-        this.powerError = '';
-        this.powers.push({ discipline: disc, name: cat ? cat.name : name, level: lv });
       },
       // Catalog powers for a discipline, capped at the character's dots and
       // hiding ones already added — drives the power-name autocomplete.
