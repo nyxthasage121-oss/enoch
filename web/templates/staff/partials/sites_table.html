@@ -33,15 +33,12 @@
                    name="name" value="{{ s.name }}" class="text-xs py-1 px-2 w-full">
           </td>
 
-          {# Area (column renamed from Borough — DB column stays) #}
+          {# Area — free text, each server names its own zones (DB col stays `borough`) #}
           <td class="px-4 py-2.5 font-garamond text-xs text-bone-500">
             <span x-show="!editing">{{ s.borough }}</span>
-            <select x-show="editing" x-cloak form="site-edit-{{ s.id }}"
-                    name="borough" class="text-xs py-1 px-2">
-              {% for b in boroughs %}
-              <option value="{{ b }}" {{ 'selected' if s.borough == b }}>{{ b }}</option>
-              {% endfor %}
-            </select>
+            <input x-show="editing" x-cloak form="site-edit-{{ s.id }}"
+                   name="borough" value="{{ s.borough }}" maxlength="80"
+                   class="text-xs py-1 px-2 w-full">
           </td>
 
           {# Sect Control #}

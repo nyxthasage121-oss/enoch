@@ -23,16 +23,12 @@
       <input type="text" name="name" required placeholder="e.g. Central Park" class="w-full">
     </div>
 
-    {# Borough is now labelled "Area" per Steward direction —
-       the underlying column name stays put for back-compat. #}
+    {# Area is free text — each server names its own zones. (DB column is
+       still `borough` for back-compat.) #}
     <div>
-      <label class="label-gold block mb-2">Area / Borough</label>
-      <select name="borough" class="w-full" required>
-        <option value="">— Select —</option>
-        {% for b in boroughs %}
-        <option value="{{ b }}">{{ b }}</option>
-        {% endfor %}
-      </select>
+      <label class="label-gold block mb-2">Area</label>
+      <input type="text" name="borough" required maxlength="80"
+             placeholder="e.g. Manhattan, Downtown, The Docks" class="w-full">
     </div>
 
     <div>

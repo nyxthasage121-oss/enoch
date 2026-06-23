@@ -146,6 +146,9 @@ async def hunting_sites_directory(
     from ..db import get_coterie
     with get_db() as conn:
         sites = list_hunting_sites(conn, active_only=True)
+        # Distinct areas/zones present — the filter options now come from the
+        # data (Area is free text per server), not a fixed list.
+        all_areas = sorted({s["borough"] for s in sites if s["borough"]})
         characters = list_player_characters(conn, user["id"])
 
         # Pick which character drives the "your DC" highlight. Default
@@ -185,7 +188,7 @@ async def hunting_sites_directory(
              active_chars=active_chars,
              selected_char=selected,
              selected_coterie_id=selected_coterie_id,
-             boroughs=_BOROUGHS_PLAYER,
+             boroughs=all_areas,
              filter_borough=borough,
              filter_min_quality=min_quality),
     )
