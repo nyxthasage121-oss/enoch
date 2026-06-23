@@ -320,6 +320,29 @@ templates.env.globals["spend_trait_keys"] = {
 }
 
 
+def _build_spend_trait_ratings() -> dict[str, list[int]]:
+    """Valid purchasable dot ratings per advantage (merit/loresheet), keyed by
+    lowercased trait name. A single-entry list is a FIXED-rating merit — e.g.
+    Cold Dead Hunger ••• → [3] — which the XP-spend form snaps "New Dots" to,
+    instead of leaving it at the generic default of 1. Scalable advantages
+    (Contacts, loresheets) get their full range so the form can cap them."""
+    out: dict[str, list[int]] = {}
+    for m in _MERIT_CATALOG:
+        nm = (m.get("name") or "").strip().lower()
+        cs = sorted({int(c) for c in (m.get("costs") or []) if isinstance(c, (int, float))})
+        if nm and cs:
+            out[nm] = cs
+    for lore in _LORESHEET_CATALOG:
+        nm = (lore.get("name") or "").strip().lower()
+        if nm and nm not in out:
+            mx = max((int(d.get("dot", 0)) for d in (lore.get("dots") or [])), default=5) or 5
+            out[nm] = list(range(1, mx + 1))
+    return out
+
+
+templates.env.globals["spend_trait_ratings"] = _build_spend_trait_ratings()
+
+
 _CLANS = [
     ("banu-haqim",   "Banu Haqim"),
     ("brujah",       "Brujah"),

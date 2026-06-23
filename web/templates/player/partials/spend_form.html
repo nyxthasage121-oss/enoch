@@ -3,7 +3,7 @@
    HTMX target: #spend-form (outerHTML swap). #}
 
 <div id="spend-form"
-     x-data="spendForm({{ spend_rules_json | safe | forceescape }}, {{ humanity_conditions | tojson | forceescape }}, {{ (spend_trait_keys | default({})) | tojson | forceescape }}, {{ ((char.sheet_json if char else {}) or {}) | tojson | forceescape }})">
+     x-data="spendForm({{ spend_rules_json | safe | forceescape }}, {{ humanity_conditions | tojson | forceescape }}, {{ (spend_trait_keys | default({})) | tojson | forceescape }}, {{ ((char.sheet_json if char else {}) or {}) | tojson | forceescape }}, {{ (spend_trait_ratings | default({})) | tojson | forceescape }})">
 
   {% if not char.is_approved %}
   <div class="gilded p-6">
@@ -120,13 +120,22 @@
                type="number"
                name="new_dots"
                x-model.number="newDots"
-               :min="currentDots + 1"
+               :min="newDotsMin"
                :max="maxDots"
                :value="{{ spend_form.new_dots if spend_form else 1 }}"
                class="w-full"
                min="1" max="10">
       </div>
     </div>
+
+    {# Fixed-rating merit hint — e.g. Cold Dead Hunger is only ever 3 dots, so
+       the dots snap to its rating automatically instead of defaulting to 1. #}
+    <p x-show="category && traitRatings && traitRatings.length === 1" x-cloak
+       class="font-garamond text-bone-600 text-xs italic -mt-2">
+      <span class="text-bone-400" x-text="traitName.trim()"></span> is a fixed
+      <span x-text="traitRatings ? traitRatings[0] : ''"></span>-dot trait —
+      dots are set for you.
+    </p>
 
     {# Cost preview — the headline of the form, so make it unmissable. #}
     <div x-show="category && computedCost !== null" x-cloak
@@ -197,16 +206,20 @@
 </div>
 
 <script>
-function spendForm(rules, humanityConditions, traitKeys, sheet) {
+function spendForm(rules, humanityConditions, traitKeys, sheet, ratings) {
   return {
     category:     '{{ spend_form.category if spend_form else "" }}',
-    traitName:    {{ (spend_form.trait_name if spend_form and spend_form.trait_name else '') | tojson | forceescape }},
+    {# tojson only — NOT forceescape: this is inside <script>, where the browser
+       does not decode HTML entities, so forceescape's &#34; would be literal and
+       break the JS. tojson is already safe (it \u-escapes <, >, &, '). #}
+    traitName:    {{ (spend_form.trait_name if spend_form and spend_form.trait_name else '') | tojson }},
     currentDots:  {{ spend_form.current_dots if spend_form else 0 }},
     newDots:      {{ spend_form.new_dots if spend_form else 1 }},
     rules:        rules,
     humanityConditions: humanityConditions,
     traitKeys:    traitKeys || {},
     sheet:        sheet || {},
+    ratingsMap:   ratings || {},
     checkedHC:    humanityConditions.map(() => false),
 
     init() {
@@ -221,6 +234,15 @@ function spendForm(rules, humanityConditions, traitKeys, sheet) {
     },
     _autofillCurrent() {
       if (this.isLevelBased) return;   // rituals/formulas start at 0
+      // Merits / loresheets carry their own valid dot ratings. Snap a fixed-
+      // rating merit (single allowed value, e.g. Cold Dead Hunger •••) to that
+      // rating instead of leaving New Dots at 1; clamp a scalable one to its max.
+      const ratings = this.traitRatings;
+      if (ratings) {
+        if (ratings.length === 1) { this.currentDots = 0; this.newDots = ratings[0]; }
+        else if (this.newDots > ratings[ratings.length - 1]) { this.newDots = ratings[ratings.length - 1]; }
+        return;
+      }
       const k = this.traitKeys[(this.traitName || '').trim().toLowerCase()];
       if (k) this.currentDots = this.sheet[k] || 0;
     },
@@ -245,7 +267,28 @@ function spendForm(rules, humanityConditions, traitKeys, sheet) {
     },
     get traitListId() { return this.traitList ? 'spend-dl-' + this.traitList : ''; },
 
-    get maxDots() { return this.rule ? (this.rule.max_dots ?? 5) : 5; },
+    // Merits/loresheets bought under "Advantage" carry their own valid dot
+    // ratings (from the catalog `costs` array). null for everything else.
+    get traitRatings() {
+      if (this.traitList !== 'advantage') return null;
+      const r = this.ratingsMap[(this.traitName || '').trim().toLowerCase()];
+      return (Array.isArray(r) && r.length) ? r : null;
+    },
+
+    // Highest valid New Dots — a trait's own ceiling if known, else the rule's.
+    get maxDots() {
+      const r = this.traitRatings;
+      if (r) return r[r.length - 1];
+      return this.rule ? (this.rule.max_dots ?? 5) : 5;
+    },
+
+    // Lowest valid New Dots. A fixed-rating merit locks New Dots to its single
+    // rating (min === max); otherwise it's one above the current dots.
+    get newDotsMin() {
+      const r = this.traitRatings;
+      if (r && r.length === 1) return r[0];
+      return this.currentDots + 1;
+    },
 
     get minCurrentDots() { return this.rule ? (this.rule.min_dots ?? 0) : 0; },
 
