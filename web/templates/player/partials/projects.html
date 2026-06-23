@@ -52,8 +52,12 @@
           {% set cur = p.stages_json[p.current_stage] %}
           <span>{{ 'All stages done — awaiting staff' if p.target_reached else ('Stage ' ~ (p.current_stage + 1) ~ ' / ' ~ p.stage_count ~ ((' · ' ~ cur.label) if cur.label else '')) }}</span>
           <span class="text-bone-400">{% if not p.target_reached %}{{ cur.progress }}/{{ cur.dc }}{% endif %}</span>
+          {% elif not p.launched %}
+          <span class="text-mauve-300">Roll to launch it</span><span></span>
+          {% elif p.paused %}
+          <span class="text-blood-400">Paused — staff reviewing</span><span></span>
           {% else %}
-          <span>{{ 'Target reached — awaiting staff' if p.target_reached else 'Extended test' }}</span>
+          <span>{{ 'Goal reached — awaiting staff' if p.target_reached else 'Extended test' }}</span>
           <span class="text-bone-400">{{ p.progress_successes }}/{{ p.target_successes }}</span>
           {% endif %}
         </div>

@@ -15,7 +15,11 @@ _DISCORD = "882000000000000077"
 
 @pytest.fixture(autouse=True)
 def _migrated(_client):
-    return _client
+    yield
+    # Reset the chronicle-wide mode so homebrew doesn't leak into other suites.
+    with get_db() as conn:
+        upsert_settings(conn, actor_id="t", project_mode="nybn", homebrew_launch_roll=0)
+        conn.commit()
 
 
 def _setup(conn, *, launch_roll=False, target=10, launched=None):
@@ -107,3 +111,56 @@ def test_resume_clears_pause():
         r = resolve_homebrew_roll(conn, pid, successes=3, period_id=_period(conn))
         assert r["result"]["outcome"] == "progress"
         conn.commit()
+
+
+# ── Phase 2 wiring: admin toggle, approve route, resume route ─────────────────
+
+def test_admin_toggle_saves_launch_roll(staff):
+    from web.db import get_db, get_homebrew_launch_roll
+    staff.post("/staff/admin/settings", data={
+        "_csrf": "dev-csrf-token", "project_mode": "homebrew",
+        "homebrew_launch_roll": "1"}, follow_redirects=False)
+    with get_db() as conn:
+        assert get_homebrew_launch_roll(conn) is True
+    # Omitting the checkbox (unchecked) turns it back off.
+    staff.post("/staff/admin/settings", data={
+        "_csrf": "dev-csrf-token", "project_mode": "homebrew"}, follow_redirects=False)
+    with get_db() as conn:
+        assert get_homebrew_launch_roll(conn) is False
+
+
+def test_homebrew_approve_route_single_target_and_launch(staff):
+    from web.db import (get_db, upsert_settings, upsert_player, create_character,
+                        create_project, get_project)
+    with get_db() as conn:
+        upsert_settings(conn, actor_id="t", project_mode="homebrew", homebrew_launch_roll=1)
+        upsert_player(conn, "883000000000000001", "HBApprove")
+        cid = create_character(conn, "883000000000000001", "HB Approve", "ventrue")["id"]
+        pid = create_project(conn, cid, "Approve Me", "", "883000000000000001")["id"]
+        conn.commit()
+    r = staff.post(f"/staff/projects/{pid}/approve", data={
+        "_csrf": "dev-csrf-token", "progress_type": "roll", "payoff_type": "freeform",
+        "roll_pool": "resolve + occult", "target_successes": "15"}, follow_redirects=False)
+    assert r.status_code in (200, 303)
+    with get_db() as conn:
+        p = get_project(conn, pid)
+    assert p["status"] == "active" and p["target_successes"] == 15
+    assert p["stages_json"] == [] and p["launched"] is False     # launch roll required
+
+
+def test_resume_route_clears_pause(staff):
+    from web.db import (get_db, upsert_player, create_character, create_project,
+                        approve_project, set_project_paused, get_project)
+    with get_db() as conn:
+        upsert_player(conn, "883000000000000002", "HBResume")
+        cid = create_character(conn, "883000000000000002", "HB Resume", "ventrue")["id"]
+        pid = create_project(conn, cid, "Pause Me", "", "883000000000000002")["id"]
+        approve_project(conn, pid, "staff", progress_type="roll", payoff_type="freeform",
+                        roll_pool="x", target_successes=10, launched=1)
+        set_project_paused(conn, pid, True, "system")
+        conn.commit()
+    r = staff.post(f"/staff/projects/{pid}/resume",
+                   data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+    assert r.status_code in (200, 303)
+    with get_db() as conn:
+        assert get_project(conn, pid)["paused"] is False

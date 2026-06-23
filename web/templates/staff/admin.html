@@ -419,19 +419,27 @@
           <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 whitespace-nowrap">Downtime Projects</span>
         </div>
 
-        <div>
-          <label class="label-gold block mb-1.5 text-[0.7rem]">Project mode</label>
+        <div x-data="{ pm: '{{ _cs.get('project_mode', 'nybn') }}' }">
           {% set _pm = _cs.get('project_mode', 'nybn') %}
-          <select name="project_mode" class="w-64 text-sm py-1.5 px-2">
+          <label class="label-gold block mb-1.5 text-[0.7rem]">Project mode</label>
+          <select name="project_mode" x-model="pm" class="w-64 text-sm py-1.5 px-2">
             <option value="nybn" {{ 'selected' if _pm == 'nybn' else '' }}>NYbN — multi-stage extended test</option>
+            <option value="homebrew" {{ 'selected' if _pm == 'homebrew' else '' }}>Homebrew — staff-set goal, optional launch</option>
             <option value="off"  {{ 'selected' if _pm == 'off' else '' }}>Off — Projects disabled</option>
-            <option value="homebrew" {{ 'selected' if _pm == 'homebrew' else '' }} {{ '' if _pm == 'homebrew' else 'disabled' }}>Homebrew — coming soon</option>
             <option value="raw" {{ 'selected' if _pm == 'raw' else '' }} {{ '' if _pm == 'raw' else 'disabled' }}>RAW — coming soon</option>
           </select>
           <p class="font-garamond text-bone-600 text-xs mt-1 italic">
             How downtime Projects work chronicle-wide. "Off" hides Projects everywhere
-            (player tab, coterie panel, staff queue). Homebrew + RAW are in progress.
+            (player tab, coterie panel, staff queue). RAW is still in progress.
           </p>
+          <label x-show="pm === 'homebrew'" x-cloak class="flex items-center gap-2 mt-3">
+            <input type="checkbox" name="homebrew_launch_roll" value="1" class="accent-gold"
+                   {{ 'checked' if _cs.get('homebrew_launch_roll') else '' }}>
+            <span class="font-garamond text-bone-300 text-xs">
+              Require a <span class="text-bone-100">launch roll</span> to open a Homebrew project
+              (a roll to start it; on a miss, the player retries next timeskip).
+            </span>
+          </label>
         </div>
 
         <div>

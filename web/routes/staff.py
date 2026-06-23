@@ -195,18 +195,25 @@ async def approve_project_route(
         stages = []
     err = None
     try:
+        from ..db import get_project_mode, get_homebrew_launch_roll
         with get_db() as conn:
+            # Homebrew uses a single staff-set goal DC (no stages) and may need a
+            # launch roll before the test opens.
+            homebrew = get_project_mode(conn) == "homebrew"
+            launched = 0 if (homebrew and get_homebrew_launch_roll(conn)) else 1
             approve_project(
                 conn, project_id, user["id"],
                 progress_type=(form.get("progress_type") or "").strip(),
                 payoff_type=(form.get("payoff_type") or "").strip(),
                 roll_pool=(form.get("roll_pool") or "").strip(),
                 roll_difficulty=form_int(form.get("roll_difficulty"), 1),
-                stages=stages,
+                stages=([] if homebrew else stages),
+                target_successes=form_int(form.get("target_successes"), 0),
                 reward_category=(form.get("reward_category") or "").strip() or None,
                 reward_trait=(form.get("reward_trait") or "").strip() or None,
                 reward_dots=form_int(form.get("reward_dots"), 0),
                 reward_xp=form_int(form.get("reward_xp"), 0),
+                launched=launched,
             )
     except ValueError as e:
         err = str(e)
@@ -261,6 +268,19 @@ async def complete_project_route(
     except ValueError as e:
         err = str(e)
     return _projects_table(request, err=err, ok="Project completed.")
+
+
+@router.post("/projects/{project_id}/resume", response_class=HTMLResponse)
+async def resume_project_route(
+    request: Request, project_id: int,
+    user: dict = Depends(require_permission("manage_project")),
+    _: None = Depends(csrf_protect),
+):
+    """Clear a Homebrew project's 'paused for ST review' flag so it can roll again."""
+    from ..db import set_project_paused
+    with get_db() as conn:
+        set_project_paused(conn, project_id, False, user["id"])
+    return _projects_table(request, ok="Project resumed — the player can roll again.")
 
 
 # ── Alerts (operational warn/error log) ───────────────────────────────────────
@@ -2199,6 +2219,8 @@ async def admin_settings_save(
         from ..db import PROJECT_MODES
         _pm = (form.get("project_mode") or "nybn").strip().lower()
         payload["project_mode"] = _pm if _pm in PROJECT_MODES else "nybn"
+        # Homebrew launch-roll toggle (a checkbox — absent means unchecked/off).
+        payload["homebrew_launch_roll"] = 1 if form.get("homebrew_launch_roll") else 0
 
     # Restricted predator types unlock list — Steward opt-in per
     # chronicle for normally-banned predator types like Blood Leech and
