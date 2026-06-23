@@ -3,14 +3,15 @@
    set/blank POST routes for HTMX swaps. Target: #backgrounds-card. #}
 <div id="backgrounds-card" class="gilded p-5">
   <div class="flex items-center justify-between mb-1">
-    <p class="label-gold">Backgrounds</p>
+    <p class="label-gold">Blanking Backgrounds</p>
     {% if active_period %}
     <span class="font-garamond text-bone-600 text-xs">Tonight · {{ active_period.label }}</span>
     {% endif %}
   </div>
   <p class="font-garamond text-bone-600 text-xs mb-4 leading-relaxed">
-    Track a background's dots, then blank some for the night (a failed hunt, a
-    Lasombra's shadow…). Blanked dots return when the next night opens.
+    Your sheet's backgrounds appear here automatically. Blank some for the night
+    (a failed hunt, a Lasombra's shadow…); blanked dots return when the next
+    night opens.
   </p>
 
   {% if bg_error %}
@@ -64,7 +65,8 @@
   <div class="gilded-inset border border-dashed border-ink-600 px-4 py-5 mb-4 text-center">
     <p class="font-cinzel text-bone-400 text-sm tracking-wide mb-1">No backgrounds yet</p>
     <p class="font-garamond text-bone-600 text-xs italic leading-relaxed">
-      Add one below (Allies, Resources, Herd…) to start tracking dots and blanking per night.
+      Backgrounds from your sheet (Allies, Resources, Herd…) show up here. Add them
+      on the Sheet tab, or add one manually below.
     </p>
   </div>
   {% endif %}
@@ -90,6 +92,7 @@
     </button>
   </form>
   <p class="font-garamond text-bone-700 text-[0.7rem] mt-1.5 italic">
-    Set dots to 0 to remove a background.
+    The list above syncs from your sheet. Use this to add a background that isn't
+    on your sheet; set dots to 0 to remove a manual one.
   </p>
 </div>

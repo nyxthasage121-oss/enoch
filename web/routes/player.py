@@ -1699,6 +1699,7 @@ async def character_detail(
         spends          = list_spends_for_character(conn, character_id)
         ledger          = get_ledger(conn, character_id, limit=50)
         coterie         = get_coterie_for_character(conn, character_id)
+        _sync_backgrounds_from_sheet(conn, char)
         backgrounds     = list_character_backgrounds(conn, character_id)
         projects        = list_projects_for_character(conn, character_id)
         proj_rolls      = timeskip_rolls_remaining(conn, character_id)
@@ -1754,9 +1755,53 @@ def _find_draft_claim(claims: list[dict], period_id: int) -> dict | None:
 
 # ── Background blanking ───────────────────────────────────────────────────────
 
+def _sheet_backgrounds(char: dict) -> list[dict]:
+    """The character's backgrounds drawn from their sheet — the `backgrounds`
+    array plus any merits/advantages the catalog classifies as a Background
+    (Haven, Resources, Herd, Mentor, …). Deduped by name; highest dots win."""
+    sheet = (char.get("sheet_json") or {})
+    bg_names = {
+        (m.get("name") or "").strip().lower()
+        for m in _MERIT_CATALOG if m.get("kind") == "background"
+    }
+    agg: dict[str, dict] = {}
+    for list_key in ("backgrounds", "advantages", "merits"):
+        for entry in (sheet.get(list_key) or []):
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name", "")).strip()
+            try:
+                dots = int(entry.get("dots", 0))
+            except (TypeError, ValueError):
+                dots = 0
+            if not name or dots < 1:
+                continue
+            # Backgrounds array = always a background; merits/advantages only
+            # when the catalog classifies the name as one.
+            if list_key != "backgrounds" and name.lower() not in bg_names:
+                continue
+            key = name.lower()
+            if key not in agg or dots > agg[key]["dots"]:
+                agg[key] = {"name": name, "dots": dots}
+    return list(agg.values())
+
+
+def _sync_backgrounds_from_sheet(conn, char: dict) -> None:
+    """Upsert the character's sheet backgrounds into the blanking table so they
+    appear automatically. Non-destructive — manually-tracked rows stay, and
+    set_character_background preserves any active blank when the dots change."""
+    for bg in _sheet_backgrounds(char):
+        try:
+            set_character_background(conn, char["id"], bg["name"], bg["dots"],
+                                     "system:sheet-sync")
+        except ValueError:
+            pass
+
+
 def _backgrounds_partial(request: Request, char: dict, conn, *,
                          notice: str | None = None, error: str | None = None):
     """Re-render the backgrounds card for an HTMX swap."""
+    _sync_backgrounds_from_sheet(conn, char)
     return templates.TemplateResponse(
         request, "player/partials/backgrounds.html",
         _ctx(
