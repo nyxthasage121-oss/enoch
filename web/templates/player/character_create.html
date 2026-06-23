@@ -1189,23 +1189,16 @@
       {# Optional guided spread — walks the V5 priorities; the pips still work
          for fine-tuning after. #}
       <div class="mb-4">
-        <template x-if="attrGuide === 0">
-          <div class="gilded-inset px-4 py-3 flex items-center justify-between flex-wrap gap-2">
-            <p class="font-garamond text-bone-500 text-xs">Not sure how to spread them? Let the guide place the V5 spread — fine-tune after.</p>
-            <button type="button" @click="startAttrGuide()"
-                    class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 shrink-0">Guided setup</button>
-          </div>
-        </template>
-        <template x-if="attrGuide > 0">
-          <div class="gilded-inset px-4 py-3 border-l-2 border-gold-700">
-            <div class="flex items-center justify-between gap-2 flex-wrap">
-              <p class="font-cinzel text-sm text-gold-400" x-text="attrGuidePrompt()"></p>
-              <button type="button" @click="cancelAttrGuide()"
-                      class="font-cinzel text-[0.55rem] tracking-widest text-bone-600 hover:text-blood-400">Cancel</button>
-            </div>
-            <p class="font-garamond text-[0.65rem] text-bone-700 italic mt-1">Click an attribute name below — the rest fill to 2 automatically.</p>
-          </div>
-        </template>
+        <div class="gilded-inset px-4 py-3 flex items-center justify-between flex-wrap gap-2"
+             :class="attrSpreadPlaced ? 'border-l-2 border-gold-700' : ''">
+          <p class="font-garamond text-xs">
+            <span x-show="!attrSpreadPlaced" class="text-bone-500">Not sure how to spread them? Let the guide place the V5 spread — fine-tune after.</span>
+            <span x-show="attrSpreadPlaced" x-cloak class="text-gold-400">Standard spread placed — one 4, three 3s, four 2s, one 1. Adjust the dots below to fit your concept.</span>
+          </p>
+          <button type="button" @click="startAttrGuide()"
+                  class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 shrink-0"
+                  x-text="attrSpreadPlaced ? 'Re-place spread' : 'Guided setup'">Guided setup</button>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
@@ -1215,11 +1208,7 @@
           <div class="space-y-1">
             {% for key, label in traits %}
             <div class="flex items-center justify-between py-1">
-              <span class="font-garamond text-sm"
-                    :class="attrGuide > 0
-                      ? (attrGuideAssigned('{{ key }}') ? 'text-gold-700' : 'text-gold-400 cursor-pointer hover:text-gold-200 underline decoration-dotted underline-offset-2')
-                      : 'text-bone-300'"
-                    @click="attrGuide > 0 && attrGuidePick('{{ key }}')">{{ label }}</span>
+              <span class="font-garamond text-sm text-bone-300">{{ label }}</span>
               {% set tplkey = key %}
               {% include "player/partials/wizard_pips.html" %}
             </div>
@@ -1445,20 +1434,66 @@
         </div>
       </template>
 
-      <div class="gilded p-5 mb-4">
-        <p class="label-gold mb-3 text-xs">Disciplines</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+      <div class="mb-4">
+        <div class="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
+          <p class="label-gold text-xs">Disciplines</p>
+          <p class="font-garamond text-[0.65rem] text-bone-700 italic">Tap a power to add it — it unlocks once you have the dots and any lower-level powers.</p>
+        </div>
+        {% set disc_labels = dict(v5_disciplines) %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {% for key, label in v5_disciplines %}
-          <div class="flex items-center justify-between py-1 border-b border-ink-800"
+          {% set _powers = discipline_powers.get(key, []) | sort(attribute='level') %}
+          <div class="gilded-inset overflow-hidden flex flex-col"
                x-show="isDiscPickable('{{ key }}')" x-cloak
-               :class="isInClan('{{ key }}') ? 'border-gold-900' : ''">
-            <div class="flex items-center gap-2">
-              <span class="font-garamond text-sm" :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-bone-200' : 'text-bone-500'">{{ label }}</span>
-              <span x-show="isInClan('{{ key }}')"
-                    class="font-cinzel text-[0.5rem] tracking-[0.2em] text-gold-500 uppercase">In-Clan</span>
+               x-data="{ moreDisc: false }"
+               :class="isInClan('{{ key }}') ? 'border-gold-800' : 'border-ink-700'">
+            {# Header — name + In-Clan tag + the dot tracker #}
+            <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-ink-800"
+                 :class="(sheet['{{ key }}'] || 0) > 0 ? 'bg-[#1a1012]' : ''">
+              <div class="min-w-0">
+                <p class="font-cinzel text-sm tracking-wide truncate"
+                   :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-gold-300' : 'text-bone-300'">{{ label }}</p>
+                <span x-show="isInClan('{{ key }}')"
+                      class="font-cinzel text-[0.5rem] tracking-[0.2em] text-gold-500 uppercase">In-Clan</span>
+              </div>
+              {% set tplkey = key %}
+              {% include "player/partials/wizard_pips.html" %}
             </div>
-            {% set tplkey = key %}
-            {% include "player/partials/wizard_pips.html" %}
+
+            {# Powers preview — browse what the Discipline offers; powers above
+               your current dots dim out, brightening as you allocate. #}
+            {% if _powers %}
+            <div class="px-2 py-2 flex-1">
+              {% for p in _powers %}
+              {% set _pn = p.name | tojson | forceescape %}
+              <div class="px-2 py-1.5 rounded transition-colors"
+                   {% if loop.index > 5 %}x-show="moreDisc" x-cloak{% endif %}
+                   :class="isPowerSelected('{{ key }}', {{ _pn }})
+                     ? 'bg-[#241a12] border-l-2 border-gold-700 cursor-pointer'
+                     : (powerAddable('{{ key }}', {{ _pn }}, {{ p.level }}) ? 'cursor-pointer hover:bg-ink-800' : 'opacity-40 cursor-not-allowed')"
+                   @click="powerAddable('{{ key }}', {{ _pn }}, {{ p.level }}) && togglePower('{{ key }}', {{ _pn }}, {{ p.level }})">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="flex items-center gap-1.5 min-w-0">
+                    <span x-show="isPowerSelected('{{ key }}', {{ _pn }})" x-cloak class="text-gold-500 text-[0.6rem] shrink-0">✦</span>
+                    <span class="font-garamond text-xs truncate"
+                          :class="isPowerSelected('{{ key }}', {{ _pn }}) ? 'text-gold-300' : 'text-bone-300'">{{ p.name }}</span>
+                  </span>
+                  <span class="font-cinzel text-[0.6rem] text-bone-600 shrink-0">{{ p.level }}</span>
+                </div>
+                {% if p.amalgam %}
+                <span class="block font-cinzel text-[0.5rem] tracking-wide text-mauve-400 mt-0.5">{% for am in p.amalgam %}Amalgam · {{ disc_labels.get(am.discipline, am.discipline) }} ({{ am.level }}){% if not loop.last %} · {% endif %}{% endfor %}</span>
+                {% endif %}
+              </div>
+              {% endfor %}
+              {% if _powers | length > 5 %}
+              <button type="button" @click="moreDisc = !moreDisc"
+                      class="w-full text-center font-cinzel text-[0.55rem] tracking-[0.2em] uppercase text-bone-600 hover:text-gold-400 pt-1.5">
+                <span x-show="!moreDisc">+{{ (_powers | length) - 5 }} more powers</span>
+                <span x-show="moreDisc" x-cloak>Show fewer</span>
+              </button>
+              {% endif %}
+            </div>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
@@ -1484,10 +1519,10 @@
          filtered to the character's dots; homebrew free text still allowed. #}
       <div class="gilded p-5 mb-5" x-show="learnedDisciplines().length > 0" x-cloak>
         <div class="flex items-baseline justify-between mb-3">
-          <p class="label-gold text-xs">Powers</p>
+          <p class="label-gold text-xs">Selected Powers</p>
           <p class="font-garamond text-[0.65rem] text-bone-700 italic">
-            The list shows only powers you can take now — a level-N power needs one
-            at each lower level, and amalgams need their other Discipline.
+            Tap powers on the cards above to add them. Use the box below to type a
+            custom (homebrew) power not in the catalog.
           </p>
         </div>
 
@@ -1815,6 +1850,10 @@
               Blood Sorcery: <span x-text="sheet.disc_blood_sorcery || 0"></span>
             </span>
           </div>
+          <p x-show="(sheet.disc_blood_sorcery || 0) > 0" x-cloak
+             class="font-garamond text-gold-600 text-[0.7rem] italic mb-2">
+            Blood Sorcery includes one free Level-1 ritual (V5) — pick it here.
+          </p>
           {% include "player/partials/wizard_leveled_list.html" with context %}
         </div>
 
@@ -1826,6 +1865,10 @@
               Oblivion: <span x-text="sheet.disc_oblivion || 0"></span>
             </span>
           </div>
+          <p x-show="(sheet.disc_oblivion || 0) > 0" x-cloak
+             class="font-garamond text-gold-600 text-[0.7rem] italic mb-2">
+            Oblivion includes one free Level-1 ceremony (V5) — pick it here.
+          </p>
           {% with list_key='ceremonies', list_label='ceremony' %}
             {% include "player/partials/wizard_leveled_list.html" %}
           {% endwith %}
@@ -2612,6 +2655,7 @@
       // Guided attribute spread (optional): 0=off, 1=pick the 4, 2=pick three 3s,
       // 3=pick the 1; then the rest auto-fill to 2.
       attrGuide: 0,
+      attrSpreadPlaced: false,
       attrGuidePicks: { four: null, threes: [], one: null },
       // Guided skill spread (optional): walks the chosen distribution's levels
       // high→low; click N skills per level, the rest stay 0.
@@ -3358,6 +3402,31 @@
       powersFor(disc) {
         return this.powers.filter(p => p.discipline === disc);
       },
+      // ── Card-driven power selection (tap a power on its discipline card) ──
+      isPowerSelected(disc, name) {
+        const n = (name || '').toLowerCase();
+        return this.powers.some(p => p.discipline === disc && (p.name || '').toLowerCase() === n);
+      },
+      // A power is "addable" when it's at/under your dots AND its level + amalgam
+      // prerequisites are met. Already-selected powers count as addable so their
+      // card row stays bright + clickable (to remove).
+      powerAddable(disc, name, level) {
+        if (this.isPowerSelected(disc, name)) return true;
+        const cat = this.catalogPower(disc, name);
+        const lv = cat ? cat.level : level;
+        if ((this.sheet[disc] || 0) < lv) return false;
+        return !this.powerBlockReason(disc, lv, cat);
+      },
+      togglePower(disc, name, level) {
+        if (this.isPowerSelected(disc, name)) { this.removePower(disc, name); return; }
+        const cat = this.catalogPower(disc, name);
+        const lv = cat ? cat.level : level;
+        if ((this.sheet[disc] || 0) < lv) return;
+        const reason = this.powerBlockReason(disc, lv, cat);
+        if (reason) { this.powerError = (cat ? cat.name : name) + ' — ' + reason + '.'; return; }
+        this.powerError = '';
+        this.powers.push({ discipline: disc, name: cat ? cat.name : name, level: lv });
+      },
       // Catalog powers for a discipline, capped at the character's dots and
       // hiding ones already added — drives the power-name autocomplete.
       catalogPowersFor(disc) {
@@ -3749,10 +3818,15 @@
                 'attr_intelligence', 'attr_wits', 'attr_resolve'];
       },
       startAttrGuide() {
-        this.attrGuide = 1;
-        this.attrGuidePicks = { four: null, threes: [], one: null };
-        this._attrKeys().forEach(k => { this.sheet[k] = 0; });
+        // Place a complete, valid V5 spread (one 4, three 3s, four 2s, one 1
+        // = 22) as a starting template, then let the player rearrange with the
+        // pips. Matches the button's promise — "place the V5 spread, fine-tune
+        // after" — instead of a multi-step walk-through that left people stuck
+        // when they tried to set the dots directly.
+        const spread = [4, 3, 3, 3, 2, 2, 2, 2, 1];
         this.xpBuys = this.xpBuys.filter(b => b.cat !== 'attr');  // reset base
+        this._attrKeys().forEach((k, i) => { this.sheet[k] = spread[i]; });
+        this.attrSpreadPlaced = true;
       },
       cancelAttrGuide() { this.attrGuide = 0; },
       attrGuidePrompt() {
