@@ -148,10 +148,11 @@
 
         <template x-if="sumAttrs && sumAttrs() > 0">
           <div class="border-t border-ink-800 pt-3">
-            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1.5">Sheet</p>
+            <p class="font-cinzel text-[0.55rem] tracking-[0.25em] uppercase text-bone-700 mb-1.5">Vitals</p>
+            {# Attribute/Skill allocation lives in the Budget panel below (by
+               priority spread) — keep this section to the derived vitals so the
+               two don't show the same thing two different ways. #}
             <div class="text-xs space-y-1">
-              <div class="flex justify-between"><span class="text-bone-600">Attributes</span><span class="font-cinzel text-gold-500" x-text="(sumAttrs && sumAttrs()) + ' dots'"></span></div>
-              <div class="flex justify-between"><span class="text-bone-600">Skills</span><span class="font-cinzel text-gold-500" x-text="(sumSkills && sumSkills()) + ' dots'"></span></div>
               <div class="flex justify-between" x-show="(sheet.attr_stamina || 0) > 0"><span class="text-bone-600">Health</span><span class="font-cinzel text-gold-500" x-text="healthMax"></span></div>
               <div class="flex justify-between" x-show="(sheet.attr_resolve || 0) + (sheet.attr_composure || 0) > 0"><span class="text-bone-600">Willpower</span><span class="font-cinzel text-gold-500" x-text="willpowerMax"></span></div>
               <div class="flex justify-between" x-show="(sheet.blood_potency || 0) > 0"><span class="text-bone-600">Blood Potency</span><span class="font-cinzel text-gold-500" x-text="sheet.blood_potency"></span></div>
