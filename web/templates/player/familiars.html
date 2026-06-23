@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% from "_macros.html" import clan_icon %}
+
+{% block title %}{{ char.name }} · Familiars — Enoch{% endblock %}
+
+{% macro animal_block(a) %}
+<div class="grid grid-cols-3 sm:grid-cols-5 gap-x-3 gap-y-1 mt-2">
+  {% for label, val in [('Physical', a.physical), ('Social', a.social), ('Mental', a.mental), ('Health', a.health), ('Willpower', a.willpower)] %}
+  <div class="flex items-baseline gap-1.5">
+    <span class="font-cinzel text-[0.5rem] tracking-[0.15em] uppercase text-bone-700">{{ label }}</span>
+    <span class="font-cinzel text-sm text-gold-400">{{ val }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% if a.exceptional %}
+<p class="font-garamond text-xs text-bone-500 mt-2 leading-snug">
+  <span class="label-gold text-[0.55rem] mr-1">Exceptional</span>
+  {% for pool, rating in a.exceptional.items() %}<span class="text-bone-400">{{ pool }} {{ rating }}</span>{% if not loop.last %} · {% endif %}{% endfor %}
+</p>
+{% endif %}
+{% if a.special %}
+<p class="font-garamond text-xs text-bone-500 mt-1 leading-snug">
+  <span class="label-gold text-[0.55rem] mr-1">Special</span>{{ a.special }}
+</p>
+{% endif %}
+{% endmacro %}
+
+{% block content %}
+<div class="page-enter clan-{{ char.clan }}">
+
+  <a href="/characters/{{ char.id }}"
+     class="inline-flex items-center gap-1.5 text-bone-600 hover:text-gold-400 font-cinzel text-xs tracking-widest uppercase mb-6 transition-colors">
+    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="square" d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    Back to {{ char.name }}
+  </a>
+
+  <div class="flex items-center gap-2 mb-1">
+    {{ clan_icon(char.clan, size='w-5 h-5', font_size=11) }}
+    <p class="label-gold text-[0.75rem] tracking-[0.25em]">{{ char.name }}</p>
+  </div>
+  <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide mb-2">Familiars</h1>
+  <p class="font-garamond text-bone-600 text-sm mb-6 max-w-2xl leading-relaxed">
+    Animals bonded through <span class="text-bone-400">Animalism •</span> (Bond Famulus). Browse the
+    bestiary below for reference, and bond one as your famulus.
+  </p>
+
+  {% if bond_error %}
+  <div class="gilded-inset px-4 py-3 mb-5 border border-blood-900">
+    <p class="font-garamond text-blood-400 text-sm">{{ bond_error }}</p>
+  </div>
+  {% endif %}
+
+  {# ══ Bonded famuli ══ #}
+  <div class="mb-8">
+    <p class="label-gold mb-3">Your Familiars</p>
+    <div class="space-y-3">
+      {% for b in bonded %}
+      <div class="gilded p-5">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="chip text-gold-400 border-gold-800 text-[0.55rem]">{{ b.animal }}</span>
+              <h2 class="font-cinzel text-lg text-bone-200 tracking-wide truncate">{{ b.name }}</h2>
+            </div>
+            {% if b.notes %}<p class="font-garamond text-bone-400 text-sm mt-1 italic">{{ b.notes }}</p>{% endif %}
+          </div>
+          <form method="post" action="/familiars/bonds/{{ b.id }}/unbond" class="shrink-0"
+                x-data="{ sure: false }" @submit="if(!sure){$event.preventDefault(); sure=true}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button type="submit"
+                    class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1 text-blood-500 hover:text-blood-300"
+                    x-text="sure ? 'Confirm?' : 'Release'"></button>
+          </form>
+        </div>
+        {% if b.familiar_id %}{{ animal_block(b) }}{% else %}
+        <p class="font-garamond text-bone-700 text-xs italic mt-2">This animal's catalog entry was removed.</p>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="gilded-inset border border-dashed border-ink-600 px-4 py-6 text-center">
+        <p class="font-cinzel text-bone-400 text-sm tracking-wide mb-1">No bonded famuli</p>
+        <p class="font-garamond text-bone-600 text-xs italic">
+          {% if can_bond %}Bond one below.{% else %}Bond Famulus needs Animalism •.{% endif %}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ══ Bond a famulus ══ #}
+  {% if can_bond %}
+  <div class="gilded p-5 mb-8">
+    <p class="label-gold mb-3">Bond a Famulus</p>
+    <form method="post" action="/characters/{{ char.id }}/familiars/bond"
+          class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div>
+        <label class="label-gold block mb-1 text-[0.6rem]">Animal</label>
+        <select name="familiar_id" required class="w-full py-1.5 text-sm">
+          <option value="">— Choose —</option>
+          {% for a in catalog %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.6rem]">Name</label>
+        <input type="text" name="name" required placeholder="e.g. Shadow" class="w-full py-1.5 text-sm">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.6rem]">Notes <span class="text-bone-700 normal-case">(optional)</span></label>
+        <input type="text" name="notes" placeholder="role, quirks…" class="w-full py-1.5 text-sm">
+      </div>
+      <div class="md:col-span-3">
+        <button type="submit" class="btn-send font-cinzel tracking-widest text-xs px-4 py-2">Bond Famulus</button>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="gilded-inset px-4 py-3 mb-8 border border-ink-700">
+    <p class="font-garamond text-bone-500 text-sm">
+      Bonding a famulus requires <span class="text-bone-300">Animalism •</span> (Bond Famulus).
+      Raise Animalism, then return here.
+    </p>
+  </div>
+  {% endif %}
+
+  {# ══ Bestiary reference ══ #}
+  <p class="label-gold mb-3">Bestiary <span class="text-bone-700 font-sans normal-case text-[0.7rem]">— standard reference blocks</span></p>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for a in catalog %}
+    <div class="gilded p-4">
+      <div class="flex items-center gap-2">
+        <span class="font-cinzel text-base text-bone-200 tracking-wide">{{ a.name }}</span>
+        {% if not a.is_standard %}<span class="chip text-mauve-300 border-mauve-800 text-[0.5rem]">Custom</span>{% endif %}
+      </div>
+      {% if a.description %}<p class="font-garamond text-xs text-bone-500 mt-1 leading-snug">{{ a.description }}</p>{% endif %}
+      {{ animal_block(a) }}
+    </div>
+    {% else %}
+    <p class="font-garamond text-bone-600 text-sm italic">No animals in the catalog yet.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

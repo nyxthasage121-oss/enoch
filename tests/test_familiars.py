@@ -69,6 +69,69 @@ def test_bond_and_unbond_familiar(_client):
             conn.commit()
 
 
+def test_familiars_page_loads(player):
+    r = player.get("/characters/1/familiars")
+    assert r.status_code == 200
+    assert "Bestiary" in r.text and "Wolf" in r.text
+
+
+def test_bond_gated_without_animalism(player):
+    """A character without Animalism • can't bond a famulus."""
+    from web.db import (get_db, create_character, list_familiars,
+                        list_character_familiars, delete_character)
+    with get_db() as conn:
+        ch = create_character(conn, discord_id="111111111111111111",
+                              name="QA NoAnimalism", clan="brujah",
+                              sheet_json={"disc_potence": 2})
+        cid = ch["id"]
+        wolf = next(f for f in list_familiars(conn) if f["name"] == "Wolf")
+        conn.commit()
+    try:
+        r = player.post(f"/characters/{cid}/familiars/bond", data={
+            "_csrf": "dev-csrf-token", "familiar_id": str(wolf["id"]), "name": "NoGo",
+        }, follow_redirects=False)
+        assert r.status_code == 200 and "Animalism" in r.text
+        with get_db() as conn:
+            assert list_character_familiars(conn, cid) == []
+    finally:
+        with get_db() as conn:
+            delete_character(conn, cid)
+            conn.commit()
+
+
+def test_bond_and_release_with_animalism(player):
+    """With Animalism •, a character can bond and then release a famulus."""
+    from web.db import (get_db, create_character, list_familiars,
+                        list_character_familiars, delete_character)
+    with get_db() as conn:
+        ch = create_character(conn, discord_id="111111111111111111",
+                              name="QA Animalist", clan="gangrel",
+                              sheet_json={"disc_animalism": 1})
+        cid = ch["id"]
+        wolf = next(f for f in list_familiars(conn) if f["name"] == "Wolf")
+        conn.commit()
+    try:
+        pg = player.get(f"/characters/{cid}/familiars")
+        assert pg.status_code == 200 and "Bond a Famulus" in pg.text
+        r = player.post(f"/characters/{cid}/familiars/bond", data={
+            "_csrf": "dev-csrf-token", "familiar_id": str(wolf["id"]),
+            "name": "Fang", "notes": "scout",
+        }, follow_redirects=False)
+        assert r.status_code == 303
+        with get_db() as conn:
+            bonds = list_character_familiars(conn, cid)
+        assert len(bonds) == 1 and bonds[0]["name"] == "Fang" and bonds[0]["animal"] == "Wolf"
+        r2 = player.post(f"/familiars/bonds/{bonds[0]['id']}/unbond",
+                         data={"_csrf": "dev-csrf-token"}, follow_redirects=False)
+        assert r2.status_code == 303
+        with get_db() as conn:
+            assert list_character_familiars(conn, cid) == []
+    finally:
+        with get_db() as conn:
+            delete_character(conn, cid)
+            conn.commit()
+
+
 def test_familiars_cascade_on_character_delete(_client):
     from web.db import (get_db, upsert_player, create_character, list_familiars,
                         bond_familiar, list_character_familiars, delete_character)

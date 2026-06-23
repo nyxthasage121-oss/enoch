@@ -21,6 +21,12 @@ from ..db import (
     get_companion_for_player,
     update_companion,
     delete_companion,
+    list_familiars,
+    get_familiar,
+    list_character_familiars,
+    bond_familiar,
+    unbond_familiar,
+    get_character_familiar_for_player,
     set_character_background,
     blank_character_background,
     list_character_backgrounds,
@@ -1715,6 +1721,7 @@ async def character_detail(
         _sync_backgrounds_from_sheet(conn, char)
         backgrounds     = list_character_backgrounds(conn, character_id)
         companions      = list_companions(conn, character_id)
+        char_familiars  = list_character_familiars(conn, character_id)
         projects        = list_projects_for_character(conn, character_id)
         proj_rolls      = timeskip_rolls_remaining(conn, character_id)
 
@@ -1745,6 +1752,7 @@ async def character_detail(
             default_tab=tab,
             backgrounds=backgrounds,
             companions=companions,
+            char_familiars=char_familiars,
             projects=projects,
             proj_rolls=proj_rolls,
             spend_categories=SPEND_CATEGORIES,
@@ -2125,6 +2133,92 @@ async def companion_delete(
             _sync_backgrounds_from_sheet(conn, char)
         conn.commit()
     return RedirectResponse(url=f"/characters/{parent_id}/companions", status_code=303)
+
+
+# ── Familiars (Animalism • Bond Famulus) ──────────────────────────────────────
+
+def _char_animalism(char: dict) -> int:
+    try:
+        return int((char.get("sheet_json") or {}).get("disc_animalism") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _familiars_ctx(request: Request, char: dict, conn, *, bond_error=None):
+    """Render the Familiars page — bestiary catalog + this character's bonds."""
+    return templates.TemplateResponse(
+        request, "player/familiars.html",
+        _ctx(
+            request,
+            char=char,
+            catalog=list_familiars(conn),
+            bonded=list_character_familiars(conn, char["id"]),
+            can_bond=_char_animalism(char) >= 1,
+            bond_error=bond_error,
+        ),
+    )
+
+
+@router.get("/characters/{character_id}/familiars", response_class=HTMLResponse)
+async def familiars_page(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+):
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        return _familiars_ctx(request, char, conn)
+
+
+@router.post("/characters/{character_id}/familiars/bond")
+async def familiar_bond_route(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    form = await request.form()
+    name  = (form.get("name") or "").strip()
+    notes = (form.get("notes") or "").strip() or None
+    fam_id = form_int(form.get("familiar_id"), 0)
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        error = None
+        if _char_animalism(char) < 1:
+            error = "Bonding a famulus requires Animalism • (Bond Famulus)."
+        elif not name:
+            error = "Give your famulus a name."
+        elif not fam_id or not get_familiar(conn, fam_id):
+            error = "Choose an animal to bond."
+        if error:
+            return _familiars_ctx(request, char, conn, bond_error=error)
+        bond_familiar(conn, character_id=character_id, familiar_id=fam_id,
+                      name=name, notes=notes)
+        conn.commit()
+    return RedirectResponse(
+        url=f"/characters/{character_id}/familiars", status_code=303)
+
+
+@router.post("/familiars/bonds/{bond_id}/unbond")
+async def familiar_unbond_route(
+    request: Request,
+    bond_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    with get_db() as conn:
+        bond = get_character_familiar_for_player(conn, bond_id, user["id"])
+        if not bond:
+            raise HTTPException(status_code=404)
+        parent_id = bond["character_id"]
+        unbond_familiar(conn, bond_id)
+        conn.commit()
+    return RedirectResponse(
+        url=f"/characters/{parent_id}/familiars", status_code=303)
 
 
 # ── Projects (downtime endeavours) ────────────────────────────────────────────

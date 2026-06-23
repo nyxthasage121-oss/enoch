@@ -414,6 +414,30 @@
       {% endif %}
     </div>
 
+    {# ── Familiars ── #}
+    <div class="gilded p-5">
+      <div class="flex items-center justify-between mb-3">
+        <p class="label-gold">Familiars</p>
+        <a href="/characters/{{ char.id }}/familiars"
+           class="btn-ghost font-cinzel text-[0.55rem] tracking-widest px-2.5 py-1">Manage</a>
+      </div>
+      {% if char_familiars %}
+      <div class="space-y-1.5">
+        {% for f in char_familiars %}
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="chip text-gold-400 border-gold-800 text-[0.5rem]">{{ f.animal }}</span>
+          <span class="font-garamond text-sm text-bone-300 truncate">{{ f.name }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="font-garamond text-bone-600 text-xs italic">
+        No bonded famuli.
+        <a href="/characters/{{ char.id }}/familiars" class="text-gold-500 hover:text-gold-300 no-underline">Bestiary →</a>
+      </p>
+      {% endif %}
+    </div>
+
     {% if char.is_approved %}
     {% include "player/partials/backgrounds.html" %}
     {% endif %}
