@@ -166,6 +166,24 @@
           </div>
         </label>
 
+        {# Resonance table mode — which Resonance chart the Roll tab generator uses. #}
+        <div class="gilded-inset px-3 py-2">
+          <label class="font-cinzel text-xs text-bone-200 block mb-1" for="resonance_mode">Resonance Table</label>
+          <select name="resonance_mode" id="resonance_mode" class="w-full text-xs">
+            {% for val, lbl in [
+              ('standard', 'Standard — V5 core'),
+              ('tattered_facade', 'Tattered Facade — alternate Disciplines'),
+              ('add_empty', 'Add Empty — +1-in-6 Empty resonance'),
+            ] %}
+            <option value="{{ val }}" {{ 'selected' if _cs.get('resonance_mode', 'standard') == val else '' }}>{{ lbl }}</option>
+            {% endfor %}
+          </select>
+          <p class="font-garamond text-[0.65rem] text-bone-600 mt-1">
+            Which Resonance chart the Roll tab's generator uses. Tattered Facade swaps in
+            alternate Discipline links (Choleric +Animalism, Melancholy +Oblivion, Sanguine +Protean).
+          </p>
+        </div>
+
         {# Per-tier budgets — visible ONLY under the Homebrew ruleset, because
            that's the only mode tier_budget() (web/db.py) actually reads the
            overrides in. Under Standard it returns pure V5 RAW and ignores any

@@ -1959,13 +1959,15 @@ async def roll_resonance_route(
 ):
     """Generate a random V5 blood Resonance + Temperament. Stateless — owner-
     gated for consistency with the other Roll-tab tools."""
+    from ..db import get_resonance_mode
     with get_db() as conn:
         char = get_character_for_player(conn, character_id, user["id"])
         if not char:
             raise HTTPException(status_code=404)
+        mode = get_resonance_mode(conn)
     return templates.TemplateResponse(
         request, "player/partials/resonance_card.html",
-        _ctx(request, char=char, resonance_result=roll_resonance()),
+        _ctx(request, char=char, resonance_result=roll_resonance(mode)),
     )
 
 

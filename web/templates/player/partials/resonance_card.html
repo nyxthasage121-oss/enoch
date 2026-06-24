@@ -21,20 +21,44 @@
 
     {% if resonance_result %}
     {% set rr = resonance_result %}
+    {% set mode_label = {'standard': 'V5 core', 'tattered_facade': 'Tattered Facade', 'add_empty': 'V5 core · +Empty'}.get(rr.mode, 'V5 core') %}
+
+    {% if rr.resonance %}
     <div class="gilded-inset px-4 py-3 border-l-2 {{ 'border-gold-700' if rr.has_bonus else 'border-ink-600' }}">
       <div class="flex items-baseline justify-between gap-3 flex-wrap">
         <p class="font-cinzel text-lg text-bone-200">
           {{ rr.label }}
           <span class="text-bone-600 text-sm">· {{ rr.temperament_label }}</span>
-          {% if rr.is_acute %}<span class="chip text-blood-400 border-blood-800 text-[0.5rem] ml-1">Dyscrasia</span>{% endif %}
+          {% if rr.dyscrasia %}<span class="chip text-blood-400 border-blood-800 text-[0.5rem] ml-1">Dyscrasia</span>{% endif %}
         </p>
+        {% if rr.disciplines %}
         <p class="font-cinzel text-[0.6rem] tracking-[0.2em] uppercase {{ 'text-gold-400' if rr.has_bonus else 'text-bone-600' }}">
           {{ rr.disciplines | join(' · ') }}
         </p>
+        {% endif %}
       </div>
-      <p class="font-garamond text-bone-500 text-xs italic mt-1">{{ rr.emotions }}</p>
+      {% if rr.emotions %}<p class="font-garamond text-bone-500 text-xs italic mt-1">{{ rr.emotions }}</p>{% endif %}
       <p class="font-garamond text-bone-400 text-sm mt-2 leading-snug">{{ rr.effect }}</p>
+
+      {% if rr.dyscrasia %}
+      <div class="mt-3 pt-3 border-t border-ink-700">
+        <p class="font-cinzel text-[0.7rem] text-blood-300">
+          Dyscrasia · {{ rr.dyscrasia.name }}
+          <span class="text-bone-700 normal-case">(V5 p.{{ rr.dyscrasia.page }})</span>
+        </p>
+        <p class="font-garamond text-bone-400 text-sm mt-1 leading-snug">{{ rr.dyscrasia.description }}</p>
+      </div>
+      {% endif %}
     </div>
+    {% else %}
+    {# Negligible — the Blood carries no usable Resonance this feed. #}
+    <div class="gilded-inset px-4 py-3 border-l-2 border-ink-600">
+      <p class="font-cinzel text-lg text-bone-300">{{ rr.temperament_label }}</p>
+      <p class="font-garamond text-bone-500 text-sm mt-1 leading-snug">{{ rr.effect }}</p>
+    </div>
+    {% endif %}
+
+    <p class="font-cinzel text-[0.55rem] tracking-widest uppercase text-bone-700 mt-2">{{ mode_label }} table</p>
     {% else %}
     <p class="font-garamond text-bone-700 text-xs italic">No resonance rolled yet.</p>
     {% endif %}

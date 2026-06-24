@@ -2222,6 +2222,10 @@ async def admin_settings_save(
         payload["project_mode"] = _pm if _pm in PROJECT_MODES else "nybn"
         # Homebrew launch-roll toggle (a checkbox — absent means unchecked/off).
         payload["homebrew_launch_roll"] = 1 if form.get("homebrew_launch_roll") else 0
+    if "resonance_mode" in form:
+        from ..db import RESONANCE_MODES
+        _rm = (form.get("resonance_mode") or "standard").strip().lower()
+        payload["resonance_mode"] = _rm if _rm in RESONANCE_MODES else "standard"
 
     # Restricted predator types unlock list — Steward opt-in per
     # chronicle for normally-banned predator types like Blood Leech and

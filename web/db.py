@@ -1090,6 +1090,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "coterie_max_members",
         # Web dice roller (Roll tab) on/off toggle (migration 051)
         "dice_roller_enabled",
+        # Resonance table mode: standard | tattered_facade | add_empty (migration 052)
+        "resonance_mode",
     }
     # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
     # migration 040. It's now an orthogonal flag — translate a legacy POST
@@ -1101,6 +1103,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
     # Validate ruleset before persisting — guard against typo'd POSTs.
     if "active_ruleset" in kwargs and kwargs["active_ruleset"] not in RULESETS:
         raise ValueError(f"Unknown ruleset: {kwargs['active_ruleset']!r}")
+    if "resonance_mode" in kwargs and kwargs["resonance_mode"] not in RESONANCE_MODES:
+        raise ValueError(f"Unknown resonance mode: {kwargs['resonance_mode']!r}")
     if "creation_mode" in kwargs and kwargs["creation_mode"] not in ("guided", "open"):
         raise ValueError(f"Unknown creation_mode: {kwargs['creation_mode']!r}")
     # Serialize lists/dicts before insert (revenant_families is a JSON column)
@@ -4883,6 +4887,16 @@ def get_project_mode(conn) -> str:
 def projects_enabled(conn) -> bool:
     """False when the chronicle has Projects turned off."""
     return get_project_mode(conn) != "off"
+
+
+RESONANCE_MODES = ("standard", "tattered_facade", "add_empty")
+
+
+def get_resonance_mode(conn) -> str:
+    """Chronicle-wide Resonance table mode (migration 052): standard |
+    tattered_facade | add_empty. Defaults to 'standard'."""
+    mode = ((get_settings(conn) or {}).get("resonance_mode") or "standard").strip().lower()
+    return mode if mode in RESONANCE_MODES else "standard"
 
 
 def get_homebrew_launch_roll(conn) -> bool:

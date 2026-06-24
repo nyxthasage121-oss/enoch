@@ -9,7 +9,15 @@ import random
 import pytest
 
 from core.conditions import SEV_CRIT, SEV_WARN, character_conditions
-from core.resonance import RESONANCES, TEMPERAMENTS, roll_resonance
+from core.dyscrasias import DYSCRASIAS
+from core.resonance import (
+    RESONANCES,
+    STANDARD_DISCIPLINES,
+    TATTERED_DISCIPLINES,
+    TEMPERAMENTS,
+    get_dyscrasia,
+    roll_resonance,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -120,25 +128,81 @@ def test_roll_tab_respects_chronicle_toggle(player):
 # ── Resonance & Temperament generator ─────────────────────────────────────────
 
 def test_roll_resonance_structure():
-    for seed in range(25):
-        rr = roll_resonance(random.Random(seed))
-        assert rr["resonance"] in RESONANCES
+    for seed in range(40):
+        rr = roll_resonance(rng=random.Random(seed))
         assert rr["temperament"] in {t[0] for t in TEMPERAMENTS}
-        assert len(rr["disciplines"]) == 2
+        if rr["temperament"] == "negligible":
+            assert rr["resonance"] is None and rr["disciplines"] == []
+        else:
+            assert rr["resonance"] in RESONANCES
+            assert len(rr["disciplines"]) >= 2
         assert rr["has_bonus"] == (rr["temperament"] in ("intense", "acute"))
         assert rr["is_acute"] == (rr["temperament"] == "acute")
 
 
 def test_roll_resonance_seeded_deterministic():
-    assert roll_resonance(random.Random(42)) == roll_resonance(random.Random(42))
+    assert roll_resonance(rng=random.Random(42)) == roll_resonance(rng=random.Random(42))
 
 
 def test_temperament_weights_sum_to_100():
     assert sum(t[2] for t in TEMPERAMENTS) == 100
 
 
+def test_tattered_facade_discipline_maps():
+    assert STANDARD_DISCIPLINES["choleric"] == ["Celerity", "Potence"]
+    assert "Animalism" in TATTERED_DISCIPLINES["choleric"]
+    assert "Oblivion" in TATTERED_DISCIPLINES["melancholic"]
+    assert "Protean" in TATTERED_DISCIPLINES["sanguine"]
+    assert TATTERED_DISCIPLINES["phlegmatic"] == STANDARD_DISCIPLINES["phlegmatic"]
+
+
+def test_tattered_mode_roll_uses_tattered_disciplines():
+    for seed in range(300):
+        rr = roll_resonance("tattered_facade", random.Random(seed))
+        if rr["resonance"] == "choleric":
+            assert "Animalism" in rr["disciplines"]
+            return
+    raise AssertionError("no choleric result across 300 seeds")
+
+
+def test_standard_never_empty_but_add_empty_can():
+    std_seen, emp_seen = set(), set()
+    for seed in range(500):
+        std_seen.add(roll_resonance("standard", random.Random(seed))["resonance"])
+        emp_seen.add(roll_resonance("add_empty", random.Random(seed))["resonance"])
+    assert "empty" not in std_seen
+    assert "empty" in emp_seen
+
+
+def test_acute_result_carries_a_dyscrasia():
+    for seed in range(600):
+        rr = roll_resonance("standard", random.Random(seed))
+        if rr["is_acute"] and rr["resonance"]:
+            assert rr["dyscrasia"] and rr["dyscrasia"]["name"] and rr["dyscrasia"]["description"]
+            return
+    raise AssertionError("no acute result across 600 seeds")
+
+
+def test_get_dyscrasia_and_coverage():
+    assert set(DYSCRASIAS) == {"choleric", "melancholic", "phlegmatic", "sanguine"}
+    assert sum(len(v) for v in DYSCRASIAS.values()) == 26
+    d = get_dyscrasia("choleric", random.Random(1))
+    assert d["name"] and isinstance(d["page"], int)
+    assert get_dyscrasia("empty") is None
+
+
+def test_resonance_mode_setting_roundtrip(player):
+    from web.db import get_db, get_resonance_mode, upsert_settings
+    with get_db() as conn:
+        upsert_settings(conn, actor_id="t", resonance_mode="tattered_facade")
+        conn.commit()
+        assert get_resonance_mode(conn) == "tattered_facade"
+        upsert_settings(conn, actor_id="t", resonance_mode="standard")
+        conn.commit()
+
+
 def test_resonance_route(player):
     r = player.post("/characters/1/resonance", data={"_csrf": "dev-csrf-token"})
     assert r.status_code == 200
     assert 'id="resonance-panel"' in r.text
-    assert any(RESONANCES[k]["label"] in r.text for k in RESONANCES)
+    assert any(t[1] in r.text for t in TEMPERAMENTS)  # a temperament label always shows
