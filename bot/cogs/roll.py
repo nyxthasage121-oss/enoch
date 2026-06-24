@@ -360,6 +360,7 @@ class RollCog(commands.Cog):
     @app_commands.describe(
         pool="Number (5), traits (strength + brawl), or a saved macro name",
         difficulty="Successes needed (optional)",
+        modifier="Bonus/penalty dice — powers, merits, situational (±)",
         hunger="Override Hunger dice (defaults to your character's Hunger)",
         specialty="Add a +1 specialty die (pick one of your character's specialties)",
         surge="Blood Surge: spend a Rouse Check to add dice (scales with Blood Potency)",
@@ -371,6 +372,7 @@ class RollCog(commands.Cog):
         interaction: discord.Interaction,
         pool: str,
         difficulty: int = 0,
+        modifier: int = 0,
         hunger: int | None = None,
         specialty: str | None = None,
         surge: bool = False,
@@ -381,8 +383,9 @@ class RollCog(commands.Cog):
         # A bare numeric pool with an explicit Hunger needs no character lookup
         # (unless surging — that needs Blood Potency + the live Hunger).
         if _looks_numeric(pool) and hunger is not None and not surge:
-            await _reply_roll(interaction, roll_pool(int(pool), hunger, difficulty),
-                              title=f"Roll · {pool}d")
+            n = max(0, int(pool) + modifier)
+            await _reply_roll(interaction, roll_pool(n, hunger, difficulty),
+                              title=f"Roll · {n}d")
             return
 
         # Otherwise resolve the invoking player's character for traits + Hunger.
@@ -408,8 +411,9 @@ class RollCog(commands.Cog):
             char = active[0]
         elif _looks_numeric(pool) and not surge:
             # Raw numeric roll, no character context needed.
-            await _reply_roll(interaction, roll_pool(int(pool), hunger or 0, difficulty),
-                              title=f"Roll · {pool}d")
+            n = max(0, int(pool) + modifier)
+            await _reply_roll(interaction, roll_pool(n, hunger or 0, difficulty),
+                              title=f"Roll · {n}d")
             return
         else:
             names = ", ".join(f"`{c['name']}`" for c in active) or "(none)"
@@ -441,6 +445,9 @@ class RollCog(commands.Cog):
         # +1 specialty die when the player picked one their character owns.
         total, parts, unknown = apply_specialty(
             total, parts, unknown, specialty, sheet.get("specialties"))
+        if modifier:
+            total = max(0, total + modifier)
+            parts = parts + [("Modifier", modifier)]
 
         eff_hunger = hunger if hunger is not None else int(sheet.get("hunger", 0) or 0)
 
