@@ -661,6 +661,48 @@ def apply_character_state_delta(conn, character_id: int, *,
     return result
 
 
+# ── Dice-roll history + stats (migration 053) ────────────────────────────────
+
+def log_roll(conn, character_id: int, *, kind: str = "roll", pool: int = 0,
+             hunger: int = 0, difficulty: int = 0, successes: int = 0,
+             outcome: str = "", label: str | None = None, dice: str | None = None,
+             source: str = "web") -> None:
+    """Record one dice roll for history/stats. Best-effort — a logging hiccup
+    must never fail the roll itself, so callers wrap this in try/except."""
+    conn.execute(
+        "INSERT INTO roll_log (character_id, kind, pool, hunger, difficulty, "
+        "successes, outcome, label, dice, source, created_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (character_id, kind, int(pool), int(hunger), int(difficulty),
+         int(successes), outcome or "", label, dice, source, _now()),
+    )
+
+
+def list_character_rolls(conn, character_id: int, limit: int = 20) -> list[dict]:
+    """A character's most-recent rolls, newest first."""
+    rows = conn.execute(
+        "SELECT * FROM roll_log WHERE character_id=? ORDER BY id DESC LIMIT ?",
+        (character_id, max(1, int(limit))),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def roll_outcome_stats(conn, character_id: int) -> dict:
+    """Outcome counts + a win rate over a character's logged rolls (roll/reroll
+    only — not hunts/rouses)."""
+    rows = conn.execute(
+        "SELECT outcome, COUNT(*) AS n FROM roll_log WHERE character_id=? "
+        "AND kind IN ('roll', 'reroll') GROUP BY outcome",
+        (character_id,),
+    ).fetchall()
+    counts = {r["outcome"]: r["n"] for r in rows}
+    total = sum(counts.values())
+    wins = (counts.get("critical", 0) + counts.get("messy_critical", 0)
+            + counts.get("success", 0))
+    return {"total": total, "counts": counts,
+            "win_rate": (wins / total) if total else 0.0}
+
+
 def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
     now = _now()
     conn.execute("""

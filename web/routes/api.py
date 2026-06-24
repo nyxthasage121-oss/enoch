@@ -48,6 +48,8 @@ from ..db import (
     upsert_player,
     write_audit,
     apply_character_state_delta,
+    list_character_rolls,
+    log_roll,
     update_character,
     STAFF_ROLES,
     get_staff_role,
@@ -407,6 +409,38 @@ async def apply_state_delta(character_id: int, body: DamageDeltaIn):
         )
 
     return {"character_id": character_id, "state": result}
+
+
+class RollLogIn(BaseModel):
+    kind: str = "roll"
+    pool: int = 0
+    hunger: int = 0
+    difficulty: int = 0
+    successes: int = 0
+    outcome: str = ""
+    label: str | None = None
+    dice: str | None = None
+
+
+@router.post("/characters/{character_id}/rolls", dependencies=[Depends(_require_bot)])
+async def log_bot_roll(character_id: int, body: RollLogIn):
+    """The dice bot records a roll so it shows in the web history + stats."""
+    with get_db() as conn:
+        if not get_character(conn, character_id):
+            raise HTTPException(status_code=404, detail="Character not found")
+        log_roll(conn, character_id, kind=body.kind, pool=body.pool,
+                 hunger=body.hunger, difficulty=body.difficulty,
+                 successes=body.successes, outcome=body.outcome,
+                 label=body.label, dice=body.dice, source="bot")
+    return {"ok": True}
+
+
+@router.get("/characters/{character_id}/rolls", dependencies=[Depends(_require_bot)])
+async def list_rolls(character_id: int, limit: int = 5):
+    """Recent rolls — lets the bot show a player their last few."""
+    with get_db() as conn:
+        rows = list_character_rolls(conn, character_id, limit=min(max(1, limit), 25))
+    return {"character_id": character_id, "rolls": rows}
 
 
 @router.post("/characters/{character_id}/macros", dependencies=[Depends(_require_bot)])

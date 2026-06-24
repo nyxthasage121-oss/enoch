@@ -394,6 +394,22 @@ def _pool_label(parts, total) -> str:
     return " + ".join(f"{lbl} {val}" for lbl, val in parts) + f" = {total}d"
 
 
+def _log_roll_safe(character_id: int, result, label: str | None,
+                   *, kind: str = "roll") -> None:
+    """Best-effort roll logging (migration 053) — a logging hiccup must never
+    fail the roll itself."""
+    try:
+        from ..db import log_roll
+        dice = ",".join(str(d) for d in (result.normal_dice + result.hunger_dice))
+        with get_db() as conn:
+            log_roll(conn, character_id, kind=kind, pool=result.pool,
+                     hunger=result.hunger, difficulty=result.difficulty,
+                     successes=result.successes, outcome=result.outcome,
+                     label=label, dice=dice)
+    except Exception:
+        pass
+
+
 def _roll_kwargs(char, *, result=None, form=None, parts=None, unknown=None,
                  surge_note=None, reroll_note=None, error=None, pool_label=None,
                  odds=None):
@@ -1822,6 +1838,9 @@ async def character_detail(
         proj_rolls      = timeskip_rolls_remaining(conn, character_id)
         downtime_hunts  = (list_downtime_actions(conn, character_id, proj_rolls["period_id"], "hunt")
                            if proj_rolls["period_id"] else [])
+        from ..db import list_character_rolls, roll_outcome_stats
+        rolls           = list_character_rolls(conn, character_id, limit=10)
+        roll_stats      = roll_outcome_stats(conn, character_id)
 
     p_criteria     = _player_criteria(all_criteria)
     period_claimed = (
@@ -1854,6 +1873,8 @@ async def character_detail(
             projects=projects,
             proj_rolls=proj_rolls,
             downtime_hunts=downtime_hunts,
+            rolls=rolls,
+            roll_stats=roll_stats,
             spend_categories=SPEND_CATEGORIES,
             spend_rules_json=json.dumps(RULES),
             humanity_conditions=HUMANITY_CONDITIONS,
@@ -1934,11 +1955,13 @@ async def roll_dice(
                       + " · ".join(str(d) for d in rolls) + f" → {rouse_txt}")
 
     result = roll_pool(total, eff_hunger, difficulty)
+    pool_label = _pool_label(parts, result.pool)
+    _log_roll_safe(character_id, result, pool_label, kind="roll")
     return templates.TemplateResponse(
         request, "player/partials/roll_form.html",
         _ctx(request, char=char, **_roll_kwargs(
             char, result=result, form=form_state, parts=parts, unknown=unknown,
-            surge_note=surge_note, pool_label=_pool_label(parts, result.pool))),
+            surge_note=surge_note, pool_label=pool_label)),
     )
 
 
@@ -1968,6 +1991,7 @@ async def reroll_dice(
             raise HTTPException(status_code=404)
 
     result, n = reroll_indices(normal, hunger, difficulty, indices)
+    _log_roll_safe(character_id, result, pool_label, kind="reroll")
     note = (f"Willpower reroll — rerolled {n} {'die' if n == 1 else 'dice'} "
             "(costs 1 Superficial Willpower — mark it on your sheet).")
     form_state = {"pool": pool_expr, "difficulty": difficulty, "hunger": "",

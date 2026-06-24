@@ -1358,6 +1358,46 @@
   {# ══ History ══ #}
   <div x-show="tab === 'history'" x-cloak class="space-y-4">
 
+    {# Dice rolls — outcome stats + recent rolls (migration 053; web + bot) #}
+    {% if roll_stats and roll_stats.total %}
+    <div class="gilded p-5">
+      <div class="flex items-baseline justify-between gap-3 mb-3">
+        <p class="label-gold">Dice Rolls</p>
+        <p class="font-cinzel text-xs text-bone-500">{{ roll_stats.total }} logged · {{ (roll_stats.win_rate * 100) | round | int }}% success</p>
+      </div>
+      <div class="flex flex-wrap gap-x-4 gap-y-1 mb-3 font-garamond text-xs">
+        {% for key, lbl in [('critical','Crit'),('messy_critical','Messy'),('success','Success'),('failure','Fail'),('total_failure','Total fail'),('bestial_failure','Bestial')] %}
+        {% if roll_stats.counts.get(key) %}<span class="text-bone-500">{{ lbl }} <span class="text-bone-300">{{ roll_stats.counts.get(key) }}</span></span>{% endif %}
+        {% endfor %}
+      </div>
+      {% if rolls %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-ink-700">
+              <th class="px-2 py-2 text-left label-gold font-normal">When</th>
+              <th class="px-2 py-2 text-left label-gold font-normal">Pool</th>
+              <th class="px-2 py-2 text-left label-gold font-normal">Outcome</th>
+              <th class="px-2 py-2 text-right label-gold font-normal">Succ.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rolls %}
+            <tr class="border-b border-ink-800">
+              <td class="px-2 py-1.5 font-cinzel text-bone-600 whitespace-nowrap">{{ r.created_at[:16] | replace('T', ' ') }}</td>
+              <td class="px-2 py-1.5 font-garamond text-bone-400">{{ r.label or (r.pool ~ 'd') }}{% if r.kind == 'reroll' %} <span class="text-mauve-400">· reroll</span>{% endif %}</td>
+              <td class="px-2 py-1.5 font-cinzel {{ 'text-blood-400' if r.outcome in ['failure', 'total_failure', 'bestial_failure', 'messy_critical'] else 'text-gold-400' }}">{{ r.outcome | replace('_', ' ') | title }}</td>
+              <td class="px-2 py-1.5 text-right font-cinzel text-bone-300">{{ r.successes }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="font-garamond text-bone-700 text-[0.65rem] mt-2 italic">Showing the last {{ rolls | length }}. Bot rolls appear here too.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {# Rejected claims with reasons #}
     {% set rejected_claims = claims | selectattr('status', 'eq', 'rejected') | list %}
     {% if rejected_claims %}
