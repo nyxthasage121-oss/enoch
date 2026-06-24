@@ -2270,6 +2270,11 @@ async def admin_settings_save(
         from ..db import RESONANCE_MODES
         _rm = (form.get("resonance_mode") or "standard").strip().lower()
         payload["resonance_mode"] = _rm if _rm in RESONANCE_MODES else "standard"
+    if "dice_channel_id" in form:
+        # Discord channel for web→Discord roll posting (migration 054). Snowflakes
+        # are digits-only; anything else clears the setting (turns the feature off).
+        _dc = (form.get("dice_channel_id") or "").strip()
+        payload["dice_channel_id"] = _dc if _dc.isdigit() else ""
 
     # Restricted predator types unlock list — Steward opt-in per
     # chronicle for normally-banned predator types like Blood Leech and

@@ -166,6 +166,21 @@
           </div>
         </label>
 
+        {# Dice channel — when set, the Roll tab offers "Post to Discord" and Irad
+           posts the result here via the bot_outbox. Blank = no posting offered. #}
+        <div class="gilded-inset px-3 py-2">
+          <label class="font-cinzel text-xs text-bone-200 block mb-1" for="dice_channel_id">Dice Channel ID</label>
+          <input type="text" name="dice_channel_id" id="dice_channel_id" inputmode="numeric"
+                 value="{{ _cs.get('dice_channel_id', '') or '' }}"
+                 placeholder="e.g. 123456789012345678" class="w-full text-xs">
+          <p class="font-garamond text-[0.65rem] text-bone-600 mt-1">
+            The Discord channel where web rolls post when a player ticks
+            <span class="text-bone-400">Post to Discord</span>. Right-click a channel →
+            <span class="text-bone-400">Copy Channel ID</span> (Developer Mode on). Leave blank to
+            disable posting. Irad must be in the server and able to post there.
+          </p>
+        </div>
+
         {# Resonance table mode — which Resonance chart the Roll tab generator uses. #}
         <div class="gilded-inset px-3 py-2">
           <label class="font-cinzel text-xs text-bone-200 block mb-1" for="resonance_mode">Resonance Table</label>

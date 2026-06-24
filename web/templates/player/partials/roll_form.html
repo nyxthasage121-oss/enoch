@@ -110,6 +110,15 @@
           <span class="font-garamond text-bone-400 text-sm">Blood Surge</span>
         </label>
       </div>
+      {% if dice_post_enabled %}
+      <div class="flex items-end">
+        <label class="flex items-center gap-2 cursor-pointer py-1.5"
+               title="Post this roll's result to the chronicle's Discord dice channel">
+          <input type="checkbox" name="post_discord" class="accent-[#8B1A1A]">
+          <span class="font-garamond text-bone-400 text-sm">Post to Discord</span>
+        </label>
+      </div>
+      {% endif %}
     </div>
     {% if roll_error %}<p class="font-garamond text-blood-400 text-xs">{{ roll_error }}</p>{% endif %}
     <div class="flex items-center gap-2">
@@ -144,6 +153,7 @@
     {% if roll_unknown %}<p class="font-garamond text-blood-400 text-xs mt-1">Unrecognized · {{ roll_unknown | join(', ') }}</p>{% endif %}
     {% if roll_surge_note %}<p class="font-garamond text-mauve-300 text-xs mt-1">{{ roll_surge_note }}</p>{% endif %}
     {% if roll_reroll_note %}<p class="font-garamond text-mauve-300 text-xs mt-1">{{ roll_reroll_note }}</p>{% endif %}
+    {% if roll_posted %}<p class="font-garamond text-gold-400 text-xs mt-1">✦ Posted to the Discord dice channel.</p>{% endif %}
 
     {% if roll_can_reroll %}
     <p class="font-garamond text-bone-700 text-[0.65rem] italic mt-3">

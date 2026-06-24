@@ -254,6 +254,86 @@ def test_odds_route(player):
     assert "Odds" in r.text and "%" in r.text
 
 
+# ── web→Discord roll posting (migration 054) ──────────────────────────────────
+
+def _set_dice_channel(value):
+    from web.db import get_db, upsert_settings
+    with get_db() as conn:
+        upsert_settings(conn, actor_id="t", dice_channel_id=value)
+        conn.commit()
+
+
+def test_post_to_discord_enqueues_when_channel_set(player):
+    import json
+    from web.db import get_character, get_db
+    _set_dice_channel("123456789012345678")
+    try:
+        with get_db() as conn:
+            conn.execute("DELETE FROM bot_outbox WHERE command='roll_posted'")
+            conn.commit()
+            char_name = get_character(conn, 1)["name"]
+        r = player.post("/characters/1/roll", data={
+            "_csrf": "dev-csrf-token", "pool": "5", "difficulty": "2",
+            "post_discord": "on"})
+        assert r.status_code == 200
+        assert "Posted to the Discord dice channel" in r.text
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT payload FROM bot_outbox WHERE command='roll_posted'").fetchall()
+        assert len(rows) == 1
+        p = json.loads(rows[0]["payload"])
+        assert p["channel_id"] == "123456789012345678"
+        assert p["character_name"] == char_name
+        assert p["difficulty"] == 2
+        assert "outcome" in p and "successes" in p
+        assert isinstance(p["normal_dice"], list)
+    finally:
+        _set_dice_channel("")
+
+
+def test_post_to_discord_noop_without_channel(player):
+    from web.db import get_db
+    _set_dice_channel("")    # feature off — no channel configured
+    with get_db() as conn:
+        conn.execute("DELETE FROM bot_outbox WHERE command='roll_posted'")
+        conn.commit()
+    r = player.post("/characters/1/roll", data={
+        "_csrf": "dev-csrf-token", "pool": "5", "post_discord": "on"})
+    assert r.status_code == 200
+    assert "Posted to the Discord dice channel" not in r.text
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT 1 FROM bot_outbox WHERE command='roll_posted'").fetchall()
+    assert rows == []
+
+
+def test_post_to_discord_not_enqueued_unless_opted_in(player):
+    from web.db import get_db
+    _set_dice_channel("123456789012345678")    # channel set, but no opt-in
+    try:
+        with get_db() as conn:
+            conn.execute("DELETE FROM bot_outbox WHERE command='roll_posted'")
+            conn.commit()
+        r = player.post("/characters/1/roll",
+                        data={"_csrf": "dev-csrf-token", "pool": "5"})
+        assert r.status_code == 200
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT 1 FROM bot_outbox WHERE command='roll_posted'").fetchall()
+        assert rows == []
+    finally:
+        _set_dice_channel("")
+
+
+def test_post_checkbox_visibility_follows_channel(player):
+    _set_dice_channel("123456789012345678")
+    try:
+        assert "Post to Discord" in player.get("/characters/1").text
+    finally:
+        _set_dice_channel("")
+    assert "Post to Discord" not in player.get("/characters/1").text
+
+
 def test_apply_character_state_delta_clamps(player):
     from web.db import apply_character_state_delta, get_character, get_db
     with get_db() as conn:

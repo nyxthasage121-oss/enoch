@@ -107,6 +107,48 @@ def build_roll_embed(result: RollResult, *, title: str,
     return e
 
 
+def build_posted_roll_embed(p: dict) -> discord.Embed:
+    """Render a web-originated roll (from a bot_outbox 'roll_posted' payload) as a
+    Discord embed for the chronicle dice channel. Mirrors build_roll_embed but
+    reads plain dict fields — the web has no RollResult object to hand over."""
+    outcome = p.get("outcome") or "success"
+    is_win  = bool(p.get("is_win"))
+    color = (_BLOOD if (outcome in (MESSY_CRITICAL, BESTIAL_FAILURE) or not is_win)
+             else _GOLD)
+    icon  = _OUTCOME_ICON.get(outcome, "◆")
+    label = p.get("outcome_label") or OUTCOME_LABELS.get(outcome, outcome)
+    name  = p.get("character_name") or "A character"
+
+    desc = f"**{label}**"
+    roller = p.get("roller_discord_id")
+    if roller:
+        desc = f"<@{roller}> · {desc}"
+    e = discord.Embed(title=f"🎲 {icon} {name}", description=desc, color=color)
+
+    if p.get("note"):
+        e.add_field(name="Blood Surge", value=p["note"], inline=False)
+    normal = [int(d) for d in (p.get("normal_dice") or [])]
+    hunger = [int(d) for d in (p.get("hunger_dice") or [])]
+    e.add_field(name="Dice", value=_fmt_dice(normal), inline=False)
+    if p.get("hunger"):
+        e.add_field(name="Hunger", value=_fmt_dice(hunger, hunger=True), inline=False)
+
+    succ_n = int(p.get("successes") or 0)
+    succ = f"{succ_n} success" + ("" if succ_n == 1 else "es")
+    diff = int(p.get("difficulty") or 0)
+    if diff:
+        margin = int(p.get("margin", succ_n - diff))
+        succ += f"  vs difficulty {diff}  ·  margin {margin:+d}"
+    e.add_field(name="Result", value=succ, inline=False)
+
+    foot = []
+    if p.get("pool_label"):
+        foot.append("Pool: " + str(p["pool_label"]))
+    foot.append("via web tracker")
+    e.set_footer(text="   ".join(foot))
+    return e
+
+
 class WillpowerRerollView(discord.ui.View):
     """A one-shot "Reroll (Willpower)" button on a roll result. Rerolls up to
     three regular (non-Hunger) failures for the original roller only."""

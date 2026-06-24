@@ -1235,6 +1235,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "dice_roller_enabled",
         # Resonance table mode: standard | tattered_facade | add_empty (migration 052)
         "resonance_mode",
+        # Discord channel for web→Discord roll posting (migration 054)
+        "dice_channel_id",
     }
     # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
     # migration 040. It's now an orthogonal flag — translate a legacy POST
@@ -5040,6 +5042,14 @@ def get_resonance_mode(conn) -> str:
     tattered_facade | add_empty. Defaults to 'standard'."""
     mode = ((get_settings(conn) or {}).get("resonance_mode") or "standard").strip().lower()
     return mode if mode in RESONANCE_MODES else "standard"
+
+
+def get_dice_channel_id(conn) -> str | None:
+    """The chronicle's Discord channel for web→Discord roll posting (migration
+    054), or None when unset. Returns the snowflake as a string; the web only
+    offers the 'Post to Discord' opt-in (and enqueues) when this is configured."""
+    raw = ((get_settings(conn) or {}).get("dice_channel_id") or "").strip()
+    return raw or None
 
 
 def get_homebrew_launch_roll(conn) -> bool:

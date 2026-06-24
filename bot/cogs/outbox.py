@@ -6,6 +6,7 @@ from discord.ext import commands, tasks
 
 from ..api import ack_outbox, drain_outbox, report_alert
 from ..config import settings
+from .roll import build_posted_roll_embed
 
 log = logging.getLogger(__name__)
 
@@ -291,6 +292,32 @@ async def _on_period_closing_soon(bot: commands.Bot, p: dict) -> None:
         await channel.send(embed=e)
     except Exception as exc:
         log.error("Failed to post period_closing_soon: %s", exc)
+
+
+# ── Dice events ───────────────────────────────────────────────────────────────
+
+@_handler("roll_posted")
+async def _on_roll_posted(bot: commands.Bot, p: dict) -> None:
+    """Post a web-originated dice roll to the chronicle's dice channel. The
+    channel id rides in on the payload (resolved web-side from the
+    dice_channel_id setting, migration 054), so the bot needs no extra config.
+    Silent no-op if the channel is missing or unreachable."""
+    raw = str(p.get("channel_id") or "").strip()
+    if not raw.isdigit():
+        log.warning("roll_posted: missing/invalid channel_id — skipping")
+        return
+    channel_id = int(raw)
+    try:
+        channel = bot.get_channel(channel_id) or await bot.fetch_channel(channel_id)
+    except discord.NotFound:
+        log.warning("roll_posted: dice channel %s not found", channel_id)
+        return
+    except discord.Forbidden:
+        log.warning("roll_posted: bot lacks access to dice channel %s", channel_id)
+        return
+
+    embed = build_posted_roll_embed(p)
+    await channel.send(embed=embed)
 
 
 # ── Cog ───────────────────────────────────────────────────────────────────────

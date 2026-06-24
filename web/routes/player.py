@@ -412,6 +412,40 @@ def _log_roll_safe(character_id: int, result, label: str | None,
         pass
 
 
+def _post_roll_to_discord(char: dict, result, pool_label: str | None,
+                          note: str | None) -> bool:
+    """Best-effort web→Discord roll post (migration 054). When the chronicle has
+    a dice channel configured, enqueue a 'roll_posted' bot_outbox event so Irad
+    posts this result's embed there. Returns True if enqueued. Never raises — a
+    posting hiccup must not fail the roll itself."""
+    try:
+        from ..db import enqueue_bot, get_dice_channel_id
+        with get_db() as conn:
+            channel_id = get_dice_channel_id(conn)
+            if not channel_id:
+                return False
+            enqueue_bot(conn, "roll_posted", {
+                "channel_id":        channel_id,
+                "character_name":    char.get("name") or "A character",
+                "roller_discord_id": char.get("discord_id"),
+                "outcome":           result.outcome,
+                "outcome_label":     OUTCOME_LABELS.get(result.outcome, result.outcome),
+                "is_win":            bool(result.is_win),
+                "successes":         result.successes,
+                "difficulty":        result.difficulty,
+                "margin":            result.margin,
+                "pool":              result.pool,
+                "hunger":            result.hunger,
+                "normal_dice":       list(result.normal_dice),
+                "hunger_dice":       list(result.hunger_dice),
+                "pool_label":        pool_label,
+                "note":              note,
+            })
+        return True
+    except Exception:
+        return False
+
+
 def _roll_kwargs(char, *, result=None, form=None, parts=None, unknown=None,
                  surge_note=None, reroll_note=None, error=None, pool_label=None,
                  odds=None):
@@ -1974,9 +2008,13 @@ async def roll_dice(
     result = roll_pool(total, eff_hunger, difficulty)
     pool_label = _pool_label(parts, result.pool)
     _log_roll_safe(character_id, result, pool_label, kind="roll")
+    # Optional web→Discord post (migration 054) — only when opted in AND the
+    # chronicle has a dice channel set; best-effort, never fails the roll.
+    posted = (form.get("post_discord") == "on"
+              and _post_roll_to_discord(char, result, pool_label, surge_note))
     return templates.TemplateResponse(
         request, "player/partials/roll_form.html",
-        _ctx(request, char=char, **_roll_kwargs(
+        _ctx(request, char=char, roll_posted=posted, **_roll_kwargs(
             char, result=result, form=form_state, parts=parts, unknown=unknown,
             surge_note=surge_note, pool_label=pool_label)),
     )
