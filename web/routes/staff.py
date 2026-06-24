@@ -830,6 +830,7 @@ def _vitals_row(c: dict) -> dict:
         "name": c["name"],
         "player": c.get("player_username"),
         "clan": c.get("clan") or "",
+        "type": (c.get("character_type") or "kindred"),
         "hunger": _i("hunger"),
         "health_marked": _i("damage_health_sup") + _i("damage_health_agg"),
         "health_max": _i("attr_stamina") + 3,

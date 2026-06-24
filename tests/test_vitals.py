@@ -14,6 +14,12 @@ def test_vitals_dashboard_forbidden_for_players(player):
     assert player.get("/staff/vitals").status_code == 403
 
 
+def test_vitals_dashboard_has_type_filter(staff):
+    r = staff.get("/staff/vitals")
+    assert r.status_code == 200
+    assert "All types" in r.text and 'x-model="typeFilter"' in r.text
+
+
 def test_vitals_row_computes_from_sheet():
     from web.routes.staff import _vitals_row
     c = {

@@ -16,14 +16,23 @@
   <div class="gilded overflow-x-auto"
        x-data="{
          search: '',
-         show(name, player) {
+         typeFilter: '',
+         show(name, player, type) {
            const q = this.search.trim().toLowerCase();
-           return !q || name.toLowerCase().includes(q) || (player || '').toLowerCase().includes(q);
+           const textOk = !q || name.toLowerCase().includes(q) || (player || '').toLowerCase().includes(q);
+           return textOk && (!this.typeFilter || type === this.typeFilter);
          }
        }">
-    <div class="px-4 py-3 border-b border-ink-700">
+    <div class="px-4 py-3 border-b border-ink-700 flex flex-wrap items-center gap-2">
       <input type="text" x-model="search" placeholder="Filter by character or player…"
-             class="w-full sm:w-72 text-sm py-1">
+             class="flex-1 min-w-[12rem] sm:max-w-xs text-sm py-1">
+      <select x-model="typeFilter" class="text-sm py-1">
+        <option value="">All types</option>
+        <option value="kindred">Kindred</option>
+        <option value="mortal">Mortal</option>
+        <option value="ghoul">Ghoul</option>
+        <option value="revenant">Revenant</option>
+      </select>
     </div>
     <table class="w-full text-sm">
       <thead>
@@ -41,7 +50,7 @@
       <tbody>
         {% for r in rows %}
         <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors"
-            x-show="show({{ r.name | tojson | forceescape }}, {{ (r.player or '') | tojson | forceescape }})">
+            x-show="show({{ r.name | tojson | forceescape }}, {{ (r.player or '') | tojson | forceescape }}, {{ r.type | tojson | forceescape }})">
           <td class="px-4 py-2.5">
             <a href="/staff/characters/{{ r.id }}" class="font-cinzel text-bone-200 hover:text-gold-400">{{ r.name }}</a>
             <span class="block font-garamond text-bone-700 text-[0.65rem]">{{ r.clan | replace('-', ' ') | title }}</span>
