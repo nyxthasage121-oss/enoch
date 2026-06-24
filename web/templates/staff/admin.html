@@ -65,15 +65,35 @@
            imEnabled: {{ 'true' if _cs.get('in_memoriam_enabled') else 'false' }},
            creationMode: '{{ _cs.get('creation_mode', 'guided') }}',
            revenants: {{ 'true' if _cs.get('revenants_enabled') else 'false' }},
-         }">
+           sec: { creation: true, types: false, roster: false, projects: false },
+           initSections() {
+             try { Object.assign(this.sec, JSON.parse(localStorage.getItem('enochAdminSections') || 'null') || {}); } catch (e) {}
+           },
+           saveSections() { try { localStorage.setItem('enochAdminSections', JSON.stringify(this.sec)); } catch (e) {} },
+           toggleSec(k) { this.sec[k] = !this.sec[k]; this.saveSections(); },
+           allOpen() { return Object.values(this.sec).every(Boolean); },
+           toggleAll() { let v = !this.allOpen(); Object.keys(this.sec).forEach(k => this.sec[k] = v); this.saveSections(); },
+         }" x-init="initSections()">
       <p class="label-gold mb-3">Chronicle Settings</p>
       <form method="post" action="/staff/admin/settings" class="space-y-5">
         <input type="hidden" name="_csrf" value="{{ csrf_token }}">
 
-        {# ─────────────────────── Character Creation ─────────────────────── #}
-        <div class="divider-gold">
-          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 whitespace-nowrap">Character Creation</span>
+        {# Collapsible sections — staff expand only what they need; collapsed
+           sections stay in the DOM so every field still saves. Open/closed
+           state persists in localStorage so a Save doesn't reset it. #}
+        <div class="flex justify-end -mb-1">
+          <button type="button" @click="toggleAll()"
+                  class="font-cinzel text-[0.6rem] tracking-widest uppercase text-bone-600 hover:text-gold-400 transition-colors"
+                  x-text="allOpen() ? 'Collapse all' : 'Expand all'"></button>
         </div>
+
+        {# ─────────────────────── Character Creation ─────────────────────── #}
+        <button type="button" @click="toggleSec('creation')" :aria-expanded="sec.creation"
+                class="w-full flex items-center justify-between gap-3 border-t border-gold-900/40 pt-4 group">
+          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 group-hover:text-gold-300 transition-colors whitespace-nowrap">Character Creation</span>
+          <svg class="w-3.5 h-3.5 text-gold-600 transition-transform duration-200 shrink-0" :class="sec.creation ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div x-show="sec.creation" x-cloak class="space-y-5">
 
         {# Character-creation mode — Guided (enforced wizard) vs Open (free
            sheet entry, nothing enforced). Launch on Open to drop in existing
@@ -310,10 +330,15 @@
           </div>
         </label>
 
+        </div>{# /Character Creation #}
+
         {# ──────────────────────── Character Types ───────────────────────── #}
-        <div class="divider-gold">
-          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 whitespace-nowrap">Character Types</span>
-        </div>
+        <button type="button" @click="toggleSec('types')" :aria-expanded="sec.types"
+                class="w-full flex items-center justify-between gap-3 border-t border-gold-900/40 pt-4 group">
+          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 group-hover:text-gold-300 transition-colors whitespace-nowrap">Character Types</span>
+          <svg class="w-3.5 h-3.5 text-gold-600 transition-transform duration-200 shrink-0" :class="sec.types ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div x-show="sec.types" x-cloak class="space-y-5">
 
         {# Revenants #}
         <label class="flex items-start gap-3 cursor-pointer group">
@@ -405,10 +430,15 @@
           </div>
         </div>
 
+        </div>{# /Character Types #}
+
         {# ───────────────────────── Roster & XP ──────────────────────────── #}
-        <div class="divider-gold">
-          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 whitespace-nowrap">Roster &amp; XP</span>
-        </div>
+        <button type="button" @click="toggleSec('roster')" :aria-expanded="sec.roster"
+                class="w-full flex items-center justify-between gap-3 border-t border-gold-900/40 pt-4 group">
+          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 group-hover:text-gold-300 transition-colors whitespace-nowrap">Roster &amp; XP</span>
+          <svg class="w-3.5 h-3.5 text-gold-600 transition-transform duration-200 shrink-0" :class="sec.roster ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div x-show="sec.roster" x-cloak class="space-y-5">
 
         <div>
           <label class="label-gold block mb-1.5 text-[0.7rem]">Characters per player</label>
@@ -461,10 +491,15 @@
           </p>
         </div>
 
+        </div>{# /Roster & XP #}
+
         {# ─────────────────────── Downtime Projects ──────────────────────── #}
-        <div class="divider-gold">
-          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 whitespace-nowrap">Downtime Projects</span>
-        </div>
+        <button type="button" @click="toggleSec('projects')" :aria-expanded="sec.projects"
+                class="w-full flex items-center justify-between gap-3 border-t border-gold-900/40 pt-4 group">
+          <span class="font-cinzel text-[0.7rem] tracking-[0.25em] uppercase text-gold-500 group-hover:text-gold-300 transition-colors whitespace-nowrap">Downtime Projects</span>
+          <svg class="w-3.5 h-3.5 text-gold-600 transition-transform duration-200 shrink-0" :class="sec.projects ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div x-show="sec.projects" x-cloak class="space-y-5">
 
         <div x-data="{ pm: '{{ _cs.get('project_mode', 'nybn') }}' }">
           {% set _pm = _cs.get('project_mode', 'nybn') %}
@@ -499,6 +534,8 @@
             all of their projects.
           </p>
         </div>
+
+        </div>{# /Downtime Projects #}
 
         <button type="submit" class="btn-ghost font-cinzel tracking-widest text-xs">
           Save Settings
