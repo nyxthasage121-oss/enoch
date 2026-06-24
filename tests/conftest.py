@@ -18,6 +18,9 @@ os.environ["DATABASE_URL"]       = str(_TEST_DB)
 os.environ["ENOCH_DEV_PREVIEW"]  = "1"
 os.environ["SESSION_SECRET"]     = "smoke-test-secret-not-for-production"
 os.environ["BOT_SERVICE_TOKEN"]  = "smoke-test-token"
+# Empty so the admin UI's guild channel/role pickers never make a real Discord
+# call from tests (the helpers degrade to [] → manual-entry fallback).
+os.environ["DISCORD_BOT_TOKEN"]  = ""
 
 from fastapi.testclient import TestClient   # noqa: E402
 

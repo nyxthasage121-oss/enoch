@@ -8,7 +8,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
 from ..config import settings
-from ..db import get_db, upsert_player
+from ..db import get_db, get_staff_role_ids, upsert_player
 
 log = logging.getLogger(__name__)
 
@@ -199,10 +199,20 @@ async def callback(
         if member.get("nick"):
             username = member["nick"]
 
-        # Staff role check — any matching role grants staff access
-        if settings.STAFF_ROLE_IDS:
+        # Staff role check — any matching role grants staff access. Allowed
+        # roles = the STAFF_ROLE_IDS env (deploy-time backstop) UNION the in-app
+        # picker list (chronicle setting staff_role_ids, migration 056), so an
+        # admin can grant access without a redeploy and a bad in-app edit can't
+        # lock out the env-configured roles.
+        allowed_roles = set(settings.STAFF_ROLE_IDS)
+        try:
+            with get_db() as conn:
+                allowed_roles |= set(get_staff_role_ids(conn))
+        except Exception:
+            log.exception("Failed to read staff_role_ids from chronicle settings")
+        if allowed_roles:
             member_roles = {int(r) for r in member.get("roles", [])}
-            is_staff     = bool(member_roles & set(settings.STAFF_ROLE_IDS))
+            is_staff     = bool(member_roles & allowed_roles)
 
     # ── Upsert player profile ─────────────────────────────────────────────────
     try:

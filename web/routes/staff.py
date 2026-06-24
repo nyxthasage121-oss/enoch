@@ -2179,10 +2179,18 @@ async def admin_page(request: Request, user: dict = Depends(require_staff)):
     player roster, and the XP criteria editor under one URL. The tab
     can be deep-linked via the URL fragment (#criteria etc.)."""
     from ..deps import is_settings_admin
+    from ..discord_api import guild_text_channels, guild_roles
+    # Bot-powered pickers for the Discord & Irad + Staff Access sections. Both
+    # return [] when the bot token/guild is unset (the template then falls back
+    # to manual entry / an informational note), so this never blocks the page.
+    discord_channels = await guild_text_channels()
+    discord_roles = await guild_roles()
     return templates.TemplateResponse(
         request, "staff/admin.html",
         _ctx(request,
              viewer_is_settings_admin=is_settings_admin(request, user),
+             discord_channels=discord_channels,
+             discord_roles=discord_roles,
              **_admin_ctx_extras()),
     )
 
@@ -2213,6 +2221,30 @@ async def set_role_route(
     msg = "Role cleared." if role is None else f"Role set to {role}."
     request.session["flash"] = [{"kind": "success", "message": msg}]
     return RedirectResponse(url="/staff/admin#staff", status_code=303)
+
+
+@router.post("/admin/staff-roles", response_class=HTMLResponse)
+async def set_staff_access_roles_route(
+    request: Request,
+    user: dict = Depends(require_settings_admin),
+    _: None = Depends(csrf_protect),
+):
+    """Set which Discord roles grant staff-dashboard access (migration 056),
+    chosen from the bot-powered role picker. Stored as a chronicle setting and
+    UNIONed with the STAFF_ROLE_IDS env at login (env stays a backstop).
+    Settings-admin only — this gates who can reach the staff dashboard at all.
+    Dedicated route (not the main settings save) so a partial submit can't
+    clobber the other checkbox settings."""
+    from ..db import upsert_settings
+    form = await request.form()
+    ids = [v.strip() for v in form.getlist("staff_role_ids") if v.strip().isdigit()]
+    with get_db() as conn:
+        upsert_settings(conn, actor_id=user["id"], staff_role_ids=ids)
+    request.session["flash"] = [{
+        "kind": "success",
+        "message": f"Saved {len(ids)} staff-access role{'' if len(ids) == 1 else 's'}. "
+                   "Members get access on their next login."}]
+    return RedirectResponse(url="/staff/admin#settings", status_code=303)
 
 
 @router.post("/admin/settings-admin/{discord_id}/set", response_class=HTMLResponse)

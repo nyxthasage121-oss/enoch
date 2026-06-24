@@ -39,6 +39,10 @@ class Settings:
     CHRONICLE_CHANNEL_ID: int|None = (
         int(os.getenv("CHRONICLE_CHANNEL_ID") or 0) or None
     )
+    # Bot token — used read-only by the admin UI to list the guild's text
+    # channels and roles so staff can pick from dropdowns instead of pasting
+    # snowflakes. Optional: when unset the pickers fall back to manual entry.
+    DISCORD_BOT_TOKEN: str|None = os.getenv("DISCORD_BOT_TOKEN")
 
     # ── Enoch / Inconnu sync ──────────────────────────────────────
     # The guild ID used inside the Inconnu bot's tables (may differ)

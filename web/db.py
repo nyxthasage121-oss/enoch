@@ -1103,7 +1103,7 @@ def unbond_familiar(conn, bond_id: int) -> None:
 def get_settings(conn) -> dict | None:
     row = conn.execute("SELECT * FROM chronicle_settings WHERE id=1").fetchone()
     return _parse(row, "revenant_families", "homebrew_tier_budgets",
-                  "unlocked_predator_types")
+                  "unlocked_predator_types", "staff_role_ids")
 
 
 def coterie_max_members(conn) -> int:
@@ -1239,6 +1239,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "dice_channel_id",
         # ST-tracker Discord channel for vitals-board posting (migration 055)
         "st_channel_id",
+        # In-app staff-access role IDs picker (migration 056) — JSON list
+        "staff_role_ids",
     }
     # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
     # migration 040. It's now an orthogonal flag — translate a legacy POST
@@ -1262,6 +1264,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         safe_raw["homebrew_tier_budgets"] = _j(safe_raw["homebrew_tier_budgets"])
     if "unlocked_predator_types" in safe_raw and isinstance(safe_raw["unlocked_predator_types"], (list, dict)):
         safe_raw["unlocked_predator_types"] = _j(safe_raw["unlocked_predator_types"])
+    if "staff_role_ids" in safe_raw and isinstance(safe_raw["staff_role_ids"], (list, dict)):
+        safe_raw["staff_role_ids"] = _j(safe_raw["staff_role_ids"])
     kwargs = safe_raw
     safe = {k: v for k, v in kwargs.items() if k in ALLOWED}
     if not safe:
@@ -5060,6 +5064,25 @@ def get_st_channel_id(conn) -> str | None:
     'Post to Discord' button (and enqueues) when this is configured."""
     raw = ((get_settings(conn) or {}).get("st_channel_id") or "").strip()
     return raw or None
+
+
+def get_staff_role_ids(conn) -> list[int]:
+    """Discord role IDs (ints) that grant staff access, chosen via the admin
+    role picker (migration 056). UNIONed with the STAFF_ROLE_IDS env at login,
+    so the env stays a backstop. Robust to junk — returns [] if unset/malformed."""
+    raw = (get_settings(conn) or {}).get("staff_role_ids")
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            raw = []
+    out: list[int] = []
+    for v in (raw or []):
+        try:
+            out.append(int(v))
+        except (TypeError, ValueError):
+            pass
+    return out
 
 
 def get_homebrew_launch_roll(conn) -> bool:

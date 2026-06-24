@@ -2,6 +2,31 @@
 {% block title %}Admin — Enoch{% endblock %}
 
 {% block content %}
+
+{# Channel picker — a dropdown from the bot's channel list when available, else
+   a manual snowflake field. `channels` is passed explicitly because Jinja
+   macros don't see the render context. #}
+{% macro channel_picker(fid, label, current, help, channels) %}
+  <div class="gilded-inset px-3 py-2">
+    <label class="font-cinzel text-xs text-bone-200 block mb-1" for="{{ fid }}">{{ label }}</label>
+    {% if channels %}
+    {% set ns = namespace(found=false) %}
+    <select name="{{ fid }}" id="{{ fid }}" class="w-full text-xs">
+      <option value="">— none —</option>
+      {% for c in channels %}
+      <option value="{{ c.id }}" {{ 'selected' if c.id == current else '' }}>#{{ c.name }}{% if c.category %} · {{ c.category }}{% endif %}</option>
+      {% if c.id == current %}{% set ns.found = true %}{% endif %}
+      {% endfor %}
+      {% if current and not ns.found %}<option value="{{ current }}" selected>{{ current }} (current)</option>{% endif %}
+    </select>
+    {% else %}
+    <input type="text" name="{{ fid }}" id="{{ fid }}" inputmode="numeric"
+           value="{{ current }}" placeholder="e.g. 123456789012345678" class="w-full text-xs">
+    {% endif %}
+    <p class="font-garamond text-[0.65rem] text-bone-600 mt-1">{{ help }}</p>
+  </div>
+{% endmacro %}
+
 {# Tabbed admin control panel — Alpine handles client-side switching,
    URL hash keeps deep-links working (e.g. /staff/admin#periods). #}
 <div class="page-enter"
@@ -530,36 +555,23 @@
         </button>
         <div x-show="sec.discord" x-cloak class="space-y-4">
           <p class="font-garamond text-bone-600 text-xs leading-relaxed">
-            Channels Irad posts to. Right-click a channel in Discord →
-            <span class="text-bone-400">Copy Channel ID</span> (Developer Mode on). Leave a
-            field blank to turn that posting off. Irad must be in the server and able to post there.
+            Channels Irad posts to.
+            {% if discord_channels %}Pick from the list — the bot reads your server's channels.{% else %}Right-click a channel in Discord →
+            <span class="text-bone-400">Copy Channel ID</span> (Developer Mode on), or set
+            <span class="font-cinzel text-bone-400">DISCORD_BOT_TOKEN</span> on the web app to pick from a dropdown.{% endif %}
+            Leave a field on <span class="text-bone-400">— none —</span> (or blank) to turn that posting
+            off. Irad must be in the server and able to post there.
           </p>
 
-          {# Dice channel — when set, the Roll tab offers players a "Post to Discord"
-             opt-in (requires the Web Dice Roller, under Character Creation). #}
-          <div class="gilded-inset px-3 py-2">
-            <label class="font-cinzel text-xs text-bone-200 block mb-1" for="dice_channel_id">Dice Channel ID</label>
-            <input type="text" name="dice_channel_id" id="dice_channel_id" inputmode="numeric"
-                   value="{{ _cs.get('dice_channel_id', '') or '' }}"
-                   placeholder="e.g. 123456789012345678" class="w-full text-xs">
-            <p class="font-garamond text-[0.65rem] text-bone-600 mt-1">
-              Where web rolls post when a player ticks <span class="text-bone-400">Post to Discord</span>
-              on the Roll tab.
-            </p>
-          </div>
+          {{ channel_picker('dice_channel_id', 'Dice Channel',
+             _cs.get('dice_channel_id', '') or '',
+             'Where web rolls post when a player ticks “Post to Discord” on the Roll tab (requires the Web Dice Roller).',
+             discord_channels) }}
 
-          {# ST tracker channel — staff push the live Vitals board here (migration 055). #}
-          <div class="gilded-inset px-3 py-2">
-            <label class="font-cinzel text-xs text-bone-200 block mb-1" for="st_channel_id">ST Tracker Channel ID</label>
-            <input type="text" name="st_channel_id" id="st_channel_id" inputmode="numeric"
-                   value="{{ _cs.get('st_channel_id', '') or '' }}"
-                   placeholder="e.g. 123456789012345678" class="w-full text-xs">
-            <p class="font-garamond text-[0.65rem] text-bone-600 mt-1">
-              Adds a <span class="text-bone-400">Post to Discord</span> button on the
-              <span class="text-bone-400">Vitals</span> page that pushes a snapshot of every active
-              character's Hunger / Health / Willpower / Humanity here — a staff dashboard in chat.
-            </p>
-          </div>
+          {{ channel_picker('st_channel_id', 'ST Tracker Channel',
+             _cs.get('st_channel_id', '') or '',
+             'Adds a “Post to Discord” button on the Vitals page that pushes a snapshot of every active character’s Hunger / Health / Willpower / Humanity here.',
+             discord_channels) }}
         </div>{# /Discord & Irad #}
 
         <button type="submit" class="btn-ghost font-cinzel tracking-widest text-xs">
@@ -594,15 +606,43 @@
     </div>
     {% endif %}
 
-    {# Staff access note #}
+    {# Staff access — when the bot can list the server's roles AND the viewer is
+       a settings admin, pick which roles grant staff-dashboard access (migration
+       056). Otherwise a clear read-only note. Dedicated form → /admin/staff-roles
+       so a partial submit can't clobber the other settings. #}
     <div class="gilded-inset px-5 py-4 border border-ink-700">
       <p class="label-gold mb-1">Staff Access</p>
-      <p class="font-garamond text-bone-500 text-sm leading-relaxed">
-        Staff permissions are granted via Discord server roles.
-        Set <span class="font-cinzel text-bone-400">STAFF_ROLE_IDS</span> in your
-        environment with the role IDs (comma-separated) that should have staff access.
-        Changes take effect at next login.
+      {% if discord_roles and viewer_is_settings_admin %}
+      {% set _sr = (_cs.get('staff_role_ids') or []) | map('string') | list %}
+      <p class="font-garamond text-bone-500 text-sm leading-relaxed mb-3">
+        Tick the Discord roles that grant access to the staff dashboard — applies on each
+        member's next login, <em>in addition</em> to any roles set via the
+        <span class="font-cinzel text-bone-400">STAFF_ROLE_IDS</span> environment variable.
+        Assign each person's role + permissions on the <span class="text-bone-400">Staff</span> tab.
       </p>
+      <form method="post" action="/staff/admin/staff-roles">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+          {% for r in discord_roles %}
+          <label class="flex items-center gap-2 gilded-inset px-3 py-1.5 cursor-pointer hover:border-gold-700 transition-colors">
+            <input type="checkbox" name="staff_role_ids" value="{{ r.id }}" class="accent-gold"
+                   {{ 'checked' if r.id in _sr else '' }}>
+            <span class="font-garamond text-bone-300 text-xs truncate">{{ r.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn-ghost font-cinzel tracking-widest text-xs">Save Staff Roles</button>
+      </form>
+      {% else %}
+      <p class="font-garamond text-bone-500 text-sm leading-relaxed">
+        Staff dashboard access is granted by Discord server role. Set
+        <span class="font-cinzel text-bone-400">STAFF_ROLE_IDS</span> (comma-separated role IDs)
+        in the app's environment — changes take effect at each member's next login. This is a
+        read-only note; there's nothing to enter here. Assign each person's role + permissions on
+        the <span class="text-bone-400">Staff</span> tab.
+        {% if not discord_roles %}<span class="block mt-1 text-bone-700 text-xs italic">Set a bot token (<span class="font-cinzel">DISCORD_BOT_TOKEN</span>) on the web app to pick roles from a list here.</span>{% endif %}
+      </p>
+      {% endif %}
     </div>
   </div>
 

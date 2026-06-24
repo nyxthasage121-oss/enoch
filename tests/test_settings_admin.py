@@ -149,6 +149,97 @@ def test_admin_html_renders_settings_admin_column(staff):
     assert "/staff/admin/settings-admin/" in r.text
 
 
+def test_staff_role_ids_roundtrip():
+    """staff_role_ids (migration 056) serializes as JSON and reads back as a
+    list of ints via get_staff_role_ids."""
+    from web.db import get_db, get_settings, get_staff_role_ids, upsert_settings
+    with get_db() as conn:
+        upsert_settings(conn, actor_id="t", staff_role_ids=["111", "222"])
+        conn.commit()
+        assert get_staff_role_ids(conn) == [111, 222]
+        assert isinstance(get_settings(conn).get("staff_role_ids"), list)
+        upsert_settings(conn, actor_id="t", staff_role_ids=[])
+        conn.commit()
+        assert get_staff_role_ids(conn) == []
+
+
+def test_staff_role_ids_robust_to_junk():
+    from web.db import get_db, get_staff_role_ids, upsert_settings
+    with get_db() as conn:
+        conn.execute("UPDATE chronicle_settings SET staff_role_ids='not json' WHERE id=1")
+        conn.commit()
+        assert get_staff_role_ids(conn) == []
+        upsert_settings(conn, actor_id="t", staff_role_ids=[])
+        conn.commit()
+
+
+def test_staff_roles_route_saves_and_digit_guards(staff):
+    """The dedicated /staff/admin/staff-roles POST persists the selected role
+    IDs (junk dropped). Settings-admin only."""
+    from web.db import get_db, get_staff_role_ids, upsert_settings
+    try:
+        r = staff.post(
+            "/staff/admin/staff-roles",
+            data={"_csrf": "dev-csrf-token",
+                  "staff_role_ids": ["555", "666", "notanid"]},
+            follow_redirects=False)
+        assert r.status_code == 303
+        with get_db() as conn:
+            assert get_staff_role_ids(conn) == [555, 666]
+    finally:
+        with get_db() as conn:
+            upsert_settings(conn, actor_id="t", staff_role_ids=[])
+            conn.commit()
+
+
+def test_staff_roles_route_blocks_non_settings_admin(staff, monkeypatch):
+    monkeypatch.delenv("ENOCH_SETTINGS_ADMIN_IDS", raising=False)
+    from web.db import get_db, set_settings_admin
+    with get_db() as conn:
+        set_settings_admin(conn, "999999999999999999", False, actor_id="0")
+        conn.commit()
+    try:
+        r = staff.post("/staff/admin/staff-roles",
+                       data={"_csrf": "dev-csrf-token", "staff_role_ids": ["1"]},
+                       follow_redirects=False)
+        assert r.status_code == 403
+    finally:
+        with get_db() as conn:
+            set_settings_admin(conn, "999999999999999999", True, actor_id="0")
+            conn.commit()
+
+
+def test_admin_discord_section_and_staff_access_fallback(staff):
+    """Without a bot token (tests), the Discord & Irad channel fields fall back
+    to manual ID inputs and Staff Access shows the env-config note."""
+    r = staff.get("/staff/admin")
+    assert r.status_code == 200
+    assert "Discord &amp; Irad" in r.text
+    assert 'id="dice_channel_id"' in r.text and 'id="st_channel_id"' in r.text
+    assert "Staff Access" in r.text and "STAFF_ROLE_IDS" in r.text
+
+
+def test_admin_pickers_render_with_bot_data(staff, monkeypatch):
+    """When the bot can list channels/roles, the Discord & Irad fields render as
+    dropdowns and Staff Access renders the role-checkbox picker. The route does a
+    function-local import, so patching the source module attributes takes."""
+    async def _chans():
+        return [{"id": "111", "name": "dice-rolls", "category": "GAME"},
+                {"id": "222", "name": "st-tracker", "category": "STAFF"}]
+
+    async def _roles():
+        return [{"id": "900", "name": "Storyteller"}, {"id": "901", "name": "Helper"}]
+
+    monkeypatch.setattr("web.discord_api.guild_text_channels", _chans)
+    monkeypatch.setattr("web.discord_api.guild_roles", _roles)
+    r = staff.get("/staff/admin")
+    assert r.status_code == 200
+    assert '<select name="dice_channel_id"' in r.text          # channel dropdown
+    assert "#dice-rolls" in r.text and "#st-tracker" in r.text
+    assert "/staff/admin/staff-roles" in r.text                # role-picker form
+    assert 'value="900"' in r.text and "Storyteller" in r.text
+
+
 def test_export_requires_settings_admin(staff, monkeypatch):
     """The full chronicle export (characters/claims/spends/ledger/audit log)
     is settings-admin only — a staff_role without the flag is blocked, since
