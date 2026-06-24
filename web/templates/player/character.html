@@ -121,7 +121,11 @@
 
   {# ── Tabs ── #}
   <div class="flex gap-0 border-b border-ink-700 mb-6 overflow-x-auto">
-    {% set play_tabs = ([('claim','Claim XP'),('spend','Spend XP'),('wishlist','Wishlist')] + ([('projects','Projects')] if project_mode != 'off' else [])) if char.is_approved else [] %}
+    {# Claim / Spend / Wishlist show even before approval: the inner partials
+       carry their own "must be approved" messaging, and the Wishlist is a useful
+       pre-approval build planner. Projects stays gated — its content needs an
+       approved, active character. #}
+    {% set play_tabs = [('claim','Claim XP'),('spend','Spend XP'),('wishlist','Wishlist')] + ([('projects','Projects')] if (char.is_approved and project_mode != 'off') else []) %}
     {% for t, lbl in [('overview','Overview'),('sheet','Sheet')] + play_tabs + [('history','History')] %}
     <button @click="tab='{{ t }}'"
             :class="tab === '{{ t }}'
@@ -1231,7 +1235,7 @@
         </div>
         <div class="md:col-span-1">
           <label class="label-gold block mb-1 text-[0.7rem]">From</label>
-          <input type="number" min="0" max="5" x-model.number="newItem.current" class="w-full text-xs">
+          <input type="number" min="0" max="9" x-model.number="newItem.current" class="w-full text-xs">
         </div>
         <div class="md:col-span-1">
           <label class="label-gold block mb-1 text-[0.7rem]">To</label>

@@ -333,6 +333,29 @@ def test_sheet_save_persists(player):
     assert sheet.get("specialties") == [{"skill": "skill_athletics", "name": "Parkour"}]
 
 
+def test_sheet_save_persists_high_blood_potency(player):
+    """Blood Potency must persist above 5 — V5 RAW runs it 0→10 like Humanity.
+    Regression for SHEET_LIMITS, which used to clamp blood_potency back to 5 on
+    save, silently undoing an approved BP purchase past 5."""
+    import json as _json
+    from web.db import get_db
+    r = player.post(
+        "/characters/1/sheet",
+        data={
+            "_csrf": "dev-csrf-token",
+            "blood_potency": "8",
+            "humanity": "10",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    with get_db() as conn:
+        row = conn.execute("SELECT sheet_json FROM characters WHERE id=1").fetchone()
+    sheet = _json.loads(row["sheet_json"])
+    assert sheet.get("blood_potency") == 8, "BP was clamped — SHEET_LIMITS still caps it"
+    assert sheet.get("humanity") == 10
+
+
 def test_sheet_save_rejects_bad_specialty_skill(player):
     """Specialty referencing a non-existent skill key should be dropped."""
     import json as _json
@@ -3397,6 +3420,73 @@ def test_creation_xp_posts_single_clean_ledger_entry(player):
             again = [e for e in get_ledger(conn, ch["id"])
                      if e["entry_type"] == "creation"]
         assert len(again) == 1, "re-approval double-posted the CC-XP entry"
+    finally:
+        with get_db() as conn:
+            delete_character(conn, ch["id"])
+            conn.commit()
+
+
+def test_no_creation_carryover_for_zero_pool_characters(player):
+    """A character with no creation-XP pool carries NOTHING over on approval.
+    Regression: mortals/ghouls/revenants keep character_tier='neonate' in the
+    column, so the old `_pool <= 0` tier fallback wrongly handed them the
+    neonate's 15 XP. A genuinely recorded pool of 0 must likewise carry nothing."""
+    import json as _json
+    from web.db import (get_db, upsert_player, create_character, approve_character,
+                        get_character, get_ledger, delete_character)
+    with get_db() as conn:
+        upsert_player(conn, discord_id="555111555111555111", username="ZeroPool")
+        # (a) a mortal with NO recorded pool — exercises the type-aware fallback
+        mortal = create_character(conn, discord_id="555111555111555111",
+                                  name="Zero Pool Mortal", clan="brujah",
+                                  character_type="mortal")
+        conn.execute("UPDATE characters SET sheet_json=? WHERE id=?",
+                     (_json.dumps({}), mortal["id"]))
+        # (b) a character that genuinely recorded a 0 pool (spent nothing)
+        rec0 = create_character(conn, discord_id="555111555111555111",
+                                name="Recorded Zero", clan="brujah")
+        conn.execute("UPDATE characters SET sheet_json=? WHERE id=?",
+                     (_json.dumps({"starting_xp_pool": 0, "xp_spent": 0}), rec0["id"]))
+        conn.commit()
+    try:
+        with get_db() as conn:
+            for cid in (mortal["id"], rec0["id"]):
+                approve_character(conn, cid, reviewer_id="999999999999999999")
+            conn.commit()
+            for cid in (mortal["id"], rec0["id"]):
+                c = get_character(conn, cid)
+                carry = [e for e in get_ledger(conn, cid) if e["entry_type"] == "carryover"]
+                assert c["xp_total"] == 0, f"char {cid} got phantom XP: {c['xp_total']}"
+                assert (c["creation_xp"] or 0) == 0, f"char {cid} creation_xp not 0"
+                assert carry == [], f"char {cid} posted a carryover entry: {carry}"
+    finally:
+        with get_db() as conn:
+            delete_character(conn, mortal["id"])
+            delete_character(conn, rec0["id"])
+            conn.commit()
+
+
+def test_kindred_without_recorded_pool_still_carries_tier_xp(player):
+    """A Kindred with no recorded starting_xp_pool (older / staff-seeded) still
+    gets the tier's finishing XP carried over — the fallback is intact for them."""
+    import json as _json
+    from web.db import (get_db, upsert_player, create_character, approve_character,
+                        get_character, get_ledger, delete_character)
+    with get_db() as conn:
+        upsert_player(conn, discord_id="555222555222555222", username="TierFallback")
+        ch = create_character(conn, discord_id="555222555222555222",
+                              name="Seeded Neonate", clan="ventrue")
+        conn.execute("UPDATE characters SET sheet_json=?, character_tier='neonate' WHERE id=?",
+                     (_json.dumps({}), ch["id"]))
+        conn.commit()
+    try:
+        with get_db() as conn:
+            approve_character(conn, ch["id"], reviewer_id="999999999999999999")
+            conn.commit()
+            c = get_character(conn, ch["id"])
+            carry = [e for e in get_ledger(conn, ch["id"]) if e["entry_type"] == "carryover"]
+        assert c["xp_total"] == 15 and (c["creation_xp"] or 0) == 15
+        assert len(carry) == 1 and carry[0]["xp_delta"] == 15
     finally:
         with get_db() as conn:
             delete_character(conn, ch["id"])

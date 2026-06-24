@@ -644,14 +644,23 @@ def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
         _cc_spent = int(_sheet.get("xp_spent") or 0)
     except (TypeError, ValueError):
         _cc_spent = 0
-    try:
-        _pool = int(_sheet.get("starting_xp_pool") or 0)
-    except (TypeError, ValueError):
-        _pool = 0
-    if _pool <= 0:
-        # Fall back to the tier's finishing-touches XP when the sheet didn't
-        # record a pool (older / staff-seeded characters).
-        _pool = int((tier_budget(get_settings(conn), char.get("character_tier")) or {}).get("xp") or 0)
+    _raw_pool = _sheet.get("starting_xp_pool")
+    if _raw_pool is None:
+        # No recorded pool (older / staff-seeded character) — fall back to the
+        # tier's finishing-touches XP, but ONLY for Kindred. Mortals, ghouls, and
+        # revenants have no creation-XP pool, yet their character_tier column
+        # defaults to "neonate", so a tier lookup would wrongly hand them 15 XP.
+        if char.get("character_type") == "kindred":
+            _pool = int((tier_budget(get_settings(conn), char.get("character_tier")) or {}).get("xp") or 0)
+        else:
+            _pool = 0
+    else:
+        # A recorded pool is authoritative — a genuine 0 (mortals, or a tier with
+        # no finishing XP) must carry nothing over, never the tier default.
+        try:
+            _pool = int(_raw_pool or 0)
+        except (TypeError, ValueError):
+            _pool = 0
     _leftover = max(0, _pool - _cc_spent)
     # Guard on EITHER kind of creation-time entry so a character that spent no
     # CC-XP (only carried leftover) still can't double-post on re-approval.

@@ -24,7 +24,10 @@ from web.xp_rules import calculate_cost
     ("Ghoul Discipline",     0, 1, 10),   # flat (ghoul's first Discipline dot)
     ("Advantage",            1, 3, 6),    # 2 dots x 3 (flat per dot)
     ("Blood Potency",        1, 2, 20),   # 2x10
+    ("Blood Potency",        5, 6, 60),   # 6x10 — scales past 5 (V5 RAW reaches 10)
+    ("Blood Potency",        9, 10, 100), # 10x10 — at the RAW cap
     ("Humanity",             6, 7, 14),   # 7x2 (single dot)
+    ("Humanity",             9, 10, 20),  # 10x2 — Humanity reaches the RAW cap of 10
     ("Blood Sorcery Ritual", 2, 3, 9),    # level x3 (flat per level)
     ("Blood Sorcery Ritual", 0, 1, 3),    # level 1 from scratch (was unbuyable)
     ("Blood Sorcery Ritual", 0, 3, 9),    # level 3 from scratch

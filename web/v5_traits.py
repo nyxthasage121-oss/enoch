@@ -191,8 +191,8 @@ SHEET_TRAIT_KEYS: set[str] = (
     | {"humanity", "blood_potency", "hunger"}
 )
 
-# Most traits cap at 5 dots. Humanity goes to 10.
-SHEET_LIMITS: dict[str, int] = {"humanity": 10, "blood_potency": 5, "hunger": 5}
+# Most traits cap at 5 dots. Humanity and Blood Potency both go to 10 (V5 RAW).
+SHEET_LIMITS: dict[str, int] = {"humanity": 10, "blood_potency": 10, "hunger": 5}
 
 
 # V5 predator types — kept here so both player creation forms and the
