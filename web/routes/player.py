@@ -2059,11 +2059,22 @@ async def roll_odds(
     eff_hunger = int(hunger_raw) if hunger_raw.isdigit() else int(sheet.get("hunger") or 0)
 
     odds = probability(total, eff_hunger, difficulty)
+    pool_label = _pool_label(parts, odds["pool"])
+    # Record the odds check in history, marked as kind='odds' (not a real roll).
+    try:
+        from ..db import log_roll
+        with get_db() as conn:
+            log_roll(conn, character_id, kind="odds", pool=odds["pool"],
+                     hunger=odds["hunger"], difficulty=odds["difficulty"],
+                     successes=round(odds["p_success"] * 100), outcome="odds",
+                     label=pool_label)
+    except Exception:
+        pass
     return templates.TemplateResponse(
         request, "player/partials/roll_form.html",
         _ctx(request, char=char, **_roll_kwargs(
             char, form=form_state, parts=parts, unknown=unknown,
-            pool_label=_pool_label(parts, odds["pool"]), odds=odds)),
+            pool_label=pool_label, odds=odds)),
     )
 
 

@@ -48,6 +48,21 @@ def test_history_tab_shows_rolls(player):
     assert "Dice Rolls" in r.text and "6d test pool" in r.text
 
 
+def test_odds_logged_and_marked(player):
+    from web.db import get_db
+    with get_db() as conn:
+        conn.execute("DELETE FROM roll_log WHERE character_id=1")
+        conn.commit()
+    player.post("/characters/1/roll/odds",
+                data={"_csrf": "dev-csrf-token", "pool": "6", "difficulty": "3"})
+    with get_db() as conn:
+        kinds = [r["kind"] for r in conn.execute(
+            "SELECT kind FROM roll_log WHERE character_id=1").fetchall()]
+    assert "odds" in kinds
+    r = player.get("/characters/1")
+    assert "· odds" in r.text and "Odds preview" in r.text   # shown even with no real rolls
+
+
 def test_bot_roll_api_round_trip(_client):
     from web.db import get_db
     headers = {"Authorization": "Bearer smoke-test-token"}

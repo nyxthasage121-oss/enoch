@@ -1359,17 +1359,19 @@
   <div x-show="tab === 'history'" x-cloak class="space-y-4">
 
     {# Dice rolls — outcome stats + recent rolls (migration 053; web + bot) #}
-    {% if roll_stats and roll_stats.total %}
+    {% if rolls %}
     <div class="gilded p-5">
       <div class="flex items-baseline justify-between gap-3 mb-3">
         <p class="label-gold">Dice Rolls</p>
-        <p class="font-cinzel text-xs text-bone-500">{{ roll_stats.total }} logged · {{ (roll_stats.win_rate * 100) | round | int }}% success</p>
+        {% if roll_stats.total %}<p class="font-cinzel text-xs text-bone-500">{{ roll_stats.total }} rolled · {{ (roll_stats.win_rate * 100) | round | int }}% success</p>{% endif %}
       </div>
+      {% if roll_stats.total %}
       <div class="flex flex-wrap gap-x-4 gap-y-1 mb-3 font-garamond text-xs">
         {% for key, lbl in [('critical','Crit'),('messy_critical','Messy'),('success','Success'),('failure','Fail'),('total_failure','Total fail'),('bestial_failure','Bestial')] %}
         {% if roll_stats.counts.get(key) %}<span class="text-bone-500">{{ lbl }} <span class="text-bone-300">{{ roll_stats.counts.get(key) }}</span></span>{% endif %}
         {% endfor %}
       </div>
+      {% endif %}
       {% if rolls %}
       <div class="overflow-x-auto">
         <table class="w-full text-xs">
@@ -1385,9 +1387,14 @@
             {% for r in rolls %}
             <tr class="border-b border-ink-800">
               <td class="px-2 py-1.5 font-cinzel text-bone-600 whitespace-nowrap">{{ r.created_at[:16] | replace('T', ' ') }}</td>
-              <td class="px-2 py-1.5 font-garamond text-bone-400">{{ r.label or (r.pool ~ 'd') }}{% if r.kind == 'reroll' %} <span class="text-mauve-400">· reroll</span>{% endif %}</td>
+              <td class="px-2 py-1.5 font-garamond text-bone-400">{{ r.label or (r.pool ~ 'd') }}{% if r.kind == 'reroll' %} <span class="text-mauve-400">· reroll</span>{% elif r.kind == 'odds' %} <span class="text-bone-500">· odds</span>{% endif %}</td>
+              {% if r.kind == 'odds' %}
+              <td class="px-2 py-1.5 font-cinzel text-bone-500">Odds preview</td>
+              <td class="px-2 py-1.5 text-right font-cinzel text-bone-400">{{ r.successes }}%</td>
+              {% else %}
               <td class="px-2 py-1.5 font-cinzel {{ 'text-blood-400' if r.outcome in ['failure', 'total_failure', 'bestial_failure', 'messy_critical'] else 'text-gold-400' }}">{{ outcome_labels.get(r.outcome) or (r.outcome | replace('_', ' ') | title) }}</td>
               <td class="px-2 py-1.5 text-right font-cinzel text-bone-300">{{ r.successes }}</td>
+              {% endif %}
             </tr>
             {% endfor %}
           </tbody>
