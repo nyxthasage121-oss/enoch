@@ -77,6 +77,7 @@ from ..db import (
     complete_project,
 )
 from ..deps import csrf_protect, require_permission, require_settings_admin, require_staff
+from core.conditions import character_conditions
 from ..main import _ctx
 from ..xp_rules import SPEND_CATEGORIES
 
@@ -810,6 +811,48 @@ async def roster(request: Request, user: dict = Depends(require_staff)):
     return templates.TemplateResponse(
         request, "staff/characters.html",
         _ctx(request, pending=pending, active=active, retired=retired, dead=dead),
+    )
+
+
+def _vitals_row(c: dict) -> dict:
+    """Flatten a character's tracked vitals + mechanical-state flags for the
+    at-a-glance board. Reads everything off the saved sheet."""
+    s = c.get("sheet_json") or {}
+
+    def _i(k: str) -> int:
+        try:
+            return int(s.get(k) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    return {
+        "id": c["id"],
+        "name": c["name"],
+        "player": c.get("player_username"),
+        "clan": c.get("clan") or "",
+        "hunger": _i("hunger"),
+        "health_marked": _i("damage_health_sup") + _i("damage_health_agg"),
+        "health_max": _i("attr_stamina") + 3,
+        "wp_marked": _i("damage_willpower_sup") + _i("damage_willpower_agg"),
+        "wp_max": _i("attr_composure") + _i("attr_resolve"),
+        "humanity": 7 if s.get("humanity") is None else _i("humanity"),
+        "xp_available": c.get("xp_available", 0),
+        "conditions": character_conditions(s),
+    }
+
+
+@router.get("/vitals", response_class=HTMLResponse)
+async def vitals_dashboard(request: Request, user: dict = Depends(require_staff)):
+    """Read-only board of every active character's vitals at a glance — Hunger,
+    Health, Willpower, Humanity + the mechanical-state flags (Impaired, Ravenous,
+    low Humanity). Reflects each saved sheet."""
+    with get_db() as conn:
+        chars = list_characters(conn, status="active")
+    rows = [_vitals_row(c) for c in chars
+            if c.get("is_approved") and not c.get("is_draft")]
+    rows.sort(key=lambda r: r["name"].lower())
+    return templates.TemplateResponse(
+        request, "staff/vitals.html", _ctx(request, rows=rows),
     )
 
 

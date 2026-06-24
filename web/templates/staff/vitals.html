@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Vitals — Enoch{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+  <div class="mb-8">
+    <p class="label-gold mb-1">Staff</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">Vitals</h1>
+    <p class="font-garamond text-bone-600 text-sm mt-1 leading-relaxed">
+      Every active character's Hunger, Health, Willpower, and Humanity at a glance —
+      plus mechanical-state flags. Read-only; reflects each saved sheet.
+    </p>
+  </div>
+
+  {% if rows %}
+  <div class="gilded overflow-x-auto"
+       x-data="{
+         search: '',
+         show(name, player) {
+           const q = this.search.trim().toLowerCase();
+           return !q || name.toLowerCase().includes(q) || (player || '').toLowerCase().includes(q);
+         }
+       }">
+    <div class="px-4 py-3 border-b border-ink-700">
+      <input type="text" x-model="search" placeholder="Filter by character or player…"
+             class="w-full sm:w-72 text-sm py-1">
+    </div>
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-ink-700">
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Character</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Player</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Hunger</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Health</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Willpower</th>
+          <th class="px-4 py-3 text-center label-gold font-normal text-xs">Humanity</th>
+          <th class="px-4 py-3 text-right label-gold font-normal text-xs">XP</th>
+          <th class="px-4 py-3 text-left label-gold font-normal text-xs">Conditions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="border-b border-ink-800 hover:bg-ink-900 transition-colors"
+            x-show="show({{ r.name | tojson | forceescape }}, {{ (r.player or '') | tojson | forceescape }})">
+          <td class="px-4 py-2.5">
+            <a href="/staff/characters/{{ r.id }}" class="font-cinzel text-bone-200 hover:text-gold-400">{{ r.name }}</a>
+            <span class="block font-garamond text-bone-700 text-[0.65rem]">{{ r.clan | replace('-', ' ') | title }}</span>
+          </td>
+          <td class="px-4 py-2.5 font-garamond text-bone-500 text-xs">{{ r.player or '—' }}</td>
+          <td class="px-4 py-2.5 text-center font-cinzel text-xs {{ 'text-blood-400' if r.hunger >= 5 else ('text-gold-400' if r.hunger >= 4 else 'text-bone-300') }}">
+            {{ r.hunger }}/5
+          </td>
+          <td class="px-4 py-2.5 text-center font-cinzel text-xs {{ 'text-blood-400' if (r.health_max and r.health_marked >= r.health_max) else 'text-bone-300' }}">
+            {{ r.health_marked }}/{{ r.health_max }}
+          </td>
+          <td class="px-4 py-2.5 text-center font-cinzel text-xs {{ 'text-gold-400' if (r.wp_max and r.wp_marked >= r.wp_max) else 'text-bone-300' }}">
+            {{ r.wp_marked }}/{{ r.wp_max }}
+          </td>
+          <td class="px-4 py-2.5 text-center font-cinzel text-xs {{ 'text-blood-400' if r.humanity <= 2 else 'text-bone-300' }}">
+            {{ r.humanity }}
+          </td>
+          <td class="px-4 py-2.5 text-right font-cinzel text-xs text-gold-500">{{ r.xp_available }}</td>
+          <td class="px-4 py-2.5">
+            {% for c in r.conditions %}
+            <span class="chip {{ 'text-blood-400 border-blood-800' if c.sev == 'crit' else 'text-gold-400 border-gold-800' }} text-[0.5rem] mr-1"
+                  title="{{ c.detail }}">{{ c.label }}</span>
+            {% else %}
+            <span class="font-garamond text-bone-700 text-xs">—</span>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="font-garamond text-bone-700 text-xs mt-3 italic">
+    {{ rows | length }} active character{{ '' if rows | length == 1 else 's' }}.
+  </p>
+  {% else %}
+  <div class="gilded p-8 text-center">
+    <p class="font-garamond text-bone-600">No active characters yet.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
