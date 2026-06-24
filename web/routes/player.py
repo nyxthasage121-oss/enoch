@@ -400,6 +400,16 @@ def _roll_kwargs(char, *, result=None, form=None, parts=None, unknown=None,
     """Context keys the roll partial needs. Excludes `char` so this composes
     with character_detail's existing context (which passes char itself)."""
     sheet = char.get("sheet_json") or {}
+
+    def _picker_traits(pairs, *, only_owned=False):
+        rows = []
+        for key, label in pairs:
+            dots = int(sheet.get(key) or 0)
+            if only_owned and dots <= 0:
+                continue
+            rows.append({"label": label, "dots": dots})
+        return rows
+
     return {
         "roll_result": result,
         "roll_outcome_label": (OUTCOME_LABELS.get(result.outcome) if result else None),
@@ -417,6 +427,13 @@ def _roll_kwargs(char, *, result=None, form=None, parts=None, unknown=None,
         "roll_specialties": [s for s in (sheet.get("specialties") or [])
                              if isinstance(s, dict)],
         "conditions": character_conditions(sheet),
+        "roll_picker": {
+            "attributes": _picker_traits(
+                [(k, l) for _c, tr in _V5_ATTRIBUTES for k, l in tr]),
+            "skills": _picker_traits(
+                [(k, l) for _c, tr in _V5_SKILLS for k, l in tr]),
+            "disciplines": _picker_traits(list(_V5_DISCIPLINES), only_owned=True),
+        },
     }
 
 

@@ -24,6 +24,21 @@
   {%- endif -%}
 {% endmacro %}
 
+{% macro trait_opts(picker) %}
+  <option value="">— trait —</option>
+  <optgroup label="Attributes">
+    {% for t in picker.attributes %}<option value="{{ t.label }}">{{ t.label }} ({{ t.dots }})</option>{% endfor %}
+  </optgroup>
+  <optgroup label="Skills">
+    {% for t in picker.skills %}<option value="{{ t.label }}">{{ t.label }} ({{ t.dots }})</option>{% endfor %}
+  </optgroup>
+  {% if picker.disciplines %}
+  <optgroup label="Disciplines">
+    {% for t in picker.disciplines %}<option value="{{ t.label }}">{{ t.label }} ({{ t.dots }})</option>{% endfor %}
+  </optgroup>
+  {% endif %}
+{% endmacro %}
+
 <div id="roll-panel">
 
   {# Mechanical-state reminders (from the saved sheet) #}
@@ -40,18 +55,27 @@
 
   {# Roll form #}
   <form hx-post="/characters/{{ char.id }}/roll" hx-target="#roll-panel" hx-swap="outerHTML"
+        x-data="{ buildPool() { const ps = [this.$refs.t1.value, this.$refs.t2.value].filter(Boolean); if (ps.length) this.$refs.pool.value = ps.join(' + '); } }"
         class="gilded p-5 space-y-4">
     <input type="hidden" name="_csrf" value="{{ csrf_token }}">
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div class="sm:col-span-2">
         <label class="label-gold block mb-1 text-[0.7rem]">Pool</label>
-        <input type="text" name="pool" list="roll-trait-dl" autocomplete="off"
+        <input type="text" name="pool" x-ref="pool" list="roll-trait-dl" autocomplete="off"
                value="{{ roll_form.pool }}"
                placeholder="A number (5) or traits — strength + brawl"
                class="w-full text-sm">
         <p class="font-garamond text-bone-700 text-[0.65rem] mt-1 italic">
-          Type a number, or trait names joined with <span class="text-bone-500">+</span> — they pull from your sheet.
+          Type a number, trait names joined with <span class="text-bone-500">+</span>, or build it from the dropdowns below.
         </p>
+      </div>
+      {# Build-from-sheet: pick two traits and the pool fills itself. #}
+      <div class="sm:col-span-2">
+        <label class="label-gold block mb-1 text-[0.7rem]">Build from your sheet</label>
+        <div class="grid grid-cols-2 gap-2">
+          <select x-ref="t1" @change="buildPool()" class="w-full text-sm">{{ trait_opts(roll_picker) }}</select>
+          <select x-ref="t2" @change="buildPool()" class="w-full text-sm">{{ trait_opts(roll_picker) }}</select>
+        </div>
       </div>
       <div>
         <label class="label-gold block mb-1 text-[0.7rem]">Difficulty <span class="text-bone-700 normal-case">(optional)</span></label>

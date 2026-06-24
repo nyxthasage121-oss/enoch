@@ -230,6 +230,14 @@ def test_probability_bounds():
     assert 0.0 <= big["p_messy"] <= 1.0
 
 
+def test_roll_picker_renders(player):
+    r = player.post("/characters/1/roll", data={"_csrf": "dev-csrf-token", "pool": "5"})
+    assert r.status_code == 200
+    assert "Build from your sheet" in r.text
+    assert 'x-ref="t1"' in r.text and 'x-ref="t2"' in r.text
+    assert "Attributes" in r.text and "Skills" in r.text   # optgroups
+
+
 def test_odds_route(player):
     r = player.post("/characters/1/roll/odds",
                     data={"_csrf": "dev-csrf-token", "pool": "6", "difficulty": "3"})
