@@ -36,8 +36,8 @@ BESTIAL_FAILURE = "bestial_failure"  # failed roll with a 1 on a Hunger die
 
 # Human-facing labels for the outcomes.
 OUTCOME_LABELS = {
-    CRITICAL:        "Critical Win",
-    MESSY_CRITICAL:  "Messy Critical",
+    CRITICAL:        "Critical Success",
+    MESSY_CRITICAL:  "Messy Critical Success",
     SUCCESS:         "Success",
     FAILURE:         "Failure",
     TOTAL_FAILURE:   "Total Failure",

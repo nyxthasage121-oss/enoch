@@ -63,7 +63,7 @@ def test_conditions_robust_to_junk():
 
 # ── roll routes (integration) ─────────────────────────────────────────────────
 
-_OUTCOMES = ("Critical Win", "Messy Critical", "Success", "Failure",
+_OUTCOMES = ("Critical Success", "Messy Critical Success", "Success", "Failure",
              "Total Failure", "Bestial Failure")
 
 
@@ -235,7 +235,16 @@ def test_roll_picker_renders(player):
     assert r.status_code == 200
     assert "Build from your sheet" in r.text
     assert 'x-ref="t1"' in r.text and 'x-ref="t2"' in r.text
-    assert "Attributes" in r.text and "Skills" in r.text   # optgroups
+    # Attributes + skills grouped Physical/Social/Mental
+    assert "Attributes" in r.text and "Physical Skills" in r.text and "Mental Skills" in r.text
+
+
+def test_roll_modifier_adjusts_pool(player):
+    r = player.post("/characters/1/roll", data={
+        "_csrf": "dev-csrf-token", "pool": "3", "modifier": "2", "difficulty": "0"})
+    assert r.status_code == 200
+    assert "= 5d" in r.text        # 3 + modifier 2 = 5 dice
+    assert "Modifier" in r.text     # shown in the pool breakdown
 
 
 def test_odds_route(player):

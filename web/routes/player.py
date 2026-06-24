@@ -375,6 +375,8 @@ def _build_spend_trait_ratings() -> dict[str, list[int]]:
 
 
 templates.env.globals["spend_trait_ratings"] = _build_spend_trait_ratings()
+# Outcome labels (one source for the roll result, bot embed, and History tab).
+templates.env.globals["outcome_labels"] = OUTCOME_LABELS
 
 
 # ── Web dice roller (Irad's engine, in the browser) ───────────────────────────
@@ -432,7 +434,7 @@ def _roll_kwargs(char, *, result=None, form=None, parts=None, unknown=None,
         "roll_can_reroll": bool(result and not reroll_note
                                 and any(d < 6 for d in result.normal_dice)),
         "roll_form": form or {"pool": "", "difficulty": 0, "hunger": "",
-                              "specialty": "", "surge": False},
+                              "modifier": 0, "specialty": "", "surge": False},
         "roll_parts": parts or [],
         "roll_unknown": unknown or [],
         "roll_surge_note": surge_note,
@@ -443,11 +445,12 @@ def _roll_kwargs(char, *, result=None, form=None, parts=None, unknown=None,
         "roll_specialties": [s for s in (sheet.get("specialties") or [])
                              if isinstance(s, dict)],
         "conditions": character_conditions(sheet),
+        "roll_current_hunger": int(sheet.get("hunger") or 0),
         "roll_picker": {
             "attributes": _picker_traits(
                 [(k, l) for _c, tr in _V5_ATTRIBUTES for k, l in tr]),
-            "skills": _picker_traits(
-                [(k, l) for _c, tr in _V5_SKILLS for k, l in tr]),
+            "skill_groups": [{"cat": cat, "traits": _picker_traits(tr)}
+                             for cat, tr in _V5_SKILLS],
             "disciplines": _picker_traits(list(_V5_DISCIPLINES), only_owned=True),
         },
     }
@@ -1911,9 +1914,10 @@ async def roll_dice(
         if not char:
             raise HTTPException(status_code=404)
     sheet = char.get("sheet_json") or {}
+    modifier = form_int(form.get("modifier"))
 
     form_state = {"pool": pool_expr, "difficulty": difficulty, "hunger": hunger_raw,
-                  "specialty": specialty or "", "surge": surge}
+                  "modifier": modifier, "specialty": specialty or "", "surge": surge}
 
     if not pool_expr:
         return templates.TemplateResponse(
@@ -1931,6 +1935,9 @@ async def roll_dice(
 
     total, parts, unknown = apply_specialty(total, parts, unknown, specialty,
                                             sheet.get("specialties"))
+    if modifier:
+        total = max(0, total + modifier)
+        parts = parts + [("Modifier", modifier)]
 
     eff_hunger = int(hunger_raw) if hunger_raw.isdigit() else int(sheet.get("hunger") or 0)
 
@@ -2025,8 +2032,9 @@ async def roll_odds(
         if not char:
             raise HTTPException(status_code=404)
     sheet = char.get("sheet_json") or {}
+    modifier = form_int(form.get("modifier"))
     form_state = {"pool": pool_expr, "difficulty": difficulty, "hunger": hunger_raw,
-                  "specialty": specialty or "", "surge": surge}
+                  "modifier": modifier, "specialty": specialty or "", "surge": surge}
 
     if not pool_expr:
         return templates.TemplateResponse(
@@ -2041,6 +2049,9 @@ async def roll_odds(
         total, parts, unknown = resolve_pool(pool_expr, sheet, _WEB_TRAIT_INDEX)
     total, parts, unknown = apply_specialty(total, parts, unknown, specialty,
                                             sheet.get("specialties"))
+    if modifier:
+        total = max(0, total + modifier)
+        parts = parts + [("Modifier", modifier)]
     if surge:
         bonus = blood_surge_bonus(sheet.get("blood_potency", 0))
         total += bonus

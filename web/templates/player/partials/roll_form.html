@@ -29,9 +29,11 @@
   <optgroup label="Attributes">
     {% for t in picker.attributes %}<option value="{{ t.label }}">{{ t.label }} ({{ t.dots }})</option>{% endfor %}
   </optgroup>
-  <optgroup label="Skills">
-    {% for t in picker.skills %}<option value="{{ t.label }}">{{ t.label }} ({{ t.dots }})</option>{% endfor %}
+  {% for g in picker.skill_groups %}
+  <optgroup label="{{ g.cat }} Skills">
+    {% for t in g.traits %}<option value="{{ t.label }}">{{ t.label }} ({{ t.dots }})</option>{% endfor %}
   </optgroup>
+  {% endfor %}
   {% if picker.disciplines %}
   <optgroup label="Disciplines">
     {% for t in picker.disciplines %}<option value="{{ t.label }}">{{ t.label }} ({{ t.dots }})</option>{% endfor %}
@@ -82,8 +84,14 @@
         <input type="number" name="difficulty" min="0" max="15" value="{{ roll_form.difficulty }}" class="w-full text-sm">
       </div>
       <div>
-        <label class="label-gold block mb-1 text-[0.7rem]">Hunger <span class="text-bone-700 normal-case">(blank = sheet)</span></label>
-        <input type="number" name="hunger" min="0" max="5" value="{{ roll_form.hunger }}" class="w-full text-sm">
+        <label class="label-gold block mb-1 text-[0.7rem]">Modifier <span class="text-bone-700 normal-case">(± dice — powers, merits…)</span></label>
+        <input type="number" name="modifier" min="-15" max="15" value="{{ roll_form.modifier or '' }}" placeholder="0" class="w-full text-sm">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.7rem]">Hunger</label>
+        <input type="number" name="hunger" min="0" max="5" value="{{ roll_form.hunger }}"
+               placeholder="auto: {{ roll_current_hunger }}" class="w-full text-sm">
+        <p class="font-garamond text-bone-700 text-[0.6rem] mt-0.5 italic">Blank = your current Hunger ({{ roll_current_hunger }}).</p>
       </div>
       {% if roll_specialties %}
       <div>

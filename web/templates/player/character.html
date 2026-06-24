@@ -1386,7 +1386,7 @@
             <tr class="border-b border-ink-800">
               <td class="px-2 py-1.5 font-cinzel text-bone-600 whitespace-nowrap">{{ r.created_at[:16] | replace('T', ' ') }}</td>
               <td class="px-2 py-1.5 font-garamond text-bone-400">{{ r.label or (r.pool ~ 'd') }}{% if r.kind == 'reroll' %} <span class="text-mauve-400">· reroll</span>{% endif %}</td>
-              <td class="px-2 py-1.5 font-cinzel {{ 'text-blood-400' if r.outcome in ['failure', 'total_failure', 'bestial_failure', 'messy_critical'] else 'text-gold-400' }}">{{ r.outcome | replace('_', ' ') | title }}</td>
+              <td class="px-2 py-1.5 font-cinzel {{ 'text-blood-400' if r.outcome in ['failure', 'total_failure', 'bestial_failure', 'messy_critical'] else 'text-gold-400' }}">{{ outcome_labels.get(r.outcome) or (r.outcome | replace('_', ' ') | title) }}</td>
               <td class="px-2 py-1.5 text-right font-cinzel text-bone-300">{{ r.successes }}</td>
             </tr>
             {% endfor %}
