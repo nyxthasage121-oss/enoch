@@ -8,6 +8,7 @@ os.environ.setdefault("STAFF_ROLE_IDS",   "")
 os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 
 from bot.cogs.roll import build_posted_roll_embed  # noqa: E402
+from bot.cogs.outbox import build_vitals_embeds  # noqa: E402
 
 
 def _payload(**over):
@@ -69,3 +70,39 @@ def test_posted_embed_tolerates_sparse_payload():
     e = build_posted_roll_embed({"character_name": "X", "outcome": "failure"})
     assert "X" in e.title
     assert any(f.name == "Result" for f in e.fields)
+
+
+# ── vitals board embed (ST-tracker, migration 055) ────────────────────────────
+
+def _vrow(**over):
+    r = {"name": "Valeria", "player": "TestPlayer", "type": "kindred",
+         "hunger": 2, "health": "1/8", "wp": "0/5", "humanity": 7, "xp": 12,
+         "flags": []}
+    r.update(over)
+    return r
+
+
+def test_vitals_embeds_basic():
+    embeds = build_vitals_embeds({
+        "channel_id": "1", "count": 2, "generated_by": "DevStaff",
+        "rows": [_vrow(), _vrow(name="Marcus", flags=["Ravenous"])]})
+    assert len(embeds) == 1
+    e = embeds[0]
+    assert "Chronicle Vitals" in e.title
+    assert "Valeria" in e.description and "Marcus" in e.description
+    assert "Ravenous" in e.description
+    assert "DevStaff" in (e.footer.text or "")
+    assert e.author.name and "2 active" in e.author.name
+
+
+def test_vitals_embeds_empty():
+    embeds = build_vitals_embeds({"channel_id": "1", "count": 0, "rows": []})
+    assert len(embeds) == 1
+    assert "No active characters" in embeds[0].description
+
+
+def test_vitals_embeds_chunks_and_caps():
+    rows = [_vrow(name=f"C{i}") for i in range(250)]   # > 10 pages of 20
+    embeds = build_vitals_embeds({"channel_id": "1", "count": 250, "rows": rows})
+    assert len(embeds) == 10                               # capped at 10 embeds/message
+    assert "not shown" in (embeds[-1].footer.text or "")   # truncation noted

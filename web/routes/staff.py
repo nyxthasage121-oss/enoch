@@ -842,19 +842,67 @@ def _vitals_row(c: dict) -> dict:
     }
 
 
+def _active_vitals_rows(conn) -> list[dict]:
+    """The active-character vitals rows, sorted by name — shared by the Vitals
+    page and the 'post to Discord' snapshot so the two never drift."""
+    rows = [_vitals_row(c) for c in list_characters(conn, status="active")
+            if c.get("is_approved") and not c.get("is_draft")]
+    rows.sort(key=lambda r: r["name"].lower())
+    return rows
+
+
 @router.get("/vitals", response_class=HTMLResponse)
 async def vitals_dashboard(request: Request, user: dict = Depends(require_staff)):
     """Read-only board of every active character's vitals at a glance — Hunger,
     Health, Willpower, Humanity + the mechanical-state flags (Impaired, Ravenous,
     low Humanity). Reflects each saved sheet."""
+    from ..db import get_st_channel_id
     with get_db() as conn:
-        chars = list_characters(conn, status="active")
-    rows = [_vitals_row(c) for c in chars
-            if c.get("is_approved") and not c.get("is_draft")]
-    rows.sort(key=lambda r: r["name"].lower())
+        rows = _active_vitals_rows(conn)
+        st_post_enabled = bool(get_st_channel_id(conn))
     return templates.TemplateResponse(
-        request, "staff/vitals.html", _ctx(request, rows=rows),
+        request, "staff/vitals.html",
+        _ctx(request, rows=rows, st_post_enabled=st_post_enabled),
     )
+
+
+@router.post("/vitals/post", response_class=HTMLResponse)
+async def vitals_post_to_discord(
+    request: Request,
+    user: dict = Depends(require_staff),
+    _: None = Depends(csrf_protect),
+):
+    """Push a snapshot of the live vitals board to the chronicle's ST-tracker
+    Discord channel (migration 055) via the bot_outbox. Irad renders it as
+    embed(s). No-op with a notice if no ST channel is configured."""
+    from ..db import enqueue_bot, get_st_channel_id
+    with get_db() as conn:
+        channel_id = get_st_channel_id(conn)
+        if not channel_id:
+            request.session["flash"] = [{
+                "kind": "error",
+                "message": "No ST Tracker Channel set — add one in Admin → Discord & Irad."}]
+            return RedirectResponse(url="/staff/vitals", status_code=303)
+        rows = _active_vitals_rows(conn)
+        payload_rows = [{
+            "name": r["name"], "player": r["player"] or "", "type": r["type"],
+            "hunger": r["hunger"],
+            "health": f'{r["health_marked"]}/{r["health_max"]}',
+            "wp": f'{r["wp_marked"]}/{r["wp_max"]}',
+            "humanity": r["humanity"], "xp": r["xp_available"],
+            "flags": [c["label"] for c in r["conditions"]],
+        } for r in rows]
+        enqueue_bot(conn, "vitals_posted", {
+            "channel_id": channel_id,
+            "count": len(payload_rows),
+            "generated_by": (user.get("username") or "Staff"),
+            "rows": payload_rows,
+        })
+    request.session["flash"] = [{
+        "kind": "success",
+        "message": f"Posted {len(payload_rows)} character"
+                   f"{'' if len(payload_rows) == 1 else 's'} to the ST tracker channel."}]
+    return RedirectResponse(url="/staff/vitals", status_code=303)
 
 
 @router.post("/characters/{character_id}/start-review", response_class=HTMLResponse)
@@ -2275,6 +2323,11 @@ async def admin_settings_save(
         # are digits-only; anything else clears the setting (turns the feature off).
         _dc = (form.get("dice_channel_id") or "").strip()
         payload["dice_channel_id"] = _dc if _dc.isdigit() else ""
+    if "st_channel_id" in form:
+        # ST-tracker channel for vitals-board posting (migration 055). Same
+        # digit-guard — junk clears it (no "Post to Discord" button on Vitals).
+        _st = (form.get("st_channel_id") or "").strip()
+        payload["st_channel_id"] = _st if _st.isdigit() else ""
 
     # Restricted predator types unlock list — Steward opt-in per
     # chronicle for normally-banned predator types like Blood Leech and

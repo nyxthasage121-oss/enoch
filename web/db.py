@@ -1237,6 +1237,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "resonance_mode",
         # Discord channel for web→Discord roll posting (migration 054)
         "dice_channel_id",
+        # ST-tracker Discord channel for vitals-board posting (migration 055)
+        "st_channel_id",
     }
     # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
     # migration 040. It's now an orthogonal flag — translate a legacy POST
@@ -5049,6 +5051,14 @@ def get_dice_channel_id(conn) -> str | None:
     054), or None when unset. Returns the snowflake as a string; the web only
     offers the 'Post to Discord' opt-in (and enqueues) when this is configured."""
     raw = ((get_settings(conn) or {}).get("dice_channel_id") or "").strip()
+    return raw or None
+
+
+def get_st_channel_id(conn) -> str | None:
+    """The chronicle's ST-tracker Discord channel for vitals-board posting
+    (migration 055), or None when unset. The Vitals page only offers its
+    'Post to Discord' button (and enqueues) when this is configured."""
+    raw = ((get_settings(conn) or {}).get("st_channel_id") or "").strip()
     return raw or None
 
 

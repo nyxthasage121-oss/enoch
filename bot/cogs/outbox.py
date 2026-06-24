@@ -320,6 +320,77 @@ async def _on_roll_posted(bot: commands.Bot, p: dict) -> None:
     await channel.send(embed=embed)
 
 
+# ── ST tracker (vitals board) ─────────────────────────────────────────────────
+
+_VITALS_GOLD = 0xC8A85B
+
+
+def build_vitals_embeds(p: dict) -> list[discord.Embed]:
+    """Render a vitals-board snapshot (from a 'vitals_posted' payload, migration
+    055) as one or more Discord embeds. Chunks rows so no embed exceeds Discord's
+    limits and caps at 10 embeds/message; offline-testable (no bot/channel)."""
+    rows = p.get("rows") or []
+    count = int(p.get("count", len(rows)))
+    by = p.get("generated_by") or "Staff"
+
+    def _line(r: dict) -> str:
+        s = (f"**{r.get('name', '?')}** — H {r.get('hunger', 0)}/5 · "
+             f"HP {r.get('health', '?')} · WP {r.get('wp', '?')} · "
+             f"Hum {r.get('humanity', '?')} · {r.get('xp', 0)} XP")
+        if r.get("player"):
+            s += f"  ·  _{r['player']}_"
+        if r.get("flags"):
+            s += f"\n⚠ {', '.join(r['flags'])}"
+        return s
+
+    if not rows:
+        e = discord.Embed(title="🩸 Chronicle Vitals", color=_VITALS_GOLD,
+                          description="No active characters.")
+        e.set_footer(text=f"Posted from the web tracker by {by}")
+        return [e]
+
+    CHUNK, MAX_EMBEDS = 20, 10
+    pages = [rows[i:i + CHUNK] for i in range(0, len(rows), CHUNK)]
+    shown, dropped = pages[:MAX_EMBEDS], rows[MAX_EMBEDS * CHUNK:]
+    embeds = []
+    for idx, page in enumerate(shown):
+        title = "🩸 Chronicle Vitals"
+        if len(shown) > 1:
+            title += f" ({idx + 1}/{len(shown)})"
+        e = discord.Embed(title=title, color=_VITALS_GOLD,
+                          description="\n".join(_line(r) for r in page))
+        if idx == 0:
+            e.set_author(name=f"{count} active character" + ("" if count == 1 else "s"))
+        foot = f"Posted from the web tracker by {by}"
+        if idx == len(shown) - 1 and dropped:
+            foot = f"… +{len(dropped)} more not shown · " + foot
+        e.set_footer(text=foot)
+        embeds.append(e)
+    return embeds
+
+
+@_handler("vitals_posted")
+async def _on_vitals_posted(bot: commands.Bot, p: dict) -> None:
+    """Post a vitals-board snapshot to the chronicle's ST-tracker channel. The
+    channel id rides in on the payload (resolved web-side from st_channel_id,
+    migration 055). Silent no-op if the channel is missing or unreachable."""
+    raw = str(p.get("channel_id") or "").strip()
+    if not raw.isdigit():
+        log.warning("vitals_posted: missing/invalid channel_id — skipping")
+        return
+    channel_id = int(raw)
+    try:
+        channel = bot.get_channel(channel_id) or await bot.fetch_channel(channel_id)
+    except discord.NotFound:
+        log.warning("vitals_posted: ST channel %s not found", channel_id)
+        return
+    except discord.Forbidden:
+        log.warning("vitals_posted: bot lacks access to ST channel %s", channel_id)
+        return
+
+    await channel.send(embeds=build_vitals_embeds(p))
+
+
 # ── Cog ───────────────────────────────────────────────────────────────────────
 
 class OutboxCog(commands.Cog):
