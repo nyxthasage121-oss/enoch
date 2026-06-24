@@ -1,0 +1,62 @@
+{# macros_card.html — saved roll macros. Rendered in character.html (Roll tab)
+   and returned by the macro save/delete routes. HTMX target: #macros-card. #}
+<div id="macros-card">
+  <div class="gilded p-5">
+    <p class="label-gold mb-1">Macros</p>
+    <p class="font-garamond text-bone-600 text-xs mb-4 leading-relaxed">
+      Save a roll you make often — a name + pool, with optional difficulty, Hunger,
+      and Blood Surge. One click runs it on the dice above. (Great for hunting,
+      where powers and merit bonuses vary — bake them into the pool or a note.)
+    </p>
+
+    {% if macros %}
+    <div class="space-y-2 mb-4">
+      {% for m in macros %}
+      <div class="gilded-inset px-3 py-2 flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <p class="font-cinzel text-sm text-bone-200">{{ m.name }}</p>
+          <p class="font-garamond text-bone-600 text-xs truncate">
+            {{ m.pool }}{% if m.difficulty %} · diff {{ m.difficulty }}{% endif %}{% if m.hunger != '' %} · Hunger {{ m.hunger }}{% endif %}{% if m.surge %} · surge{% endif %}{% if m.comment %} — <span class="italic">{{ m.comment }}</span>{% endif %}
+          </p>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <form hx-post="/characters/{{ char.id }}/roll" hx-target="#roll-panel" hx-swap="outerHTML">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="hidden" name="macro" value="{{ m.name }}">
+            <button type="submit" class="btn-send font-cinzel tracking-widest text-[0.55rem] px-2.5 py-1">Roll</button>
+          </form>
+          <form hx-post="/characters/{{ char.id }}/macros/delete" hx-target="#macros-card" hx-swap="outerHTML"
+                hx-confirm="Delete macro “{{ m.name }}”?">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="hidden" name="name" value="{{ m.name }}">
+            <button type="submit" class="btn-ghost font-cinzel text-[0.6rem] px-2 py-1 text-bone-600 hover:text-blood-400" title="Delete">✕</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="font-garamond text-bone-700 text-xs italic mb-4">No macros yet — save one below.</p>
+    {% endif %}
+
+    {# Add / update a macro (same name overwrites) #}
+    <form hx-post="/characters/{{ char.id }}/macros" hx-target="#macros-card" hx-swap="outerHTML"
+          class="space-y-2 pt-3 border-t border-ink-700">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <input type="text" name="name" maxlength="40" required placeholder="Name — e.g. Frenzy" class="text-sm">
+        <input type="text" name="pool" maxlength="120" required placeholder="Pool — wits + composure" class="text-sm">
+      </div>
+      <div class="grid grid-cols-3 gap-2 items-center">
+        <input type="number" name="difficulty" min="0" max="15" placeholder="Diff" class="text-sm">
+        <input type="number" name="hunger" min="0" max="5" placeholder="Hunger" class="text-sm">
+        <label class="flex items-center gap-1.5 font-garamond text-bone-400 text-xs cursor-pointer">
+          <input type="checkbox" name="surge" class="accent-[#8B1A1A]"> Surge
+        </label>
+      </div>
+      <input type="text" name="comment" maxlength="120" placeholder="Note (optional) — e.g. + Celerity bonus" class="text-sm w-full">
+      {% if macro_error %}<p class="font-garamond text-blood-400 text-xs">{{ macro_error }}</p>{% endif %}
+      <button type="submit" class="btn-ghost font-cinzel tracking-widest text-[0.55rem] px-3 py-1.5">Save Macro</button>
+    </form>
+  </div>
+</div>

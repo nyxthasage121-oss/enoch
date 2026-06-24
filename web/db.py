@@ -703,6 +703,71 @@ def roll_outcome_stats(conn, character_id: int) -> dict:
             "win_rate": (wins / total) if total else 0.0}
 
 
+# ── Roll macros (rich; legacy bot string-macros tolerated) ───────────────────
+
+def _normalize_macro(name: str, value) -> dict:
+    """A stored macro → a uniform dict. Legacy bot macros are bare pool strings;
+    rich (web) macros are dicts with optional difficulty / hunger / surge / note."""
+    if isinstance(value, str):
+        return {"name": name, "pool": value, "difficulty": 0,
+                "hunger": "", "surge": False, "comment": ""}
+    v = value if isinstance(value, dict) else {}
+    return {
+        "name": name,
+        "pool": str(v.get("pool") or ""),
+        "difficulty": int(v.get("difficulty") or 0),
+        "hunger": str(v.get("hunger") or ""),
+        "surge": bool(v.get("surge")),
+        "comment": str(v.get("comment") or ""),
+    }
+
+
+def macros_from_sheet(sheet: dict) -> list[dict]:
+    """Normalized macro list (sorted by name) from a sheet dict."""
+    return [_normalize_macro(n, v)
+            for n, v in sorted((sheet.get("macros") or {}).items())]
+
+
+def get_macro(sheet: dict, name: str) -> dict | None:
+    """One normalized macro by name from a sheet dict, or None."""
+    macros = sheet.get("macros") or {}
+    return _normalize_macro(name, macros[name]) if name in macros else None
+
+
+def save_character_macro(conn, character_id: int, name: str, *, pool: str,
+                         difficulty: int = 0, hunger: str = "", surge: bool = False,
+                         comment: str = "") -> dict | None:
+    """Create/update a rich macro on the sheet. Returns the saved macro, or None
+    if the character is gone or the 25-macro cap is hit on a new name."""
+    char = get_character(conn, character_id)
+    if not char:
+        return None
+    sheet = dict(char.get("sheet_json") or {})
+    macros = dict(sheet.get("macros") or {})
+    if name not in macros and len(macros) >= 25:
+        return None
+    macros[name] = {"pool": pool[:120], "difficulty": int(difficulty or 0),
+                    "hunger": hunger, "surge": bool(surge), "comment": comment[:120]}
+    sheet["macros"] = macros
+    update_character(conn, character_id, sheet_json=sheet)
+    return _normalize_macro(name, macros[name])
+
+
+def delete_character_macro(conn, character_id: int, name: str) -> None:
+    """Remove a macro by name."""
+    char = get_character(conn, character_id)
+    if not char:
+        return
+    sheet = dict(char.get("sheet_json") or {})
+    macros = dict(sheet.get("macros") or {})
+    macros.pop(name, None)
+    if macros:
+        sheet["macros"] = macros
+    else:
+        sheet.pop("macros", None)
+    update_character(conn, character_id, sheet_json=sheet)
+
+
 def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
     now = _now()
     conn.execute("""

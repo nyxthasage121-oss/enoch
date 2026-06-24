@@ -1186,6 +1186,7 @@
   {% if dice_roller_enabled %}
   <div x-show="tab === 'roll'" x-cloak class="space-y-6">
     {% include "player/partials/roll_form.html" %}
+    {% include "player/partials/macros_card.html" %}
     {% include "player/partials/resonance_card.html" %}
   </div>
   {% endif %}

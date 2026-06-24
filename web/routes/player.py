@@ -1841,9 +1841,10 @@ async def character_detail(
         proj_rolls      = timeskip_rolls_remaining(conn, character_id)
         downtime_hunts  = (list_downtime_actions(conn, character_id, proj_rolls["period_id"], "hunt")
                            if proj_rolls["period_id"] else [])
-        from ..db import list_character_rolls, roll_outcome_stats
+        from ..db import list_character_rolls, macros_from_sheet, roll_outcome_stats
         rolls           = list_character_rolls(conn, character_id, limit=10)
         roll_stats      = roll_outcome_stats(conn, character_id)
+        macros          = macros_from_sheet(char.get("sheet_json") or {})
 
     p_criteria     = _player_criteria(all_criteria)
     period_claimed = (
@@ -1878,6 +1879,7 @@ async def character_detail(
             downtime_hunts=downtime_hunts,
             rolls=rolls,
             roll_stats=roll_stats,
+            macros=macros,
             spend_categories=SPEND_CATEGORIES,
             spend_rules_json=json.dumps(RULES),
             humanity_conditions=HUMANITY_CONDITIONS,
@@ -1914,6 +1916,14 @@ async def roll_dice(
         if not char:
             raise HTTPException(status_code=404)
     sheet = char.get("sheet_json") or {}
+    # A saved macro fills pool / difficulty / Hunger / Surge for this roll.
+    macro_name = (form.get("macro") or "").strip()
+    if macro_name:
+        from ..db import get_macro
+        m = get_macro(sheet, macro_name)
+        if m:
+            pool_expr, difficulty, hunger_raw, surge = (
+                m["pool"], m["difficulty"], m["hunger"], m["surge"])
     modifier = form_int(form.get("modifier"))
 
     form_state = {"pool": pool_expr, "difficulty": difficulty, "hunger": hunger_raw,
@@ -2097,6 +2107,68 @@ async def roll_resonance_route(
         request, "player/partials/resonance_card.html",
         _ctx(request, char=char, resonance_result=roll_resonance(mode)),
     )
+
+
+def _macros_ctx(request: Request, char: dict, *, error: str | None = None):
+    from ..db import macros_from_sheet
+    return _ctx(request, char=char,
+                macros=macros_from_sheet(char.get("sheet_json") or {}),
+                macro_error=error)
+
+
+@router.post("/characters/{character_id}/macros", response_class=HTMLResponse)
+async def save_macro_route(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Create or update a rich roll macro on the character's sheet."""
+    from ..db import save_character_macro
+    form  = await request.form()
+    name  = (form.get("name") or "").strip()
+    pool  = (form.get("pool") or "").strip()
+    error = None
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        if not name or not pool:
+            error = "Both a name and a pool are required."
+        elif save_character_macro(
+                conn, character_id, name, pool=pool,
+                difficulty=form_int(form.get("difficulty")),
+                hunger=(form.get("hunger") or "").strip(),
+                surge=form.get("surge") == "on",
+                comment=(form.get("comment") or "").strip()) is None:
+            error = "Macro limit reached (25)."
+        char = get_character_for_player(conn, character_id, user["id"])
+    return templates.TemplateResponse(
+        request, "player/partials/macros_card.html",
+        _macros_ctx(request, char, error=error))
+
+
+@router.post("/characters/{character_id}/macros/delete", response_class=HTMLResponse)
+async def delete_macro_route(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Delete a roll macro from the character's sheet."""
+    from ..db import delete_character_macro
+    form = await request.form()
+    name = (form.get("name") or "").strip()
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        if name:
+            delete_character_macro(conn, character_id, name)
+        char = get_character_for_player(conn, character_id, user["id"])
+    return templates.TemplateResponse(
+        request, "player/partials/macros_card.html",
+        _macros_ctx(request, char))
 
 
 def _find_draft_claim(claims: list[dict], period_id: int) -> dict | None:
