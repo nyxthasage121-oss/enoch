@@ -13,7 +13,7 @@ from discord.ext import commands
 
 from ..api import (
     get_character, get_player_characters, apply_state_delta, set_macro,
-    get_character_coterie, list_hunting_sites, log_hunt,
+    get_character_coterie, list_hunting_sites, log_hunt, log_roll,
 )
 from core.dice import (
     build_trait_index, resolve_pool, apply_specialty, roll_pool,
@@ -171,6 +171,14 @@ async def _reply_roll(interaction: discord.Interaction, result: RollResult, *,
                                    unknown=unknown, user_id=interaction.user.id,
                                    character_id=character_id)
     await interaction.followup.send(embed=embed, view=view)
+    # Record it in the shared web history (best-effort; never raises).
+    if character_id is not None:
+        label = (" + ".join(f"{lbl} {val}" for lbl, val in (pool_parts or []))
+                 or f"{result.pool}d")
+        await log_roll(character_id, pool=result.pool, hunger=result.hunger,
+                       difficulty=result.difficulty, successes=result.successes,
+                       outcome=result.outcome, label=label,
+                       dice=",".join(str(d) for d in result.normal_dice + result.hunger_dice))
 
 
 def _looks_numeric(expr: str) -> bool:

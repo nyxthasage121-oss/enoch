@@ -7,7 +7,7 @@ from discord.ext import commands
 
 from ..api import (
     get_character, get_player_characters, upsert_player, set_condition, set_bond,
-    get_backgrounds, blank_background,
+    get_backgrounds, blank_background, recent_rolls,
 )
 from ..config import settings
 
@@ -349,7 +349,20 @@ class CharactersCog(commands.Cog):
             )
             return
 
-        await interaction.followup.send(embed=_build_sheet_embed(char), ephemeral=True)
+        embed = _build_sheet_embed(char)
+        # Recent rolls (web + bot share one history; migration 053).
+        try:
+            recent = await recent_rolls(target["id"], limit=5)
+        except Exception:
+            recent = []
+        if recent:
+            lines = [
+                f"`{r.get('successes', 0)}` {(r.get('outcome') or '').replace('_', ' ').title()}"
+                f" — {r.get('label') or str(r.get('pool', 0)) + 'd'}"
+                for r in recent
+            ]
+            embed.add_field(name="Recent Rolls", value="\n".join(lines), inline=False)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     # ── /condition (add / clear / list) ───────────────────────────────────────
 

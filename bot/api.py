@@ -114,6 +114,37 @@ async def get_character(character_id: int) -> dict:
         return r.json()
 
 
+async def log_roll(character_id: int, *, kind: str = "roll", pool: int = 0,
+                   hunger: int = 0, difficulty: int = 0, successes: int = 0,
+                   outcome: str = "", label: str | None = None,
+                   dice: str | None = None) -> None:
+    """Record a roll in the shared web history (best-effort; never raises so it
+    can't break a roll)."""
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            await client.post(
+                f"{_base()}/api/characters/{character_id}/rolls",
+                json={"kind": kind, "pool": pool, "hunger": hunger,
+                      "difficulty": difficulty, "successes": successes,
+                      "outcome": outcome, "label": label, "dice": dice},
+                headers=_headers(),
+            )
+    except Exception:
+        log.debug("log_roll failed", exc_info=True)
+
+
+async def recent_rolls(character_id: int, limit: int = 5) -> list[dict]:
+    """A character's most-recent rolls (newest first) for `/character sheet`."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.get(
+            f"{_base()}/api/characters/{character_id}/rolls",
+            params={"limit": limit},
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()["rolls"]
+
+
 async def apply_state_delta(character_id: int, *, hunger: int = 0,
                             damage_health_sup: int = 0,
                             damage_willpower_sup: int = 0, humanity: int = 0,
