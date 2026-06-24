@@ -4,9 +4,12 @@ Roll tab and /roll + /roll/reroll routes.
 The roll itself is random, so the route tests assert structure (status, the
 result panel, a valid outcome label) rather than specific dice.
 """
+import random
+
 import pytest
 
 from core.conditions import SEV_CRIT, SEV_WARN, character_conditions
+from core.resonance import RESONANCES, TEMPERAMENTS, roll_resonance
 
 
 @pytest.fixture(autouse=True)
@@ -112,3 +115,30 @@ def test_roll_tab_respects_chronicle_toggle(player):
             upsert_settings(conn, actor_id="t", dice_roller_enabled=1)
             conn.commit()
     assert "tab === 'roll'" in player.get("/characters/1").text
+
+
+# ── Resonance & Temperament generator ─────────────────────────────────────────
+
+def test_roll_resonance_structure():
+    for seed in range(25):
+        rr = roll_resonance(random.Random(seed))
+        assert rr["resonance"] in RESONANCES
+        assert rr["temperament"] in {t[0] for t in TEMPERAMENTS}
+        assert len(rr["disciplines"]) == 2
+        assert rr["has_bonus"] == (rr["temperament"] in ("intense", "acute"))
+        assert rr["is_acute"] == (rr["temperament"] == "acute")
+
+
+def test_roll_resonance_seeded_deterministic():
+    assert roll_resonance(random.Random(42)) == roll_resonance(random.Random(42))
+
+
+def test_temperament_weights_sum_to_100():
+    assert sum(t[2] for t in TEMPERAMENTS) == 100
+
+
+def test_resonance_route(player):
+    r = player.post("/characters/1/resonance", data={"_csrf": "dev-csrf-token"})
+    assert r.status_code == 200
+    assert 'id="resonance-panel"' in r.text
+    assert any(RESONANCES[k]["label"] in r.text for k in RESONANCES)

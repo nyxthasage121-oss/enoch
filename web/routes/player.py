@@ -82,6 +82,7 @@ from core.dice import (
     rouse_check,
 )
 from core.conditions import character_conditions
+from core.resonance import roll_resonance
 
 router = APIRouter(tags=["player"])
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -1842,6 +1843,7 @@ async def character_detail(
             active_bane=_active_clan_bane(
                 char.get("clan"), (char.get("sheet_json") or {}).get("bane_choice")),
             clan_disciplines=set(_CLAN_DISCIPLINES.get(char["clan"], [])),
+            resonance_result=None,
             **_roll_kwargs(char),
         ),
     )
@@ -1945,6 +1947,25 @@ async def reroll_dice(
         _ctx(request, char=char, **_roll_kwargs(
             char, result=result, form=form_state, reroll_note=note,
             pool_label=pool_label)),
+    )
+
+
+@router.post("/characters/{character_id}/resonance", response_class=HTMLResponse)
+async def roll_resonance_route(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Generate a random V5 blood Resonance + Temperament. Stateless — owner-
+    gated for consistency with the other Roll-tab tools."""
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request, "player/partials/resonance_card.html",
+        _ctx(request, char=char, resonance_result=roll_resonance()),
     )
 
 

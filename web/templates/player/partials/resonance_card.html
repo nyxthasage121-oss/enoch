@@ -1,0 +1,42 @@
+{# resonance_card.html — V5 blood Resonance + Temperament generator.
+   Rendered in character.html (Roll tab) AND returned by
+   POST /characters/{id}/resonance. HTMX target: #resonance-panel. #}
+<div id="resonance-panel">
+  <div class="gilded p-5">
+    <div class="flex items-center justify-between gap-3 mb-1">
+      <p class="label-gold">Blood Resonance</p>
+      <form hx-post="/characters/{{ char.id }}/resonance"
+            hx-target="#resonance-panel" hx-swap="outerHTML">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <button type="submit"
+                class="btn-ghost font-cinzel tracking-widest text-[0.55rem] px-3 py-1.5">
+          {{ 'Roll Again' if resonance_result else 'Roll Resonance' }}
+        </button>
+      </form>
+    </div>
+    <p class="font-garamond text-bone-600 text-xs mb-4 leading-relaxed">
+      The dominant humor of a vessel's blood — its Resonance and Temperament
+      (intensity). Each Resonance eases two Disciplines.
+    </p>
+
+    {% if resonance_result %}
+    {% set rr = resonance_result %}
+    <div class="gilded-inset px-4 py-3 border-l-2 {{ 'border-gold-700' if rr.has_bonus else 'border-ink-600' }}">
+      <div class="flex items-baseline justify-between gap-3 flex-wrap">
+        <p class="font-cinzel text-lg text-bone-200">
+          {{ rr.label }}
+          <span class="text-bone-600 text-sm">· {{ rr.temperament_label }}</span>
+          {% if rr.is_acute %}<span class="chip text-blood-400 border-blood-800 text-[0.5rem] ml-1">Dyscrasia</span>{% endif %}
+        </p>
+        <p class="font-cinzel text-[0.6rem] tracking-[0.2em] uppercase {{ 'text-gold-400' if rr.has_bonus else 'text-bone-600' }}">
+          {{ rr.disciplines | join(' · ') }}
+        </p>
+      </div>
+      <p class="font-garamond text-bone-500 text-xs italic mt-1">{{ rr.emotions }}</p>
+      <p class="font-garamond text-bone-400 text-sm mt-2 leading-snug">{{ rr.effect }}</p>
+    </div>
+    {% else %}
+    <p class="font-garamond text-bone-700 text-xs italic">No resonance rolled yet.</p>
+    {% endif %}
+  </div>
+</div>
