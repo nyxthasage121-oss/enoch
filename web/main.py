@@ -138,10 +138,11 @@ def static_url(rel_path: str) -> str:
     return f"/static/{rel_path}?v={fp}"
 
 
-def _xp_cap_settings() -> tuple[bool, int, str]:
-    """(cap_enabled, cap_amount, project_mode) — chronicle bits read per render so
-    an admin change takes effect immediately. Safe defaults if settings can't be
-    read. XP cap = migrations 027/028; project_mode = migration 043."""
+def _xp_cap_settings() -> tuple[bool, int, str, bool]:
+    """(cap_enabled, cap_amount, project_mode, dice_roller_enabled) — chronicle
+    bits read per render so an admin change takes effect immediately. Safe
+    defaults if settings can't be read. XP cap = migrations 027/028;
+    project_mode = migration 043; dice roller = migration 051."""
     try:
         from .db import get_db, get_settings, PROJECT_MODES
         with get_db() as conn:
@@ -149,9 +150,10 @@ def _xp_cap_settings() -> tuple[bool, int, str]:
         mode = (s.get("project_mode") or "nybn").strip().lower()
         return (bool(s.get("xp_cap_enabled", 1)),
                 int(s.get("xp_cap_amount", 350) or 350),
-                mode if mode in PROJECT_MODES else "nybn")
+                mode if mode in PROJECT_MODES else "nybn",
+                bool(s.get("dice_roller_enabled", 1)))
     except Exception:
-        return True, 350, "nybn"
+        return True, 350, "nybn", True
 
 
 def _ctx(request: Request, **extra) -> dict:
@@ -159,7 +161,7 @@ def _ctx(request: Request, **extra) -> dict:
     user = request.session.get("user")
     flash = request.session.pop("flash", [])
     raw_role = request.session.get("staff_role") or ""
-    cap_enabled, cap_amount, project_mode = _xp_cap_settings()
+    cap_enabled, cap_amount, project_mode, dice_roller_enabled = _xp_cap_settings()
     # Active-alert count for the staff nav badge (staff renders only — cheap
     # COUNT, but no point running it for players/anon).
     n_active_alerts = 0
@@ -187,6 +189,7 @@ def _ctx(request: Request, **extra) -> dict:
         "xp_cap_amount": cap_amount,
         "n_active_alerts": n_active_alerts,
         "project_mode": project_mode,
+        "dice_roller_enabled": dice_roller_enabled,
         **extra,
     }
 

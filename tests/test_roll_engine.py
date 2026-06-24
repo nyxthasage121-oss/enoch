@@ -1,4 +1,4 @@
-"""Unit tests for the V5 dice roll engine (bot/roll.py).
+"""Unit tests for the V5 dice roll engine (core/dice.py).
 
 These exercise the V5 scoring rules with hand-picked dice (via ``classify``)
 so the logic is deterministic, plus a couple of seeded ``roll_pool`` checks.
@@ -12,7 +12,7 @@ os.environ.setdefault("DISCORD_GUILD_ID", "0")
 os.environ.setdefault("STAFF_ROLE_IDS", "")
 os.environ.setdefault("BOT_SERVICE_TOKEN", "test-token")
 
-from bot.roll import (  # noqa: E402
+from core.dice import (  # noqa: E402
     classify, roll_pool, build_trait_index, resolve_pool, apply_specialty,
     reroll_failures, rouse_check, blood_surge_bonus, mend_amount, willpower_recovery,
     bane_severity, frenzy_pool, remorse_pool, hunt_outcome, hunt_slake,

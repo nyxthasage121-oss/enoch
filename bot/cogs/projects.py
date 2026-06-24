@@ -15,7 +15,7 @@ from ..api import (
     get_character, get_player_characters, get_projects, record_project_roll,
     apply_state_delta, get_backgrounds, blank_background,
 )
-from ..roll import resolve_pool, roll_pool, reroll_failures, blood_surge_bonus
+from core.dice import resolve_pool, roll_pool, reroll_failures, blood_surge_bonus
 from .characters import _parse_sheet
 from .roll import _TRAIT_INDEX, build_roll_embed
 

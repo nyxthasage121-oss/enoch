@@ -15,7 +15,7 @@ from ..api import (
     get_character, get_player_characters, apply_state_delta, set_macro,
     get_character_coterie, list_hunting_sites, log_hunt,
 )
-from ..roll import (
+from core.dice import (
     build_trait_index, resolve_pool, apply_specialty, roll_pool,
     reroll_failures, rouse_check, blood_surge_bonus, mend_amount,
     willpower_recovery, bane_severity, frenzy_pool, remorse_pool,
@@ -112,13 +112,15 @@ class WillpowerRerollView(discord.ui.View):
     three regular (non-Hunger) failures for the original roller only."""
 
     def __init__(self, result: RollResult, *, title: str,
-                 pool_parts=None, unknown=None, user_id: int, timeout: float = 120):
+                 pool_parts=None, unknown=None, user_id: int,
+                 character_id: int | None = None, timeout: float = 120):
         super().__init__(timeout=timeout)
         self._result = result
         self._title = title
         self._pool_parts = pool_parts
         self._unknown = unknown
         self._user_id = user_id
+        self._character_id = character_id
 
     @discord.ui.button(label="Reroll (Willpower)", style=discord.ButtonStyle.secondary)
     async def reroll(self, interaction: discord.Interaction,
@@ -132,10 +134,24 @@ class WillpowerRerollView(discord.ui.View):
             self._result.normal_dice, self._result.hunger_dice,
             self._result.difficulty)
         button.disabled = True   # Willpower reroll is once per roll
+        # V5: a Willpower reroll costs 1 Superficial Willpower. Mark it on the
+        # sheet when we know whose character rolled (bare numeric rolls have none).
+        wp_note = ""
+        if n > 0 and self._character_id is not None:
+            try:
+                await apply_state_delta(self._character_id, damage_willpower_sup=1,
+                                        source="dice:wp-reroll")
+                wp_note = " · −1 Superficial Willpower"
+            except Exception as exc:
+                log.warning("wp-reroll write-back failed for %s: %s",
+                            self._character_id, exc)
+                wp_note = " · spend 1 Superficial Willpower"
+        elif n > 0:
+            wp_note = " · spend 1 Superficial Willpower"
         embed = build_roll_embed(
             new_result, title=f"{self._title} · Willpower reroll",
             pool_parts=self._pool_parts, unknown=self._unknown)
-        note = f"Rerolled {n} die{'s' if n != 1 else ''} with Willpower"
+        note = f"Rerolled {n} {'die' if n == 1 else 'dice'} with Willpower{wp_note}"
         base = embed.footer.text or ""
         embed.set_footer(text=(base + "   " if base else "") + note)
         await interaction.response.edit_message(embed=embed, view=self)
@@ -143,15 +159,17 @@ class WillpowerRerollView(discord.ui.View):
 
 async def _reply_roll(interaction: discord.Interaction, result: RollResult, *,
                       title: str, pool_parts=None, unknown=None,
-                      note: str | None = None) -> None:
+                      note: str | None = None, character_id: int | None = None) -> None:
     """Send a roll result, attaching the Willpower-reroll button when there are
-    regular failures worth rerolling."""
+    regular failures worth rerolling. ``character_id`` lets the reroll spend the
+    Willpower it costs (omitted for bare numeric rolls with no character)."""
     embed = build_roll_embed(result, title=title, pool_parts=pool_parts,
                              unknown=unknown, note=note)
     view = None
     if any(d < 6 for d in result.normal_dice):
         view = WillpowerRerollView(result, title=title, pool_parts=pool_parts,
-                                   unknown=unknown, user_id=interaction.user.id)
+                                   unknown=unknown, user_id=interaction.user.id,
+                                   character_id=character_id)
     await interaction.followup.send(embed=embed, view=view)
 
 
@@ -443,7 +461,8 @@ class RollCog(commands.Cog):
 
         result = roll_pool(total, eff_hunger, difficulty)
         await _reply_roll(interaction, result, title=full["name"],
-                          pool_parts=parts, unknown=unknown, note=surge_note)
+                          pool_parts=parts, unknown=unknown, note=surge_note,
+                          character_id=char["id"])
 
     @app_commands.command(
         name="rouse",

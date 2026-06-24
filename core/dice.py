@@ -1,4 +1,7 @@
-"""V5 dice roller — pure logic, no Discord dependency (offline-testable).
+"""V5 dice engine — pure logic, no Discord/web dependency (offline-testable).
+
+Shared by both the Discord bot (Irad, ``bot/cogs/roll.py``) and the web roller
+(``web/routes/player.py``) so the V5 rules live in exactly one place.
 
 Implements the Vampire: The Masquerade 5th Edition roll. The mechanics here
 are the public V5 corebook rules (Chapter 4, "Dice Rolls", pp. 118-120); the

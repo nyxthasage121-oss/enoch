@@ -1,0 +1,127 @@
+{# roll_form.html — web V5 dice roller (Irad's engine in the browser).
+   Rendered inline in character.html (Roll tab) AND returned by
+   POST /characters/{id}/roll and /characters/{id}/roll/reroll.
+   HTMX target: #roll-panel (outerHTML swap). #}
+
+{% macro die(d, hunger=False) %}
+  {%- if hunger -%}
+    {%- set st = 'background:#8B1A1A;color:#f4e9d6;border-color:#c0504d' if d == 10
+       else ('background:#3a1414;color:#ff9d9d;border-color:#8B1A1A' if d == 1
+       else ('color:#dd9a9a;border-color:#5c2424' if d >= 6
+       else 'color:#8f8276;border-color:#3a2020')) -%}
+  {%- else -%}
+    {%- set st = 'background:#c29b48;color:#1c1610;border-color:#c29b48' if d == 10
+       else ('color:#d8b56a;border-color:#5c4a25' if d >= 6
+       else 'color:#6b6358;border-color:#2c2820') -%}
+  {%- endif -%}
+  <span class="inline-flex items-center justify-center w-7 h-7 rounded border font-cinzel text-sm leading-none"
+        style="{{ st }}" title="{{ 'Hunger die' if hunger else 'Die' }}">{{ d }}</span>
+{% endmacro %}
+
+<div id="roll-panel">
+
+  {# ── Mechanical-state reminders (from the saved sheet) ── #}
+  {% if conditions %}
+  <div class="space-y-1.5 mb-4">
+    {% for c in conditions %}
+    <div class="gilded-inset px-3 py-2 border-l-2 {{ 'border-blood-700' if c.sev == 'crit' else 'border-gold-700' }}">
+      <p class="font-cinzel text-[0.6rem] tracking-[0.2em] uppercase {{ 'text-blood-400' if c.sev == 'crit' else 'text-gold-400' }}">{{ c.label }}</p>
+      <p class="font-garamond text-bone-500 text-xs leading-snug mt-0.5">{{ c.detail }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# ── Roll form ── #}
+  <form hx-post="/characters/{{ char.id }}/roll" hx-target="#roll-panel" hx-swap="outerHTML"
+        class="gilded p-5 space-y-4">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="sm:col-span-2">
+        <label class="label-gold block mb-1 text-[0.7rem]">Pool</label>
+        <input type="text" name="pool" list="roll-trait-dl" autocomplete="off"
+               value="{{ roll_form.pool }}"
+               placeholder="A number (5) or traits — strength + brawl"
+               class="w-full text-sm">
+        <p class="font-garamond text-bone-700 text-[0.65rem] mt-1 italic">
+          Type a number, or trait names joined with <span class="text-bone-500">+</span> — they pull from your sheet.
+        </p>
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.7rem]">Difficulty <span class="text-bone-700 normal-case">(optional)</span></label>
+        <input type="number" name="difficulty" min="0" max="15" value="{{ roll_form.difficulty }}" class="w-full text-sm">
+      </div>
+      <div>
+        <label class="label-gold block mb-1 text-[0.7rem]">Hunger <span class="text-bone-700 normal-case">(blank = sheet)</span></label>
+        <input type="number" name="hunger" min="0" max="5" value="{{ roll_form.hunger }}" class="w-full text-sm">
+      </div>
+      {% if roll_specialties %}
+      <div>
+        <label class="label-gold block mb-1 text-[0.7rem]">Specialty (+1)</label>
+        <select name="specialty" class="w-full text-sm">
+          <option value="">— none —</option>
+          {% for s in roll_specialties %}
+          <option value="{{ s.skill }}:{{ s.name }}" {{ 'selected' if roll_form.specialty == (s.skill ~ ':' ~ s.name) else '' }}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="flex items-end">
+        <label class="flex items-center gap-2 cursor-pointer py-1.5">
+          <input type="checkbox" name="surge" class="accent-[#8B1A1A]" {{ 'checked' if roll_form.surge else '' }}>
+          <span class="font-garamond text-bone-400 text-sm">Blood Surge</span>
+        </label>
+      </div>
+    </div>
+    {% if roll_error %}
+    <p class="font-garamond text-blood-400 text-xs">{{ roll_error }}</p>
+    {% endif %}
+    <button type="submit" class="btn-send font-cinzel tracking-widest text-xs px-4 py-2">Roll</button>
+  </form>
+
+  {# ── Result ── #}
+  {% if roll_result %}
+  {% set r = roll_result %}
+  {% set lose = (r.outcome in ['messy_critical', 'bestial_failure']) or not r.is_win %}
+  <div class="gilded p-5 mt-4 border-2 {{ 'border-blood-800' if lose else 'border-gold-700' }}"
+       style="box-shadow: inset 0 0 22px rgba({{ '139,26,26' if lose else '201,168,107' }},0.14);">
+    <div class="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
+      <p class="font-cinzel text-xl {{ 'text-blood-400' if lose else 'text-gold-300' }}">{{ roll_outcome_label }}</p>
+      <p class="font-cinzel text-sm text-bone-400">
+        {{ r.successes }} success{{ '' if r.successes == 1 else 'es' }}{% if r.difficulty %} · vs {{ r.difficulty }} · margin {{ '%+d' % r.margin }}{% endif %}
+      </p>
+    </div>
+
+    <div class="flex flex-wrap gap-1.5 mb-3">
+      {% for d in r.normal_dice %}{{ die(d) }}{% endfor %}
+      {% for d in r.hunger_dice %}{{ die(d, hunger=True) }}{% endfor %}
+    </div>
+
+    {% if roll_pool_label %}<p class="font-garamond text-bone-600 text-xs">Pool · {{ roll_pool_label }}</p>{% endif %}
+    {% if roll_unknown %}<p class="font-garamond text-blood-400 text-xs mt-1">Unrecognized · {{ roll_unknown | join(', ') }}</p>{% endif %}
+    {% if roll_surge_note %}<p class="font-garamond text-mauve-300 text-xs mt-1">{{ roll_surge_note }}</p>{% endif %}
+    {% if roll_reroll_note %}<p class="font-garamond text-mauve-300 text-xs mt-1">{{ roll_reroll_note }}</p>{% endif %}
+
+    {% if roll_can_reroll %}
+    <form hx-post="/characters/{{ char.id }}/roll/reroll" hx-target="#roll-panel" hx-swap="outerHTML" class="mt-3">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="normal" value="{{ r.normal_dice | join(',') }}">
+      <input type="hidden" name="hunger" value="{{ r.hunger_dice | join(',') }}">
+      <input type="hidden" name="difficulty" value="{{ r.difficulty }}">
+      <input type="hidden" name="pool_label" value="{{ roll_pool_label or '' }}">
+      <input type="hidden" name="pool" value="{{ roll_form.pool }}">
+      <button type="submit" class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
+        Reroll (Willpower) · costs 1 WP
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# Trait autocomplete — reuses the shared spend catalogs (always-present globals). #}
+  <datalist id="roll-trait-dl">
+    {% for n in (spend_trait_lists.attribute + spend_trait_lists.skill + spend_trait_lists.discipline) %}
+    <option value="{{ n }}"></option>
+    {% endfor %}
+  </datalist>
+</div>

@@ -1088,6 +1088,8 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "homebrew_launch_roll",
         # Per-chronicle coterie member cap (migration 045)
         "coterie_max_members",
+        # Web dice roller (Roll tab) on/off toggle (migration 051)
+        "dice_roller_enabled",
     }
     # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
     # migration 040. It's now an orthogonal flag — translate a legacy POST

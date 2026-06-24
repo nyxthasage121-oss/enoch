@@ -152,6 +152,20 @@
           </label>
         </div>
 
+        {# Web dice roller toggle — adds/removes the "Roll" tab on character pages. #}
+        <label class="flex items-start gap-3 gilded-inset px-3 py-2 cursor-pointer hover:border-gold-700 transition-colors">
+          <input type="checkbox" name="dice_roller_enabled" class="accent-[#8B1A1A] mt-0.5"
+                 {{ 'checked' if _cs.get('dice_roller_enabled', 1) else '' }}>
+          <div>
+            <p class="font-cinzel text-xs text-bone-200">Web Dice Roller</p>
+            <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">
+              Shows a <span class="text-bone-400">Roll</span> tab on each character page — a V5 pool
+              roller (Hunger, criticals, Blood Surge, Willpower reroll) that reads from the sheet.
+              Turn off to remove it chronicle-wide.
+            </p>
+          </div>
+        </label>
+
         {# Per-tier budgets — visible ONLY under the Homebrew ruleset, because
            that's the only mode tier_budget() (web/db.py) actually reads the
            overrides in. Under Standard it returns pure V5 RAW and ignores any

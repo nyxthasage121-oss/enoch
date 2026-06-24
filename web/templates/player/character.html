@@ -125,7 +125,7 @@
        carry their own "must be approved" messaging, and the Wishlist is a useful
        pre-approval build planner. Projects stays gated — its content needs an
        approved, active character. #}
-    {% set play_tabs = [('claim','Claim XP'),('spend','Spend XP'),('wishlist','Wishlist')] + ([('projects','Projects')] if (char.is_approved and project_mode != 'off') else []) %}
+    {% set play_tabs = (([('roll','Roll')] if dice_roller_enabled else []) + [('claim','Claim XP'),('spend','Spend XP'),('wishlist','Wishlist')]) + ([('projects','Projects')] if (char.is_approved and project_mode != 'off') else []) %}
     {% for t, lbl in [('overview','Overview'),('sheet','Sheet')] + play_tabs + [('history','History')] %}
     <button @click="tab='{{ t }}'"
             :class="tab === '{{ t }}'
@@ -623,6 +623,18 @@
           Save Sheet
         </button>
       </div>
+    </div>
+    {% endif %}
+
+    {# Mechanical-state reminders — reflect the saved sheet (refresh on save). #}
+    {% if conditions %}
+    <div class="space-y-1.5 mb-5">
+      {% for c in conditions %}
+      <div class="gilded-inset px-3 py-2 border-l-2 {{ 'border-blood-700' if c.sev == 'crit' else 'border-gold-700' }}">
+        <p class="font-cinzel text-[0.6rem] tracking-[0.2em] uppercase {{ 'text-blood-400' if c.sev == 'crit' else 'text-gold-400' }}">{{ c.label }}</p>
+        <p class="font-garamond text-bone-500 text-xs leading-snug mt-0.5">{{ c.detail }}</p>
+      </div>
+      {% endfor %}
     </div>
     {% endif %}
 
@@ -1169,6 +1181,13 @@
     {% for n in names %}<option value="{{ n }}"></option>{% endfor %}
   </datalist>
   {% endfor %}
+
+  {# ══ Roll ══ #}
+  {% if dice_roller_enabled %}
+  <div x-show="tab === 'roll'" x-cloak>
+    {% include "player/partials/roll_form.html" %}
+  </div>
+  {% endif %}
 
   {# ══ Claim XP ══ #}
   <div x-show="tab === 'claim'" x-cloak>

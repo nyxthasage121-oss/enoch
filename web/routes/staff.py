@@ -2206,6 +2206,7 @@ async def admin_settings_save(
         "homebrew_background_budget":form_int(form.get("homebrew_background_budget"), 5, lo=0),
         "homebrew_flaw_cap":         form_int(form.get("homebrew_flaw_cap"), 2, lo=0),
         "revenants_enabled":         1 if form.get("revenants_enabled") == "on" else 0,
+        "dice_roller_enabled":       1 if form.get("dice_roller_enabled") == "on" else 0,
     }
     # Only touch the per-player cap when the form actually submits it, so a
     # partial settings save (or API call) doesn't silently reset it.

@@ -71,6 +71,17 @@ from ..xp_rules import (
     validate_humanity_conditions,
     validate_spend,
 )
+from core.dice import (
+    OUTCOME_LABELS,
+    apply_specialty,
+    blood_surge_bonus,
+    build_trait_index,
+    reroll_failures,
+    resolve_pool,
+    roll_pool,
+    rouse_check,
+)
+from core.conditions import character_conditions
 
 router = APIRouter(tags=["player"])
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -362,6 +373,60 @@ def _build_spend_trait_ratings() -> dict[str, list[int]]:
 
 
 templates.env.globals["spend_trait_ratings"] = _build_spend_trait_ratings()
+
+
+# ── Web dice roller (Irad's engine, in the browser) ───────────────────────────
+# Trait name → sheet key so a pool like "strength + brawl" resolves from the
+# sheet. Mirrors the bot's _TRAIT_INDEX so web and Discord rolls agree.
+_WEB_TRAIT_INDEX = build_trait_index(
+    [pair for _c, _tr in _V5_ATTRIBUTES for pair in _tr],
+    [pair for _c, _tr in _V5_SKILLS for pair in _tr],
+    _V5_DISCIPLINES,
+)
+
+
+def _pool_label(parts, total) -> str:
+    """Render a pool breakdown like 'Strength 3 + Brawl 2 = 5d'."""
+    if not parts:
+        return f"{total}d"
+    return " + ".join(f"{lbl} {val}" for lbl, val in parts) + f" = {total}d"
+
+
+def _roll_kwargs(char, *, result=None, form=None, parts=None, unknown=None,
+                 surge_note=None, reroll_note=None, error=None, pool_label=None):
+    """Context keys the roll partial needs. Excludes `char` so this composes
+    with character_detail's existing context (which passes char itself)."""
+    sheet = char.get("sheet_json") or {}
+    return {
+        "roll_result": result,
+        "roll_outcome_label": (OUTCOME_LABELS.get(result.outcome) if result else None),
+        "roll_can_reroll": bool(result and not reroll_note
+                                and any(d < 6 for d in result.normal_dice)),
+        "roll_form": form or {"pool": "", "difficulty": 0, "hunger": "",
+                              "specialty": "", "surge": False},
+        "roll_parts": parts or [],
+        "roll_unknown": unknown or [],
+        "roll_surge_note": surge_note,
+        "roll_reroll_note": reroll_note,
+        "roll_error": error,
+        "roll_pool_label": pool_label,
+        "roll_specialties": [s for s in (sheet.get("specialties") or [])
+                             if isinstance(s, dict)],
+        "conditions": character_conditions(sheet),
+    }
+
+
+def _parse_dice_csv(raw) -> list[int]:
+    """Parse a comma-separated dice string ('10,7,3') into ints (1-10). Ignores
+    junk and caps length so a crafted reroll POST can't balloon the pool."""
+    out: list[int] = []
+    for tok in (raw or "").split(","):
+        tok = tok.strip()
+        if tok.lstrip("-").isdigit():
+            out.append(max(1, min(10, int(tok))))
+        if len(out) >= 50:
+            break
+    return out
 
 
 _CLANS = [
@@ -1777,7 +1842,109 @@ async def character_detail(
             active_bane=_active_clan_bane(
                 char.get("clan"), (char.get("sheet_json") or {}).get("bane_choice")),
             clan_disciplines=set(_CLAN_DISCIPLINES.get(char["clan"], [])),
+            **_roll_kwargs(char),
         ),
+    )
+
+
+@router.post("/characters/{character_id}/roll", response_class=HTMLResponse)
+async def roll_dice(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Web V5 roller — reuses the shared engine. A pure calculator: it never
+    writes to the sheet (Surge shows the Rouse but doesn't persist Hunger)."""
+    form       = await request.form()
+    pool_expr  = (form.get("pool") or "").strip()
+    difficulty = form_int(form.get("difficulty"))
+    hunger_raw = (form.get("hunger") or "").strip()
+    specialty  = (form.get("specialty") or "").strip() or None
+    surge      = form.get("surge") == "on"
+
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+    sheet = char.get("sheet_json") or {}
+
+    form_state = {"pool": pool_expr, "difficulty": difficulty, "hunger": hunger_raw,
+                  "specialty": specialty or "", "surge": surge}
+
+    if not pool_expr:
+        return templates.TemplateResponse(
+            request, "player/partials/roll_form.html",
+            _ctx(request, char=char, **_roll_kwargs(
+                char, form=form_state,
+                error="Enter a pool — a number (5) or traits like 'strength + brawl'.")),
+        )
+
+    if pool_expr.isdigit():
+        # A flat number needs no breakdown — _pool_label renders just "Nd".
+        total, parts, unknown = int(pool_expr), [], []
+    else:
+        total, parts, unknown = resolve_pool(pool_expr, sheet, _WEB_TRAIT_INDEX)
+
+    total, parts, unknown = apply_specialty(total, parts, unknown, specialty,
+                                            sheet.get("specialties"))
+
+    eff_hunger = int(hunger_raw) if hunger_raw.isdigit() else int(sheet.get("hunger") or 0)
+
+    surge_note = None
+    if surge:
+        bonus = blood_surge_bonus(sheet.get("blood_potency", 0))
+        total += bonus
+        parts = parts + [("Blood Surge", bonus)]
+        rolls, gained = rouse_check(1)
+        proj = min(5, eff_hunger + gained)
+        eff_hunger = proj   # reflect the Rouse in this roll's Hunger dice
+        rouse_txt = (f"+{gained} Hunger → set Hunger to {proj}/5 on your sheet"
+                     if gained else "no Hunger gained")
+        surge_note = (f"+{bonus} {'die' if bonus == 1 else 'dice'} · Rouse "
+                      + " · ".join(str(d) for d in rolls) + f" → {rouse_txt}")
+
+    result = roll_pool(total, eff_hunger, difficulty)
+    return templates.TemplateResponse(
+        request, "player/partials/roll_form.html",
+        _ctx(request, char=char, **_roll_kwargs(
+            char, result=result, form=form_state, parts=parts, unknown=unknown,
+            surge_note=surge_note, pool_label=_pool_label(parts, result.pool))),
+    )
+
+
+@router.post("/characters/{character_id}/roll/reroll", response_class=HTMLResponse)
+async def reroll_dice(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Willpower reroll of the regular failures from a prior web roll. The dice
+    ride in on hidden fields (the roller is stateless). v1 is read-only — it
+    flags the -1 Superficial Willpower cost rather than writing it."""
+    form       = await request.form()
+    normal     = _parse_dice_csv(form.get("normal"))
+    hunger     = _parse_dice_csv(form.get("hunger"))
+    difficulty = form_int(form.get("difficulty"))
+    pool_label = (form.get("pool_label") or "").strip() or None
+    pool_expr  = (form.get("pool") or "").strip()
+
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+
+    result, n = reroll_failures(normal, hunger, difficulty)
+    note = (f"Willpower reroll — rerolled {n} {'die' if n == 1 else 'dice'} "
+            "(costs 1 Superficial Willpower — mark it on your sheet).")
+    form_state = {"pool": pool_expr, "difficulty": difficulty, "hunger": "",
+                  "specialty": "", "surge": False}
+    return templates.TemplateResponse(
+        request, "player/partials/roll_form.html",
+        _ctx(request, char=char, **_roll_kwargs(
+            char, result=result, form=form_state, reroll_note=note,
+            pool_label=pool_label)),
     )
 
 
