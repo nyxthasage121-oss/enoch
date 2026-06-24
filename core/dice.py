@@ -168,6 +168,62 @@ def reroll_failures(normal_dice: list[int], hunger_dice: list[int],
     return classify(normal, list(hunger_dice), difficulty), len(chosen)
 
 
+def reroll_indices(normal_dice: list[int], hunger_dice: list[int],
+                   difficulty: int = 0, indices: list[int] | None = None,
+                   count: int = 3,
+                   rng: random.Random | None = None) -> tuple[RollResult, int]:
+    """V5 Willpower reroll of SPECIFIC regular (non-Hunger) dice, chosen by
+    0-based index into ``normal_dice``. Caps at ``count`` (3), dedups, and
+    ignores out-of-range indices. Hunger dice are never rerolled. With no valid
+    indices given, falls back to rerolling the failures (the V5 default)."""
+    chosen: list[int] = []
+    seen: set[int] = set()
+    for i in (indices or []):
+        if isinstance(i, int) and 0 <= i < len(normal_dice) and i not in seen:
+            seen.add(i)
+            chosen.append(i)
+        if len(chosen) >= max(0, int(count)):
+            break
+    if not chosen:
+        return reroll_failures(normal_dice, hunger_dice, difficulty, count, rng)
+    r = rng or random
+    normal = list(normal_dice)
+    for i in chosen:
+        normal[i] = r.randint(1, 10)
+    return classify(normal, list(hunger_dice), difficulty), len(chosen)
+
+
+def probability(pool: int, hunger: int = 0, difficulty: int = 0,
+                trials: int = 10000,
+                rng: random.Random | None = None) -> dict:
+    """Estimate a roll's outcome odds by simulation (exact enough for a preview,
+    and reuses the real ``classify`` rules). Returns probabilities in 0..1 for
+    success / critical / messy / bestial, plus the mean successes. Pass a seeded
+    ``random.Random`` for deterministic results."""
+    r = rng or random
+    pool = max(0, min(int(pool), _MAX_POOL))
+    hunger = max(0, min(int(hunger), _MAX_HUNGER, pool))
+    diff = max(0, int(difficulty))
+    n = max(1, int(trials))
+    wins = crits = messy = bestial = total = 0
+    for _ in range(n):
+        res = roll_pool(pool, hunger, diff, r)
+        total += res.successes
+        wins += res.is_win
+        crits += res.critical
+        messy += res.messy
+        bestial += res.bestial
+    return {
+        "trials": n,
+        "pool": pool, "hunger": hunger, "difficulty": diff,
+        "p_success": wins / n,
+        "p_critical": crits / n,
+        "p_messy": messy / n,
+        "p_bestial": bestial / n,
+        "mean_successes": total / n,
+    }
+
+
 def rouse_check(count: int = 1,
                 rng: random.Random | None = None) -> tuple[list[int], int]:
     """Roll ``count`` Rouse Check dice. Each die showing 6+ avoids a Hunger

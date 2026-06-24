@@ -1,9 +1,8 @@
 {# roll_form.html — web V5 dice roller (Irad's engine in the browser).
    Rendered inline in character.html (Roll tab) AND returned by
-   POST /characters/{id}/roll and /characters/{id}/roll/reroll.
-   HTMX target: #roll-panel (outerHTML swap). #}
+   POST .../roll, .../roll/reroll, and .../roll/odds. Target: #roll-panel. #}
 
-{% macro die(d, hunger=False) %}
+{% macro die(d, hunger=False, idx=None) %}
   {%- if hunger -%}
     {%- set st = 'background:#8B1A1A;color:#f4e9d6;border-color:#c0504d' if d == 10
        else ('background:#3a1414;color:#ff9d9d;border-color:#8B1A1A' if d == 1
@@ -14,13 +13,20 @@
        else ('color:#d8b56a;border-color:#5c4a25' if d >= 6
        else 'color:#6b6358;border-color:#2c2820') -%}
   {%- endif -%}
+  {%- if idx is not none and not hunger -%}
+  <button type="button" @click="toggle({{ idx }})"
+          :class="sel.includes({{ idx }}) ? 'ring-2 ring-gold-300' : ''"
+          class="inline-flex items-center justify-center w-7 h-7 rounded border font-cinzel text-sm leading-none cursor-pointer transition-shadow"
+          style="{{ st }}" title="Click to mark for Willpower reroll">{{ d }}</button>
+  {%- else -%}
   <span class="inline-flex items-center justify-center w-7 h-7 rounded border font-cinzel text-sm leading-none"
         style="{{ st }}" title="{{ 'Hunger die' if hunger else 'Die' }}">{{ d }}</span>
+  {%- endif -%}
 {% endmacro %}
 
 <div id="roll-panel">
 
-  {# ── Mechanical-state reminders (from the saved sheet) ── #}
+  {# Mechanical-state reminders (from the saved sheet) #}
   {% if conditions %}
   <div class="space-y-1.5 mb-4">
     {% for c in conditions %}
@@ -32,7 +38,7 @@
   </div>
   {% endif %}
 
-  {# ── Roll form ── #}
+  {# Roll form #}
   <form hx-post="/characters/{{ char.id }}/roll" hx-target="#roll-panel" hx-swap="outerHTML"
         class="gilded p-5 space-y-4">
     <input type="hidden" name="_csrf" value="{{ csrf_token }}">
@@ -73,18 +79,23 @@
         </label>
       </div>
     </div>
-    {% if roll_error %}
-    <p class="font-garamond text-blood-400 text-xs">{{ roll_error }}</p>
-    {% endif %}
-    <button type="submit" class="btn-send font-cinzel tracking-widest text-xs px-4 py-2">Roll</button>
+    {% if roll_error %}<p class="font-garamond text-blood-400 text-xs">{{ roll_error }}</p>{% endif %}
+    <div class="flex items-center gap-2">
+      <button type="submit" class="btn-send font-cinzel tracking-widest text-xs px-4 py-2">Roll</button>
+      <button type="button" hx-post="/characters/{{ char.id }}/roll/odds"
+              hx-include="closest form" hx-target="#roll-panel" hx-swap="outerHTML"
+              class="btn-ghost font-cinzel tracking-widest text-xs px-4 py-2"
+              title="Preview the odds without rolling">Odds</button>
+    </div>
   </form>
 
-  {# ── Result ── #}
+  {# Result #}
   {% if roll_result %}
   {% set r = roll_result %}
   {% set lose = (r.outcome in ['messy_critical', 'bestial_failure']) or not r.is_win %}
   <div class="gilded p-5 mt-4 border-2 {{ 'border-blood-800' if lose else 'border-gold-700' }}"
-       style="box-shadow: inset 0 0 22px rgba({{ '139,26,26' if lose else '201,168,107' }},0.14);">
+       style="box-shadow: inset 0 0 22px rgba({{ '139,26,26' if lose else '201,168,107' }},0.14);"
+       x-data="{ sel: [], toggle(i){ const k = this.sel.indexOf(i); if (k >= 0) { this.sel.splice(k, 1); } else if (this.sel.length < 3) { this.sel.push(i); } } }">
     <div class="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
       <p class="font-cinzel text-xl {{ 'text-blood-400' if lose else 'text-gold-300' }}">{{ roll_outcome_label }}</p>
       <p class="font-cinzel text-sm text-bone-400">
@@ -92,8 +103,8 @@
       </p>
     </div>
 
-    <div class="flex flex-wrap gap-1.5 mb-3">
-      {% for d in r.normal_dice %}{{ die(d) }}{% endfor %}
+    <div class="flex flex-wrap gap-1.5 mb-2">
+      {% for d in r.normal_dice %}{{ die(d, idx=loop.index0) }}{% endfor %}
       {% for d in r.hunger_dice %}{{ die(d, hunger=True) }}{% endfor %}
     </div>
 
@@ -103,18 +114,43 @@
     {% if roll_reroll_note %}<p class="font-garamond text-mauve-300 text-xs mt-1">{{ roll_reroll_note }}</p>{% endif %}
 
     {% if roll_can_reroll %}
-    <form hx-post="/characters/{{ char.id }}/roll/reroll" hx-target="#roll-panel" hx-swap="outerHTML" class="mt-3">
+    <p class="font-garamond text-bone-700 text-[0.65rem] italic mt-3">
+      Click your regular dice to choose which to reroll (up to 3) — or just reroll the failures.
+    </p>
+    <form hx-post="/characters/{{ char.id }}/roll/reroll" hx-target="#roll-panel" hx-swap="outerHTML" class="mt-1.5">
       <input type="hidden" name="_csrf" value="{{ csrf_token }}">
       <input type="hidden" name="normal" value="{{ r.normal_dice | join(',') }}">
       <input type="hidden" name="hunger" value="{{ r.hunger_dice | join(',') }}">
       <input type="hidden" name="difficulty" value="{{ r.difficulty }}">
       <input type="hidden" name="pool_label" value="{{ roll_pool_label or '' }}">
       <input type="hidden" name="pool" value="{{ roll_form.pool }}">
+      <input type="hidden" name="indices" :value="sel.join(',')">
       <button type="submit" class="btn-ghost font-cinzel tracking-widest text-[0.6rem] px-3 py-1.5">
-        Reroll (Willpower) · costs 1 WP
+        <span x-show="!sel.length">Reroll failures (Willpower)</span>
+        <span x-show="sel.length" x-cloak>Reroll <span x-text="sel.length"></span> selected (Willpower)</span>
+        · 1 WP
       </button>
     </form>
     {% endif %}
+  </div>
+  {% endif %}
+
+  {# Odds preview (no dice rolled) #}
+  {% if roll_odds %}
+  {% set o = roll_odds %}
+  <div class="gilded p-5 mt-4 border border-gold-800">
+    <div class="flex items-baseline justify-between gap-3 mb-1">
+      <p class="label-gold">Odds{% if o.difficulty %} · vs {{ o.difficulty }}{% endif %}</p>
+      <p class="font-cinzel text-3xl text-gold-300">{{ (o.p_success * 100) | round | int }}%</p>
+    </div>
+    {% if roll_pool_label %}<p class="font-garamond text-bone-600 text-xs">{{ roll_pool_label }} · {{ o.hunger }} Hunger · ~{{ o.mean_successes | round(1) }} successes avg</p>{% endif %}
+    {% if roll_unknown %}<p class="font-garamond text-blood-400 text-xs mt-1">Unrecognized · {{ roll_unknown | join(', ') }}</p>{% endif %}
+    <div class="flex flex-wrap gap-x-5 gap-y-1 mt-2 font-garamond text-xs">
+      <span class="text-bone-500">Critical <span class="text-gold-400">{{ (o.p_critical * 100) | round | int }}%</span></span>
+      <span class="text-bone-500">Messy <span class="text-blood-400">{{ (o.p_messy * 100) | round | int }}%</span></span>
+      <span class="text-bone-500">Bestial <span class="text-blood-400">{{ (o.p_bestial * 100) | round | int }}%</span></span>
+    </div>
+    <p class="font-cinzel text-[0.55rem] tracking-widest uppercase text-bone-700 mt-2">Estimated over {{ o.trials }} simulated rolls</p>
   </div>
   {% endif %}
 

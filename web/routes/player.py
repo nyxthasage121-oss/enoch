@@ -76,7 +76,8 @@ from core.dice import (
     apply_specialty,
     blood_surge_bonus,
     build_trait_index,
-    reroll_failures,
+    probability,
+    reroll_indices,
     resolve_pool,
     roll_pool,
     rouse_check,
@@ -394,7 +395,8 @@ def _pool_label(parts, total) -> str:
 
 
 def _roll_kwargs(char, *, result=None, form=None, parts=None, unknown=None,
-                 surge_note=None, reroll_note=None, error=None, pool_label=None):
+                 surge_note=None, reroll_note=None, error=None, pool_label=None,
+                 odds=None):
     """Context keys the roll partial needs. Excludes `char` so this composes
     with character_detail's existing context (which passes char itself)."""
     sheet = char.get("sheet_json") or {}
@@ -411,6 +413,7 @@ def _roll_kwargs(char, *, result=None, form=None, parts=None, unknown=None,
         "roll_reroll_note": reroll_note,
         "roll_error": error,
         "roll_pool_label": pool_label,
+        "roll_odds": odds,
         "roll_specialties": [s for s in (sheet.get("specialties") or [])
                              if isinstance(s, dict)],
         "conditions": character_conditions(sheet),
@@ -1856,8 +1859,8 @@ async def roll_dice(
     user: dict = Depends(require_auth),
     _: None = Depends(csrf_protect),
 ):
-    """Web V5 roller — reuses the shared engine. A pure calculator: it never
-    writes to the sheet (Surge shows the Rouse but doesn't persist Hunger)."""
+    """Web V5 roller — reuses the shared engine. Read-only except that a Blood
+    Surge persists its Rouse's Hunger gain to the sheet, like the bot does."""
     form       = await request.form()
     pool_expr  = (form.get("pool") or "").strip()
     difficulty = form_int(form.get("difficulty"))
@@ -1899,9 +1902,16 @@ async def roll_dice(
         total += bonus
         parts = parts + [("Blood Surge", bonus)]
         rolls, gained = rouse_check(1)
-        proj = min(5, eff_hunger + gained)
-        eff_hunger = proj   # reflect the Rouse in this roll's Hunger dice
-        rouse_txt = (f"+{gained} Hunger → set Hunger to {proj}/5 on your sheet"
+        new_hunger = min(5, eff_hunger + gained)
+        if gained:
+            # The Surge's Rouse raised Hunger — persist it, like the bot does.
+            from ..db import apply_character_state_delta
+            with get_db() as conn:
+                st = apply_character_state_delta(conn, character_id, hunger=gained)
+            if st:
+                new_hunger = st["hunger"]
+        eff_hunger = new_hunger   # reflect the Rouse in this roll's Hunger dice
+        rouse_txt = (f"+{gained} Hunger → {new_hunger}/5 (saved to your sheet)"
                      if gained else "no Hunger gained")
         surge_note = (f"+{bonus} {'die' if bonus == 1 else 'dice'} · Rouse "
                       + " · ".join(str(d) for d in rolls) + f" → {rouse_txt}")
@@ -1931,13 +1941,16 @@ async def reroll_dice(
     difficulty = form_int(form.get("difficulty"))
     pool_label = (form.get("pool_label") or "").strip() or None
     pool_expr  = (form.get("pool") or "").strip()
+    indices_raw = (form.get("indices") or "").strip()
+    indices = ([int(x) for x in indices_raw.split(",") if x.strip().isdigit()]
+               if indices_raw else None)
 
     with get_db() as conn:
         char = get_character_for_player(conn, character_id, user["id"])
         if not char:
             raise HTTPException(status_code=404)
 
-    result, n = reroll_failures(normal, hunger, difficulty)
+    result, n = reroll_indices(normal, hunger, difficulty, indices)
     note = (f"Willpower reroll — rerolled {n} {'die' if n == 1 else 'dice'} "
             "(costs 1 Superficial Willpower — mark it on your sheet).")
     form_state = {"pool": pool_expr, "difficulty": difficulty, "hunger": "",
@@ -1947,6 +1960,58 @@ async def reroll_dice(
         _ctx(request, char=char, **_roll_kwargs(
             char, result=result, form=form_state, reroll_note=note,
             pool_label=pool_label)),
+    )
+
+
+@router.post("/characters/{character_id}/roll/odds", response_class=HTMLResponse)
+async def roll_odds(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Probability preview for the current pool — simulates the odds without
+    rolling or writing anything to the sheet."""
+    form       = await request.form()
+    pool_expr  = (form.get("pool") or "").strip()
+    difficulty = form_int(form.get("difficulty"))
+    hunger_raw = (form.get("hunger") or "").strip()
+    specialty  = (form.get("specialty") or "").strip() or None
+    surge      = form.get("surge") == "on"
+
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+    sheet = char.get("sheet_json") or {}
+    form_state = {"pool": pool_expr, "difficulty": difficulty, "hunger": hunger_raw,
+                  "specialty": specialty or "", "surge": surge}
+
+    if not pool_expr:
+        return templates.TemplateResponse(
+            request, "player/partials/roll_form.html",
+            _ctx(request, char=char, **_roll_kwargs(
+                char, form=form_state, error="Enter a pool to preview its odds.")),
+        )
+
+    if pool_expr.isdigit():
+        total, parts, unknown = int(pool_expr), [], []
+    else:
+        total, parts, unknown = resolve_pool(pool_expr, sheet, _WEB_TRAIT_INDEX)
+    total, parts, unknown = apply_specialty(total, parts, unknown, specialty,
+                                            sheet.get("specialties"))
+    if surge:
+        bonus = blood_surge_bonus(sheet.get("blood_potency", 0))
+        total += bonus
+        parts = parts + [("Blood Surge", bonus)]
+    eff_hunger = int(hunger_raw) if hunger_raw.isdigit() else int(sheet.get("hunger") or 0)
+
+    odds = probability(total, eff_hunger, difficulty)
+    return templates.TemplateResponse(
+        request, "player/partials/roll_form.html",
+        _ctx(request, char=char, **_roll_kwargs(
+            char, form=form_state, parts=parts, unknown=unknown,
+            pool_label=_pool_label(parts, odds["pool"]), odds=odds)),
     )
 
 

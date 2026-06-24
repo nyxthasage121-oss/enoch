@@ -206,3 +206,43 @@ def test_resonance_route(player):
     assert r.status_code == 200
     assert 'id="resonance-panel"' in r.text
     assert any(t[1] in r.text for t in TEMPERAMENTS)  # a temperament label always shows
+
+
+# ── Phase 4 polish: selective reroll, odds preview, Hunger write-back ──────────
+
+def test_reroll_indices_chosen_capped_and_fallback():
+    from core.dice import reroll_indices
+    normal = [2, 3, 4, 9, 9]            # 0,1,2 fail; 3,4 succeed
+    _, n = reroll_indices(normal, [7], indices=[0, 1], rng=random.Random(5))
+    assert n == 2
+    _, n2 = reroll_indices(normal, [7], indices=[0, 1, 2, 3, 4], rng=random.Random(5))
+    assert n2 == 3                      # capped at 3
+    _, n3 = reroll_indices(normal, [7], indices=None, rng=random.Random(5))
+    assert n3 == 3                      # empty → reroll the failures
+
+
+def test_probability_bounds():
+    from core.dice import probability
+    assert probability(0, 0, 1, trials=200, rng=random.Random(1))["p_success"] == 0.0
+    big = probability(10, 0, 1, trials=1000, rng=random.Random(1))
+    assert big["p_success"] > 0.95
+    assert big["mean_successes"] > 3
+    assert 0.0 <= big["p_messy"] <= 1.0
+
+
+def test_odds_route(player):
+    r = player.post("/characters/1/roll/odds",
+                    data={"_csrf": "dev-csrf-token", "pool": "6", "difficulty": "3"})
+    assert r.status_code == 200
+    assert "Odds" in r.text and "%" in r.text
+
+
+def test_apply_character_state_delta_clamps(player):
+    from web.db import apply_character_state_delta, get_character, get_db
+    with get_db() as conn:
+        apply_character_state_delta(conn, 1, hunger=-99)          # zero it
+        assert apply_character_state_delta(conn, 1, hunger=3)["hunger"] == 3
+        assert apply_character_state_delta(conn, 1, hunger=99)["hunger"] == 5   # clamp
+        apply_character_state_delta(conn, 1, hunger=-99)          # revert
+        conn.commit()
+        assert (get_character(conn, 1)["sheet_json"].get("hunger") or 0) == 0

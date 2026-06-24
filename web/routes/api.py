@@ -47,6 +47,7 @@ from ..db import (
     log_alert,
     upsert_player,
     write_audit,
+    apply_character_state_delta,
     update_character,
     STAFF_ROLES,
     get_staff_role,
@@ -388,28 +389,14 @@ async def apply_state_delta(character_id: int, body: DamageDeltaIn):
         if not char:
             raise HTTPException(status_code=404, detail="Character not found")
 
-        sheet = dict(char.get("sheet_json") or {})
-
-        def _apply(key: str, delta: int, lo: int, hi: int) -> int:
-            if not delta:
-                return sheet.get(key, 0)
-            new = max(lo, min(hi, (sheet.get(key, 0) or 0) + delta))
-            if new == 0:
-                sheet.pop(key, None)
-            else:
-                sheet[key] = new
-            return new
-
-        result = {
-            "damage_health_sup":    _apply("damage_health_sup",    body.damage_health_sup,    0, 15),
-            "damage_health_agg":    _apply("damage_health_agg",    body.damage_health_agg,    0, 15),
-            "damage_willpower_sup": _apply("damage_willpower_sup", body.damage_willpower_sup, 0, 15),
-            "damage_willpower_agg": _apply("damage_willpower_agg", body.damage_willpower_agg, 0, 15),
-            "hunger":               _apply("hunger",               body.hunger,                0, 5),
-            "humanity":             _apply("humanity",             body.humanity,              0, 10),
-        }
-
-        update_character(conn, character_id, sheet_json=sheet)
+        result = apply_character_state_delta(
+            conn, character_id,
+            damage_health_sup=body.damage_health_sup,
+            damage_health_agg=body.damage_health_agg,
+            damage_willpower_sup=body.damage_willpower_sup,
+            damage_willpower_agg=body.damage_willpower_agg,
+            hunger=body.hunger, humanity=body.humanity,
+        )
         write_audit(
             conn,
             actor_id="bot",

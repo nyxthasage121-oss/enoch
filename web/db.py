@@ -625,6 +625,42 @@ def update_character(conn, character_id: int, **fields) -> dict:
     return get_character(conn, character_id)
 
 
+def apply_character_state_delta(conn, character_id: int, *,
+                                damage_health_sup: int = 0, damage_health_agg: int = 0,
+                                damage_willpower_sup: int = 0, damage_willpower_agg: int = 0,
+                                hunger: int = 0, humanity: int = 0) -> dict | None:
+    """Apply clamped incremental updates to a character's damage tracks / Hunger
+    / Humanity in sheet_json, returning the new resolved values (or None if the
+    character is gone). Shared by the bot state API and the web dice roller so
+    both clamp identically (damage 0-15, Hunger 0-5, Humanity 0-10); a value that
+    lands on 0 is dropped from the sheet."""
+    char = get_character(conn, character_id)
+    if not char:
+        return None
+    sheet = dict(char.get("sheet_json") or {})
+
+    def _apply(key: str, delta: int, lo: int, hi: int) -> int:
+        if not delta:
+            return sheet.get(key, 0) or 0
+        new = max(lo, min(hi, (sheet.get(key, 0) or 0) + delta))
+        if new == 0:
+            sheet.pop(key, None)
+        else:
+            sheet[key] = new
+        return new
+
+    result = {
+        "damage_health_sup":    _apply("damage_health_sup",    damage_health_sup,    0, 15),
+        "damage_health_agg":    _apply("damage_health_agg",    damage_health_agg,    0, 15),
+        "damage_willpower_sup": _apply("damage_willpower_sup", damage_willpower_sup, 0, 15),
+        "damage_willpower_agg": _apply("damage_willpower_agg", damage_willpower_agg, 0, 15),
+        "hunger":               _apply("hunger",               hunger,               0, 5),
+        "humanity":             _apply("humanity",             humanity,             0, 10),
+    }
+    update_character(conn, character_id, sheet_json=sheet)
+    return result
+
+
 def approve_character(conn, character_id: int, reviewer_id: str) -> dict:
     now = _now()
     conn.execute("""
