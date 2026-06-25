@@ -107,3 +107,16 @@ def test_sheet_parser_merges_bonus_flaws():
     # Re-parsing onto the prior sheet doesn't duplicate the bonus flaws.
     sheet2 = _parse_sheet_from_form(form, base=sheet)
     assert sum(1 for f in sheet2["flaws"] if f.get("bonus")) == 2
+
+
+def test_sheet_parser_keeps_merit_grants():
+    """Thin-blood merit-grant choices (Discipline Affinity / Thin-Blood
+    Alchemist) ride through the parser as sheet['merit_grants'] so a resumed
+    draft can restore which Discipline/formula a merit granted; junk keys drop."""
+    import json
+
+    from web.routes.player import _parse_sheet_from_form
+    form = {"merit_grants": json.dumps(
+        {"affinity": "disc_dominate", "alchemist": "Far Reach", "junk": "x"})}
+    sheet = _parse_sheet_from_form(form)
+    assert sheet["merit_grants"] == {"affinity": "disc_dominate", "alchemist": "Far Reach"}

@@ -1603,6 +1603,25 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
                     entry["detail"] = detail
                 flaws.append(entry)
 
+    # Thin-blood merit grants — the player's Discipline-Affinity / Alchemist
+    # choices, kept so a resumed draft can reconstruct which dot/formula a merit
+    # granted (the granted dots themselves ride in the disc/formulae fields).
+    raw = form.get("merit_grants")
+    if raw is not None:
+        try:
+            mg = json.loads(raw)
+        except (ValueError, TypeError):
+            mg = None
+        if isinstance(mg, dict):
+            clean = {}
+            aff = str(mg.get("affinity", "")).strip()[:40]
+            alch = str(mg.get("alchemist", "")).strip()[:80]
+            if aff:
+                clean["affinity"] = aff
+            if alch:
+                clean["alchemist"] = alch
+            sheet["merit_grants"] = clean
+
     # Discipline powers — {discipline: 'disc_auspex', name: 'Heightened Senses', level: 1}
     raw = form.get("powers")
     if raw is not None:

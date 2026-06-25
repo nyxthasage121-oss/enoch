@@ -1599,7 +1599,7 @@
                             :class="(m.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700') + (m.src ? ' opacity-60 cursor-default' : '')"></button>
                   </template>
                 </div>
-                <button type="button" x-show="!m.src" @click="merits.splice(idx, 1)"
+                <button type="button" x-show="!m.src" @click="merits.splice(idx, 1); resolveMeritGrants()"
                         class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
                 <span x-show="m.src" class="text-bone-800 text-xs ml-1 w-3 text-center" title="Granted — managed for you">&#128274;</span>
               </div>
@@ -1607,6 +1607,34 @@
                 <input type="text" maxlength="60" x-model="m.detail"
                        :placeholder="detailPrompt(m.name)"
                        class="mt-1 w-full text-[0.62rem] py-0.5 px-2 border-l-2 border-gold-700/50">
+              </template>
+              {# Thin-blood merit grants — pick the Discipline / formula the merit gives. #}
+              <template x-if="isThinblood() && m.name === 'Discipline Affinity'">
+                <div class="mt-1.5 gilded-inset px-2 py-1.5">
+                  <label class="block text-[0.5rem] tracking-widest uppercase text-gold-600 mb-1">Affinity Discipline — grants 1 dot</label>
+                  <select x-model="meritGrantChoices.affinity" @change="resolveMeritGrants()"
+                          x-init="$nextTick(() => { if (meritGrantChoices.affinity) $el.value = meritGrantChoices.affinity })"
+                          class="text-[0.7rem] py-1 px-2 w-full">
+                    <option value="">— pick a Discipline —</option>
+                    <template x-for="o in affinityDiscOptions()" :key="o.key">
+                      <option :value="o.key" x-text="o.label"></option>
+                    </template>
+                  </select>
+                </div>
+              </template>
+              <template x-if="isThinblood() && m.name === 'Thin-blood Alchemist'">
+                <div class="mt-1.5 gilded-inset px-2 py-1.5">
+                  <p class="text-[0.6rem] text-gold-600 mb-1">Grants +1 Thin-Blood Alchemy dot and one starting formula.</p>
+                  <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-1">Starting Formula</label>
+                  <select x-model="meritGrantChoices.alchemist" @change="resolveMeritGrants()"
+                          x-init="$nextTick(() => { if (meritGrantChoices.alchemist) $el.value = meritGrantChoices.alchemist })"
+                          class="text-[0.7rem] py-1 px-2 w-full">
+                    <option value="">— pick a formula —</option>
+                    <template x-for="p in (disciplinePowers['disc_thin_blood_alchemy'] || [])" :key="p.name">
+                      <option :value="p.name" x-text="p.name + ' · L' + p.level"></option>
+                    </template>
+                  </select>
+                </div>
               </template>
             </div>
           </template>
@@ -1824,6 +1852,7 @@
       <input type="hidden" name="backgrounds" :value="JSON.stringify(backgrounds)">
       <input type="hidden" name="flaws"       :value="JSON.stringify(flaws)">
       <input type="hidden" name="bonus_flaws" :value="JSON.stringify(bonusFlaws)">
+      <input type="hidden" name="merit_grants" :value="JSON.stringify(meritGrantChoices)">
       <input type="hidden" name="loresheets"  :value="JSON.stringify(loresheets)">
 
       {% include "player/partials/wizard_nav.html" %}
@@ -2116,22 +2145,40 @@
             </template>
           </div>
         </template>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
-          <div class="flex items-center gap-2">
-            <input type="text" maxlength="80" x-model="newXpMeritName" list="mf-merits" autocomplete="off"
-                   placeholder="Buy a merit…"
-                   @keydown.enter.prevent="buyXpAdvantage('merit', newXpMeritName); newXpMeritName=''"
-                   class="text-xs py-1 px-2 flex-1">
-            <button type="button" @click="buyXpAdvantage('merit', newXpMeritName); newXpMeritName=''"
-                    class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300 shrink-0">+3 XP</button>
+        <p class="font-garamond text-[0.65rem] text-bone-700 italic mb-2">
+          Type a name and add it at one dot (3 XP), then use the pips above to
+          raise it further.
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
+          <div>
+            <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">Merit</label>
+            <div class="flex items-center gap-2">
+              <input type="text" maxlength="80" x-model="newXpMeritName" list="mf-merits" autocomplete="off"
+                     placeholder="e.g. Resources, Linguistics…"
+                     @keydown.enter.prevent="buyXpAdvantage('merit', newXpMeritName); newXpMeritName=''"
+                     class="text-xs py-1.5 px-2 flex-1">
+              <button type="button" @click="buyXpAdvantage('merit', newXpMeritName); newXpMeritName=''"
+                      :disabled="!newXpMeritName.trim() || xpRemaining < 3"
+                      :class="(!newXpMeritName.trim() || xpRemaining < 3) ? 'opacity-30 cursor-not-allowed' : 'hover:text-gold-300 hover:border-gold-700'"
+                      class="btn-ghost font-cinzel text-[0.55rem] tracking-widest text-gold-500 px-3 py-1.5 shrink-0">
+                + Add <span class="text-bone-600">· 3 XP</span>
+              </button>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <input type="text" maxlength="80" x-model="newXpBackgroundName" list="mf-backgrounds" autocomplete="off"
-                   placeholder="Buy a background…"
-                   @keydown.enter.prevent="buyXpAdvantage('background', newXpBackgroundName); newXpBackgroundName=''"
-                   class="text-xs py-1 px-2 flex-1">
-            <button type="button" @click="buyXpAdvantage('background', newXpBackgroundName); newXpBackgroundName=''"
-                    class="font-cinzel text-[0.55rem] tracking-widest text-gold-500 hover:text-gold-300 shrink-0">+3 XP</button>
+          <div>
+            <label class="block text-[0.5rem] tracking-widest uppercase text-bone-700 mb-0.5">Background</label>
+            <div class="flex items-center gap-2">
+              <input type="text" maxlength="80" x-model="newXpBackgroundName" list="mf-backgrounds" autocomplete="off"
+                     placeholder="e.g. Allies, Haven, Mentor…"
+                     @keydown.enter.prevent="buyXpAdvantage('background', newXpBackgroundName); newXpBackgroundName=''"
+                     class="text-xs py-1.5 px-2 flex-1">
+              <button type="button" @click="buyXpAdvantage('background', newXpBackgroundName); newXpBackgroundName=''"
+                      :disabled="!newXpBackgroundName.trim() || xpRemaining < 3"
+                      :class="(!newXpBackgroundName.trim() || xpRemaining < 3) ? 'opacity-30 cursor-not-allowed' : 'hover:text-gold-300 hover:border-gold-700'"
+                      class="btn-ghost font-cinzel text-[0.55rem] tracking-widest text-gold-500 px-3 py-1.5 shrink-0">
+                + Add <span class="text-bone-600">· 3 XP</span>
+              </button>
+            </div>
           </div>
         </div>
         <p x-show="newXpAdvError" x-cloak x-text="newXpAdvError" class="font-garamond text-blood-400 text-[0.6rem] mt-1"></p>
@@ -2574,6 +2621,12 @@
       predatorChoices:   (initial.predator_choices && typeof initial.predator_choices === 'object')
                            ? Object.assign({}, initial.predator_choices) : {},
       _predatorDisc:     null,
+      // Thin-blood merit grants (Discipline Affinity / Thin-Blood Alchemist):
+      // the player's choices persist in the sheet; _meritGrantDiscs tracks the
+      // granted dots for idempotent revert, mirroring _predatorDisc.
+      meritGrantChoices: (seededSheet.merit_grants && typeof seededSheet.merit_grants === 'object')
+                           ? Object.assign({}, seededSheet.merit_grants) : {},
+      _meritGrantDiscs:  {},
       // Skill / Discipline distribution choices — guidance + live trackers.
       skillSpread:       initial.skill_spread || '',
       disciplineSpread:  initial.discipline_spread || '',
@@ -2782,6 +2835,16 @@
             }
           });
         }
+        // Mirror the above for thin-blood merit grants: a resumed draft already
+        // has the granted dot folded into the sheet, so just re-establish the
+        // tracking (no re-apply) so a later remove reverts cleanly.
+        if (this.isThinblood()) {
+          const _has = n => this.merits.some(m => (m.name || '').toLowerCase() === n);
+          if (_has('thin-blood alchemist'))
+            this._meritGrantDiscs.disc_thin_blood_alchemy = 1;
+          if (_has('discipline affinity') && this.meritGrantChoices.affinity)
+            this._meritGrantDiscs[this.meritGrantChoices.affinity] = 1;
+        }
         // Reconcile the clan Bane flaw on load (resumed drafts already carry
         // it tagged src:'clan_bane'; this strips + re-applies so it's exactly
         // once and matches the current clan). Top up a pool Bane (Hecata
@@ -2985,6 +3048,49 @@
       _pushGrantList(list, name, dots) {
         const arr = this[list];
         if (Array.isArray(arr)) arr.push({ name, dots, src: 'predator' });
+      },
+
+      // ── Thin-blood merit grants ───────────────────────────────────────
+      // Discipline Affinity → +1 dot in a chosen Discipline; Thin-Blood
+      // Alchemist → +1 Thin-Blood Alchemy dot + one starting formula. Both are
+      // thin-blood-only. Idempotent: revert the prior grant, then re-apply from
+      // the current merits + choices (mirrors resolvePredatorGrants).
+      resolveMeritGrants() {
+        Object.entries(this._meritGrantDiscs || {}).forEach(([k, n]) => {
+          this.sheet[k] = Math.max(0, (this.sheet[k] || 0) - n);
+        });
+        this._meritGrantDiscs = {};
+        this.formulae = (this.formulae || []).filter(f => f.src !== 'merit');
+        if (!this.isThinblood()) return;
+        const has = n => this.merits.some(m => (m.name || '').toLowerCase() === n);
+        if (has('thin-blood alchemist')) {
+          this.sheet.disc_thin_blood_alchemy = (this.sheet.disc_thin_blood_alchemy || 0) + 1;
+          this._meritGrantDiscs.disc_thin_blood_alchemy = 1;
+          const f = this.meritGrantChoices.alchemist;
+          if (f) {
+            const pw = (this.disciplinePowers['disc_thin_blood_alchemy'] || []).find(p => p.name === f);
+            this.formulae.push({ name: f, level: (pw && pw.level) || 1, src: 'merit' });
+          }
+        }
+        if (has('discipline affinity')) {
+          const d = this.meritGrantChoices.affinity;
+          if (d) {
+            this.sheet[d] = (this.sheet[d] || 0) + 1;
+            this._meritGrantDiscs[d] = 1;
+          }
+        }
+      },
+      // Real Disciplines (not Alchemy) a Discipline-Affinity pick can land on.
+      affinityDiscOptions() {
+        const labels = {
+          disc_animalism: 'Animalism', disc_auspex: 'Auspex',
+          disc_blood_sorcery: 'Blood Sorcery', disc_celerity: 'Celerity',
+          disc_dominate: 'Dominate', disc_fortitude: 'Fortitude',
+          disc_obfuscate: 'Obfuscate', disc_oblivion: 'Oblivion',
+          disc_potence: 'Potence', disc_presence: 'Presence',
+          disc_protean: 'Protean',
+        };
+        return Object.keys(labels).map(k => ({ key: k, label: labels[k] }));
       },
 
       // ── Skill spread tracker ──────────────────────────────────────────
@@ -3714,6 +3820,7 @@
       },
       addMerit() {
         if (this._addTrait('merits', this.newMeritName, n => this.meritByName(n))) this.newMeritName = '';
+        this.resolveMeritGrants();
       },
       addAdvantage() {
         if (this._addTrait('advantages', this.newAdvantageName, n => this.meritByName(n))) this.newAdvantageName = '';
