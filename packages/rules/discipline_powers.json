@@ -1671,10 +1671,38 @@
   ],
   "disc_thin_blood_alchemy": [
     {
+      "name": "Body Paint",
+      "level": 1,
+      "summary": "create supernatural tattoo fluid that can mark skin permanently or reshape itself",
+      "dice_pool": "Dexterity + Craft / Stamina + Resolve",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Checkout Time",
+      "level": 1,
+      "summary": "place a vampire into corpse-like torpor until a written end time, protecting them from daylight mishaps",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Elevate",
+      "level": 1,
+      "summary": "brew a euphoric party drug that sharpens Dexterity and intensifies sensation",
+      "dice_pool": "Stamina + Alchemy",
+      "rouse_checks": 1
+    },
+    {
       "name": "Far Reach",
       "level": 1,
       "summary": "use your mind to grab, hold, and push objects or people without touching them",
       "dice_pool": "Resolve + Alchemy",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Food Stain",
+      "level": 1,
+      "summary": "mark a vessel so you can recognize the next person who drinks from them",
+      "dice_pool": "",
       "rouse_checks": 1
     },
     {
@@ -1711,6 +1739,34 @@
       "summary": "change your gender permanently through alchemical transformation",
       "dice_pool": "",
       "rouse_checks": 0
+    },
+    {
+      "name": "Speak from the Heart",
+      "level": 1,
+      "summary": "hide a short message, image, or emotion in a carrier's blood for the next drinker",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Advanced Torpor",
+      "level": 2,
+      "summary": "induce torpor that improves healing chances and can preserve Hunger for thin-bloods",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Blacklight Surprise",
+      "level": 2,
+      "summary": "make ultraviolet light burn vampires like weak sunlight and provoke terror frenzy",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Blue State",
+      "level": 2,
+      "summary": "make a target fixate on the next betrayal or Conviction breach by an ally",
+      "dice_pool": "",
+      "rouse_checks": 1
     },
     {
       "name": "Envelop",
@@ -1762,10 +1818,45 @@
       "rouse_checks": 0
     },
     {
+      "name": "Diamond Skin",
+      "level": 3,
+      "summary": "harden skin so some cutting, piercing, or impact aggravated damage becomes superficial",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Fireskin",
+      "level": 3,
+      "summary": "superheat your body, ignore fire for a scene, and add fire damage to touch attacks",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Hospital Chains",
+      "level": 3,
+      "summary": "prevent an injured target from healing physical damage for several days",
+      "dice_pool": "Distillation vs Stamina",
+      "rouse_checks": 1
+    },
+    {
       "name": "Mandagloire",
       "level": 3,
       "summary": "emit noxious gas that paralyzes mortals and cramps supernatural creatures",
       "dice_pool": "Stamina + Alchemy",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Martian Purity",
+      "level": 3,
+      "summary": "burn a blood-borne infection out through the carrier's skin in a painful flare",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Mask Off",
+      "level": 3,
+      "summary": "create gas that strips Blush of Life from true vampires caught in the blast",
+      "dice_pool": "Distillation vs Stamina + Resolve",
       "rouse_checks": 1
     },
     {
@@ -1797,10 +1888,31 @@
       "rouse_checks": 1
     },
     {
+      "name": "TLC",
+      "level": 3,
+      "summary": "treat animal blood so vampires can feed from it as though it were human blood",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Troll the Pious",
+      "level": 3,
+      "summary": "coat a person, object, or place with paste that unsettles the religious and torments the faithful",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
       "name": "Airborne Momentum",
       "level": 4,
       "summary": "lift yourself from the ground, achieving a state of swift flight or floating",
       "dice_pool": "Strength + Alchemy",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Copycat",
+      "level": 4,
+      "summary": "blur your face and hair toward a blood donor's appearance for a brief disguise",
+      "dice_pool": "Intelligence + Awareness",
       "rouse_checks": 1
     },
     {
@@ -1811,10 +1923,24 @@
       "rouse_checks": 0
     },
     {
+      "name": "Half-Living Conductor",
+      "level": 4,
+      "summary": "ignore electrical harm and redirect electricity as a ranged alchemical attack",
+      "dice_pool": "Stamina + Alchemy / Dexterity + Alchemy",
+      "rouse_checks": 1
+    },
+    {
       "name": "Juice Box",
       "level": 4,
       "summary": "distill any thin-blood alchemy formula using methuselah vitae so that any Duskborn or Kindred can benefit from it; brew rests in a juice box for 24 hours; all activation costs, dice pools, and duration apply per the original formula",
       "dice_pool": "Stamina + Alchemy",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Red State",
+      "level": 4,
+      "summary": "erase a target's memory of one trusted ally's next betrayal or harmful act",
+      "dice_pool": "",
       "rouse_checks": 1
     },
     {
@@ -1829,6 +1955,13 @@
       "level": 4,
       "summary": "secrete caustic bile that corrodes materials and enhances touch attacks",
       "dice_pool": "Strength or Dexterity + Alchemy",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Vitae MSG",
+      "level": 4,
+      "summary": "make a vessel's blood irresistibly appetizing, pressuring nearby vampires to feed",
+      "dice_pool": "",
       "rouse_checks": 1
     },
     {
@@ -1863,6 +1996,13 @@
       "name": "Moment of Clarity",
       "level": 5,
       "summary": "temporarily sharpen mental focus, resist mental Disciplines, and avoid bestial interference",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "Saturn's Flux",
+      "level": 5,
+      "summary": "break a Blood Bond within a day through a painful and politically dangerous purge",
       "dice_pool": "",
       "rouse_checks": 1
     }
