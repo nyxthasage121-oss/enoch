@@ -653,6 +653,7 @@ async def char_detail(
         companions = list_companions(conn, character_id)
         char_familiars = list_character_familiars(conn, character_id)
         settings = dict(get_settings(conn) or {})
+        players = list_all_players(conn)
 
     # RAW chargen lint — only meaningful before approval. Once approved a
     # character may legitimately pass creation limits through play, so we
@@ -682,7 +683,7 @@ async def char_detail(
         request, "staff/character_detail.html",
         _ctx(request, char=char, claims=claims, spends=spends, ledger=ledger,
              raw_errors=raw_errors, companions=companions,
-             char_familiars=char_familiars,
+             char_familiars=char_familiars, players=players,
              v5_attributes=V5_ATTRIBUTES, v5_skills=V5_SKILLS,
              v5_disciplines=V5_DISCIPLINES,
              active_bane=active_clan_bane(
@@ -1053,6 +1054,30 @@ async def do_retire_char(
     if affected:
         msg += f" Suspended their contributions to {len(affected)} coterie/coteries."
     request.session["flash"] = [{"kind": "info", "message": msg}]
+    return RedirectResponse(url=f"/staff/characters/{character_id}", status_code=303)
+
+
+@router.post("/characters/{character_id}/transfer", response_class=HTMLResponse)
+async def do_transfer_char(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_permission("edit_character")),
+    _: None = Depends(csrf_protect),
+):
+    """Reassign a character to another player — the new owner is picked from the
+    registered-players list. The character moves to their roster on next visit."""
+    from ..db import transfer_character
+    form = await request.form()
+    new_discord_id = (form.get("new_discord_id") or "").strip()
+    try:
+        with get_db() as conn:
+            char = transfer_character(conn, character_id, new_discord_id, actor_id=user["id"])
+        request.session["flash"] = [{
+            "kind": "success",
+            "message": f"\"{char['name']}\" transferred to "
+                       f"{char.get('player_username') or new_discord_id}."}]
+    except ValueError as e:
+        request.session["flash"] = [{"kind": "error", "message": str(e)}]
     return RedirectResponse(url=f"/staff/characters/{character_id}", status_code=303)
 
 

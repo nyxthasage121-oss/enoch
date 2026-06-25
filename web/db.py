@@ -625,6 +625,31 @@ def update_character(conn, character_id: int, **fields) -> dict:
     return get_character(conn, character_id)
 
 
+def transfer_character(conn, character_id: int, new_discord_id: str,
+                       new_username: str | None = None,
+                       actor_id: str | None = None) -> dict:
+    """Reassign a character to another player (staff action). Repoints the
+    character's discord_id, creating the new owner's profile if they're not
+    registered yet (without clobbering an existing username), and audits it.
+    Raises ValueError on a bad/duplicate target. Returns the updated character."""
+    char = get_character(conn, character_id)
+    if not char:
+        raise ValueError("Character not found.")
+    old = str(char.get("discord_id") or "")
+    new = str(new_discord_id or "").strip()
+    if not new.isdigit():
+        raise ValueError("Enter a valid Discord user ID.")
+    if new == old:
+        raise ValueError("That player already owns this character.")
+    if get_player(conn, new) is None:
+        upsert_player(conn, new, new_username or new)
+    conn.execute("UPDATE characters SET discord_id=?, updated_at=? WHERE id=?",
+                 (new, _now(), character_id))
+    write_audit(conn, actor_id, "transfer_character", "character", character_id,
+                before={"discord_id": old}, after={"discord_id": new})
+    return get_character(conn, character_id)
+
+
 def apply_character_state_delta(conn, character_id: int, *,
                                 damage_health_sup: int = 0, damage_health_agg: int = 0,
                                 damage_willpower_sup: int = 0, damage_willpower_agg: int = 0,

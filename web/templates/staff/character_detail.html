@@ -924,6 +924,31 @@
         </details>
       </div>
 
+      {# Transfer ownership — reassign the character to another registered player. #}
+      {% if 'edit_character' in viewer_perms %}
+      <div class="gilded border border-ink-700 p-5">
+        <p class="label-gold mb-1">Transfer Character</p>
+        <p class="font-garamond text-bone-600 text-sm mb-3 leading-relaxed">
+          Reassign <span class="text-bone-300">{{ char.name }}</span> to another player — they take
+          over ownership and it moves to their roster.
+          {% if char.player_username or char.discord_id %}Currently
+          <span class="text-bone-400">{{ char.player_username or char.discord_id }}</span>.{% endif %}
+        </p>
+        <form method="post" action="/staff/characters/{{ char.id }}/transfer"
+              class="flex flex-wrap items-end gap-2"
+              onsubmit="return confirm('Transfer this character to the selected player?');">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <select name="new_discord_id" required class="text-sm grow min-w-[12rem]">
+            <option value="" disabled selected>Transfer to…</option>
+            {% for p in players|default([]) if p.discord_id != char.discord_id %}
+            <option value="{{ p.discord_id }}">{{ p.username }} ({{ p.discord_id }})</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn-ghost font-cinzel tracking-widest text-xs px-4 py-2">Transfer</button>
+        </form>
+      </div>
+      {% endif %}
+
       {# Danger zone #}
       <div class="gilded border border-ink-700 p-5" x-data="{ confirming: false }">
         <p class="label-gold mb-1 text-bone-600">Danger Zone</p>
