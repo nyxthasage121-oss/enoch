@@ -2138,6 +2138,10 @@ def _admin_ctx_extras() -> dict:
         list_hunting_sites, _TIER_DEFAULTS,
     )
     from ..v5_traits import V5_SITE_PREDATOR_TYPES
+    from ..settings_enums import (
+        CREATION_MODE_OPTIONS, PROJECT_MODE_OPTIONS,
+        RESONANCE_MODE_OPTIONS, RULESET_OPTIONS,
+    )
     with get_db() as conn:
         restrictions = list_restrictions(conn)
     # Flatten restrictions into a {(type, id): mode} dict the template can
@@ -2170,6 +2174,11 @@ def _admin_ctx_extras() -> dict:
             "coteries":              _all_coteries_for_picker(conn),
             "predator_types":        V5_SITE_PREDATOR_TYPES,
             "boroughs":              _BOROUGHS,
+            # Admin dropdown options — single source in settings_enums.py
+            "creation_mode_options":  CREATION_MODE_OPTIONS,
+            "ruleset_options":        RULESET_OPTIONS,
+            "resonance_mode_options": RESONANCE_MODE_OPTIONS,
+            "project_mode_options":   PROJECT_MODE_OPTIONS,
         }
 
 
@@ -2294,7 +2303,7 @@ async def admin_settings_save(
     # if the form somehow sends an unknown value. For back-compat with
     # the legacy use_homebrew_rules checkbox, if it's posted without an
     # explicit active_ruleset, infer 'homebrew'.
-    from ..db import RULESETS
+    from ..db import CREATION_MODES, RULESETS
     active_ruleset = (form.get("active_ruleset") or "").strip().lower()
     # In Memoriam is now an orthogonal flag (migration 040). A legacy
     # 'in_memoriam' base value means Standard base + IM on.
@@ -2309,7 +2318,7 @@ async def admin_settings_save(
         active_ruleset = "standard"
     # Creation mode — guided (wizard enforces the standard) vs open (free entry).
     creation_mode = (form.get("creation_mode") or "guided").strip().lower()
-    if creation_mode not in ("guided", "open"):
+    if creation_mode not in CREATION_MODES:
         creation_mode = "guided"
 
     payload: dict = {

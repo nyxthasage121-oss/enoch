@@ -132,18 +132,15 @@
             with no enforcement — use it to launch with existing or imported sheets.
           </p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {% for val, label, desc in [
-              ('guided', 'Guided creation', 'Wizard enforces RAW / In Memoriam / Homebrew'),
-              ('open',   'Open entry',      'Players just enter their sheet — nothing enforced'),
-            ] %}
+            {% for opt in creation_mode_options %}
             <label class="flex items-start gap-2 gilded-inset px-3 py-2 cursor-pointer hover:border-gold-700 transition-colors"
-                   :class="creationMode === '{{ val }}' ? 'border-gold-700' : ''">
-              <input type="radio" name="creation_mode" value="{{ val }}"
+                   :class="creationMode === '{{ opt.value }}' ? 'border-gold-700' : ''">
+              <input type="radio" name="creation_mode" value="{{ opt.value }}"
                      x-model="creationMode"
                      class="accent-gold mt-0.5">
               <div>
-                <p class="font-cinzel text-xs text-bone-200">{{ label }}</p>
-                <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">{{ desc }}</p>
+                <p class="font-cinzel text-xs text-bone-200">{{ opt.label }}</p>
+                <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">{{ opt.desc }}</p>
               </div>
             </label>
             {% endfor %}
@@ -165,18 +162,15 @@
             budgets below so the chronicle can tune each archetype.
           </p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-            {% for val, label, desc in [
-              ('standard',  'Standard',  'V5 RAW defaults'),
-              ('homebrew',  'Homebrew',  'Chronicle-tuned budgets'),
-            ] %}
+            {% for opt in ruleset_options %}
             <label class="flex items-start gap-2 gilded-inset px-3 py-2 cursor-pointer hover:border-gold-700 transition-colors"
-                   :class="baseRuleset === '{{ val }}' ? 'border-gold-700' : ''">
-              <input type="radio" name="active_ruleset" value="{{ val }}"
+                   :class="baseRuleset === '{{ opt.value }}' ? 'border-gold-700' : ''">
+              <input type="radio" name="active_ruleset" value="{{ opt.value }}"
                      x-model="baseRuleset"
                      class="accent-gold mt-0.5">
               <div>
-                <p class="font-cinzel text-xs text-bone-200">{{ label }}</p>
-                <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">{{ desc }}</p>
+                <p class="font-cinzel text-xs text-bone-200">{{ opt.label }}</p>
+                <p class="font-garamond text-[0.65rem] text-bone-600 mt-0.5">{{ opt.desc }}</p>
               </div>
             </label>
             {% endfor %}
@@ -215,12 +209,8 @@
         <div class="gilded-inset px-3 py-2">
           <label class="font-cinzel text-xs text-bone-200 block mb-1" for="resonance_mode">Resonance Table</label>
           <select name="resonance_mode" id="resonance_mode" class="w-full text-xs">
-            {% for val, lbl in [
-              ('standard', 'Standard — V5 core'),
-              ('tattered_facade', 'Tattered Facade — alternate Disciplines'),
-              ('add_empty', 'Add Empty — +1-in-6 Empty resonance'),
-            ] %}
-            <option value="{{ val }}" {{ 'selected' if _cs.get('resonance_mode', 'standard') == val else '' }}>{{ lbl }}</option>
+            {% for opt in resonance_mode_options %}
+            <option value="{{ opt.value }}" {{ 'selected' if _cs.get('resonance_mode', 'standard') == opt.value else '' }}>{{ opt.label }}</option>
             {% endfor %}
           </select>
           <p class="font-garamond text-[0.65rem] text-bone-600 mt-1">
@@ -515,10 +505,9 @@
           {% set _pm = _cs.get('project_mode', 'nybn') %}
           <label class="label-gold block mb-1.5 text-[0.7rem]">Project mode</label>
           <select name="project_mode" x-model="pm" class="w-64 text-sm py-1.5 px-2">
-            <option value="nybn" {{ 'selected' if _pm == 'nybn' else '' }}>NYbN — multi-stage extended test</option>
-            <option value="homebrew" {{ 'selected' if _pm == 'homebrew' else '' }}>Homebrew — staff-set goal, optional launch</option>
-            <option value="off"  {{ 'selected' if _pm == 'off' else '' }}>Off — Projects disabled</option>
-            <option value="raw" {{ 'selected' if _pm == 'raw' else '' }} {{ '' if _pm == 'raw' else 'disabled' }}>RAW — coming soon</option>
+            {% for opt in project_mode_options %}
+            <option value="{{ opt.value }}" {{ 'selected' if _pm == opt.value else '' }} {{ 'disabled' if opt.disabled and _pm != opt.value else '' }}>{{ opt.label }}</option>
+            {% endfor %}
           </select>
           <p class="font-garamond text-bone-600 text-xs mt-1 italic">
             How downtime Projects work chronicle-wide. "Off" hides Projects everywhere

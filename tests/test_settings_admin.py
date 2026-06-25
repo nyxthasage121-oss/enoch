@@ -240,6 +240,17 @@ def test_admin_pickers_render_with_bot_data(staff, monkeypatch):
     assert 'value="900"' in r.text and "Storyteller" in r.text
 
 
+def test_admin_renders_enum_driven_options(staff):
+    """The four admin dropdowns render from settings_enums (single source) —
+    their labels/descriptions must still appear in the page."""
+    r = staff.get("/staff/admin")
+    assert r.status_code == 200
+    assert "Guided creation" in r.text and "Open entry" in r.text       # creation_mode
+    assert "Chronicle-tuned budgets" in r.text                          # ruleset desc
+    assert "Add Empty — +1-in-6 Empty resonance" in r.text              # resonance_mode
+    assert "NYbN — multi-stage extended test" in r.text                 # project_mode
+
+
 def test_export_requires_settings_admin(staff, monkeypatch):
     """The full chronicle export (characters/claims/spends/ledger/audit log)
     is settings-admin only — a staff_role without the flag is blocked, since

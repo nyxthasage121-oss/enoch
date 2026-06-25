@@ -1118,12 +1118,14 @@ def coterie_max_members(conn) -> int:
     return val if val > 0 else settings.COTERIE_MAX_MEMBERS
 
 
-# Chronicle ruleset constants — gives the rest of the app a single place
-# to look up valid values + the V5 RAW defaults.
-RULESETS = ("standard", "homebrew")  # base budget rulesets. In Memoriam is no
-# longer a mutually-exclusive ruleset value (migration 040) — it's an orthogonal
-# `in_memoriam_enabled` flag layered on top of either base, so a chronicle can
-# offer Standard AND In Memoriam and let Ancilla players choose.
+# Chronicle settings enums (value/label/description) live in ONE place —
+# settings_enums.py — so the admin form and these validators never drift. The
+# value collections are re-exported here under their historical names for the
+# rest of the app. (In Memoriam is NOT a ruleset value since migration 040 —
+# it's an orthogonal `in_memoriam_enabled` flag layered on top of either base.)
+from .settings_enums import (  # noqa: E402
+    CREATION_MODES, PROJECT_MODES, RESONANCE_MODES, RULESETS,
+)
 
 # Per-tier budget defaults used when the chronicle is on the standard
 # ruleset or hasn't customized that tier yet. Values reflect V5 RAW
@@ -1254,7 +1256,7 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         raise ValueError(f"Unknown ruleset: {kwargs['active_ruleset']!r}")
     if "resonance_mode" in kwargs and kwargs["resonance_mode"] not in RESONANCE_MODES:
         raise ValueError(f"Unknown resonance mode: {kwargs['resonance_mode']!r}")
-    if "creation_mode" in kwargs and kwargs["creation_mode"] not in ("guided", "open"):
+    if "creation_mode" in kwargs and kwargs["creation_mode"] not in CREATION_MODES:
         raise ValueError(f"Unknown creation_mode: {kwargs['creation_mode']!r}")
     # Serialize lists/dicts before insert (revenant_families is a JSON column)
     safe_raw = {k: v for k, v in kwargs.items() if k in ALLOWED}
@@ -5026,9 +5028,6 @@ def add_project_note(conn, project_id: int, staff_id: str, text: str) -> dict:
     return get_project(conn, project_id)
 
 
-PROJECT_MODES = {"nybn", "homebrew", "raw", "off"}
-
-
 def get_project_mode(conn) -> str:
     """Chronicle-wide project ruleset (migration 043). Defaults to 'nybn'."""
     mode = ((get_settings(conn) or {}).get("project_mode") or "nybn").strip().lower()
@@ -5038,9 +5037,6 @@ def get_project_mode(conn) -> str:
 def projects_enabled(conn) -> bool:
     """False when the chronicle has Projects turned off."""
     return get_project_mode(conn) != "off"
-
-
-RESONANCE_MODES = ("standard", "tattered_facade", "add_empty")
 
 
 def get_resonance_mode(conn) -> str:
