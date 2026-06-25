@@ -72,6 +72,26 @@ def test_bonus_flaws_excluded_from_creation_cap():
     assert any("Flaws total" in e for e in errs2), errs2
 
 
+def test_pool_upgraded_grant_counts_only_delta():
+    """A predator grant upgraded with creation dots (Beautiful 2 → Stunning 4,
+    src='predator', granted_dots=2) charges only the 2-dot delta to the
+    Advantages pool — the granted base stays free."""
+    from web.v5_traits import validate_chargen_raw
+    # backgrounds 5 (Allies 3 + Resources 2) + Stunning delta (4-2) = 7 = pool.
+    s = _valid_sheet()
+    s["merits"] = [{"name": "Stunning", "dots": 4, "src": "predator", "granted_dots": 2}]
+    assert validate_chargen_raw(s, advantage_pool=7, flaw_cap=2, flaw_min=2) == []
+    # The same Stunning as a plain player merit charges all 4 dots → 5+4=9 > 7.
+    s2 = _valid_sheet()
+    s2["merits"] = [{"name": "Stunning", "dots": 4}]
+    errs = validate_chargen_raw(s2, advantage_pool=7, flaw_cap=2, flaw_min=2)
+    assert any("Advantages" in e and "limit" in e for e in errs), errs
+    # A fully-granted Stunning (no granted_dots → all free) stays free.
+    s3 = _valid_sheet()
+    s3["merits"] = [{"name": "Stunning", "dots": 4, "src": "predator"}]
+    assert validate_chargen_raw(s3, advantage_pool=7, flaw_cap=2, flaw_min=2) == []
+
+
 def test_xp_buys_are_subtracted_to_base():
     """A trait raised by starting XP keeps its BASE within the spread."""
     from web.v5_traits import validate_chargen_raw

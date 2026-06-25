@@ -1557,6 +1557,16 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
             # flaws list with a bonus flag so they round-trip on edit/save.
             if it.get("bonus") is True:
                 entry["bonus"] = True
+            # A granted trait upgraded with creation dots (Beautiful → Stunning)
+            # keeps its src but records how many dots are the free granted base;
+            # dots above that count against the Advantages pool.
+            if entry.get("src"):
+                try:
+                    gd = int(it.get("granted_dots"))
+                    if gd > 0:
+                        entry["granted_dots"] = min(5, gd)
+                except (TypeError, ValueError):
+                    pass
             cleaned.append(entry)
         sheet[list_key] = cleaned
 

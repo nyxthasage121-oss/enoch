@@ -1105,7 +1105,7 @@ def validate_chargen_raw(
         def _player_dots(list_key: str) -> int:
             total = 0
             for it in (sheet.get(list_key) or []):
-                if not (isinstance(it, dict) and not it.get("src")):
+                if not isinstance(it, dict):
                     continue
                 # Extra "narrative" flaws a player tacks on in the Advance step
                 # are marked bonus and don't count toward the creation cap.
@@ -1116,9 +1116,21 @@ def validate_chargen_raw(
                 if str(it.get("name", "")).strip().lower() in _TB_RESTRICTED_NAMES:
                     continue
                 try:
-                    total += int(it.get("dots", 0) or 0)
+                    dots = int(it.get("dots", 0) or 0)
                 except (TypeError, ValueError):
-                    pass
+                    continue
+                if it.get("src"):
+                    # Granted dots are free, EXCEPT the portion a creation-dot
+                    # upgrade (Beautiful → Stunning) added above the granted base
+                    # recorded in granted_dots.
+                    try:
+                        free = int(it.get("granted_dots"))
+                    except (TypeError, ValueError):
+                        continue   # fully granted → no pool cost
+                    dots = max(0, dots - free)
+                    if dots <= 0:
+                        continue
+                total += dots
             return total
 
         # Loresheets count the same as Merits/Backgrounds — they draw the same

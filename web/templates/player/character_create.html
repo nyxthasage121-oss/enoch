@@ -2205,8 +2205,9 @@
         <div class="gilded p-5 mb-5">
           <p class="label-gold mb-1 text-xs">Upgrade Granted Traits</p>
           <p class="font-garamond text-[0.65rem] text-bone-700 italic mb-3">
-            A free granted trait can be upgraded to a stronger version in the same
-            family — you pay only the XP difference.
+            A free granted trait (e.g. a predator's Beautiful) can be upgraded to a
+            stronger version in the same family. Pay the difference with your free
+            creation dots, or with Starting XP — whichever you'd rather spend.
           </p>
           <template x-for="g in grantedUpgradeOptions()" :key="g.baseName">
             <div class="py-1.5 border-b border-ink-800 last:border-0">
@@ -2217,12 +2218,24 @@
                         x-text="'(from ' + g.baseName + ')'"></span>
                 </span>
                 <template x-for="opt in g.options" :key="opt.name">
-                  <button type="button" @click="applyUpgrade(g.entry, g.baseName, g.baseDots, opt.name)"
-                          :disabled="upgradeDeltaXp(g.baseDots, opt) > xpRemaining"
-                          :class="upgradeDeltaXp(g.baseDots, opt) > xpRemaining ? 'opacity-30 cursor-not-allowed' : 'hover:text-gold-400 hover:border-gold-700'"
-                          class="font-cinzel text-[0.55rem] tracking-widest text-bone-400 border border-ink-600 px-2 py-1">
-                    → <span x-text="opt.name"></span> · <span x-text="upgradeDeltaXp(g.baseDots, opt)"></span> XP
-                  </button>
+                  <span class="inline-flex items-center gap-1 mr-1">
+                    {# Pay the delta from the free creation Advantage pool. #}
+                    <button type="button" @click="applyUpgrade(g.entry, g.baseName, g.baseDots, opt.name, 'pool')"
+                            :disabled="upgradeDeltaDots(g.baseDots, opt) > advPoolRemaining()"
+                            :class="upgradeDeltaDots(g.baseDots, opt) > advPoolRemaining() ? 'opacity-30 cursor-not-allowed' : 'hover:text-gold-400 hover:border-gold-700'"
+                            class="font-cinzel text-[0.55rem] tracking-widest text-bone-400 border border-ink-600 px-2 py-1">
+                      → <span x-text="opt.name"></span> ·
+                      <span x-text="upgradeDeltaDots(g.baseDots, opt)"></span>
+                      free dot<span x-show="upgradeDeltaDots(g.baseDots, opt) !== 1">s</span>
+                    </button>
+                    {# Or pay the XP difference. #}
+                    <button type="button" @click="applyUpgrade(g.entry, g.baseName, g.baseDots, opt.name, 'xp')"
+                            :disabled="upgradeDeltaXp(g.baseDots, opt) > xpRemaining"
+                            :class="upgradeDeltaXp(g.baseDots, opt) > xpRemaining ? 'opacity-30 cursor-not-allowed' : 'hover:text-gold-400 hover:border-gold-700'"
+                            class="font-cinzel text-[0.55rem] tracking-widest text-bone-400 border border-ink-600 px-2 py-1">
+                      → <span x-text="opt.name"></span> · <span x-text="upgradeDeltaXp(g.baseDots, opt)"></span> XP
+                    </button>
+                  </span>
                 </template>
                 <button type="button" x-show="isUpgraded(g.entry)" @click="refundUpgrade(g.entry)"
                         class="font-cinzel text-[0.55rem] tracking-widest text-blood-500 hover:text-blood-400 ml-1">Refund</button>
@@ -3160,24 +3173,60 @@
         return out;
       },
       upgradeDeltaXp(baseDots, target) {
-        return Math.max(0, ((target.costs && target.costs[0]) || baseDots) - baseDots) * 3;
+        return this.upgradeDeltaDots(baseDots, target) * 3;
+      },
+      upgradeDeltaDots(baseDots, target) {
+        return Math.max(0, ((target.costs && target.costs[0]) || baseDots) - baseDots);
+      },
+      // Free Advantage dots still unspent in the creation pool (combined
+      // Merits + Backgrounds + Advantages), for the "use free dots" upgrade path.
+      advPoolRemaining() {
+        const b = this.budgets, u = this.budgetUsed;
+        return (b.merits + b.advantages + b.backgrounds)
+             - (u.merits + u.advantages + u.backgrounds + u.loresheets);
       },
       isUpgraded(entry) { return !!entry._upgradeFrom; },
-      applyUpgrade(entry, baseName, baseDots, targetName) {
+      // Upgrade a granted trait (e.g. the predator's free Beautiful → Stunning).
+      // fund='pool' pays the dot delta from the creation Advantages pool — the
+      // granted base stays free (entry keeps src + records granted_dots);
+      // fund='xp' pays the XP difference in the Advance step instead.
+      applyUpgrade(entry, baseName, baseDots, targetName, fund) {
         const target = this._mfCatalogByName()[(targetName || '').toLowerCase()];
         if (!target) return;
-        const cost = this.upgradeDeltaXp(baseDots, target);
+        const targetDots = (target.costs && target.costs[0]) || baseDots;
         const key = 'upg:' + baseName.toLowerCase();
-        const prior = this.xpBuys.filter(b => b.key === key).reduce((s, b) => s + b.cost, 0);
-        if (cost - prior > this.xpRemaining) { this.upgradeError = 'Not enough XP to upgrade.'; return; }
-        this.upgradeError = '';
-        if (!entry._upgradeFrom) entry._upgradeFrom = { name: baseName, dots: baseDots };
-        entry.name = target.name;
-        entry.dots = (target.costs && target.costs[0]) || baseDots;
-        for (let i = this.xpBuys.length - 1; i >= 0; i--) {
-          if (this.xpBuys[i].key === key) this.xpBuys.splice(i, 1);
+        const clearXp = () => {
+          for (let i = this.xpBuys.length - 1; i >= 0; i--) {
+            if (this.xpBuys[i].key === key) this.xpBuys.splice(i, 1);
+          }
+        };
+        if (fund === 'pool') {
+          // Dots this upgrade adds above what it already draws from the pool.
+          const already = (entry.granted_dots != null)
+            ? Math.max(0, (entry.dots || 0) - entry.granted_dots) : 0;
+          const need = this.upgradeDeltaDots(baseDots, target) - already;
+          if (need > this.advPoolRemaining()) {
+            this.upgradeError = 'Not enough free creation dots — refund an Advantage first.';
+            return;
+          }
+          this.upgradeError = '';
+          if (!entry._upgradeFrom) entry._upgradeFrom = { name: baseName, dots: baseDots };
+          clearXp();
+          entry.name = target.name;
+          entry.dots = targetDots;
+          entry.granted_dots = baseDots;   // the free, granted base
+        } else {
+          const cost = this.upgradeDeltaXp(baseDots, target);
+          const prior = this.xpBuys.filter(b => b.key === key).reduce((s, b) => s + b.cost, 0);
+          if (cost - prior > this.xpRemaining) { this.upgradeError = 'Not enough XP to upgrade.'; return; }
+          this.upgradeError = '';
+          if (!entry._upgradeFrom) entry._upgradeFrom = { name: baseName, dots: baseDots };
+          delete entry.granted_dots;       // XP-funded — don't also charge the pool
+          entry.name = target.name;
+          entry.dots = targetDots;
+          clearXp();
+          this.xpBuys.push({ cat: 'upgrade', key, label: baseName + ' → ' + target.name, cost });
         }
-        this.xpBuys.push({ cat: 'upgrade', key, label: baseName + ' → ' + target.name, cost });
       },
       refundUpgrade(entry) {
         if (!entry._upgradeFrom) return;
@@ -3185,6 +3234,7 @@
         entry.name = entry._upgradeFrom.name;
         entry.dots = entry._upgradeFrom.dots;
         delete entry._upgradeFrom;
+        delete entry.granted_dots;
         for (let i = this.xpBuys.length - 1; i >= 0; i--) {
           if (this.xpBuys[i].key === key) this.xpBuys.splice(i, 1);
         }
@@ -4211,9 +4261,17 @@
         // advantage/background/flaw pools, so exclude any src-tagged entry.
         // Thin-blood-specific merits/flaws are also free: each tb merit is
         // offset by a tb flaw (a separate 1:1 balanced set), so exclude both.
-        const sum = list => list
-          .filter(x => !x.src && !this._isTbTrait(x.name))
-          .reduce((acc, x) => acc + (x.dots || 0), 0);
+        const sum = list => list.reduce((acc, x) => {
+          if (this._isTbTrait(x.name)) return acc;
+          if (x.src) {
+            // Granted dots are free — but a predator grant upgraded with
+            // creation dots (Beautiful → Stunning) spends the delta above the
+            // granted base from the Advantages pool.
+            const free = (x.granted_dots != null) ? x.granted_dots : (x.dots || 0);
+            return acc + Math.max(0, (x.dots || 0) - free);
+          }
+          return acc + (x.dots || 0);
+        }, 0);
         // Loresheets: each picked entry costs its own level (non-cumulative).
         // XP-bought entries (src:'xp', from the Advance step) draw XP, not the
         // creation pool — exclude them here like merits/backgrounds.
