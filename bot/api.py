@@ -91,6 +91,35 @@ async def get_staff_roster() -> list[dict]:
         return r.json()["staff"]
 
 
+# ── Chronicle settings ────────────────────────────────────────────────────────
+
+async def get_chronicle_settings() -> dict:
+    """Curated chronicle settings for `/settings show`."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.get(f"{_base()}/api/settings", headers=_headers())
+        r.raise_for_status()
+        return r.json()
+
+
+async def update_chronicle_settings(actor_discord_id: str, fields: dict) -> dict:
+    """Update curated chronicle settings from the bot. The issuing user must be a
+    Settings Admin — the web enforces it. Returns the updated settings, or
+    ``{error: <reason>}`` when the issuer lacks permission or a value is invalid."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/settings",
+            json={"actor_discord_id": actor_discord_id, "fields": fields},
+            headers=_headers(),
+        )
+        if r.status_code in (400, 403):
+            try:
+                return {"error": r.json().get("detail") or "Could not update settings."}
+            except Exception:
+                return {"error": "Could not update settings."}
+        r.raise_for_status()
+        return r.json()
+
+
 # ── Characters ────────────────────────────────────────────────────────────────
 
 async def create_character(data: dict) -> dict:

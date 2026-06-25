@@ -56,6 +56,12 @@ from ..db import (
     set_staff_role,
     staff_role_has_permission,
     list_all_players,
+    get_settings,
+    upsert_settings,
+    is_settings_admin_id,
+    get_announce_channel_id,
+    RESONANCE_MODES,
+    PROJECT_MODES,
 )
 
 log = logging.getLogger(__name__)
@@ -97,6 +103,11 @@ class StaffRoleIn(BaseModel):
     target_discord_id: str                # who's being assigned
     target_username: str | None = None    # upsert the target's profile if new
     role: str | None = None               # one of STAFF_ROLES, or null to revoke
+
+
+class SettingsUpdateIn(BaseModel):
+    actor_discord_id: str                 # the staff member issuing the change
+    fields: dict = Field(default_factory=dict)   # curated settings → new values
 
 
 class AckIn(BaseModel):
@@ -310,6 +321,80 @@ async def set_staff_role_api(body: StaffRoleIn):
         set_staff_role(conn, body.target_discord_id, role,
                        actor_id=body.actor_discord_id)
     return {"target_discord_id": body.target_discord_id, "role": role}
+
+
+# ── Chronicle settings ────────────────────────────────────────────────────────
+
+# Allowlist of settings the bot `/settings` command may edit — everything else
+# stays web-only. Keep this curated and validated; the bot is one door in.
+_BOT_SETTINGS_BOOL = {"dice_roller_enabled", "xp_cap_enabled"}
+_BOT_SETTINGS_CHANNEL = {"dice_channel_id", "st_channel_id", "announce_channel_id"}
+_BOT_SETTINGS_INT = {"xp_cap_amount": (1, 9999), "max_chars_per_player": (0, 20)}
+
+
+def _bot_settings_view(conn) -> dict:
+    """The curated current-settings dict the bot shows + edits."""
+    s = get_settings(conn) or {}
+    return {
+        "dice_channel_id":      (s.get("dice_channel_id") or ""),
+        "st_channel_id":        (s.get("st_channel_id") or ""),
+        "announce_channel_id":  get_announce_channel_id(conn) or "",
+        "dice_roller_enabled":  1 if s.get("dice_roller_enabled", 1) else 0,
+        "resonance_mode":       (s.get("resonance_mode") or "standard"),
+        "project_mode":         (s.get("project_mode") or "nybn"),
+        "xp_cap_enabled":       1 if s.get("xp_cap_enabled", 1) else 0,
+        "xp_cap_amount":        int(s.get("xp_cap_amount", 350) or 350),
+        "max_chars_per_player": int(s.get("max_chars_per_player", 2) or 2),
+    }
+
+
+@router.get("/settings", dependencies=[Depends(_require_bot)])
+async def get_settings_api():
+    """Curated chronicle settings for the bot `/settings show`."""
+    with get_db() as conn:
+        return _bot_settings_view(conn)
+
+
+@router.post("/settings", dependencies=[Depends(_require_bot)])
+async def update_settings_api(body: SettingsUpdateIn):
+    """Update curated chronicle settings from the bot `/settings` command. The
+    issuing user must be a Settings Admin — the web is the single authority, so
+    the bot can't escalate. Each field is validated against its allowlist."""
+    with get_db() as conn:
+        if not is_settings_admin_id(conn, body.actor_discord_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You need the Settings Admin flag to change chronicle settings.")
+        clean: dict = {}
+        for key, val in (body.fields or {}).items():
+            if key in _BOT_SETTINGS_CHANNEL:
+                v = str(val or "").strip()
+                clean[key] = v if v.isdigit() else ""
+            elif key in _BOT_SETTINGS_BOOL:
+                clean[key] = 1 if val in (1, "1", True, "on", "true", "True") else 0
+            elif key in _BOT_SETTINGS_INT:
+                lo, hi = _BOT_SETTINGS_INT[key]
+                try:
+                    clean[key] = max(lo, min(hi, int(val)))
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail=f"{key} must be a number.")
+            elif key == "resonance_mode":
+                if val not in RESONANCE_MODES:
+                    raise HTTPException(status_code=400,
+                                        detail=f"Unknown resonance mode: {val!r}")
+                clean[key] = val
+            elif key == "project_mode":
+                if val not in PROJECT_MODES:
+                    raise HTTPException(status_code=400,
+                                        detail=f"Unknown project mode: {val!r}")
+                clean[key] = val
+            else:
+                raise HTTPException(status_code=400,
+                                    detail=f"Setting not editable from the bot: {key}")
+        if not clean:
+            raise HTTPException(status_code=400, detail="No valid settings to update.")
+        upsert_settings(conn, actor_id=body.actor_discord_id, **clean)
+        return _bot_settings_view(conn)
 
 
 # ── Characters ────────────────────────────────────────────────────────────────

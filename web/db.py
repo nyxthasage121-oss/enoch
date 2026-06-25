@@ -1243,6 +1243,9 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         "st_channel_id",
         # In-app staff-access role IDs picker (migration 056) — JSON list
         "staff_role_ids",
+        # Chronicle announcement channel (migration 057) — DB home for the
+        # legacy CHRONICLE_CHANNEL_ID env var
+        "announce_channel_id",
     }
     # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
     # migration 040. It's now an orthogonal flag — translate a legacy POST
@@ -2068,6 +2071,7 @@ def sweep_period_closing_soon(conn, hours_threshold: int = 24) -> list[dict]:
         (now_iso, cutoff_iso),
     ).fetchall()
 
+    announce_channel = get_announce_channel_id(conn) or ""
     for p in rows:
         enqueue_bot(conn, "period_closing_soon", {
             "period_id":   p["id"],
@@ -2075,6 +2079,7 @@ def sweep_period_closing_soon(conn, hours_threshold: int = 24) -> list[dict]:
             "period_type": p["period_type"],
             "phase":       p["phase"],
             "closes_at":   p["closes_at"],
+            "channel_id":  announce_channel,
         })
         conn.execute(
             "UPDATE play_periods SET closing_reminder_sent_at=? WHERE id=?",
@@ -5060,6 +5065,29 @@ def get_st_channel_id(conn) -> str | None:
     'Post to Discord' button (and enqueues) when this is configured."""
     raw = ((get_settings(conn) or {}).get("st_channel_id") or "").strip()
     return raw or None
+
+
+def get_announce_channel_id(conn) -> str | None:
+    """The chronicle announcement channel (migration 057) for period-closing
+    reminders + announcements. Prefers the DB setting; falls back to the legacy
+    CHRONICLE_CHANNEL_ID env var. None when neither is set."""
+    raw = ((get_settings(conn) or {}).get("announce_channel_id") or "").strip()
+    if raw:
+        return raw
+    env = settings.CHRONICLE_CHANNEL_ID
+    return str(env) if env else None
+
+
+def is_settings_admin_id(conn, discord_id: str) -> bool:
+    """Settings-admin check by discord_id, for the bot API (which has no request
+    session). Mirrors deps.is_settings_admin: the ENOCH_SETTINGS_ADMIN_IDS env
+    override OR the player_profiles.settings_admin flag."""
+    import os
+    env_ids = os.environ.get("ENOCH_SETTINGS_ADMIN_IDS") or ""
+    if str(discord_id) in {i.strip() for i in env_ids.split(",") if i.strip()}:
+        return True
+    prof = get_player(conn, str(discord_id))
+    return bool(prof.get("settings_admin")) if prof else False
 
 
 def get_staff_role_ids(conn) -> list[int]:

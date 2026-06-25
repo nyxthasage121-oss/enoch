@@ -26,6 +26,7 @@ _COGS = [
     "bot.cogs.timeskip",
     "bot.cogs.projects",
     "bot.cogs.staff",
+    "bot.cogs.settings",
 ]
 
 

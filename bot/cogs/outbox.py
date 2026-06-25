@@ -252,12 +252,15 @@ async def _on_coterie_spend_rejected(bot: commands.Bot, p: dict) -> None:
 
 @_handler("period_closing_soon")
 async def _on_period_closing_soon(bot: commands.Bot, p: dict) -> None:
-    """Post a closing-soon announcement to the chronicle channel.
-    Silent no-op if CHRONICLE_CHANNEL_ID isn't configured."""
-    channel_id = settings.CHRONICLE_CHANNEL_ID
-    if not channel_id:
-        log.info("period_closing_soon: CHRONICLE_CHANNEL_ID unset — skipping announcement")
+    """Post a closing-soon announcement to the chronicle announcement channel.
+    The channel id rides in on the payload (resolved web-side from the
+    announce_channel_id setting / CHRONICLE_CHANNEL_ID env, migration 057), so
+    the bot needs no own config. Silent no-op if it's unset or unreachable."""
+    raw = str(p.get("channel_id") or "").strip()
+    if not raw.isdigit():
+        log.info("period_closing_soon: no announcement channel configured — skipping")
         return
+    channel_id = int(raw)
 
     try:
         channel = bot.get_channel(channel_id) or await bot.fetch_channel(channel_id)
