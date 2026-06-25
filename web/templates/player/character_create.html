@@ -218,8 +218,8 @@
             <li class="flex items-center justify-between gap-2">
               <span class="text-bone-500">Specialties
                 <span class="text-bone-700 normal-case">(free)</span></span>
-              <span :class="specialties.length >= freeSpecialtyCount ? 'text-gold-400' : 'text-bone-400'">
-                <span x-text="specialties.length"></span>
+              <span :class="freeSpecialtiesUsed >= freeSpecialtyCount ? 'text-gold-400' : 'text-bone-400'">
+                <span x-text="freeSpecialtiesUsed"></span>
                 <span class="text-bone-700">/</span>
                 <span x-text="freeSpecialtyCount"></span>
               </span>
@@ -1265,7 +1265,7 @@
           You get <span class="text-gold-400">one free specialty</span>, plus a free
           specialty in <span class="text-bone-300">Academics, Science, Craft,</span> and
           <span class="text-bone-300">Performance</span> for each you put a dot in. The
-          sidebar tracks your free allotment (<span class="text-gold-400" x-text="specialties.length"></span>/<span x-text="freeSpecialtyCount"></span>).
+          sidebar tracks your free allotment (<span class="text-gold-400" x-text="freeSpecialtiesUsed"></span>/<span x-text="freeSpecialtyCount"></span>).
         </p>
       </div>
 
@@ -3863,6 +3863,12 @@
         ['skill_academics', 'skill_science', 'skill_craft', 'skill_performance']
           .forEach(k => { if ((this.sheet[k] || 0) > 0) n += 1; });
         return n;
+      },
+      // Only player-PICKED specialties count against the free allotment —
+      // predator / loresheet grants carry `src` and are extra (mirrors the
+      // server's chargen validator).
+      get freeSpecialtiesUsed() {
+        return this.specialties.filter(s => !s.src).length;
       },
       // Spread-only dot counts (exclude Starting-XP purchases) so the
       // budget trackers measure the base allocation, not bought dots.
