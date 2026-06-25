@@ -27,6 +27,7 @@ _COGS = [
     "bot.cogs.projects",
     "bot.cogs.staff",
     "bot.cogs.settings",
+    "bot.cogs.reference",
 ]
 
 

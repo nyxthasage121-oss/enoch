@@ -565,6 +565,34 @@ class RollCog(commands.Cog):
         e.set_footer(text=foot)
         await interaction.followup.send(embed=e)
 
+    @app_commands.command(
+        name="slake",
+        description="Slake Hunger after feeding — reduce it by 1-5 (updates your sheet).",
+    )
+    @app_commands.describe(
+        amount="How much Hunger to slake (1-5)",
+        character="Which character (only if you have more than one)",
+    )
+    async def slake(self, interaction: discord.Interaction, amount: int = 1,
+                    character: str | None = None) -> None:
+        await interaction.response.defer()
+        amount = max(1, min(5, amount))
+        char = await self._pick_character(interaction, character)
+        if not char:
+            await interaction.followup.send(
+                "Pick a character with `character:<name>` to slake.")
+            return
+        new_hunger = None
+        try:
+            resp = await apply_state_delta(char["id"], hunger=-amount, source="dice:slake")
+            new_hunger = resp.get("state", {}).get("hunger")
+        except Exception as exc:
+            log.warning("slake: hunger write-back failed for %s: %s", char.get("id"), exc)
+        desc = (f"**−{amount} Hunger** → now **{new_hunger}/5**" if new_hunger is not None
+                else f"**−{amount} Hunger.** Update your Hunger on the tracker.")
+        e = discord.Embed(title=f"🩸 Slake · {char['name']}", description=desc, color=_GOLD)
+        await interaction.followup.send(embed=e)
+
     # ── Hunting ──────────────────────────────────────────────────────────────
 
     @app_commands.command(
