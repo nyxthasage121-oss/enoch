@@ -1585,22 +1585,29 @@
         <div class="gilded p-5">
           <p class="label-gold mb-3 text-xs">Merits</p>
           <template x-for="(m, idx) in merits" :key="'m'+idx">
-            <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
-              <span class="font-garamond text-xs text-bone-300 flex-1 truncate">
-                <span x-text="m.name"></span>
-                <span x-show="m.src" class="text-[0.5rem] font-cinzel tracking-widest uppercase text-mauve-400 ml-1"
-                      x-text="m.src === 'loresheet' ? 'Loresheet' : (m.src === 'predator' ? 'Predator' : m.src)"></span>
-              </span>
-              <div class="flex gap-0.5">
-                <template x-for="n in 5">
-                  <button type="button" @click="if (!m.src) m.dots = (m.dots === n ? n - 1 : n)"
-                          class="w-2.5 h-2.5 rounded-full border transition-colors"
-                          :class="(m.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700') + (m.src ? ' opacity-60 cursor-default' : '')"></button>
-                </template>
+            <div class="py-1 border-b border-ink-800 last:border-0">
+              <div class="flex items-center gap-2">
+                <span class="font-garamond text-xs text-bone-300 flex-1 truncate">
+                  <span x-text="m.name"></span>
+                  <span x-show="m.src" class="text-[0.5rem] font-cinzel tracking-widest uppercase text-mauve-400 ml-1"
+                        x-text="m.src === 'loresheet' ? 'Loresheet' : (m.src === 'predator' ? 'Predator' : m.src)"></span>
+                </span>
+                <div class="flex gap-0.5">
+                  <template x-for="n in 5">
+                    <button type="button" @click="if (!m.src) m.dots = (m.dots === n ? n - 1 : n)"
+                            class="w-2.5 h-2.5 rounded-full border transition-colors"
+                            :class="(m.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700') + (m.src ? ' opacity-60 cursor-default' : '')"></button>
+                  </template>
+                </div>
+                <button type="button" x-show="!m.src" @click="merits.splice(idx, 1)"
+                        class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+                <span x-show="m.src" class="text-bone-800 text-xs ml-1 w-3 text-center" title="Granted — managed for you">&#128274;</span>
               </div>
-              <button type="button" x-show="!m.src" @click="merits.splice(idx, 1)"
-                      class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
-              <span x-show="m.src" class="text-bone-800 text-xs ml-1 w-3 text-center" title="Granted — managed for you">&#128274;</span>
+              <template x-if="needsDetail(m.name)">
+                <input type="text" maxlength="60" x-model="m.detail"
+                       :placeholder="detailPrompt(m.name)"
+                       class="mt-1 w-full text-[0.62rem] py-0.5 px-2 border-l-2 border-gold-700/50">
+              </template>
             </div>
           </template>
           <div class="flex items-center gap-2 mt-3">
@@ -1617,22 +1624,29 @@
         <div class="gilded p-5">
           <p class="label-gold mb-3 text-xs">Backgrounds</p>
           <template x-for="(b, idx) in backgrounds" :key="'b'+idx">
-            <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
-              <span class="font-garamond text-xs text-bone-300 flex-1 truncate">
-                <span x-text="b.name"></span>
-                <span x-show="b.src" class="text-[0.5rem] font-cinzel tracking-widest uppercase text-mauve-400 ml-1"
-                      x-text="b.src === 'loresheet' ? 'Loresheet' : (b.src === 'predator' ? 'Predator' : b.src)"></span>
-              </span>
-              <div class="flex gap-0.5">
-                <template x-for="n in 5">
-                  <button type="button" @click="if (!b.src) b.dots = (b.dots === n ? n - 1 : n)"
-                          class="w-2.5 h-2.5 rounded-full border transition-colors"
-                          :class="(b.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700') + (b.src ? ' opacity-60 cursor-default' : '')"></button>
-                </template>
+            <div class="py-1 border-b border-ink-800 last:border-0">
+              <div class="flex items-center gap-2">
+                <span class="font-garamond text-xs text-bone-300 flex-1 truncate">
+                  <span x-text="b.name"></span>
+                  <span x-show="b.src" class="text-[0.5rem] font-cinzel tracking-widest uppercase text-mauve-400 ml-1"
+                        x-text="b.src === 'loresheet' ? 'Loresheet' : (b.src === 'predator' ? 'Predator' : b.src)"></span>
+                </span>
+                <div class="flex gap-0.5">
+                  <template x-for="n in 5">
+                    <button type="button" @click="if (!b.src) b.dots = (b.dots === n ? n - 1 : n)"
+                            class="w-2.5 h-2.5 rounded-full border transition-colors"
+                            :class="(b.dots >= n ? 'bg-gold-500 border-gold-400' : 'border-bone-700') + (b.src ? ' opacity-60 cursor-default' : '')"></button>
+                  </template>
+                </div>
+                <button type="button" x-show="!b.src" @click="backgrounds.splice(idx, 1)"
+                        class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+                <span x-show="b.src" class="text-bone-800 text-xs ml-1 w-3 text-center" title="Granted — managed for you">&#128274;</span>
               </div>
-              <button type="button" x-show="!b.src" @click="backgrounds.splice(idx, 1)"
-                      class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
-              <span x-show="b.src" class="text-bone-800 text-xs ml-1 w-3 text-center" title="Granted — managed for you">&#128274;</span>
+              <template x-if="needsDetail(b.name)">
+                <input type="text" maxlength="60" x-model="b.detail"
+                       :placeholder="detailPrompt(b.name)"
+                       class="mt-1 w-full text-[0.62rem] py-0.5 px-2 border-l-2 border-gold-700/50">
+              </template>
             </div>
           </template>
           <div class="flex items-center gap-2 mt-3">
@@ -1742,27 +1756,34 @@
             </p>
           </template>
           <template x-for="(f, idx) in flaws" :key="'f'+idx">
-            <div class="flex items-center gap-2 py-1 border-b border-ink-800 last:border-0">
-              <span class="font-garamond text-xs text-blood-300 flex-1 truncate min-w-0">
-                <span x-text="f.name"></span>
-                <span x-show="f.src === 'clan_bane'"
-                      class="text-[0.5rem] font-cinzel tracking-widest uppercase text-mauve-400 ml-1">Clan Bane</span>
-                <span x-show="f.src === 'predator'"
-                      class="text-[0.5rem] font-cinzel tracking-widest uppercase text-gold-600 ml-1">Predator</span>
-              </span>
-              <div class="flex gap-0.5">
-                <template x-for="n in 5">
-                  {# Auto-granted flaws (clan Bane / predator) have fixed dots. #}
-                  <button type="button" @click="if (!f.src) f.dots = (f.dots === n ? n - 1 : n)"
-                          class="w-2.5 h-2.5 rounded-full border transition-colors"
-                          :class="(f.dots >= n ? 'bg-blood-bright border-blood-bright' : 'border-bone-700')
-                                  + (f.src ? ' opacity-60 cursor-default' : '')"></button>
-                </template>
+            <div class="py-1 border-b border-ink-800 last:border-0">
+              <div class="flex items-center gap-2">
+                <span class="font-garamond text-xs text-blood-300 flex-1 truncate min-w-0">
+                  <span x-text="f.name"></span>
+                  <span x-show="f.src === 'clan_bane'"
+                        class="text-[0.5rem] font-cinzel tracking-widest uppercase text-mauve-400 ml-1">Clan Bane</span>
+                  <span x-show="f.src === 'predator'"
+                        class="text-[0.5rem] font-cinzel tracking-widest uppercase text-gold-600 ml-1">Predator</span>
+                </span>
+                <div class="flex gap-0.5">
+                  <template x-for="n in 5">
+                    {# Auto-granted flaws (clan Bane / predator) have fixed dots. #}
+                    <button type="button" @click="if (!f.src) f.dots = (f.dots === n ? n - 1 : n)"
+                            class="w-2.5 h-2.5 rounded-full border transition-colors"
+                            :class="(f.dots >= n ? 'bg-blood-bright border-blood-bright' : 'border-bone-700')
+                                    + (f.src ? ' opacity-60 cursor-default' : '')"></button>
+                  </template>
+                </div>
+                <button type="button" x-show="!f.src" @click="flaws.splice(idx, 1)"
+                        class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+                <span x-show="f.src" class="text-bone-800 text-xs ml-1 w-3 text-center"
+                      title="Auto-granted — managed for you">&#128274;</span>
               </div>
-              <button type="button" x-show="!f.src" @click="flaws.splice(idx, 1)"
-                      class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
-              <span x-show="f.src" class="text-bone-800 text-xs ml-1 w-3 text-center"
-                    title="Auto-granted — managed for you">&#128274;</span>
+              <template x-if="needsDetail(f.name)">
+                <input type="text" maxlength="60" x-model="f.detail"
+                       :placeholder="detailPrompt(f.name)"
+                       class="mt-1 w-full text-[0.62rem] py-0.5 px-2 border-l-2 border-blood-700/50">
+              </template>
             </div>
           </template>
           <div class="flex items-center gap-2 mt-3">
@@ -3523,6 +3544,29 @@
         }
         return this._mfIndex;
       },
+      // Some merits/flaws name a target — Contacts (of whom?), Influence (over
+      // what?), Folkloric Bane (what object?) — so the player records the
+      // specifics. Haven is deliberately excluded (no "which" to give).
+      needsDetail(name) {
+        const e = this._mfCatalogByName()[(name || '').trim().toLowerCase()];
+        return !!(e && e.needs_detail);
+      },
+      detailPrompt(name) {
+        const map = {
+          'contacts': 'of whom? e.g. Police, Press, Dockworkers',
+          'influence': 'over what or whom?',
+          'mask': 'what false identity?',
+          'retainer': 'who serves you?',
+          'herd': 'your feeding ground?',
+          'status': 'in what group?',
+          'adversary': 'who opposes you?',
+          'enemy': 'who is your enemy?',
+          'archaic': 'what outdated habit?',
+          'folkloric bane': 'what bane object? e.g. silver, garlic',
+          'folkloric block': 'what ward or rite?',
+        };
+        return 'Specify — ' + (map[(name || '').trim().toLowerCase()] || 'what kind?');
+      },
       takenTraitNames() {
         return [...this.merits, ...this.backgrounds, ...this.advantages, ...this.flaws]
           .map(x => (x.name || '').toLowerCase());
@@ -3563,7 +3607,9 @@
         this.mfError = '';
         // No duplicate trait within the same list.
         if (!this[listKey].some(x => x.name.toLowerCase() === name.toLowerCase())) {
-          this[listKey].push({ name, dots });
+          const entry = { name, dots };
+          if (this.needsDetail(name)) entry.detail = '';
+          this[listKey].push(entry);
         }
         return true;
       },

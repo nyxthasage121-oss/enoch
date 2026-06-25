@@ -45,3 +45,39 @@ def test_chargen_page_embeds_catalogs(player):
     assert r.status_code == 200
     assert "meritCatalog" in r.text and "flawCatalog" in r.text
     assert "Beautiful" in r.text                  # a catalog entry is embedded
+
+
+def test_detail_flag_on_target_naming_traits():
+    """Traits that name a target — Contacts (of whom), Influence (over what),
+    Folkloric Bane (what object) — are flagged needs_detail so the wizard
+    prompts for specifics. Haven is deliberately excluded: there's no 'which'
+    to give (per the chronicle's house ruling)."""
+    by_name = {e["name"]: e for e in (*MERIT_CATALOG, *FLAW_CATALOG)}
+    for name in ("Contacts", "Herd", "Influence", "Mask", "Retainer", "Status",
+                 "Adversary", "Archaic", "Enemy", "Folkloric Bane",
+                 "Folkloric Block"):
+        assert by_name[name].get("needs_detail") is True, name
+    assert "needs_detail" not in by_name["Haven"]
+
+
+def test_sheet_parser_preserves_detail():
+    """A trait's free-text 'detail' (what kind of Contact, which Bane object)
+    round-trips through the shared sheet parser alongside name/dots/src, and is
+    capped at 60 chars; traits without one stay clean."""
+    import json
+
+    from web.routes.player import _parse_sheet_from_form
+    form = {
+        "merits": json.dumps([
+            {"name": "Contacts", "dots": 2, "detail": "NYPD Vice"},
+            {"name": "Resources", "dots": 3},                 # no detail
+        ]),
+        "flaws": json.dumps([
+            {"name": "Folkloric Bane", "dots": 1, "detail": "x" * 80},
+        ]),
+    }
+    sheet = _parse_sheet_from_form(form)
+    merits = {m["name"]: m for m in sheet["merits"]}
+    assert merits["Contacts"]["detail"] == "NYPD Vice"
+    assert "detail" not in merits["Resources"]
+    assert len(sheet["flaws"][0]["detail"]) == 60          # truncated

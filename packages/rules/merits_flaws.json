@@ -248,6 +248,7 @@
     },
     {
       "name": "Contacts",
+      "needs_detail": true,
       "costs": [
         1,
         2,
@@ -470,6 +471,7 @@
     },
     {
       "name": "Herd",
+      "needs_detail": true,
       "costs": [
         1,
         2,
@@ -516,6 +518,7 @@
     },
     {
       "name": "Influence",
+      "needs_detail": true,
       "costs": [
         1,
         2,
@@ -718,6 +721,7 @@
     },
     {
       "name": "Mask",
+      "needs_detail": true,
       "costs": [
         1,
         2
@@ -899,6 +903,7 @@
     },
     {
       "name": "Retainer",
+      "needs_detail": true,
       "costs": [
         1,
         2,
@@ -1022,6 +1027,7 @@
     },
     {
       "name": "Status",
+      "needs_detail": true,
       "costs": [
         1,
         2,
@@ -1272,6 +1278,7 @@
     },
     {
       "name": "Adversary",
+      "needs_detail": true,
       "costs": [
         1,
         2,
@@ -1285,6 +1292,7 @@
     },
     {
       "name": "Archaic",
+      "needs_detail": true,
       "costs": [
         2
       ],
@@ -1576,6 +1584,7 @@
     },
     {
       "name": "Enemy",
+      "needs_detail": true,
       "costs": [
         1,
         2
@@ -1635,6 +1644,7 @@
     },
     {
       "name": "Folkloric Bane",
+      "needs_detail": true,
       "costs": [
         1
       ],
@@ -1644,6 +1654,7 @@
     },
     {
       "name": "Folkloric Block",
+      "needs_detail": true,
       "costs": [
         1
       ],

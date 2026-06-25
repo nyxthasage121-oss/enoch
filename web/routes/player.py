@@ -1548,6 +1548,11 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
             src = str(it.get("src", "")).strip()[:20]
             if src:
                 entry["src"] = src
+            # Some traits name a target (Contacts of whom, Folkloric Bane object,
+            # …) — keep the player's free-text specifics.
+            detail = str(it.get("detail", "")).strip()[:60]
+            if detail:
+                entry["detail"] = detail
             cleaned.append(entry)
         sheet[list_key] = cleaned
 

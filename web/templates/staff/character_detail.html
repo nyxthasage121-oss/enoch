@@ -331,6 +331,7 @@
           <div class="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
             <span class="font-garamond text-xs text-bone-300 truncate pr-2">
               {{ m.name }}
+              {% if m.get('detail') %}<span class="text-bone-500 italic">— {{ m.detail }}</span>{% endif %}
               {% if m.get('shared_with_coteries') %}
               <span class="chip text-mauve-400 border-mauve-800 text-[0.5rem] ml-1"
                     title="Shared with coterie ID(s) {{ m.shared_with_coteries | join(', ') }}">

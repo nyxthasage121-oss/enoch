@@ -842,22 +842,29 @@
           <div>
             <p class="label-gold mb-3">Merits</p>
             <template x-for="(m, idx) in merits" :key="'m'+idx">
-              <div class="flex items-center justify-between py-1.5 border-b border-ink-800">
-                <span class="font-garamond text-sm text-bone-300 truncate flex-1 pr-2" x-text="m.name"></span>
-                <div class="flex gap-1 shrink-0">
-                  <template x-for="n in 5" :key="n">
-                    <button type="button" @click="m.dots = m.dots === n ? n - 1 : n"
-                            class="w-3 h-3 rounded-full border transition-colors"
-                            :class="m.dots >= n
-                              ? 'pip-on'
-                              : 'pip-off'">
-                    </button>
-                  </template>
+              <div class="py-1.5 border-b border-ink-800">
+                <div class="flex items-center justify-between">
+                  <span class="font-garamond text-sm text-bone-300 truncate flex-1 pr-2" x-text="m.name"></span>
+                  <div class="flex gap-1 shrink-0">
+                    <template x-for="n in 5" :key="n">
+                      <button type="button" @click="m.dots = m.dots === n ? n - 1 : n"
+                              class="w-3 h-3 rounded-full border transition-colors"
+                              :class="m.dots >= n
+                                ? 'pip-on'
+                                : 'pip-off'">
+                      </button>
+                    </template>
+                  </div>
+                  <button type="button" @click="merits.splice(idx, 1)"
+                          class="ml-3 font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-blood-400">
+                    ×
+                  </button>
                 </div>
-                <button type="button" @click="merits.splice(idx, 1)"
-                        class="ml-3 font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-blood-400">
-                  ×
-                </button>
+                <template x-if="m.detail !== undefined">
+                  <input type="text" maxlength="60" x-model="m.detail"
+                         placeholder="Specify what kind…"
+                         class="mt-1 w-full text-[0.62rem] py-0.5 px-2 border-l-2 border-gold-700/50">
+                </template>
               </div>
             </template>
             <template x-if="merits.length === 0">
@@ -882,22 +889,29 @@
           <div>
             <p class="label-gold mb-3">Flaws</p>
             <template x-for="(f, idx) in flaws" :key="'f'+idx">
-              <div class="flex items-center justify-between py-1.5 border-b border-ink-800">
-                <span class="font-garamond text-sm text-bone-300 truncate flex-1 pr-2" x-text="f.name"></span>
-                <div class="flex gap-1 shrink-0">
-                  <template x-for="n in 5" :key="n">
-                    <button type="button" @click="f.dots = f.dots === n ? n - 1 : n"
-                            class="w-3 h-3 rounded-full border transition-colors"
-                            :class="f.dots >= n
-                              ? 'bg-blood-bright border-blood-bright'
-                              : 'pip-off'">
-                    </button>
-                  </template>
+              <div class="py-1.5 border-b border-ink-800">
+                <div class="flex items-center justify-between">
+                  <span class="font-garamond text-sm text-bone-300 truncate flex-1 pr-2" x-text="f.name"></span>
+                  <div class="flex gap-1 shrink-0">
+                    <template x-for="n in 5" :key="n">
+                      <button type="button" @click="f.dots = f.dots === n ? n - 1 : n"
+                              class="w-3 h-3 rounded-full border transition-colors"
+                              :class="f.dots >= n
+                                ? 'bg-blood-bright border-blood-bright'
+                                : 'pip-off'">
+                      </button>
+                    </template>
+                  </div>
+                  <button type="button" @click="flaws.splice(idx, 1)"
+                          class="ml-3 font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-blood-400">
+                    ×
+                  </button>
                 </div>
-                <button type="button" @click="flaws.splice(idx, 1)"
-                        class="ml-3 font-cinzel text-[0.55rem] tracking-widest text-bone-700 hover:text-blood-400">
-                  ×
-                </button>
+                <template x-if="f.detail !== undefined">
+                  <input type="text" maxlength="60" x-model="f.detail"
+                         placeholder="Specify what kind…"
+                         class="mt-1 w-full text-[0.62rem] py-0.5 px-2 border-l-2 border-blood-700/50">
+                </template>
               </div>
             </template>
             <template x-if="flaws.length === 0">
