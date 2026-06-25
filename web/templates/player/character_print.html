@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ char.name }} — Character Sheet</title>
+<style>
+  :root { --ink:#221a12; --muted:#6b5d4f; --gold:#7c5e16; --blood:#7a1f1f; --line:#cdbfa8; --bg:#fbf7ee; --boxbg:#fffdf7; }
+  * { box-sizing: border-box; }
+  body { font-family: "Garamond","Georgia",serif; color: var(--ink); background: var(--bg); margin: 0; padding: 24px; }
+  .sheet { max-width: 880px; margin: 0 auto; }
+  .hd { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--gold); padding-bottom:8px; margin-bottom:14px; }
+  h1 { font-family:"Cinzel","Georgia",serif; font-size:30px; margin:0; letter-spacing:1px; }
+  .sub { color:var(--muted); font-size:13px; margin-top:3px; }
+  .cols { display:flex; flex-wrap:wrap; gap:14px; }
+  .col { flex:1 1 30%; min-width:230px; }
+  .box { border:1px solid var(--line); border-radius:2px; background:var(--boxbg); padding:10px 12px; margin-bottom:12px; break-inside:avoid; }
+  .box h2 { font-family:"Cinzel",serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--gold); margin:0 0 7px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  .box h3 { font-family:"Cinzel",serif; font-size:9.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin:8px 0 3px; }
+  .trait { display:flex; justify-content:space-between; align-items:baseline; font-size:13px; padding:1.5px 0; gap:8px; }
+  .trait .nm { flex:1; }
+  .dots { letter-spacing:1px; color:var(--blood); white-space:nowrap; font-size:11px; }
+  .num { font-family:"Cinzel",serif; color:var(--gold); font-size:14px; }
+  .spec, .detail { color:var(--muted); font-size:11px; font-style:italic; }
+  .kv { font-size:13px; margin:2.5px 0; }
+  .kv b { color:var(--muted); font-weight:normal; text-transform:uppercase; font-size:9.5px; letter-spacing:1px; display:block; }
+  .vit { display:flex; gap:14px; flex-wrap:wrap; }
+  .vit .v { text-align:center; }
+  .vit .v b { display:block; color:var(--muted); text-transform:uppercase; font-size:9px; letter-spacing:1px; }
+  .vit .v span { font-family:"Cinzel",serif; font-size:18px; color:var(--ink); }
+  .li { font-size:12.5px; padding:1.5px 0; }
+  .li .pow { color:var(--muted); font-size:11px; }
+  .muted { color:var(--muted); font-style:italic; font-size:12px; }
+  .print-btn { font-family:"Cinzel",serif; font-size:11px; letter-spacing:1px; text-transform:uppercase; background:var(--gold); color:#fffdf7; border:none; padding:8px 14px; border-radius:2px; cursor:pointer; }
+  a.back { font-size:12px; color:var(--gold); text-decoration:none; }
+  @media print {
+    body { padding:0; background:#fff; }
+    .no-print { display:none !important; }
+    .box { background:#fff; }
+    @page { margin: 1.4cm; }
+  }
+</style>
+</head>
+<body>
+{% macro dots(v) %}{% set v = v|int %}<span class="dots">{{ '●' * v }}{{ '○' * (5 - v) if v <= 5 else '' }}{% if v > 5 %} {{ v }}{% endif %}</span>{% endmacro %}
+{% set s = char.sheet_json or {} %}
+<div class="sheet">
+
+  <div class="no-print" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+    <a class="back" href="/characters/{{ char.id }}">&larr; Back to character</a>
+    <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <div class="hd">
+    <div>
+      <h1>{{ char.name }}</h1>
+      <p class="sub">
+        {% if char.clan %}{{ char.clan | replace('-', ' ') | title }}{% endif %}
+        {% if char.character_type and char.character_type != 'kindred' %} · {{ char.character_type | title }}{% endif %}
+        {% if char.character_tier %} · {{ char.character_tier | replace('thinblood','Thin-Blood') | title }}{% endif %}
+        {% if s.get('generation') %} · {{ s.generation }}th Generation{% endif %}
+        {% if char.predator_type %} · {{ char.predator_type }}{% endif %}
+      </p>
+    </div>
+    <div style="text-align:right; font-size:12px; color:var(--muted);">
+      <div><b style="color:var(--gold);">XP</b> {{ (char.xp_total or 0) - (char.xp_spent or 0) }} avail · {{ char.xp_total or 0 }} total</div>
+    </div>
+  </div>
+
+  {# Identity #}
+  {% if char.concept or char.sire or char.ambition or char.desire or char.covenant %}
+  <div class="box">
+    <h2>Identity</h2>
+    <div class="cols">
+      {% for label, val in [('Concept', char.concept), ('Sire', char.sire), ('Covenant', char.covenant), ('Ambition', char.ambition), ('Desire', char.desire)] %}
+        {% if val %}<div class="col kv"><b>{{ label }}</b>{{ val }}</div>{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# Vitals #}
+  <div class="box">
+    <h2>Vitals</h2>
+    <div class="vit">
+      <div class="v"><b>Health</b><span>{{ (s.get('attr_stamina', 0) or 0) + 3 }}</span></div>
+      <div class="v"><b>Willpower</b><span>{{ (s.get('attr_composure', 0) or 0) + (s.get('attr_resolve', 0) or 0) }}</span></div>
+      <div class="v"><b>Humanity</b><span>{{ s.get('humanity', 7) }}</span></div>
+      {% if char.character_type == 'kindred' %}
+      <div class="v"><b>Blood Potency</b><span>{{ s.get('blood_potency', 0) }}</span></div>
+      <div class="v"><b>Hunger</b><span>{{ s.get('hunger', 1) }}</span></div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Attributes #}
+  <div class="box">
+    <h2>Attributes</h2>
+    <div class="cols">
+      {% for cat, traits in v5_attributes %}
+      <div class="col">
+        <h3>{{ cat }}</h3>
+        {% for key, label in traits %}
+        <div class="trait"><span class="nm">{{ label }}</span>{{ dots(s.get(key, 0)) }}</div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Skills #}
+  <div class="box">
+    <h2>Skills</h2>
+    <div class="cols">
+      {% for cat, traits in v5_skills %}
+      <div class="col">
+        <h3>{{ cat }}</h3>
+        {% for key, label in traits %}
+        {% if s.get(key, 0) %}
+        <div class="trait">
+          <span class="nm">{{ label }}{% set _sp = (s.get('specialties') or []) | selectattr('skill', 'equalto', key) | map(attribute='name') | list %}{% if _sp %} <span class="spec">({{ _sp | join(', ') }})</span>{% endif %}</span>
+          {{ dots(s.get(key, 0)) }}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% set _freesp = (s.get('specialties') or []) | rejectattr('skill') | map(attribute='name') | list %}
+    {% if _freesp %}<p class="spec" style="margin-top:6px;">Specialties: {{ _freesp | join(', ') }}</p>{% endif %}
+  </div>
+
+  {# Disciplines #}
+  {% set _learned = [] %}{% for key, label in v5_disciplines if s.get(key, 0) %}{% set _ = _learned.append((key, label)) %}{% endfor %}
+  {% if _learned %}
+  <div class="box">
+    <h2>Disciplines</h2>
+    <div class="cols">
+      {% for key, label in _learned %}
+      <div class="col" style="margin-bottom:6px;">
+        <div class="trait"><span class="nm" style="font-weight:bold;">{{ label }}</span>{{ dots(s.get(key, 0)) }}</div>
+        {% for p in (s.get('powers') or []) if p.discipline == key %}
+        <div class="li pow">· {{ p.name }}{% if p.level %} <span style="opacity:.7;">(L{{ p.level }})</span>{% endif %}</div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# Advantages #}
+  {% set _adv = s.get('merits') or s.get('backgrounds') or s.get('advantages') or s.get('flaws') or s.get('loresheets') %}
+  {% if _adv %}
+  <div class="box">
+    <h2>Advantages &amp; Flaws</h2>
+    <div class="cols">
+      {% for list_key, heading in [('merits','Merits'), ('backgrounds','Backgrounds'), ('advantages','Advantages'), ('loresheets','Loresheets'), ('flaws','Flaws')] %}
+      {% if s.get(list_key) %}
+      <div class="col">
+        <h3>{{ heading }}</h3>
+        {% for m in s.get(list_key) %}
+        <div class="trait">
+          <span class="nm">{{ m.name }}{% if m.get('detail') %} <span class="detail">— {{ m.detail }}</span>{% endif %}{% if m.get('bonus') %} <span class="spec">(extra)</span>{% endif %}</span>
+          {% if list_key == 'loresheets' %}<span class="dots">{{ '●' * (m.levels | length) }}</span>{% else %}{{ dots(m.get('dots', 0)) }}{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# Blood Sorcery / Oblivion / Alchemy #}
+  {% if s.get('rituals') or s.get('ceremonies') or s.get('formulae') %}
+  <div class="box">
+    <h2>Rituals · Ceremonies · Formulae</h2>
+    <div class="cols">
+      {% for list_key, heading in [('rituals','Blood Sorcery Rituals'), ('ceremonies','Oblivion Ceremonies'), ('formulae','Thin-Blood Formulae')] %}
+      {% if s.get(list_key) %}
+      <div class="col">
+        <h3>{{ heading }}</h3>
+        {% for r in s.get(list_key) %}
+        <div class="li">{{ r.name }}{% if r.level %} <span class="pow">(L{{ r.level }})</span>{% endif %}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# Touchstones & Convictions #}
+  {% if s.get('touchstones') %}
+  <div class="box">
+    <h2>Touchstones &amp; Convictions</h2>
+    {% for t in s.get('touchstones') %}
+    {% if t.name or t.conviction %}
+    <div class="kv" style="margin-bottom:5px;">
+      <b>{{ t.name or 'Touchstone' }}</b>{{ t.conviction or '' }}
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <p class="muted no-print" style="text-align:center; margin-top:18px;">
+    Use your browser's Print dialog (Ctrl/Cmd-P) and choose “Save as PDF”.
+  </p>
+</div>
+</body>
+</html>

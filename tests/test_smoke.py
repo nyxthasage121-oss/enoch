@@ -91,6 +91,17 @@ def test_player_character_detail_sheet_tab_renders_v5_traits(player):
     assert "Humanity" in r.text
 
 
+def test_character_print_sheet_renders(player):
+    """The printable sheet (browser → Save as PDF) renders the full sheet for
+    the owner; an unowned/missing character 404s."""
+    r = player.get("/characters/1/print")
+    assert r.status_code == 200
+    assert 'class="sheet"' in r.text
+    assert "Attributes" in r.text and "Print / Save as PDF" in r.text
+    miss = player.get("/characters/999999/print", follow_redirects=False)
+    assert miss.status_code == 404
+
+
 def test_clan_and_predator_data_renders_in_wizard(player):
     """The wizard should embed the clan + predator data the Alpine state
     reads to render the pickers. The legacy Quick Reference sidebar was

@@ -2010,6 +2010,30 @@ async def character_detail(
     )
 
 
+@router.get("/characters/{character_id}/print", response_class=HTMLResponse)
+async def character_print(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+):
+    """A clean, print-optimised full character sheet. The player uses the
+    browser's Print dialog → Save as PDF (no server-side PDF dependency)."""
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request, "player/character_print.html",
+        _ctx(
+            request,
+            char=char,
+            v5_attributes=_V5_ATTRIBUTES,
+            v5_skills=_V5_SKILLS,
+            v5_disciplines=_V5_DISCIPLINES,
+        ),
+    )
+
+
 @router.post("/characters/{character_id}/roll", response_class=HTMLResponse)
 async def roll_dice(
     request: Request,
