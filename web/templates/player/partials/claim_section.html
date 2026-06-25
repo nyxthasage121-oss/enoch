@@ -34,10 +34,21 @@
   {# ── Already claimed ── #}
   <div class="gilded p-6">
     <p class="label-gold mb-1">Already Claimed</p>
-    <p class="font-garamond text-bone-400 text-sm leading-relaxed">
+    <p class="font-garamond text-bone-400 text-sm leading-relaxed mb-4">
       You have already submitted a claim for <span class="text-bone-300">{{ active_period.label }}</span>.
       Your claim is pending staff review.
     </p>
+    {# Withdraw a still-pending claim to fix + resubmit. No-op once approved. #}
+    <form hx-post="/characters/{{ char.id }}/claim/withdraw"
+          hx-target="#claim-section" hx-swap="outerHTML"
+          hx-confirm="Withdraw your pending claim so you can submit a new one? Staff will no longer see it."
+          class="inline">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <button type="submit"
+              class="font-cinzel text-[0.6rem] tracking-widest text-blood-500 hover:text-blood-400">
+        Withdraw &amp; redo
+      </button>
+    </form>
   </div>
 
   {% else %}

@@ -3093,6 +3093,51 @@ async def discard_claim_draft(
     return resp
 
 
+@router.post("/characters/{character_id}/claim/withdraw", response_class=HTMLResponse)
+async def withdraw_claim(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+    _: None = Depends(csrf_protect),
+):
+    """Player withdraws their own still-pending claim for the active period,
+    freeing the one-per-period slot so they can submit a corrected one. An
+    approved claim already moved XP and can't be withdrawn."""
+    from ..db import withdraw_pending_claim
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+        active_period = get_active_period(conn)
+        claims        = list_claims_for_character(conn, character_id)
+        pending = next(
+            (c for c in claims
+             if active_period and c["play_period_id"] == active_period["id"]
+             and c["status"] == "pending"),
+            None,
+        )
+        withdrew     = bool(pending) and withdraw_pending_claim(conn, pending["id"])
+        all_criteria = list_criteria(conn, active_only=True)
+        p_criteria   = _player_criteria(all_criteria)
+
+    resp = templates.TemplateResponse(
+        request, "player/partials/claim_section.html",
+        _ctx(
+            request,
+            char=char,
+            active_period=active_period,
+            player_criteria=p_criteria,
+            already_claimed=False,
+        ),
+    )
+    _toast(
+        resp,
+        "Claim withdrawn — you can submit a new one." if withdrew else "No pending claim to withdraw.",
+        "info" if withdrew else "error",
+    )
+    return resp
+
+
 @router.post("/characters/{character_id}/spend", response_class=HTMLResponse)
 async def submit_spend(
     request: Request,

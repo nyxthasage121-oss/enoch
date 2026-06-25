@@ -2394,6 +2394,17 @@ def discard_draft_claim(conn, claim_id: int) -> None:
     conn.execute("DELETE FROM xp_claims WHERE id=? AND status='draft'", (claim_id,))
 
 
+def withdraw_pending_claim(conn, claim_id: int) -> bool:
+    """Player withdraws their own still-pending claim, freeing the one-per-
+    period slot so they can resubmit. Only status='pending' — an approved claim
+    already moved XP and must go through staff. Returns True if one was removed."""
+    claim = get_claim(conn, claim_id)
+    if claim is None or claim["status"] != "pending":
+        return False
+    conn.execute("DELETE FROM xp_claims WHERE id=? AND status='pending'", (claim_id,))
+    return True
+
+
 def approve_claim(conn, claim_id: int, reviewer_id: str) -> dict:
     claim = get_claim(conn, claim_id)
     if claim is None:
@@ -2525,10 +2536,12 @@ def list_pending_spends(conn) -> list[dict]:
             sr.*,
             c.name      AS character_name,
             c.clan      AS character_clan,
-            pp.username AS player_username
+            COALESCE(pp.username, c.discord_id) AS player_username
         FROM spend_requests  sr
         JOIN characters      c  ON c.id         = sr.character_id
-        JOIN player_profiles pp ON pp.discord_id = c.discord_id
+        -- LEFT, not INNER: a missing player_profiles row must never hide a
+        -- pending spend from staff (same fix as the claim queues).
+        LEFT JOIN player_profiles pp ON pp.discord_id = c.discord_id
         WHERE sr.status = 'pending'
         ORDER BY sr.submitted_at ASC
     """).fetchall()
@@ -2557,10 +2570,10 @@ def list_spends_history(
             sr.*,
             c.name      AS character_name,
             c.clan      AS character_clan,
-            pp.username AS player_username
+            COALESCE(pp.username, c.discord_id) AS player_username
         FROM spend_requests  sr
         JOIN characters      c  ON c.id         = sr.character_id
-        JOIN player_profiles pp ON pp.discord_id = c.discord_id
+        LEFT JOIN player_profiles pp ON pp.discord_id = c.discord_id
         WHERE {' AND '.join(where)}
         ORDER BY sr.submitted_at DESC
         LIMIT ?

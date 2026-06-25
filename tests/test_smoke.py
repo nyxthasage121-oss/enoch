@@ -161,6 +161,44 @@ def test_pending_claim_visible_without_player_profile(staff):
     assert row["player_username"] == "no-profile-zzz"   # COALESCE fallback
 
 
+def _seed_claim(conn, *, discord, name, clan, status):
+    """A character + one claim of the given status, returning (char_id, period_id, claim_id)."""
+    from web.db import create_character, update_character
+    ch = create_character(conn, discord_id=discord, name=name, clan=clan)
+    update_character(conn, ch["id"], status="active")
+    pid = conn.execute(
+        "INSERT INTO play_periods (label, is_active, opens_at, closes_at, created_by) "
+        "VALUES ('WD Test', 1, '2026-06-01T00:00:00Z', '2026-12-01T00:00:00Z', 't')").lastrowid
+    cid = conn.execute(
+        "INSERT INTO xp_claims (character_id, play_period_id, claimed_criteria, status, "
+        "xp_claimed, submitted_at) VALUES (?,?,'[]',?,3,'2026-06-25T00:00:00Z')",
+        (ch["id"], pid, status)).lastrowid
+    conn.commit()
+    return ch["id"], pid, cid
+
+
+def test_withdraw_pending_claim_frees_slot(player):
+    from web.db import get_db, list_claims_for_character, withdraw_pending_claim
+    from web.routes.player import _already_claimed
+    with get_db() as conn:
+        char_id, pid, cid = _seed_claim(conn, discord="wd-1", name="Withdrawer",
+                                        clan="brujah", status="pending")
+        assert _already_claimed(list_claims_for_character(conn, char_id), pid) is True
+        assert withdraw_pending_claim(conn, cid) is True
+        conn.commit()
+        assert _already_claimed(list_claims_for_character(conn, char_id), pid) is False
+
+
+def test_withdraw_does_not_remove_approved_claim(player):
+    from web.db import get_db, withdraw_pending_claim
+    with get_db() as conn:
+        _char_id, _pid, cid = _seed_claim(conn, discord="wd-2", name="Approved One",
+                                          clan="ventrue", status="approved")
+        assert withdraw_pending_claim(conn, cid) is False   # approved is protected
+        row = conn.execute("SELECT status FROM xp_claims WHERE id=?", (cid,)).fetchone()
+    assert row and row["status"] == "approved"
+
+
 def test_clan_and_predator_data_renders_in_wizard(player):
     """The wizard should embed the clan + predator data the Alpine state
     reads to render the pickers. The legacy Quick Reference sidebar was
