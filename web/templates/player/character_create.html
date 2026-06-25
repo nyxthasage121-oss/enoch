@@ -1945,10 +1945,20 @@
        ═══════════════════════════════════════════════════ #}
     {% macro xp_buy_row(cat, key, label) %}
     <div class="flex items-center justify-between gap-2 py-1 border-b border-ink-800 last:border-0">
-      <span class="font-garamond text-sm {{ '' }}"
-            :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-bone-200' : 'text-bone-400'">{{ label }}</span>
+      <span class="font-garamond text-sm"
+            :class="(sheet['{{ key }}'] || 0) > 0 ? 'text-bone-200' : 'text-bone-400'">{{ label }}{% if cat == 'disc' %}
+        <span x-show="isInClan('{{ key }}')" x-cloak class="font-cinzel text-[0.45rem] tracking-[0.2em] text-gold-500 uppercase ml-1">In-Clan</span>
+        <span x-show="!isInClan('{{ key }}')" x-cloak class="font-cinzel text-[0.45rem] tracking-[0.2em] text-mauve-400 uppercase ml-1">Out</span>{% endif %}</span>
       <div class="flex items-center gap-1.5 shrink-0">
-        <span class="font-cinzel text-xs text-gold-400 w-3 text-center" x-text="sheet['{{ key }}'] || 0"></span>
+        {# Visible dots — base (spread) dots in bone, XP-bought dots highlighted gold. #}
+        <div class="flex gap-0.5 mr-0.5">
+          <template x-for="n in 5" :key="n">
+            <span class="w-3 h-3 rounded-full border transition-colors"
+                  :class="(sheet['{{ key }}'] || 0) >= n
+                    ? (n > ((sheet['{{ key }}'] || 0) - boughtDots('{{ key }}')) ? 'bg-gold-400 border-gold-300' : 'bg-bone-500 border-bone-400')
+                    : 'border-bone-700'"></span>
+          </template>
+        </div>
         <button type="button" @click="refundTrait('{{ key }}')"
                 :disabled="boughtDots('{{ key }}') === 0"
                 :class="boughtDots('{{ key }}') === 0 ? 'opacity-25 cursor-not-allowed' : 'hover:border-gold-700 text-bone-300'"
@@ -2067,10 +2077,11 @@
                 <span class="font-garamond text-xs text-bone-300 flex-1 truncate">
                   <span x-text="a.name"></span>
                   <span class="text-bone-700 text-[0.6rem]" x-text="'· ' + kind"></span>
+                  <span class="text-gold-600 text-[0.6rem]" x-text="'· ' + (a.dots * 3) + ' XP'"></span>
                 </span>
                 <div class="flex gap-0.5">
                   <template x-for="n in 5">
-                    <span class="w-2.5 h-2.5 rounded-full" :class="a.dots >= n ? 'bg-gold-500' : 'border border-bone-700'"></span>
+                    <span class="w-3 h-3 rounded-full border" :class="a.dots >= n ? 'bg-gold-400 border-gold-300' : 'border-bone-700'"></span>
                   </template>
                 </div>
                 <button type="button" @click="refundXpAdvantage(kind, a.name)"
