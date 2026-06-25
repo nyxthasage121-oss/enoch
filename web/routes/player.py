@@ -2034,6 +2034,29 @@ async def character_print(
     )
 
 
+@router.get("/characters/{character_id}/sheet.pdf")
+async def character_sheet_pdf(
+    request: Request,
+    character_id: int,
+    user: dict = Depends(require_auth),
+):
+    """The official V5 character sheet (Paradox/Renegade's fillable PDF) poured
+    full of this character's data — opens in the browser to view + Save as PDF."""
+    with get_db() as conn:
+        char = get_character_for_player(conn, character_id, user["id"])
+        if not char:
+            raise HTTPException(status_code=404)
+    from ..pdf_sheet import fill_character_pdf
+    pdf = fill_character_pdf(char)
+    safe = "".join(c for c in (char.get("name") or "character")
+                   if c.isalnum() or c in " -_").strip() or "character"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{safe}.pdf"'},
+    )
+
+
 @router.post("/characters/{character_id}/roll", response_class=HTMLResponse)
 async def roll_dice(
     request: Request,

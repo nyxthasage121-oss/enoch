@@ -102,6 +102,38 @@ def test_character_print_sheet_renders(player):
     assert miss.status_code == 404
 
 
+def test_character_sheet_pdf_downloads(player):
+    """The official V5 sheet PDF fills + serves for the owner; missing 404s."""
+    r = player.get("/characters/1/sheet.pdf")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:4] == b"%PDF"
+    assert player.get("/characters/999999/sheet.pdf",
+                      follow_redirects=False).status_code == 404
+
+
+def test_pdf_fill_maps_core_fields():
+    """fill_character_pdf pours name/attributes/disciplines/merits into the
+    official sheet's AcroForm fields (dots as the /Yes checkbox on-state)."""
+    from io import BytesIO
+
+    from pypdf import PdfReader
+
+    from web.pdf_sheet import fill_character_pdf
+    char = {"name": "Test Vamp", "clan": "brujah", "sheet_json": {
+        "attr_strength": 3, "disc_celerity": 2,
+        "specialties": [{"skill": "skill_occult", "name": "Rituals"}],
+        "merits": [{"name": "Beautiful", "dots": 2}]}}
+    f = PdfReader(BytesIO(fill_character_pdf(char))).get_fields() or {}
+    assert f["Name"]["/V"] == "Test Vamp"
+    assert f["Clan"]["/V"] == "Brujah"
+    assert f["Str-3"]["/V"] == "/Yes"           # Strength 3 → 3 boxes
+    assert f["Str-4"].get("/V") in (None, "/Off")
+    assert f["specOccu"]["/V"] == "Rituals"      # specialty
+    assert f["Disc1"]["/V"] == "Celerity" and f["Disc1-2"]["/V"] == "/Yes"
+    assert f["Merit1"]["/V"] == "Beautiful" and f["Merit1-2"]["/V"] == "/Yes"
+
+
 def test_clan_and_predator_data_renders_in_wizard(player):
     """The wizard should embed the clan + predator data the Alpine state
     reads to render the pickers. The legacy Quick Reference sidebar was

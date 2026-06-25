@@ -6,6 +6,7 @@ httpx>=0.27
 python-multipart>=0.0.12
 python-dotenv>=1.0
 libsql-experimental>=0.0.9
+pypdf>=4.0          # fills the official V5 fillable character sheet (web/pdf_sheet.py)
 
 # Discord bot
 discord.py>=2.4

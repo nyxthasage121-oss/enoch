@@ -60,9 +60,17 @@
             {{ char.name }}
           </h1>
           <div class="flex items-center gap-2 shrink-0 mt-0.5">
+            <a href="/characters/{{ char.id }}/sheet.pdf" target="_blank"
+               class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 flex items-center gap-1.5"
+               title="Official V5 sheet, filled in — view, then Save as PDF">
+              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="square" d="M9 2H5a1 1 0 00-1 1v18a1 1 0 001 1h14a1 1 0 001-1V8l-6-6H9zM13 2v6h6M8 13h8M8 17h8"/>
+              </svg>
+              PDF
+            </a>
             <a href="/characters/{{ char.id }}/print" target="_blank"
                class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5 flex items-center gap-1.5"
-               title="Printable sheet — Save as PDF from your browser">
+               title="Printable summary sheet — Save as PDF from your browser">
               <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="square" d="M6 9V3h12v6M6 18H4a2 2 0 01-2-2v-4a2 2 0 012-2h16a2 2 0 012 2v4a2 2 0 01-2 2h-2M6 14h12v7H6z"/>
               </svg>
