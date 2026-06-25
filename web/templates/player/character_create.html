@@ -1469,6 +1469,8 @@
               {{ label }}
               <span x-show="isInClan('{{ key }}')" x-cloak
                     class="font-cinzel text-[0.5rem] tracking-[0.2em] text-gold-500 uppercase ml-1">In-Clan</span>
+              <span x-show="charName.character_type === 'kindred' && !['caitiff','thin-blood'].includes(charName.clan) && !isInClan('{{ key }}')" x-cloak
+                    class="font-cinzel text-[0.5rem] tracking-[0.2em] text-mauve-400 uppercase ml-1">Out-of-Clan</span>
             </span>
             {% set tplkey = key %}
             {% include "player/partials/wizard_pips.html" %}
@@ -3363,9 +3365,9 @@
             this.charName.clan === 'thin-blood') return key === 'disc_thin_blood_alchemy';
         if (this.charName.clan === 'caitiff') return true;
         if (this.isInClan(key)) return true;
-        const info = this.predatorInfo[this.charName.predator_type];
-        if (info && (info.grants || []).some(
-              g => g.kind === 'discipline' && (g.options || []).includes(key))) return true;
+        // Only the predator Discipline the player actually CHOSE belongs here —
+        // not the alternative option they passed on.
+        if (this._predatorDisc === key) return true;
         return (this.sheet[key] || 0) > 0;
       },
       learnedDisciplines() {
