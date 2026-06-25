@@ -115,13 +115,43 @@ def test_announce_channel_db_then_env_fallback(_client, monkeypatch):
             conn.commit()
 
 
-def test_settings_embed_builder():
-    from bot.cogs.settings import build_settings_embed
-    e = build_settings_embed({
-        "dice_channel_id": "111", "st_channel_id": "", "announce_channel_id": "222",
-        "dice_roller_enabled": 1, "resonance_mode": "standard", "project_mode": "nybn",
-        "xp_cap_enabled": 1, "xp_cap_amount": 350, "max_chars_per_player": 2})
-    vals = {f.name: f.value for f in e.fields}
-    assert vals["Dice post channel"] == "<#111>"
-    assert vals["ST tracker channel"] == "—"          # blank → dash
-    assert "350" in vals["XP cap"]
+def test_get_settings_editable_flag(_client):
+    _ensure_admin()
+    assert _client.get("/api/settings", headers=_BOT,
+                       params={"actor": _DEV_ADMIN}).json()["editable"] is True
+    assert _client.get("/api/settings", headers=_BOT,
+                       params={"actor": "nobody-xyz"}).json()["editable"] is False
+    assert _client.get("/api/settings", headers=_BOT).json().get("editable") is False
+
+
+# ── /settings interactive menu (Components V2, Inconnu-style) ─────────────────
+
+_VIEW_DATA = {
+    "dice_channel_id": "111", "st_channel_id": "", "announce_channel_id": "222",
+    "dice_roller_enabled": 1, "resonance_mode": "tattered_facade", "project_mode": "off",
+    "xp_cap_enabled": 0, "xp_cap_amount": 350, "max_chars_per_player": 2,
+}
+
+
+def test_settings_view_constructs_and_reflects_state():
+    import discord
+    from bot.cogs.settings import SettingsView
+    v = SettingsView({**_VIEW_DATA, "editable": True}, actor_id="1", guild=None)
+    kids = list(v.walk_children())
+    selects = [x for x in kids if isinstance(x, (discord.ui.Select, discord.ui.ChannelSelect))]
+    buttons = [x for x in kids if isinstance(x, discord.ui.Button)]
+    assert len(buttons) == 2                         # roller + xp-cap toggles
+    assert len(selects) == 7                         # 2 enum + 2 number + 3 channel
+    # the resonance dropdown marks the current value as its default option
+    res = next(x for x in selects if isinstance(x, discord.ui.Select)
+               and "Resonance" in (x.placeholder or ""))
+    assert any(o.value == "tattered_facade" and o.default for o in res.options)
+
+
+def test_settings_view_disabled_when_not_editable():
+    import discord
+    from bot.cogs.settings import SettingsView
+    v = SettingsView({**_VIEW_DATA, "editable": False}, actor_id="1", guild=None)
+    interactive = [x for x in v.walk_children()
+                   if isinstance(x, (discord.ui.Select, discord.ui.ChannelSelect, discord.ui.Button))]
+    assert interactive and all(x.disabled for x in interactive)

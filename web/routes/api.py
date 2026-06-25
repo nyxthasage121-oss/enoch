@@ -349,10 +349,14 @@ def _bot_settings_view(conn) -> dict:
 
 
 @router.get("/settings", dependencies=[Depends(_require_bot)])
-async def get_settings_api():
-    """Curated chronicle settings for the bot `/settings show`."""
+async def get_settings_api(actor: str | None = None):
+    """Curated chronicle settings for the bot `/settings` menu. When `actor`
+    (a discord_id) is passed, includes `editable` = whether that user is a
+    Settings Admin, so the menu can disable its controls for non-admins."""
     with get_db() as conn:
-        return _bot_settings_view(conn)
+        view = _bot_settings_view(conn)
+        view["editable"] = bool(actor and is_settings_admin_id(conn, actor))
+        return view
 
 
 @router.post("/settings", dependencies=[Depends(_require_bot)])

@@ -1,13 +1,14 @@
-"""settings.py — `/settings` chronicle configuration from Discord.
+"""settings.py — `/settings` interactive chronicle-settings menu.
 
-A thin door onto the web's chronicle settings: read with `/settings show`, flip
-the common knobs (post channels, the dice roller, resonance/project mode, the XP
-cap) without leaving Discord. Every write goes through the web API, which enforces
-the Settings-Admin gate — the bot can't escalate its own authority. Complex config
-(tier budgets, chargen, predator unlocks, staff roles) stays on the web.
+One `/settings` command opens a single menu (Discord Components V2) of toggles +
+dropdowns + channel pickers that reflect the current chronicle settings and change
+them in place — modelled on tiltowait/inconnu's `/settings` UX (MIT). Every write
+goes through the web API, which is the single authority and enforces the
+Settings-Admin gate: non-admins see the menu, but its controls are disabled.
 
-Setting a channel from Discord is the win here: `/settings dice-channel` in a
-channel points posting there with no snowflake-copying.
+Setting a channel from Discord is the win — pick it from the dropdown right where
+you are, no snowflake-copying. Complex config (tier budgets, chargen, predator
+unlocks, staff roles) stays on the web.
 """
 import logging
 
@@ -21,153 +22,181 @@ log = logging.getLogger(__name__)
 
 _GOLD = 0xC8A85B
 
-# Mirror web/settings_enums.py — kept short here since the bot can't import the
-# web package. The web validates the value regardless, so a drift just gets a
-# polite error rather than a bad write.
-_RESONANCE_CHOICES = [
-    app_commands.Choice(name="Standard — V5 core", value="standard"),
-    app_commands.Choice(name="Tattered Facade — alt Disciplines", value="tattered_facade"),
-    app_commands.Choice(name="Add Empty — +1-in-6 Empty", value="add_empty"),
+# Mirror web/settings_enums.py (the bot can't import the web package; the web
+# re-validates every value, so any drift is a polite error, not a bad write).
+_RESONANCE = [
+    ("standard", "Standard — V5 core"),
+    ("tattered_facade", "Tattered Facade — alt Disciplines"),
+    ("add_empty", "Add Empty — +1-in-6 Empty"),
 ]
-_PROJECT_CHOICES = [
-    app_commands.Choice(name="NYbN — multi-stage extended test", value="nybn"),
-    app_commands.Choice(name="Homebrew — staff-set goal", value="homebrew"),
-    app_commands.Choice(name="Off — Projects disabled", value="off"),
+_PROJECT = [
+    ("nybn", "NYbN — multi-stage extended test"),
+    ("homebrew", "Homebrew — staff-set goal"),
+    ("off", "Off — Projects disabled"),
 ]
+_XP_AMOUNTS = [150, 200, 250, 300, 350, 400, 450, 500]
+_CHAR_CAPS = [0, 1, 2, 3, 4, 5, 6, 8, 10]
 
 
-def _chan(v) -> str:
-    v = str(v or "").strip()
-    return f"<#{v}>" if v.isdigit() else "—"
+def _chan_label(guild, raw) -> str:
+    """Human label for a stored channel id — a mention when we can resolve it."""
+    raw = str(raw or "").strip()
+    if not raw.isdigit():
+        return "—"
+    ch = guild.get_channel(int(raw)) if guild else None
+    return ch.mention if ch else f"<#{raw}>"
 
 
-def build_settings_embed(s: dict) -> discord.Embed:
-    """Render the curated chronicle settings (offline-testable)."""
-    e = discord.Embed(title="⚙️ Chronicle Settings", color=_GOLD)
-    e.add_field(name="Dice post channel", value=_chan(s.get("dice_channel_id")), inline=True)
-    e.add_field(name="ST tracker channel", value=_chan(s.get("st_channel_id")), inline=True)
-    e.add_field(name="Announce channel", value=_chan(s.get("announce_channel_id")), inline=True)
-    e.add_field(name="Web dice roller",
-                value="✅ on" if s.get("dice_roller_enabled") else "⛔ off", inline=True)
-    e.add_field(name="Resonance table", value=str(s.get("resonance_mode") or "standard"), inline=True)
-    e.add_field(name="Project mode", value=str(s.get("project_mode") or "nybn"), inline=True)
-    e.add_field(name="XP cap",
-                value=(f"✅ {s.get('xp_cap_amount', 350)}" if s.get("xp_cap_enabled") else "⛔ off"),
-                inline=True)
-    e.add_field(name="Chars / player", value=str(s.get("max_chars_per_player", 2)), inline=True)
-    e.set_footer(text="Complex config (budgets, chargen, staff roles) lives on the web.")
-    return e
+class SettingsView(discord.ui.LayoutView):
+    """The interactive chronicle-settings menu. Rebuilt from the API's settings
+    dict after every change, so the controls always show live state. Controls are
+    disabled unless ``data['editable']`` (the web says the user is Settings-Admin)."""
+
+    def __init__(self, data: dict, *, actor_id: str, guild) -> None:
+        super().__init__(timeout=300)
+        self.data = data
+        self.actor_id = actor_id
+        self.guild = guild
+        editable = bool(data.get("editable"))
+
+        c = discord.ui.Container(accent_colour=_GOLD)
+        note = ("Change any control to update it instantly." if editable
+                else "🔒 You need the **Settings Admin** flag to change these.")
+        c.add_item(discord.ui.TextDisplay(f"## ⚙️ Chronicle Settings\n{note}"))
+
+        # ── Toggles (two buttons share a row) ──
+        roller_on = bool(data.get("dice_roller_enabled"))
+        roller = discord.ui.Button(
+            label=f"Web Dice Roller: {'On' if roller_on else 'Off'}",
+            style=discord.ButtonStyle.success if roller_on else discord.ButtonStyle.secondary,
+            disabled=not editable)
+        roller.callback = self._toggle_roller
+        cap_on = bool(data.get("xp_cap_enabled"))
+        cap_amt = int(data.get("xp_cap_amount", 350) or 350)
+        cap = discord.ui.Button(
+            label=f"XP Cap: {('On · ' + str(cap_amt)) if cap_on else 'Off'}",
+            style=discord.ButtonStyle.success if cap_on else discord.ButtonStyle.secondary,
+            disabled=not editable)
+        cap.callback = self._toggle_cap
+        c.add_item(discord.ui.ActionRow(roller, cap))
+
+        # ── Enum + number dropdowns ──
+        c.add_item(discord.ui.ActionRow(self._enum_select(
+            "Resonance table", _RESONANCE, data.get("resonance_mode", "standard"),
+            editable, self._set_resonance)))
+        c.add_item(discord.ui.ActionRow(self._enum_select(
+            "Project mode", _PROJECT, data.get("project_mode", "nybn"),
+            editable, self._set_project)))
+        c.add_item(discord.ui.ActionRow(self._num_select(
+            "XP cap amount", _XP_AMOUNTS, cap_amt, editable, self._set_cap_amount)))
+        c.add_item(discord.ui.ActionRow(self._num_select(
+            "Characters per player", _CHAR_CAPS,
+            int(data.get("max_chars_per_player", 2) or 2), editable, self._set_chars,
+            zero_label="0 — unlimited")))
+
+        # ── Channels — current value shown above each picker; deselect to clear ──
+        for field, label, cb in (
+            ("dice_channel_id", "Dice post channel", self._set_dice_channel),
+            ("st_channel_id", "ST tracker channel", self._set_st_channel),
+            ("announce_channel_id", "Announcement channel", self._set_announce_channel),
+        ):
+            c.add_item(discord.ui.TextDisplay(
+                f"**{label}:** {_chan_label(guild, data.get(field))}"))
+            picker = discord.ui.ChannelSelect(
+                channel_types=[discord.ChannelType.text],
+                placeholder=f"Set {label} (or clear)",
+                min_values=0, max_values=1, disabled=not editable)
+            picker.callback = cb
+            c.add_item(discord.ui.ActionRow(picker))
+
+        self.add_item(c)
+
+    # ── component builders ──
+    def _enum_select(self, label, choices, current, editable, callback):
+        opts = [discord.SelectOption(label=text, value=val, default=(val == current))
+                for val, text in choices]
+        sel = discord.ui.Select(placeholder=f"{label}: {current}", options=opts,
+                                disabled=not editable)
+        sel.callback = callback
+        return sel
+
+    def _num_select(self, label, values, current, editable, callback, zero_label=None):
+        vals = sorted(set(list(values) + [current]))
+        opts = []
+        for v in vals:
+            text = zero_label if (zero_label and v == 0) else str(v)
+            opts.append(discord.SelectOption(label=text, value=str(v), default=(v == current)))
+        sel = discord.ui.Select(placeholder=f"{label}: {current}", options=opts,
+                                disabled=not editable)
+        sel.callback = callback
+        return sel
+
+    # ── persistence + live refresh ──
+    async def _apply(self, interaction: discord.Interaction, fields: dict) -> None:
+        result = await update_chronicle_settings(self.actor_id, fields)
+        if result.get("error"):
+            await interaction.response.send_message(f"❌ {result['error']}", ephemeral=True)
+            return
+        result["editable"] = True   # they just edited → they're a Settings Admin
+        await interaction.response.edit_message(
+            view=SettingsView(result, actor_id=self.actor_id, guild=self.guild))
+
+    @staticmethod
+    def _picked(interaction: discord.Interaction) -> str:
+        """The first selected value from a select/channel-select interaction, or
+        '' when nothing is selected (used to clear a channel)."""
+        vals = (interaction.data or {}).get("values") or []
+        return vals[0] if vals else ""
+
+    # ── callbacks ──
+    async def _toggle_roller(self, interaction: discord.Interaction) -> None:
+        await self._apply(interaction, {"dice_roller_enabled": 0 if self.data.get("dice_roller_enabled") else 1})
+
+    async def _toggle_cap(self, interaction: discord.Interaction) -> None:
+        await self._apply(interaction, {"xp_cap_enabled": 0 if self.data.get("xp_cap_enabled") else 1})
+
+    async def _set_resonance(self, interaction: discord.Interaction) -> None:
+        await self._apply(interaction, {"resonance_mode": self._picked(interaction)})
+
+    async def _set_project(self, interaction: discord.Interaction) -> None:
+        await self._apply(interaction, {"project_mode": self._picked(interaction)})
+
+    async def _set_cap_amount(self, interaction: discord.Interaction) -> None:
+        await self._apply(interaction, {"xp_cap_amount": int(self._picked(interaction) or 0)})
+
+    async def _set_chars(self, interaction: discord.Interaction) -> None:
+        await self._apply(interaction, {"max_chars_per_player": int(self._picked(interaction) or 0)})
+
+    async def _set_dice_channel(self, interaction: discord.Interaction) -> None:
+        await self._apply(interaction, {"dice_channel_id": self._picked(interaction)})
+
+    async def _set_st_channel(self, interaction: discord.Interaction) -> None:
+        await self._apply(interaction, {"st_channel_id": self._picked(interaction)})
+
+    async def _set_announce_channel(self, interaction: discord.Interaction) -> None:
+        await self._apply(interaction, {"announce_channel_id": self._picked(interaction)})
 
 
 class SettingsCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    settings = app_commands.Group(
+    @app_commands.command(
         name="settings",
-        description="View + change chronicle settings (Settings-Admin to change)",
-        guild_only=True,
-    )
-
-    async def _apply(self, interaction: discord.Interaction, fields: dict, label: str) -> None:
-        """Push a settings change through the web API, then confirm or surface the
-        error. The caller has already deferred."""
-        result = await update_chronicle_settings(str(interaction.user.id), fields)
-        if result.get("error"):
-            await interaction.followup.send(f"❌ {result['error']}", ephemeral=True)
-            return
-        await interaction.followup.send(f"✅ {label}", embed=build_settings_embed(result),
-                                        ephemeral=True)
-
-    @settings.command(name="show", description="Show the current chronicle settings.")
-    async def settings_show(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer(ephemeral=True)
+        description="View + change chronicle settings (Settings-Admin to change).")
+    @app_commands.guild_only()
+    async def settings(self, interaction: discord.Interaction) -> None:
         try:
-            s = await get_chronicle_settings()
+            data = await get_chronicle_settings(actor=str(interaction.user.id))
         except Exception as exc:
-            log.warning("settings show: fetch failed: %s", exc)
-            await interaction.followup.send(
+            log.warning("settings: fetch failed: %s", exc)
+            await interaction.response.send_message(
                 "❌ Could not reach the tracker right now. Try again in a moment.",
                 ephemeral=True)
             return
-        await interaction.followup.send(embed=build_settings_embed(s), ephemeral=True)
-
-    async def _set_channel(self, interaction: discord.Interaction, field: str,
-                           channel, disable: bool, name: str) -> None:
-        await interaction.response.defer(ephemeral=True)
-        if disable:
-            await self._apply(interaction, {field: ""}, f"{name} disabled.")
-            return
-        ch = channel or interaction.channel
-        await self._apply(interaction, {field: str(ch.id)}, f"{name} set to {ch.mention}.")
-
-    @settings.command(name="dice-channel",
-                      description="Where web rolls post (defaults to this channel).")
-    @app_commands.describe(channel="Channel (default: here)", disable="Turn dice posting off")
-    async def dice_channel(self, interaction: discord.Interaction,
-                           channel: discord.TextChannel | None = None,
-                           disable: bool = False) -> None:
-        await self._set_channel(interaction, "dice_channel_id", channel, disable, "Dice post channel")
-
-    @settings.command(name="st-channel",
-                      description="Where the ST vitals board posts (defaults to this channel).")
-    @app_commands.describe(channel="Channel (default: here)", disable="Turn ST posting off")
-    async def st_channel(self, interaction: discord.Interaction,
-                         channel: discord.TextChannel | None = None,
-                         disable: bool = False) -> None:
-        await self._set_channel(interaction, "st_channel_id", channel, disable, "ST tracker channel")
-
-    @settings.command(name="announce-channel",
-                      description="Where period reminders post (defaults to this channel).")
-    @app_commands.describe(channel="Channel (default: here)", disable="Turn announcements off")
-    async def announce_channel(self, interaction: discord.Interaction,
-                               channel: discord.TextChannel | None = None,
-                               disable: bool = False) -> None:
-        await self._set_channel(interaction, "announce_channel_id", channel, disable,
-                                "Announcement channel")
-
-    @settings.command(name="roller", description="Turn the web Dice Roller tab on or off.")
-    @app_commands.describe(enabled="On or off")
-    async def roller(self, interaction: discord.Interaction, enabled: bool) -> None:
-        await interaction.response.defer(ephemeral=True)
-        await self._apply(interaction, {"dice_roller_enabled": 1 if enabled else 0},
-                          f"Web dice roller {'enabled' if enabled else 'disabled'}.")
-
-    @settings.command(name="resonance", description="Set the Resonance table mode.")
-    @app_commands.choices(mode=_RESONANCE_CHOICES)
-    async def resonance(self, interaction: discord.Interaction,
-                        mode: app_commands.Choice[str]) -> None:
-        await interaction.response.defer(ephemeral=True)
-        await self._apply(interaction, {"resonance_mode": mode.value},
-                          f"Resonance table → {mode.name}.")
-
-    @settings.command(name="projects", description="Set the downtime Project mode.")
-    @app_commands.choices(mode=_PROJECT_CHOICES)
-    async def projects(self, interaction: discord.Interaction,
-                       mode: app_commands.Choice[str]) -> None:
-        await interaction.response.defer(ephemeral=True)
-        await self._apply(interaction, {"project_mode": mode.value},
-                          f"Project mode → {mode.name}.")
-
-    @settings.command(name="xp-cap", description="Turn the XP cap on/off and set its amount.")
-    @app_commands.describe(enabled="Enforce the cap", amount="Cap amount (optional)")
-    async def xp_cap(self, interaction: discord.Interaction, enabled: bool,
-                     amount: int | None = None) -> None:
-        await interaction.response.defer(ephemeral=True)
-        fields = {"xp_cap_enabled": 1 if enabled else 0}
-        if amount is not None:
-            fields["xp_cap_amount"] = amount
-        await self._apply(interaction, fields,
-                          f"XP cap {'on' if enabled else 'off'}"
-                          + (f" at {amount}" if amount is not None else "") + ".")
-
-    @settings.command(name="chars-per-player",
-                      description="Max active+pending characters per player (0 = unlimited).")
-    @app_commands.describe(count="Number (0–20)")
-    async def chars_per_player(self, interaction: discord.Interaction, count: int) -> None:
-        await interaction.response.defer(ephemeral=True)
-        await self._apply(interaction, {"max_chars_per_player": count},
-                          f"Characters per player → {count}.")
+        await interaction.response.send_message(
+            view=SettingsView(data, actor_id=str(interaction.user.id), guild=interaction.guild),
+            ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

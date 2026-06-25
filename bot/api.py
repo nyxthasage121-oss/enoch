@@ -93,10 +93,13 @@ async def get_staff_roster() -> list[dict]:
 
 # ── Chronicle settings ────────────────────────────────────────────────────────
 
-async def get_chronicle_settings() -> dict:
-    """Curated chronicle settings for `/settings show`."""
+async def get_chronicle_settings(actor: str | None = None) -> dict:
+    """Curated chronicle settings for the `/settings` menu. Pass ``actor`` (the
+    invoking user's discord id) to learn whether they're allowed to edit
+    (``editable`` in the response)."""
+    params = {"actor": actor} if actor else None
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        r = await client.get(f"{_base()}/api/settings", headers=_headers())
+        r = await client.get(f"{_base()}/api/settings", headers=_headers(), params=params)
         r.raise_for_status()
         return r.json()
 
