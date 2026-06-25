@@ -323,28 +323,6 @@ async def dismiss_all_alerts_route(
 
 # ── Data export ───────────────────────────────────────────────────────────────
 
-# Tables in the snapshot. Order is arbitrary — JSON keys preserve insertion.
-# `bot_outbox` is excluded by design: it's a transient queue, not chronicle data.
-_EXPORT_TABLES = (
-    "chronicle_settings",
-    "player_profiles",
-    "characters",
-    "play_periods",
-    "criteria",
-    "xp_claims",
-    "spend_requests",
-    "ledger_entries",
-    "audit_log",
-    "coteries",
-    "coterie_memberships",
-    "coterie_merits",
-    "coterie_flaws",
-    "coterie_requests",
-    "coterie_spends",
-    "hunting_sites",
-)
-
-
 @router.get("/admin/export.json")
 async def export_snapshot(
     request: Request,
@@ -354,34 +332,62 @@ async def export_snapshot(
     claims, spends, periods, coteries, ledger, audit log. Bot outbox
     (transient queue) and session data are excluded. Writes an audit
     row recording the export."""
-    from datetime import datetime, timezone
     import json as _json
     from fastapi.responses import Response
-    from ..db import write_audit
-
-    now = datetime.now(timezone.utc)
-    payload: dict = {
-        "schema_version": 1,
-        "exported_at":    now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "exported_by":    user["id"],
-        "tables":         {},
-    }
+    from ..db import build_export_snapshot, write_audit
 
     with get_db() as conn:
-        for table in _EXPORT_TABLES:
-            rows = conn.execute(f"SELECT * FROM {table}").fetchall()
-            payload["tables"][table] = rows
+        payload = build_export_snapshot(conn, user["id"])
         write_audit(conn, user["id"], "export_snapshot", "system", None,
-                    after={"tables": len(_EXPORT_TABLES),
+                    after={"tables": len(payload["tables"]),
                            "row_count": sum(len(v) for v in payload["tables"].values())})
 
     body = _json.dumps(payload, indent=2, default=str, ensure_ascii=False)
-    fname = f"enoch-export-{now.strftime('%Y-%m-%d')}.json"
+    fname = "enoch-export-" + payload["exported_at"][:10] + ".json"
     return Response(
         content=body,
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+@router.post("/admin/backup-now")
+async def backup_now(
+    request: Request,
+    user: dict = Depends(require_settings_admin),
+    _: None = Depends(csrf_protect),
+):
+    """Trigger an off-site backup immediately — posts a gzipped snapshot to the
+    configured Discord webhook. This is how staff test that the webhook works."""
+    from ..backups import run_backup_sweep
+    result = await run_backup_sweep(force=True)
+    if result.get("ok"):
+        flash = {"kind": "success",
+                 "message": f"Backup posted — {result['filename']} "
+                            f"({result['bytes'] // 1024} KB)."}
+    else:
+        flash = {"kind": "error", "message": result.get("reason") or "Backup failed."}
+    request.session["flash"] = [flash]
+    return RedirectResponse(url="/staff/admin#backups", status_code=303)
+
+
+@router.post("/admin/backup-webhook")
+async def set_backup_webhook(
+    request: Request,
+    user: dict = Depends(require_settings_admin),
+    _: None = Depends(csrf_protect),
+):
+    """Save (or clear) the off-site backup Discord webhook URL."""
+    from ..db import upsert_settings
+    form = await request.form()
+    url = (form.get("backup_webhook_url") or "").strip()[:500]
+    with get_db() as conn:
+        upsert_settings(conn, actor_id=user["id"], backup_webhook_url=url)
+    request.session["flash"] = [{
+        "kind": "success",
+        "message": "Backup webhook saved." if url else "Backup webhook cleared — automatic backups are off.",
+    }]
+    return RedirectResponse(url="/staff/admin#backups", status_code=303)
 
 
 # ── Global character search ───────────────────────────────────────────────────

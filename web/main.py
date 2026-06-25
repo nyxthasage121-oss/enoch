@@ -67,6 +67,15 @@ async def _hourly_period_closing_sweep() -> None:
             if created:
                 log.info("Auto-created next period %r (id=%s)",
                          created["label"], created["id"])
+            # Off-site backup — a no-op unless a webhook is configured and a day
+            # has passed. After the DB work so a backup hiccup can't block it.
+            from .backups import run_backup_sweep
+            backup = await run_backup_sweep()
+            if backup.get("ok"):
+                log.info("Posted off-site backup %s (%d bytes)",
+                         backup["filename"], backup["bytes"])
+            elif not backup.get("skipped"):
+                log.warning("Off-site backup failed: %s", backup.get("reason"))
         except Exception:
             log.exception("Period-closing sweep failed")
         await asyncio.sleep(60 * 60)  # 1h

@@ -1229,6 +1229,39 @@ def tier_budget(settings: dict | None, tier: str) -> dict:
     return out
 
 
+# Tables in a full chronicle export/backup. bot_outbox (transient queue) and
+# session data are excluded by design.
+EXPORT_TABLES = (
+    "chronicle_settings", "player_profiles", "characters", "play_periods",
+    "criteria", "xp_claims", "spend_requests", "ledger_entries", "audit_log",
+    "coteries", "coterie_memberships", "coterie_merits", "coterie_flaws",
+    "coterie_requests", "coterie_spends", "hunting_sites",
+)
+
+
+def build_export_snapshot(conn, exported_by: str = "system") -> dict:
+    """A full JSON-serialisable snapshot of all chronicle data — every table in
+    EXPORT_TABLES. Shared by the staff export.json download and the automated
+    off-site backup. Pure read; the caller decides whether to audit."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    payload: dict = {
+        "schema_version": 1,
+        "exported_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "exported_by": exported_by,
+        "tables": {},
+    }
+    for table in EXPORT_TABLES:
+        payload["tables"][table] = conn.execute(f"SELECT * FROM {table}").fetchall()
+    return payload
+
+
+def mark_backup_done(conn, when: str) -> None:
+    """Record the timestamp of the last successful off-site backup (singleton)."""
+    conn.execute("UPDATE chronicle_settings SET last_backup_at = ?", (when,))
+    conn.commit()
+
+
 def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
     ALLOWED = {
         "server_start_date", "xp_frequency", "night_start_hour",
@@ -1271,6 +1304,9 @@ def upsert_settings(conn, actor_id: str | None = None, **kwargs) -> dict:
         # Chronicle announcement channel (migration 057) — DB home for the
         # legacy CHRONICLE_CHANNEL_ID env var
         "announce_channel_id",
+        # Off-site backup webhook (migration 058). last_backup_at is set
+        # internally by the sweep via mark_backup_done, not the admin form.
+        "backup_webhook_url",
     }
     # Back-compat: 'in_memoriam' was a discrete active_ruleset value before
     # migration 040. It's now an orthogonal flag — translate a legacy POST
