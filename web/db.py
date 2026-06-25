@@ -2378,6 +2378,7 @@ def update_draft_claim(
         params.append("pending")
         sets.append("submitted_at=?")
         params.append(_now())
+        sets.append("rejection_reason=NULL")   # clear any prior send-back note
     if not sets:
         return claim
     params.append(claim_id)
@@ -2488,6 +2489,37 @@ def reject_claim(conn, claim_id: int, reviewer_id: str, reason: str) -> dict:
         "discord_id":   char["discord_id"],
         "claim_id":     claim_id,
         "reason":       reason,
+    })
+    return get_claim(conn, claim_id)
+
+
+def send_claim_back(conn, claim_id: int, reviewer_id: str, note: str) -> dict:
+    """Staff bounces a pending claim back to the player to fix + resubmit: it
+    becomes an editable draft carrying the staff note, so it leaves the pending
+    queue until the player resubmits (the note is cleared on resubmit). Only for
+    status='pending'."""
+    claim = get_claim(conn, claim_id)
+    if claim is None:
+        raise ValueError(f"Claim {claim_id} not found")
+    if claim["status"] != "pending":
+        raise ValueError(f"Claim {claim_id} is not pending")
+
+    now = _now()
+    conn.execute("""
+        UPDATE xp_claims
+        SET status='draft', reviewed_by=?, reviewed_at=?, rejection_reason=?
+        WHERE id=?
+    """, (reviewer_id, now, note, claim_id))
+
+    char = get_character(conn, claim["character_id"])
+    write_audit(conn, reviewer_id, "claim_sent_back", "claim", claim_id,
+                before={"status": "pending"},
+                after={"status": "draft", "note": note})
+    enqueue_bot(conn, "claim_sent_back", {
+        "character_id": char["id"],
+        "discord_id":   char["discord_id"],
+        "claim_id":     claim_id,
+        "note":         note,
     })
     return get_claim(conn, claim_id)
 

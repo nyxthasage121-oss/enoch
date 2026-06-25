@@ -13,6 +13,7 @@
     <div class="gilded p-5 clan-{{ claim.character_clan }} relative overflow-hidden aurora-beam {{ 'aurora-pulse-blood' if claim.status == 'pending' }}"
          x-data="{
            rejecting: false, reason: '',
+           sendingBack: false, sendBackNote: '',
            gx: 50, gy: 50, active: false,
            onMove(e) {
              const r = $el.getBoundingClientRect();
@@ -106,13 +107,18 @@
           {% if claim.status == 'pending' %}
           <p class="label-gold mb-3">Review</p>
 
-          <div x-show="!rejecting" class="space-y-2 aurora-sparkle-host">
+          <div x-show="!rejecting && !sendingBack" class="space-y-2 aurora-sparkle-host">
             <button hx-post="/staff/claims/{{ claim.id }}/approve"
                     hx-target="#claims-table"
                     hx-swap="outerHTML"
                     @click="if(window.Aurora) window.Aurora.sparkles($el.parentElement, 14)"
                     class="btn-send font-cinzel tracking-widest text-xs w-full py-2.5 aurora-beam">
               Approve
+            </button>
+            <button @click="sendingBack = true"
+                    title="Bounce this claim back to the player to fix and resubmit"
+                    class="btn-ghost font-cinzel tracking-widest text-xs w-full py-2.5">
+              Send Back
             </button>
             <button @click="rejecting = true"
                     class="btn-ghost font-cinzel tracking-widest text-xs w-full py-2.5">
@@ -137,6 +143,29 @@
                 Confirm Reject
               </button>
               <button type="button" @click="rejecting = false; reason = ''"
+                      class="btn-ghost font-cinzel text-[0.6rem] px-3 py-2">
+                Cancel
+              </button>
+            </div>
+          </form>
+
+          <form x-show="sendingBack" x-cloak
+                hx-post="/staff/claims/{{ claim.id }}/send-back"
+                hx-target="#claims-table"
+                hx-swap="outerHTML"
+                class="space-y-2">
+            <textarea name="note"
+                      x-model="sendBackNote"
+                      rows="3"
+                      placeholder="What should the player fix? They can edit + resubmit."
+                      required
+                      class="w-full text-xs resize-none"></textarea>
+            <div class="flex gap-2">
+              <button type="submit"
+                      class="btn-send font-cinzel tracking-widest text-[0.6rem] flex-1 py-2">
+                Send Back
+              </button>
+              <button type="button" @click="sendingBack = false; sendBackNote = ''"
                       class="btn-ghost font-cinzel text-[0.6rem] px-3 py-2">
                 Cancel
               </button>

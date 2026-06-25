@@ -62,6 +62,15 @@
   </div>
   {% endif %}
 
+  {# Staff sent this claim back for changes — show their note above the form. #}
+  {% if draft_claim and draft_claim.rejection_reason %}
+  <div class="gilded-inset px-4 py-3 mb-4 border border-blood-800">
+    <p class="font-cinzel tracking-widest text-[0.6rem] text-blood-400 mb-1">Sent back by staff</p>
+    <p class="font-garamond text-bone-300 text-sm leading-relaxed">{{ draft_claim.rejection_reason }}</p>
+    <p class="font-garamond text-bone-600 text-[0.7rem] italic mt-1">Adjust the claim below and resubmit.</p>
+  </div>
+  {% endif %}
+
   {# Resumed-draft banner #}
   {% if draft_claim %}
   <div class="gilded-inset px-4 py-3 mb-4 border border-mauve-800 flex items-center justify-between gap-3">

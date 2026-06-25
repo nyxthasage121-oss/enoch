@@ -199,6 +199,35 @@ def test_withdraw_does_not_remove_approved_claim(player):
     assert row and row["status"] == "approved"
 
 
+def test_send_claim_back_cycle(player):
+    """Staff send-back turns a pending claim into an editable draft carrying the
+    note; the player resubmits → pending again, note cleared."""
+    from web.db import get_db, send_claim_back, update_draft_claim
+    with get_db() as conn:
+        _c, _p, cid = _seed_claim(conn, discord="sb-1", name="Bouncer",
+                                  clan="brujah", status="pending")
+        sent = send_claim_back(conn, cid, "staff-1", "Add an RP link, please.")
+        assert sent["status"] == "draft"
+        assert sent["rejection_reason"] == "Add an RP link, please."
+        conn.commit()
+        resub = update_draft_claim(conn, cid, rp_links=["https://x"], submit_now=True)
+    assert resub["status"] == "pending"
+    assert not resub["rejection_reason"]   # cleared on resubmit
+
+
+def test_send_claim_back_refuses_non_pending(player):
+    from web.db import get_db, send_claim_back
+    with get_db() as conn:
+        _c, _p, cid = _seed_claim(conn, discord="sb-2", name="Done",
+                                  clan="ventrue", status="approved")
+        try:
+            send_claim_back(conn, cid, "staff-1", "note")
+            raised = False
+        except ValueError:
+            raised = True
+    assert raised, "send_claim_back must refuse a non-pending claim"
+
+
 def test_clan_and_predator_data_renders_in_wizard(player):
     """The wizard should embed the clan + predator data the Alpine state
     reads to render the pickers. The legacy Quick Reference sidebar was

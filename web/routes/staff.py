@@ -514,6 +514,37 @@ async def do_reject_claim(
     return resp
 
 
+@router.post("/claims/{claim_id}/send-back", response_class=HTMLResponse)
+async def do_send_claim_back(
+    request: Request,
+    claim_id: int,
+    user: dict = Depends(require_permission("approve_claim")),
+    _: None = Depends(csrf_protect),
+):
+    """Bounce a pending claim back to the player to fix + resubmit — it becomes
+    an editable draft carrying the staff note, instead of approve/reject."""
+    from ..db import send_claim_back
+    form = await request.form()
+    note = (form.get("note") or "").strip() or "Please review and resubmit."
+
+    err = None
+    try:
+        with get_db() as conn:
+            send_claim_back(conn, claim_id, user["id"], note)
+    except ValueError as e:
+        err = str(e)
+
+    with get_db() as conn:
+        claims = list_pending_claims(conn)
+
+    resp = templates.TemplateResponse(
+        request, "staff/partials/claims_table.html",
+        _ctx(request, claims=claims, oob_count=True),
+    )
+    _toast(resp, err or "Claim sent back to the player for changes.", "error" if err else "info")
+    return resp
+
+
 # Backwards-compat: legacy /staff/claims/history URLs land on the
 # consolidated page with the same filters preserved.
 @router.get("/claims/history", response_class=HTMLResponse)
