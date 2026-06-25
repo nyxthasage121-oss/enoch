@@ -8,7 +8,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
 from ..config import settings
-from ..db import get_db, get_staff_role, get_staff_role_ids, upsert_player
+from ..db import (
+    get_db, get_staff_role, get_staff_role_ids, is_settings_admin_id, upsert_player,
+)
 
 log = logging.getLogger(__name__)
 
@@ -216,18 +218,22 @@ async def callback(
 
     # ── Upsert player profile + resolve their assigned staff role ──────────────
     staff_role = None
+    is_sa = False
     try:
         with get_db() as conn:
             upsert_player(conn, user_id, username)
             staff_role = get_staff_role(conn, user_id)
+            is_sa = is_settings_admin_id(conn, user_id)
     except Exception:
         log.exception("Failed to upsert player profile for %s", user_id)
         # Non-fatal — session still gets set below
 
-    # An explicitly-assigned Enoch staff role (web Staff tab or bot `/staff role`)
-    # ALSO grants dashboard access, so an admin can add staff directly without a
-    # matching Discord role. Revoke access by clearing their role.
-    if staff_role:
+    # An assigned Enoch staff role (web Staff tab / bot `/staff role`) OR being a
+    # settings-admin (ENOCH_SETTINGS_ADMIN_IDS env / settings_admin flag) grants
+    # dashboard access. The settings-admin path bootstraps the first admin without
+    # a Discord role; an assigned role lets an admin add staff directly. Revoke
+    # access by clearing their role / removing the settings-admin grant.
+    if staff_role or is_sa:
         is_staff = True
 
     # ── Write session ─────────────────────────────────────────────────────────

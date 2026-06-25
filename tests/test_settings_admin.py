@@ -289,6 +289,31 @@ def test_staff_tab_has_access_and_add_sections(staff):
     assert "Staff Access" in r.text                   # relocated from Settings
 
 
+def test_settings_admin_bypasses_permission_gate(staff):
+    """A settings-admin holds every staff permission even with NO staff role —
+    the founder/superuser bootstrap (so the first admin can approve + assign
+    roles without a chicken-and-egg role grant)."""
+    from web.db import get_db, get_staff_role, set_staff_role, upsert_player
+    with get_db() as conn:
+        set_staff_role(conn, "999999999999999999", None, actor_id="t")   # clear DevStaff's role
+        upsert_player(conn, "perm-target-xyz", "PermTarget")
+        conn.commit()
+    try:
+        # DevStaff keeps the settings_admin flag → require_permission(manage_roles)
+        # passes via the bypass even though their staff role is now empty.
+        r = staff.post("/staff/admin/roles/perm-target-xyz/set",
+                       data={"_csrf": "dev-csrf-token", "role": "helper"},
+                       follow_redirects=False)
+        assert r.status_code == 303
+        with get_db() as conn:
+            assert get_staff_role(conn, "perm-target-xyz") == "helper"
+    finally:
+        with get_db() as conn:
+            set_staff_role(conn, "999999999999999999", "admin", actor_id="t")
+            conn.execute("DELETE FROM player_profiles WHERE discord_id='perm-target-xyz'")
+            conn.commit()
+
+
 def test_export_requires_settings_admin(staff, monkeypatch):
     """The full chronicle export (characters/claims/spends/ledger/audit log)
     is settings-admin only — a staff_role without the flag is blocked, since

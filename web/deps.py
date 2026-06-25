@@ -83,12 +83,18 @@ def require_permission(permission: str):
     def _checker(request: Request, user: dict = Depends(require_staff)) -> dict:
         from .db import staff_role_has_permission
         role = _current_staff_role(request)
-        if not staff_role_has_permission(role, permission):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Your staff role does not grant '{permission}' permission.",
-            )
-        return user
+        if staff_role_has_permission(role, permission):
+            return user
+        # Settings admins are the founder / superuser tier — they implicitly hold
+        # every staff permission. This also bootstraps the FIRST admin: set their
+        # id in ENOCH_SETTINGS_ADMIN_IDS (or grant the settings_admin flag) and
+        # they can approve + assign roles without a chicken-and-egg role grant.
+        if is_settings_admin(request, user):
+            return user
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your staff role does not grant '{permission}' permission.",
+        )
     return _checker
 
 

@@ -85,15 +85,21 @@ def test_bulk_xp_requires_reason(staff):
         assert get_character(conn, cid)["xp_total"] == before
 
 
-def test_bulk_xp_blocked_for_helper(staff):
-    """A Helper (no adjust_xp) is 403'd by the route gate, which reads the role
-    live from the DB — so even with a stale session they can't reach the tool."""
-    from web.db import get_db, set_staff_role
+def test_bulk_xp_blocked_for_helper(staff, monkeypatch):
+    """A Helper (no adjust_xp, and NOT a settings-admin) is 403'd by the route
+    gate, which reads the role live from the DB. Settings-admins are a superuser
+    bypass now, so the flag + env override are cleared to test the role gate."""
+    monkeypatch.delenv("ENOCH_SETTINGS_ADMIN_IDS", raising=False)
+    from web.db import get_db, set_settings_admin, set_staff_role
     with get_db() as conn:
         set_staff_role(conn, "999999999999999999", "helper", actor_id="test")
+        set_settings_admin(conn, "999999999999999999", False, actor_id="test")
+        conn.commit()
     try:
         r = staff.get("/staff/xp/bulk", follow_redirects=False)
         assert r.status_code == 403
     finally:
         with get_db() as conn:
             set_staff_role(conn, "999999999999999999", "admin", actor_id="test")
+            set_settings_admin(conn, "999999999999999999", True, actor_id="test")
+            conn.commit()
