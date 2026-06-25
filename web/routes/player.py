@@ -1017,7 +1017,7 @@ async def character_create(
                 clan=clan, predator_type=predator_type,
                 family_disciplines=_fam_discs,
                 advantage_pool=_bud["merits"] + _bud["advantages"] + _bud["backgrounds"],
-                flaw_cap=_bud["flaw_cap"],
+                flaw_cap=_bud["flaw_cap"], character_tier=character_tier,
             )
             if raw_errors:
                 return _rerender_wizard(raw_errors)

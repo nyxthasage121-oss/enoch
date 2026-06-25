@@ -251,7 +251,7 @@ V5_CLAN_INFO: dict[str, dict[str, str]] = {
     },
     "caitiff": {
         "name": "Caitiff",
-        "bane": "Clanless stigma — no in-clan Disciplines; every Discipline costs the out-of-clan rate. Vampires who recognize Caitiffs often look down on them.",
+        "bane": "Clanless stigma — no in-clan Disciplines; raising any Discipline costs new level × 6 XP (between in-clan ×5 and out-of-clan ×7). Vampires who recognize Caitiffs often look down on them.",
         "compulsion": "No fixed Compulsion — staff and player negotiate one at chargen.",
     },
     "gangrel": {
@@ -956,7 +956,7 @@ def validate_chargen_raw(
     clan: str = "", predator_type: str | None = None,
     family_disciplines: list[str] | None = None,
     advantage_pool: int | None = None, flaw_cap: int | None = None,
-    flaw_min: int = 2,
+    flaw_min: int = 2, character_tier: str = "",
 ) -> list[str]:
     """Validate a chargen sheet against V5 "rules as written" priority spreads.
 
@@ -967,6 +967,14 @@ def validate_chargen_raw(
     skip this when the chronicle runs homebrew budgets.
     """
     errors: list[str] = []
+
+    # A thin-blood is identified either by clan or by the Thin-Blood tier — the
+    # wizard accepts both, so honour both here (the discipline-spread exemption
+    # and the 1:1 thin-blood Merit funding both key off this).
+    _is_thinblood = (
+        (clan or "").strip().lower() in ("thin-blood", "thinblood")
+        or (character_tier or "").strip().lower() == "thinblood"
+    )
 
     # Attributes — the multiset of base values must equal the V5 spread.
     attr_base = sorted((base_trait_value(sheet, k) for k in _ATTR_KEYS), reverse=True)
@@ -1046,7 +1054,7 @@ def validate_chargen_raw(
         # Discipline COUNT / shape — base (pre-XP) dots must match the spread
         # (2+1 standard, or the chosen Ancilla spread) PLUS the predator's free
         # dot. Thin-bloods use Alchemy instead of Disciplines, so they're exempt.
-        if (clan or "").strip().lower() not in ("thin-blood", "thinblood"):
+        if not _is_thinblood:
             _spread_slug = (sheet.get("discipline_spread") or "standard").strip().lower()
             _spread = V5_DISCIPLINE_SPREADS.get(_spread_slug) or V5_DISCIPLINE_SPREADS["standard"]
             _free = PREDATOR_FREE_DISCIPLINE_DOTS if predator_type else 0
@@ -1167,7 +1175,7 @@ def validate_chargen_raw(
             )
 
         # Thin-blood-specific Merits must each be funded by a thin-blood Flaw (1:1).
-        if (clan or "").strip().lower() in ("thin-blood", "thinblood"):
+        if _is_thinblood:
             def _tb_count(list_key: str) -> int:
                 return sum(
                     1 for it in (sheet.get(list_key) or [])

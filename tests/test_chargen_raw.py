@@ -72,6 +72,21 @@ def test_bonus_flaws_excluded_from_creation_cap():
     assert any("Flaws total" in e for e in errs2), errs2
 
 
+def test_thinblood_by_tier_is_exempt_from_discipline_spread():
+    """A Thin-Blood identified by the tier (not the clan) is still exempt from
+    the 2+1 discipline-spread check — the validator honours character_tier, not
+    just clan."""
+    from web.v5_traits import validate_chargen_raw
+    s = _valid_sheet()
+    s["disc_celerity"] = 0
+    s["disc_potence"] = 0   # no disciplines — would fail the 2+1 spread...
+    # ...but a thin-blood-by-tier uses Alchemy instead, so it's exempt.
+    assert not any("Discipline" in e
+                   for e in validate_chargen_raw(s, character_tier="thinblood"))
+    # A normal kindred with the same missing disciplines DOES error.
+    assert any("Discipline" in e for e in validate_chargen_raw(s))
+
+
 def test_pool_upgraded_grant_counts_only_delta():
     """A predator grant upgraded with creation dots (Beautiful 2 → Stunning 4,
     src='predator', granted_dots=2) charges only the 2-dot delta to the
