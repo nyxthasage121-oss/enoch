@@ -611,6 +611,7 @@
           </div>
           {% for label, value in [
             ('Concept',       char.concept),
+            ('Generation',    (sheet.get('generation')|string ~ 'th') if sheet.get('generation') else None),
             ('Ambition',      char.ambition),
             ('Desire',        char.desire),
             ('Profession',    char.profession),

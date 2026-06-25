@@ -370,6 +370,35 @@
                x-model="charName.name" autocomplete="off" class="w-full text-lg">
       </div>
 
+      {# Identity — sire + V5 drives. All also editable later on the character
+         page; captured here so the sheet is complete at submission. #}
+      <div class="gilded p-5 mb-5">
+        <p class="label-gold mb-3">Identity</p>
+        <div class="mb-4">
+          <label class="block text-[0.6rem] tracking-widest uppercase text-bone-700 mb-1">
+            Sire <span class="normal-case tracking-normal text-bone-800">— who Embraced you</span>
+          </label>
+          <input type="text" name="sire" maxlength="80" x-model="charName.sire"
+                 placeholder="Your sire's name…" autocomplete="off" class="w-full text-sm">
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[0.6rem] tracking-widest uppercase text-bone-700 mb-1">
+              Ambition <span class="normal-case tracking-normal text-bone-800">— long-term goal</span>
+            </label>
+            <input type="text" name="ambition" maxlength="120" x-model="charName.ambition"
+                   placeholder="What drives you across the nights…" autocomplete="off" class="w-full text-sm">
+          </div>
+          <div>
+            <label class="block text-[0.6rem] tracking-widest uppercase text-bone-700 mb-1">
+              Desire <span class="normal-case tracking-normal text-bone-800">— immediate want</span>
+            </label>
+            <input type="text" name="desire" maxlength="120" x-model="charName.desire"
+                   placeholder="What you want right now…" autocomplete="off" class="w-full text-sm">
+          </div>
+        </div>
+      </div>
+
       {# Type picker grid #}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
         {% set _types = [
@@ -509,6 +538,27 @@
           </button>
           {% endfor %}
         </div>
+      </div>
+
+      {# Generation — optional flavour/reference. The tier above sets BP + XP;
+         this only records the literal generation on the sheet (V5: lower = older
+         and more potent). #}
+      <div x-show="charName.character_type === 'kindred'" x-cloak class="gilded p-5 mb-5">
+        <label class="label-gold block mb-2">
+          Generation <span class="text-bone-700 font-sans normal-case text-[0.6rem]">— optional; your tier sets the mechanics</span>
+        </label>
+        <select name="generation" x-model="sheet.generation" class="w-full md:w-72">
+          <option value="">— unspecified —</option>
+          <option value="8">8th Generation</option>
+          <option value="9">9th Generation</option>
+          <option value="10">10th Generation</option>
+          <option value="11">11th Generation</option>
+          <option value="12">12th Generation</option>
+          <option value="13">13th Generation</option>
+          <option value="14">14th Generation</option>
+          <option value="15">15th Generation</option>
+          <option value="16">16th Generation</option>
+        </select>
       </div>
 
       {# ── Ancilla mode picker (only for Ancilla) ──
@@ -2673,6 +2723,7 @@
                               ? 'in_memoriam'
                               : (initial.ancilla_mode || ''),
         // Phase 5 metadata
+        sire:               initial.sire         || '',
         ambition:           initial.ambition     || '',
         desire:             initial.desire       || '',
         profession:         initial.profession   || '',

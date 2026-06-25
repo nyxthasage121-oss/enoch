@@ -3076,13 +3076,17 @@ def test_sheet_pips_use_reliable_utility_classes():
     assert ".pip-on" in codex and ".pip-off" in codex, "codex.css must define the pip utilities"
 
 
-def test_chargen_has_no_sire_field():
-    """Sire is collected in the About My Character panel, not during chargen
-    (staff direction 2026-05). The wizard must not render a sire input."""
+def test_chargen_collects_identity_fields():
+    """Sire, Ambition, Desire, and an optional Generation are collected in the
+    wizard (Phase 3 of the Progeny coverage sweep, 2026-06-25 — reversing the
+    earlier 2026-05 deferral; the About My Character panel still edits them too)."""
     from pathlib import Path
     tpl = (Path(__file__).resolve().parents[1]
            / "web" / "templates" / "player" / "character_create.html").read_text(encoding="utf-8")
-    assert 'name="sire"' not in tpl, "chargen should not have a Sire input — it's set in About."
+    assert 'name="sire"' in tpl
+    assert 'name="ambition"' in tpl
+    assert 'name="desire"' in tpl
+    assert 'name="generation"' in tpl
 
 
 def test_about_section_hosts_profile_image_form():

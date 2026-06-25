@@ -1622,6 +1622,16 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
                 clean["alchemist"] = alch
             sheet["merit_grants"] = clean
 
+    # Optional literal generation (flavour/reference; the tier drives BP/XP).
+    raw = form.get("generation")
+    if raw not in (None, ""):
+        try:
+            g = int(raw)
+            if 1 <= g <= 16:
+                sheet["generation"] = g
+        except (ValueError, TypeError):
+            pass
+
     # Discipline powers — {discipline: 'disc_auspex', name: 'Heightened Senses', level: 1}
     raw = form.get("powers")
     if raw is not None:

@@ -219,11 +219,13 @@
         {% endif %}
         {% set _has_any = char.concept or char.sire or char.covenant or char.predator_type
                           or char.profession or char.pronouns or char.true_age or char.apparent_age
-                          or char.ambition or char.desire or char.profile_blurb or char.backstory %}
+                          or char.ambition or char.desire or char.profile_blurb or char.backstory
+                          or (char.sheet_json or {}).get('generation') %}
         {% if _has_any %}
         <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
           {% for label, val in [
             ('Concept', char.concept), ('Sire', char.sire),
+            ('Generation', ((char.sheet_json or {}).get('generation')|string ~ 'th') if (char.sheet_json or {}).get('generation') else None),
             ('Predator Type', char.predator_type), ('Covenant', char.covenant),
             ('Profession', char.profession), ('Pronouns', char.pronouns),
             ('True Age', char.true_age), ('Apparent Age', char.apparent_age),
