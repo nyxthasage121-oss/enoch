@@ -241,12 +241,12 @@ V5_SITE_PREDATOR_TYPES: list[str] = [
 V5_CLAN_INFO: dict[str, dict[str, str]] = {
     "banu-haqim": {
         "name": "Banu Haqim",
-        "bane": "Diablerist's curse — drinking vampire blood is addictive; resisting requires a Hunger test against intoxication.",
+        "bane": "Blood Addiction — drinking another vampire's blood is addictive; the Banu Haqim must pass a test or be compelled to keep drinking from that vampire.",
         "compulsion": "Judgment — driven to punish those who break their personal code; bite anyone who transgresses or take a 2-die penalty.",
     },
     "brujah": {
         "name": "Brujah",
-        "bane": "Volatile temper — penalty equal to Bane Severity on rolls to resist fury frenzy.",
+        "bane": "Violent Temper — penalty equal to Bane Severity on rolls to resist fury frenzy.",
         "compulsion": "Rebellion — must defy the most recent order, request, or expectation until they've pushed back; 2-die penalty otherwise.",
     },
     "caitiff": {
@@ -256,7 +256,7 @@ V5_CLAN_INFO: dict[str, dict[str, str]] = {
     },
     "gangrel": {
         "name": "Gangrel",
-        "bane": "Beastly features — after each frenzy, gain an animal trait that imposes a penalty until next sunset.",
+        "bane": "Bestial Features — after each frenzy, gain an animal feature that imposes a penalty equal to Bane Severity until the next sunset.",
         "compulsion": "Feral Impulses — regress to instinct; lose dice on Social/Mental pools and prefer physical solutions for one scene.",
     },
     "hecata": {
@@ -266,7 +266,7 @@ V5_CLAN_INFO: dict[str, dict[str, str]] = {
     },
     "lasombra": {
         "name": "Lasombra",
-        "bane": "Distorted reflection — no clear reflection in mirrors and recording devices distort their image and voice.",
+        "bane": "Distorted Image — they cast no clear reflection, and recording devices distort their image and voice.",
         "compulsion": "Ruthlessness — every plan must include the most direct path to power, even if cruel; 2-die penalty on rolls that don't.",
     },
     "malkavian": {
@@ -276,7 +276,7 @@ V5_CLAN_INFO: dict[str, dict[str, str]] = {
     },
     "ministry": {
         "name": "The Ministry",
-        "bane": "Cold Blood — sunlight, fire, and faith damage them more readily; Aggravated damage scales with Bane Severity.",
+        "bane": "Abhors the Light — bright light (sunlight or any intense source) imposes a penalty equal to Bane Severity to all dice pools, and sunlight inflicts extra Aggravated damage scaling with Bane Severity.",
         "compulsion": "Transgression — tempt someone (or yourself) into breaking a rule, taboo, or vow before the scene ends.",
     },
     "nosferatu": {
@@ -291,7 +291,7 @@ V5_CLAN_INFO: dict[str, dict[str, str]] = {
     },
     "salubri": {
         "name": "Salubri",
-        "bane": "Hunted Blood — drinking from a Salubri compels other Kindred to seek them out; their vitae draws diablerists.",
+        "bane": "Hunted — anyone who drinks a Salubri's blood gains a taste for it and feels compelled to hunt them down; their vitae marks them for diablerie.",
         "compulsion": "Affective Empathy — drawn to another character's distress; must act on their feelings or take a penalty until they intervene.",
     },
     "thin-blood": {
@@ -301,12 +301,12 @@ V5_CLAN_INFO: dict[str, dict[str, str]] = {
     },
     "toreador": {
         "name": "Toreador",
-        "bane": "Aesthetic Failure — surroundings that fall short of their standard impose a penalty equal to Bane Severity on Discipline rolls.",
+        "bane": "Aesthetic Fixation — surroundings that fall short of their standards impose a penalty equal to Bane Severity on dice pools (the Storyteller picks which).",
         "compulsion": "Obsession — fixate on a person, object, or sensation; can't take attention off it until the scene ends or it leaves their senses.",
     },
     "tremere": {
         "name": "Tremere",
-        "bane": "Deficient Bond — their Blood cannot create permanent Bonds normally; each step takes additional drinks equal to Bane Severity.",
+        "bane": "Deficient Blood — their Blood cannot create Blood Bonds normally; each step of a Bond takes additional drinks equal to Bane Severity.",
         "compulsion": "Perfectionism — repeat actions until they get them \"right\"; 2-die penalty on dice pools until a critical win or scene end.",
     },
     "tzimisce": {

@@ -3669,11 +3669,11 @@ def test_active_clan_bane_helper_resolves_standard_and_variant():
 def test_staff_sheet_shows_active_clan_bane_effect(staff):
     """The staff character sheet surfaces the active clan Bane's name + the
     mechanical effect text (not just the build-summary one-liner)."""
-    # Seed character id 1 (Valeria) is Brujah → standard Bane 'Volatile temper'.
+    # Seed character id 1 (Valeria) is Brujah → standard Bane 'Violent Temper'.
     r = staff.get("/staff/characters/1")
     assert r.status_code == 200
     assert "Clan Bane" in r.text
-    assert "Volatile temper" in r.text
+    assert "Violent Temper" in r.text
     assert "fury frenzy" in r.text
 
 
