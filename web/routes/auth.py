@@ -8,7 +8,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
 from ..config import settings
-from ..db import get_db, get_staff_role_ids, upsert_player
+from ..db import get_db, get_staff_role, get_staff_role_ids, upsert_player
 
 log = logging.getLogger(__name__)
 
@@ -214,13 +214,21 @@ async def callback(
             member_roles = {int(r) for r in member.get("roles", [])}
             is_staff     = bool(member_roles & allowed_roles)
 
-    # ── Upsert player profile ─────────────────────────────────────────────────
+    # ── Upsert player profile + resolve their assigned staff role ──────────────
+    staff_role = None
     try:
         with get_db() as conn:
             upsert_player(conn, user_id, username)
+            staff_role = get_staff_role(conn, user_id)
     except Exception:
         log.exception("Failed to upsert player profile for %s", user_id)
         # Non-fatal — session still gets set below
+
+    # An explicitly-assigned Enoch staff role (web Staff tab or bot `/staff role`)
+    # ALSO grants dashboard access, so an admin can add staff directly without a
+    # matching Discord role. Revoke access by clearing their role.
+    if staff_role:
+        is_staff = True
 
     # ── Write session ─────────────────────────────────────────────────────────
     request.session["user"] = {
@@ -230,18 +238,9 @@ async def callback(
     }
     request.session["is_staff"] = is_staff
     request.session["_csrf"]    = secrets.token_urlsafe(32)
-
-    # Pull the assigned Enoch staff role (if any) into the session so
-    # require_permission can gate without hitting the DB on every request.
+    # Cache the assigned role so require_permission gates without a per-request DB hit.
     if is_staff:
-        # NB: get_db is already imported at module top — do NOT re-import it
-        # here. A function-local `import get_db` would make the name local to
-        # this whole function and turn the earlier upsert call (above) into an
-        # UnboundLocalError, silently killing the player-profile upsert.
-        from ..db import get_staff_role
-        with get_db() as conn:
-            role = get_staff_role(conn, user_id)
-        request.session["staff_role"] = role or ""
+        request.session["staff_role"] = staff_role or ""
 
     log.info("Login: %s (%s) staff=%s role=%s", username, user_id, is_staff,
              request.session.get("staff_role") or "—")

@@ -251,6 +251,44 @@ def test_admin_renders_enum_driven_options(staff):
     assert "NYbN — multi-stage extended test" in r.text                 # project_mode
 
 
+def test_add_staff_member_upserts_and_assigns(staff):
+    """The Staff tab 'Add staff member' route upserts the profile + assigns the
+    role (the web twin of the bot's /staff role)."""
+    from web.db import get_db, get_staff_role
+    try:
+        r = staff.post("/staff/admin/staff/add",
+                       data={"_csrf": "dev-csrf-token", "discord_id": "424242424242424242",
+                             "username": "NewST", "role": "storyteller"},
+                       follow_redirects=False)
+        assert r.status_code == 303
+        with get_db() as conn:
+            assert get_staff_role(conn, "424242424242424242") == "storyteller"
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM player_profiles WHERE discord_id='424242424242424242'")
+            conn.commit()
+
+
+def test_add_staff_member_rejects_non_numeric_id(staff):
+    from web.db import get_db
+    r = staff.post("/staff/admin/staff/add",
+                   data={"_csrf": "dev-csrf-token", "discord_id": "not-an-id",
+                         "username": "JunkUser", "role": "helper"},
+                   follow_redirects=False)
+    assert r.status_code == 303                       # redirected with a flash error
+    with get_db() as conn:
+        assert conn.execute(
+            "SELECT 1 FROM player_profiles WHERE username='JunkUser'").fetchall() == []
+
+
+def test_staff_tab_has_access_and_add_sections(staff):
+    """Staff Access moved onto the Staff tab, and the Add-member form is there."""
+    r = staff.get("/staff/admin")
+    assert r.status_code == 200
+    assert "Add Staff Member" in r.text and "/staff/admin/staff/add" in r.text
+    assert "Staff Access" in r.text                   # relocated from Settings
+
+
 def test_export_requires_settings_admin(staff, monkeypatch):
     """The full chronicle export (characters/claims/spends/ledger/audit log)
     is settings-admin only — a staff_role without the flag is blocked, since

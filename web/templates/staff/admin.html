@@ -594,20 +594,34 @@
       </div>
     </div>
     {% endif %}
+  </div>
 
-    {# Staff access — when the bot can list the server's roles AND the viewer is
-       a settings admin, pick which roles grant staff-dashboard access (migration
-       056). Otherwise a clear read-only note. Dedicated form → /admin/staff-roles
-       so a partial submit can't clobber the other settings. #}
+  {# ─────────────────────────── Staff tab ─────────────────────────── #}
+  {# Was "Players" — renamed 2026-05 per Steward direction. The tab
+     manages staff role assignments and the Settings Admin flag; it does
+     not (and never did) manage player-side things like character
+     creation. The Discord-role gate still controls who shows up here. #}
+  <div x-show="tab === 'staff'" x-cloak class="space-y-4">
+    <div>
+      <p class="label-gold mb-1">Staff</p>
+      <p class="font-garamond text-bone-600 text-sm leading-relaxed">
+        Who can reach the staff dashboard, and what each person can do. Access is granted two ways:
+        tick Discord roles in <span class="text-bone-400">Staff Access</span> (everyone with that role),
+        or add someone directly (an assigned role grants access on their next login).
+      </p>
+    </div>
+
+    {# Staff Access — which Discord server roles grant dashboard access (the bulk
+       gate). Moved here from Settings 2026-06. Role picker when the bot can list
+       roles + the viewer is a settings admin; else a read-only env note. #}
     <div class="gilded-inset px-5 py-4 border border-ink-700">
       <p class="label-gold mb-1">Staff Access</p>
       {% if discord_roles and viewer_is_settings_admin %}
       {% set _sr = (_cs.get('staff_role_ids') or []) | map('string') | list %}
       <p class="font-garamond text-bone-500 text-sm leading-relaxed mb-3">
-        Tick the Discord roles that grant access to the staff dashboard — applies on each
-        member's next login, <em>in addition</em> to any roles set via the
+        Tick the Discord roles that grant access to the staff dashboard — everyone with one of these
+        roles gets in on their next login, <em>in addition</em> to any roles set via the
         <span class="font-cinzel text-bone-400">STAFF_ROLE_IDS</span> environment variable.
-        Assign each person's role + permissions on the <span class="text-bone-400">Staff</span> tab.
       </p>
       <form method="post" action="/staff/admin/staff-roles">
         <input type="hidden" name="_csrf" value="{{ csrf_token }}">
@@ -626,29 +640,43 @@
       <p class="font-garamond text-bone-500 text-sm leading-relaxed">
         Staff dashboard access is granted by Discord server role. Set
         <span class="font-cinzel text-bone-400">STAFF_ROLE_IDS</span> (comma-separated role IDs)
-        in the app's environment — changes take effect at each member's next login. This is a
-        read-only note; there's nothing to enter here. Assign each person's role + permissions on
-        the <span class="text-bone-400">Staff</span> tab.
+        in the app's environment — changes take effect at each member's next login. Or add someone
+        directly below (no Discord role needed).
         {% if not discord_roles %}<span class="block mt-1 text-bone-700 text-xs italic">Set a bot token (<span class="font-cinzel">DISCORD_BOT_TOKEN</span>) on the web app to pick roles from a list here.</span>{% endif %}
       </p>
       {% endif %}
     </div>
-  </div>
 
-  {# ─────────────────────────── Staff tab ─────────────────────────── #}
-  {# Was "Players" — renamed 2026-05 per Steward direction. The tab
-     manages staff role assignments and the Settings Admin flag; it does
-     not (and never did) manage player-side things like character
-     creation. The Discord-role gate still controls who shows up here. #}
-  <div x-show="tab === 'staff'" x-cloak>
-    <div class="flex items-center justify-between mb-3">
-      <p class="label-gold">Registered Players <span class="text-bone-600 ml-2">{{ players | length }}</span></p>
+    {# Add a staff member directly by Discord ID — the web twin of the bot's
+       /staff role. An assigned role grants access on next login (see auth.py). #}
+    {% if 'manage_roles' in viewer_perms %}
+    <div class="gilded-inset px-5 py-4 border border-ink-700">
+      <p class="label-gold mb-1">Add Staff Member</p>
+      <p class="font-garamond text-bone-500 text-sm leading-relaxed mb-3">
+        Grant someone a staff role by Discord user ID — they get dashboard access on their next login,
+        even without a Staff Access role above. (Developer Mode on → right-click a member →
+        <span class="text-bone-400">Copy User ID</span>.)
+      </p>
+      <form method="post" action="/staff/admin/staff/add" class="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <input type="text" name="discord_id" inputmode="numeric" required
+               placeholder="Discord user ID" class="text-sm grow min-w-[10rem]">
+        <input type="text" name="username" maxlength="80" placeholder="Name (optional)" class="text-sm">
+        <select name="role" required class="text-sm">
+          <option value="" disabled selected>Role…</option>
+          {% for role_key, role_label in staff_role_labels.items() %}
+          <option value="{{ role_key }}">{{ role_label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn-send font-cinzel tracking-widest text-xs px-4 py-2">Add</button>
+      </form>
     </div>
+    {% endif %}
 
-    <div class="gilded-inset px-4 py-3 mb-4 border border-gold-900/40 space-y-2">
+    {# Role-meaning reference + the Settings-Admin note #}
+    <div class="gilded-inset px-4 py-3 border border-gold-900/40 space-y-2">
       <p class="font-garamond text-bone-500 text-xs leading-relaxed">
-        <strong class="text-bone-400">Staff roles</strong> gate what each ST can do
-        once the Discord role grants them dashboard access.
+        <strong class="text-bone-400">Staff roles</strong> gate what each person can do once they have access.
         <strong class="text-mauve-400">Admin</strong>: every permission, including settings + role management.
         <strong class="text-mauve-400">Moderator</strong> / <strong class="text-mauve-400">Storyteller</strong>: full XP + chronicle management, but not settings or roles.
         <strong class="text-mauve-400">Helper</strong>: spend approvals only.
@@ -660,6 +688,10 @@
         grant ships pre-set for existing Lead STs but must be granted explicitly to
         anyone new.
       </p>
+    </div>
+
+    <div class="flex items-center justify-between mb-1">
+      <p class="label-gold">Registered Players <span class="text-bone-600 ml-2">{{ players | length }}</span></p>
     </div>
 
     <div class="gilded overflow-x-auto">

@@ -2253,7 +2253,40 @@ async def set_staff_access_roles_route(
         "kind": "success",
         "message": f"Saved {len(ids)} staff-access role{'' if len(ids) == 1 else 's'}. "
                    "Members get access on their next login."}]
-    return RedirectResponse(url="/staff/admin#settings", status_code=303)
+    return RedirectResponse(url="/staff/admin#staff", status_code=303)
+
+
+@router.post("/admin/staff/add", response_class=HTMLResponse)
+async def add_staff_member_route(
+    request: Request,
+    user: dict = Depends(require_permission("manage_roles")),
+    _: None = Depends(csrf_protect),
+):
+    """Add a staff member by Discord user ID and assign their role — even before
+    they've logged in (upserts the profile). An assigned role grants dashboard
+    access (see auth.py), so this is the web twin of the bot's `/staff role`.
+    Admin-only (manage_roles)."""
+    from ..db import STAFF_ROLES, set_staff_role, upsert_player
+    form = await request.form()
+    discord_id = (form.get("discord_id") or "").strip()
+    username = (form.get("username") or "").strip()
+    role = (form.get("role") or "").strip().lower() or None
+    if not discord_id.isdigit():
+        request.session["flash"] = [{"kind": "error",
+            "message": "Enter a numeric Discord user ID "
+                       "(turn on Developer Mode, right-click a member → Copy User ID)."}]
+        return RedirectResponse(url="/staff/admin#staff", status_code=303)
+    if role is not None and role not in STAFF_ROLES:
+        request.session["flash"] = [{"kind": "error", "message": f"Unknown role: {role!r}"}]
+        return RedirectResponse(url="/staff/admin#staff", status_code=303)
+    with get_db() as conn:
+        upsert_player(conn, discord_id, username or discord_id)
+        set_staff_role(conn, discord_id, role, actor_id=user["id"])
+    who = username or discord_id
+    msg = (f"Cleared {who}'s staff role." if role is None
+           else f"{who} added as {role}. They get dashboard access on their next login.")
+    request.session["flash"] = [{"kind": "success", "message": msg}]
+    return RedirectResponse(url="/staff/admin#staff", status_code=303)
 
 
 @router.post("/admin/settings-admin/{discord_id}/set", response_class=HTMLResponse)
