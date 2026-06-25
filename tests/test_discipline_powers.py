@@ -9,8 +9,9 @@ _DISC_KEYS = {k for k, _ in V5_DISCIPLINES}
 def test_catalog_loads_and_covers_disciplines():
     assert len(DISCIPLINE_POWERS) == 12
     total = sum(len(v) for v in DISCIPLINE_POWERS.values())
-    assert total == 244
-    # Thin-Blood Alchemy formula catalog brought to V5 parity (2026-06-25).
+    assert total == 249
+    # Thin-Blood Alchemy formula catalog brought to V5 parity (2026-06-25),
+    # plus 5 Players-Guide powers added in the Progeny coverage sweep.
     assert len(DISCIPLINE_POWERS["disc_thin_blood_alchemy"]) == 48
     for k in DISCIPLINE_POWERS:                 # every key is a real discipline
         assert k in _DISC_KEYS, k

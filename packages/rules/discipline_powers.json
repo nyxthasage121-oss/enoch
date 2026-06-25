@@ -385,6 +385,13 @@
       "rouse_checks": 1
     },
     {
+      "name": "Ripples of the Heart",
+      "level": 3,
+      "summary": "alter blood resonance or seed a compulsion into blood the next vampire drinks",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
       "name": "Scorpion's Touch",
       "level": 3,
       "summary": "turn your blood into paralyzing poison",
@@ -910,6 +917,19 @@
       "amalgam": [
         {
           "discipline": "disc_presence",
+          "level": 1
+        }
+      ]
+    },
+    {
+      "name": "Doubletalk",
+      "level": 2,
+      "summary": "hide a short private message inside ordinary speech for one intended listener",
+      "dice_pool": "Composure + Obfuscate",
+      "rouse_checks": 1,
+      "amalgam": [
+        {
+          "discipline": "disc_auspex",
           "level": 1
         }
       ]
@@ -1484,6 +1504,13 @@
       "rouse_checks": 1
     },
     {
+      "name": "Wingman",
+      "level": 4,
+      "summary": "extend one of your active Presence powers to another willing vampire instead of yourself",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
       "name": "Majesty",
       "level": 5,
       "summary": "amplify your countenance to supernatural levels, making everyone unable to act against you",
@@ -1526,6 +1553,26 @@
       "summary": "grow deadly claws",
       "dice_pool": "",
       "rouse_checks": 1
+    },
+    {
+      "name": "Serpent's Kiss",
+      "level": 2,
+      "summary": "grow hollow fangs that push your vitae into a victim during a bite or kiss",
+      "dice_pool": "",
+      "rouse_checks": 1
+    },
+    {
+      "name": "The False Sip",
+      "level": 2,
+      "summary": "hold swallowed blood outside your system for a scene, avoiding feeding effects until you expel it",
+      "dice_pool": "",
+      "rouse_checks": 1,
+      "amalgam": [
+        {
+          "discipline": "disc_fortitude",
+          "level": 1
+        }
+      ]
     },
     {
       "name": "Vicissitude",
