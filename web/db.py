@@ -2251,11 +2251,13 @@ def list_pending_claims(conn) -> list[dict]:
             xc.*,
             c.name       AS character_name,
             c.clan       AS character_clan,
-            pp.username  AS player_username,
+            COALESCE(pp.username, c.discord_id) AS player_username,
             pd.label     AS period_label
         FROM xp_claims       xc
         JOIN characters      c  ON c.id          = xc.character_id
-        JOIN player_profiles pp ON pp.discord_id  = c.discord_id
+        -- LEFT, not INNER: a missing player_profiles row must NEVER hide a
+        -- pending claim from staff (it would still block the player's resubmit).
+        LEFT JOIN player_profiles pp ON pp.discord_id = c.discord_id
         LEFT JOIN play_periods pd ON pd.id        = xc.play_period_id
         WHERE xc.status = 'pending'
         ORDER BY xc.submitted_at ASC
@@ -2288,11 +2290,11 @@ def list_claims_history(
             xc.*,
             c.name       AS character_name,
             c.clan       AS character_clan,
-            pp.username  AS player_username,
+            COALESCE(pp.username, c.discord_id) AS player_username,
             pd.label     AS period_label
         FROM xp_claims       xc
         JOIN characters      c  ON c.id          = xc.character_id
-        JOIN player_profiles pp ON pp.discord_id  = c.discord_id
+        LEFT JOIN player_profiles pp ON pp.discord_id = c.discord_id
         LEFT JOIN play_periods pd ON pd.id        = xc.play_period_id
         WHERE {' AND '.join(where)}
         ORDER BY xc.submitted_at DESC

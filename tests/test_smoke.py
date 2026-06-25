@@ -134,6 +134,33 @@ def test_pdf_fill_maps_core_fields():
     assert f["Merit1"]["/V"] == "Beautiful" and f["Merit1-2"]["/V"] == "/Yes"
 
 
+def test_pending_claim_visible_without_player_profile(staff):
+    """A pending claim must reach the staff queue even when the owner has no
+    player_profiles row. An INNER join there used to hide the claim from staff
+    while still blocking the player's resubmit (looks like 'submitted but
+    nothing to approve')."""
+    from web.db import (create_character, get_db, list_pending_claims,
+                        update_character)
+    with get_db() as conn:
+        ch = create_character(conn, discord_id="no-profile-zzz",
+                              name="Ghosted Claimant", clan="thin-blood")
+        update_character(conn, ch["id"], status="active")
+        conn.execute("DELETE FROM player_profiles WHERE discord_id=?", ("no-profile-zzz",))
+        cur = conn.execute(
+            "INSERT INTO play_periods (label, is_active, opens_at, closes_at, created_by) "
+            "VALUES ('Claim Vis Test', 0, '2026-06-01T00:00:00Z', '2026-12-01T00:00:00Z', 'test')")
+        period_id = cur.lastrowid
+        conn.execute(
+            "INSERT INTO xp_claims (character_id, play_period_id, claimed_criteria, "
+            "status, xp_claimed, submitted_at) VALUES (?,?,'[]','pending',3,'2026-06-25T00:00:00Z')",
+            (ch["id"], period_id))
+        conn.commit()
+        pending = list_pending_claims(conn)
+    row = next((c for c in pending if c["character_id"] == ch["id"]), None)
+    assert row is not None, "pending claim hidden from staff when owner has no profile"
+    assert row["player_username"] == "no-profile-zzz"   # COALESCE fallback
+
+
 def test_clan_and_predator_data_renders_in_wizard(player):
     """The wizard should embed the clan + predator data the Alpine state
     reads to render the pickers. The legacy Quick Reference sidebar was
