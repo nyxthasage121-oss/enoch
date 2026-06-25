@@ -56,6 +56,22 @@ def test_bad_skill_allocation_rejected():
     assert any("Skill" in e for e in errs)
 
 
+def test_bonus_flaws_excluded_from_creation_cap():
+    """Extra 'narrative' flaws (bonus=True, added in the Advance step) don't
+    count toward the 2-dot creation flaw cap: a valid 2-dot creation set plus a
+    bonus flaw still passes, while the same dots added as a normal flaw fail."""
+    from web.v5_traits import validate_chargen_raw
+    s = _valid_sheet()   # already has 2 creation flaw dots
+    s["flaws"].append({"name": "Prey Exclusion", "dots": 3, "bonus": True})
+    errs = validate_chargen_raw(s, advantage_pool=7, flaw_cap=2, flaw_min=2)
+    assert not any("Flaws total" in e for e in errs), errs
+    # Sanity: the same flaw WITHOUT the bonus tag does break the cap.
+    s2 = _valid_sheet()
+    s2["flaws"].append({"name": "Prey Exclusion", "dots": 3})
+    errs2 = validate_chargen_raw(s2, advantage_pool=7, flaw_cap=2, flaw_min=2)
+    assert any("Flaws total" in e for e in errs2), errs2
+
+
 def test_xp_buys_are_subtracted_to_base():
     """A trait raised by starting XP keeps its BASE within the spread."""
     from web.v5_traits import validate_chargen_raw

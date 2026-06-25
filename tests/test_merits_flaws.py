@@ -81,3 +81,29 @@ def test_sheet_parser_preserves_detail():
     assert merits["Contacts"]["detail"] == "NYPD Vice"
     assert "detail" not in merits["Resources"]
     assert len(sheet["flaws"][0]["detail"]) == 60          # truncated
+
+
+def test_sheet_parser_merges_bonus_flaws():
+    """The wizard posts extra narrative flaws in a separate bonus_flaws field;
+    the parser merges them into the flaws list tagged bonus=True (idempotently),
+    keeping their detail, so they store + display with the creation flaws but
+    stay out of the 2-dot count."""
+    import json
+
+    from web.routes.player import _parse_sheet_from_form
+    form = {
+        "flaws": json.dumps([{"name": "Enemy", "dots": 1}]),
+        "bonus_flaws": json.dumps([
+            {"name": "Prey Exclusion", "dots": 1},
+            {"name": "Adversary", "dots": 2, "detail": "a rival broodmate"},
+        ]),
+    }
+    sheet = _parse_sheet_from_form(form)
+    by = {f["name"]: f for f in sheet["flaws"]}
+    assert by["Enemy"].get("bonus") is None            # creation flaw
+    assert by["Prey Exclusion"]["bonus"] is True
+    assert by["Adversary"]["bonus"] is True
+    assert by["Adversary"]["detail"] == "a rival broodmate"
+    # Re-parsing onto the prior sheet doesn't duplicate the bonus flaws.
+    sheet2 = _parse_sheet_from_form(form, base=sheet)
+    assert sum(1 for f in sheet2["flaws"] if f.get("bonus")) == 2

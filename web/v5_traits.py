@@ -1107,6 +1107,10 @@ def validate_chargen_raw(
             for it in (sheet.get(list_key) or []):
                 if not (isinstance(it, dict) and not it.get("src")):
                     continue
+                # Extra "narrative" flaws a player tacks on in the Advance step
+                # are marked bonus and don't count toward the creation cap.
+                if it.get("bonus"):
+                    continue
                 # Thin-blood-specific merits/flaws are a separate balanced set,
                 # free of the normal pool / cap — exclude them here.
                 if str(it.get("name", "")).strip().lower() in _TB_RESTRICTED_NAMES:

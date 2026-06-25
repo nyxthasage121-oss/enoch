@@ -1553,8 +1553,45 @@ def _parse_sheet_from_form(form, base: dict | None = None) -> dict:
             detail = str(it.get("detail", "")).strip()[:60]
             if detail:
                 entry["detail"] = detail
+            # Extra narrative flaws (added in the Advance step) ride in the
+            # flaws list with a bonus flag so they round-trip on edit/save.
+            if it.get("bonus") is True:
+                entry["bonus"] = True
             cleaned.append(entry)
         sheet[list_key] = cleaned
+
+    # Extra "narrative" flaws added in the Advance step — optional, no XP, and
+    # beyond the 2-dot creation cap (house rule). They live in the same flaws
+    # list with a bonus flag so they display together but are excluded from the
+    # creation-flaw count. The wizard posts them in a separate `bonus_flaws`
+    # field; the per-character edit page keeps them inline (no such field), so
+    # only re-merge when the field is actually present.
+    raw = form.get("bonus_flaws")
+    if raw is not None:
+        try:
+            items = json.loads(raw)
+        except (ValueError, TypeError):
+            items = None
+        if isinstance(items, list):
+            flaws = sheet.setdefault("flaws", [])
+            # Idempotent: drop any prior bonus flaws before re-merging.
+            flaws[:] = [f for f in flaws
+                        if not (isinstance(f, dict) and f.get("bonus"))]
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                name = str(it.get("name", "")).strip()[:80]
+                if not name:
+                    continue
+                try:
+                    dots = int(it.get("dots", 1))
+                except (ValueError, TypeError):
+                    dots = 1
+                entry = {"name": name, "dots": max(1, min(5, dots)), "bonus": True}
+                detail = str(it.get("detail", "")).strip()[:60]
+                if detail:
+                    entry["detail"] = detail
+                flaws.append(entry)
 
     # Discipline powers — {discipline: 'disc_auspex', name: 'Heightened Senses', level: 1}
     raw = form.get("powers")

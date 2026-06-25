@@ -1823,6 +1823,7 @@
       <input type="hidden" name="advantages"  :value="JSON.stringify(advantages)">
       <input type="hidden" name="backgrounds" :value="JSON.stringify(backgrounds)">
       <input type="hidden" name="flaws"       :value="JSON.stringify(flaws)">
+      <input type="hidden" name="bonus_flaws" :value="JSON.stringify(bonusFlaws)">
       <input type="hidden" name="loresheets"  :value="JSON.stringify(loresheets)">
 
       {% include "player/partials/wizard_nav.html" %}
@@ -2232,6 +2233,50 @@
         </div>
       </template>
 
+      {# Extra Flaws — optional narrative flaws beyond the two taken at creation.
+         No XP and no mechanical benefit (house rule): pure character colour.
+         Tagged bonus so they don't count against the 2-dot creation cap. #}
+      <div class="gilded p-5 mb-5">
+        <div class="flex items-baseline justify-between mb-1">
+          <p class="label-gold text-xs">Extra Flaws</p>
+          <span class="font-cinzel text-[0.6rem] text-bone-700">optional · no XP</span>
+        </div>
+        <p class="font-garamond text-[0.65rem] text-bone-700 italic mb-3">
+          Beyond the two Flaws you took at creation, add more purely for
+          character depth. These grant no Starting XP — they're just who your
+          Kindred is.
+        </p>
+        <template x-for="(f, idx) in bonusFlaws" :key="'bf'+idx">
+          <div class="py-1 border-b border-ink-800 last:border-0">
+            <div class="flex items-center gap-2">
+              <span class="font-garamond text-xs text-blood-300 flex-1 truncate" x-text="f.name"></span>
+              <div class="flex gap-0.5">
+                <template x-for="n in 5">
+                  <button type="button" @click="f.dots = (f.dots === n ? n - 1 : n)"
+                          class="w-2.5 h-2.5 rounded-full border transition-colors"
+                          :class="f.dots >= n ? 'bg-blood-bright border-blood-bright' : 'border-bone-700'"></button>
+                </template>
+              </div>
+              <button type="button" @click="bonusFlaws.splice(idx, 1)"
+                      class="text-bone-700 hover:text-blood-400 text-xs ml-1">×</button>
+            </div>
+            <template x-if="needsDetail(f.name)">
+              <input type="text" maxlength="60" x-model="f.detail"
+                     :placeholder="detailPrompt(f.name)"
+                     class="mt-1 w-full text-[0.62rem] py-0.5 px-2 border-l-2 border-blood-700/50">
+            </template>
+          </div>
+        </template>
+        <div class="flex items-center gap-2 mt-3">
+          <input type="text" maxlength="80" x-model="newBonusFlawName"
+                 list="mf-flaws" autocomplete="off"
+                 @keydown.enter.prevent="addBonusFlaw()"
+                 placeholder="e.g. Prey Exclusion, Dark Secret…" class="text-xs py-1 px-2 flex-1">
+          <button type="button" @click="addBonusFlaw()"
+                  class="font-cinzel text-[0.55rem] tracking-widest text-blood-400 hover:text-blood-300">Add</button>
+        </div>
+      </div>
+
       <p x-show="xpRemaining < 0" x-cloak class="font-garamond text-[0.75rem] text-blood-400 italic mb-3">
         You've overspent your Starting XP by <span x-text="-xpRemaining"></span> — refund a dot before submitting.
       </p>
@@ -2636,7 +2681,11 @@
       merits:      seededSheet.merits      || [],
       advantages:  seededSheet.advantages  || [],
       backgrounds: seededSheet.backgrounds || [],
-      flaws:       seededSheet.flaws       || [],
+      // Creation flaws (the required 2 dots) vs. extra narrative flaws a player
+      // tacks on in the Advance step — split on the bonus flag so each gets its
+      // own card and only the creation flaws count toward the budget.
+      flaws:       (seededSheet.flaws || []).filter(f => !f.bonus),
+      bonusFlaws:  (seededSheet.flaws || []).filter(f => f.bonus),
       rituals:     seededSheet.rituals     || [],
       ceremonies:  seededSheet.ceremonies  || [],
       formulae:    seededSheet.formulae    || [],
@@ -2661,7 +2710,7 @@
       })(),
       convictions: [],  // legacy state retained but unused going forward
       newMeritName: '', newAdvantageName: '',
-      newBackgroundName: '', newFlawName: '',
+      newBackgroundName: '', newFlawName: '', newBonusFlawName: '',
       newLoresheetName: '', newLoresheetError: '',
       mfError: '',   // merit/flaw mutual-exclusion message
       powerError: '',  // discipline-power prerequisite / amalgam message
@@ -3624,6 +3673,23 @@
       },
       addFlaw() {
         if (this._addTrait('flaws', this.newFlawName, n => this.flawByName(n))) this.newFlawName = '';
+      },
+      // Extra narrative flaws (Advance step) — no XP, beyond the creation cap.
+      // Kept in their own list so they don't touch the budget; tagged bonus so
+      // the server excludes them from the 2-dot count and stores them together.
+      addBonusFlaw() {
+        const name = (this.newBonusFlawName || '').trim().slice(0, 80);
+        if (!name) return;
+        const c = this.flawByName(name);
+        const canonical = c ? c.name : name;
+        const dots = (c && c.costs && c.costs[0]) || 1;
+        if (this.bonusFlaws.some(x => x.name.toLowerCase() === canonical.toLowerCase())) {
+          this.newBonusFlawName = ''; return;
+        }
+        const entry = { name: canonical, dots, bonus: true };
+        if (this.needsDetail(canonical)) entry.detail = '';
+        this.bonusFlaws.push(entry);
+        this.newBonusFlawName = '';
       },
 
       // Rituals / Ceremonies / Formulae helpers — used by the partial
