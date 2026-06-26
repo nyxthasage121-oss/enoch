@@ -89,6 +89,21 @@ async def _on_claim_rejected(bot: commands.Bot, p: dict) -> None:
     await _dm(bot, p["discord_id"], e)
 
 
+@_handler("claim_sent_back")
+async def _on_claim_sent_back(bot: commands.Bot, p: dict) -> None:
+    note = p.get("note") or "Please review and resubmit."
+    e = discord.Embed(
+        title="📝 XP Claim Sent Back",
+        description=(
+            "Staff asked you to adjust your XP claim and resubmit it — it's "
+            "waiting as an editable draft on your character's **Claim XP** tab.\n\n"
+            f"**What to fix:** {note}"
+        ),
+        color=0xB08A3E,
+    )
+    await _dm(bot, p["discord_id"], e)
+
+
 @_handler("spend_approved")
 async def _on_spend_approved(bot: commands.Bot, p: dict) -> None:
     trait = p.get("trait_name") or "Unknown trait"
