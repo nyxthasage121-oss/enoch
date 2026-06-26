@@ -452,6 +452,14 @@ class RollCog(commands.Cog):
         """Shared V5 roll engine behind /roll, /vr and /vm."""
         await interaction.response.defer()
 
+        # Inconnu-style: a 'surge' term anywhere in the pool toggles a Blood
+        # Surge (e.g. /vr strength+brawl+surge). Strip it; the flag drives the
+        # Rouse + Blood-Potency dice below.
+        comps = [c.strip() for c in pool.split("+")]
+        if any(c.lower() == "surge" for c in comps):
+            surge = True
+            pool = "+".join(c for c in comps if c.lower() != "surge") or "0"
+
         # A bare numeric pool is a raw roll — resolved LOCALLY with no tracker
         # round-trip (exactly like Inconnu's /vr 5), so it never fails on the
         # network or a missing character. Hunger: explicit if given, else a

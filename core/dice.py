@@ -325,8 +325,10 @@ def resolve_pool(expression: str, sheet: dict,
     integer modifier or a trait name resolved from the sheet via
     ``trait_index``. Returns ``(pool, parts, unknown)`` where ``parts`` is a
     list of ``(label, value)`` for display and ``unknown`` lists any tokens
-    that didn't resolve. The +1 specialty die is applied separately via
-    ``apply_specialty`` (the command offers an autocompleted picker).
+    that didn't resolve. The +1 specialty die can be granted two ways: the
+    separate ``apply_specialty`` picker, OR inline Inconnu-style dot-notation —
+    a token like ``melee.swords`` rolls Melee +1 when the character owns the
+    Swords specialty.
     """
     pool = 0
     parts: list[tuple[str, int]] = []
@@ -341,13 +343,31 @@ def resolve_pool(expression: str, sheet: dict,
             pool += val
             parts.append((f"{'+' if val >= 0 else ''}{val}", val))
             continue
+        # Specialty dot-notation: "melee.swords" → Melee + 1 if the character
+        # owns the Swords specialty.
+        spec_name = ""
+        if "." in tok:
+            tok, _, spec_name = tok.partition(".")
+            tok, spec_name = tok.strip(), spec_name.strip()
         key = trait_index.get(tok.lower())
         if key is None:
-            unknown.append(tok)
+            unknown.append(f"{tok}.{spec_name}" if spec_name else tok)
             continue
         val = int(sheet.get(key, 0) or 0)
         pool += val
         parts.append((tok.title(), val))
+        if spec_name:
+            owned = any(
+                isinstance(s, dict)
+                and s.get("name", "").strip().lower() == spec_name.lower()
+                and (not s.get("skill") or s.get("skill") == key)
+                for s in (sheet.get("specialties") or [])
+            )
+            if owned:
+                pool += 1
+                parts.append((f"{spec_name.title()} (spec)", 1))
+            else:
+                unknown.append(f"{spec_name}?")
     return max(0, pool), parts, unknown
 
 

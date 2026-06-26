@@ -132,3 +132,14 @@ def test_parse_vr_syntax_cog_helper():
     assert _parse_vr_syntax("5") == ("5", None, 0, False)
     assert _parse_vr_syntax("") == ("0", None, 0, False)
 
+
+def test_resolve_pool_specialty_dot_notation():
+    """Inconnu-style 'melee.swords' grants +1 when the character owns the spec."""
+    idx = _sheet_trait_index()
+    sheet = {"attr_strength": 2, "skill_melee": 3,
+             "specialties": [{"name": "Swords", "skill": "skill_melee"}]}
+    assert resolve_pool("melee.swords", sheet, idx)[0] == 4          # 3 + spec
+    pool, _p, unknown = resolve_pool("melee.guns", sheet, idx)
+    assert pool == 3 and "guns?" in unknown                          # no spec → flagged
+    assert resolve_pool("strength+melee.swords", sheet, idx)[0] == 6  # mixes fine
+
