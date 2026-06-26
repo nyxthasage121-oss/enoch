@@ -18,11 +18,7 @@
   <div class="relative overflow-hidden mb-6 border border-clan
               bg-gradient-to-b from-ink-900 to-ink-950 aurora-beam aurora-sparkle-host"
        x-data="{}"
-       x-init="
-         if (window.Aurora && !window.Aurora.MOBILE && !window.Aurora.REDUCED) {
-           window.Aurora.embers($el, { rateMs: 1100, max: 6 });
-         }
-       ">
+       x-init="window.Aurora && !window.Aurora.MOBILE && !window.Aurora.REDUCED && window.Aurora.embers($el, { rateMs: 1100, max: 6 })">
 
     {# Clan tint overlay #}
     <div class="absolute inset-0 opacity-[0.04] pointer-events-none"

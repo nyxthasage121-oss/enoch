@@ -15,16 +15,22 @@
           <th class="px-4 py-3 text-right label-gold font-normal text-xs">Actions</th>
         </tr>
       </thead>
+      {# Each site gets its OWN <tbody x-data="{ editing: false }"> so the main
+         row and its predator-DC sub-row (sibling <tr>s) share one `editing`
+         scope — a sub-row outside the x-data tr would throw "editing is not
+         defined" and never reveal. Multiple <tbody> per <table> is valid HTML;
+         zone headers + the empty state get a plain <tbody>. #}
+      {% for zone, zone_sites in sites | groupby('borough') %}
       <tbody>
-        {% for zone, zone_sites in sites | groupby('borough') %}
         <tr class="bg-ink-900/60">
           <td colspan="7" class="px-4 py-2 font-cinzel text-[0.65rem] tracking-[0.2em] uppercase text-gold-500">
             {{ zone or 'Unzoned' }}<span class="text-bone-700 normal-case ml-2">{{ zone_sites | length }} site{{ 's' if zone_sites | length != 1 else '' }}</span>
           </td>
         </tr>
+      </tbody>
         {% for s in zone_sites %}
-        <tr class="border-b border-ink-800 align-top {{ 'opacity-40' if not s.active }}"
-            x-data="{ editing: false }">
+      <tbody x-data="{ editing: false }">
+        <tr class="border-b border-ink-800 align-top {{ 'opacity-40' if not s.active }}">
 
           {# Name #}
           <td class="px-4 py-2.5">
@@ -137,15 +143,17 @@
             </div>
           </td>
         </tr>
+      </tbody>
         {% endfor %}
-        {% else %}
+      {% else %}
+      <tbody>
         <tr>
           <td colspan="7" class="px-4 py-8 text-center font-garamond text-bone-700 italic">
             No hunting sites yet.
           </td>
         </tr>
-        {% endfor %}
       </tbody>
+      {% endfor %}
     </table>
   </div>
 </div>

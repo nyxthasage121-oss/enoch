@@ -25,12 +25,7 @@
   <div class="relative overflow-hidden mb-6 border border-clan
               bg-gradient-to-b from-ink-900 to-ink-950 aurora-beam aurora-sparkle-host"
        x-data="{ embers: null }"
-       x-init="
-         /* Drift soft embers across the hero on desktop */
-         if (window.Aurora && !window.Aurora.MOBILE && !window.Aurora.REDUCED) {
-           embers = window.Aurora.embers($el, { rateMs: 900, max: 8 });
-         }
-       ">
+       x-init="window.Aurora && !window.Aurora.MOBILE && !window.Aurora.REDUCED && (embers = window.Aurora.embers($el, { rateMs: 900, max: 8 }))">
     <div class="absolute inset-0 opacity-[0.05] pointer-events-none"
          style="background:radial-gradient(ellipse at 80% 50%, var(--clan,#8B6914) 0%, transparent 70%)"></div>
 
