@@ -722,6 +722,134 @@ def apply_character_state_delta(conn, character_id: int, *,
     return result
 
 
+# ── Sheet-independent (Inconnu-style) bot editing ────────────────────────────
+# Lets the Discord bot create a lightweight character and set its traits/vitals
+# straight into sheet_json — no web chargen, no approval gate. The roller already
+# reads these same keys, so a bot-built character rolls exactly like a web one.
+# Model ported from tiltowait/inconnu (MIT) — lightweight, open key-value traits.
+
+_SHEET_TRAIT_INDEX: dict[str, str] | None = None
+
+
+def _sheet_trait_index() -> dict[str, str]:
+    """{normalized trait name -> sheet_json key}, built once from the V5 trait
+    lists — the same index the roller uses, so setting "Strength" writes the key
+    the dice engine reads. Lazy to dodge any import cycle."""
+    global _SHEET_TRAIT_INDEX
+    if _SHEET_TRAIT_INDEX is None:
+        from core.dice import build_trait_index
+
+        from .v5_traits import V5_ATTRIBUTES, V5_DISCIPLINES, V5_SKILLS
+        _SHEET_TRAIT_INDEX = build_trait_index(
+            [pair for _c, traits in V5_ATTRIBUTES for pair in traits],
+            [pair for _c, traits in V5_SKILLS for pair in traits],
+            V5_DISCIPLINES,
+        )
+    return _SHEET_TRAIT_INDEX
+
+
+# Inconnu "splat" → Enoch (character_type, forced clan). Thin-bloods are a clan
+# in Enoch, not a type; ghouls/mortals carry no Hunger or Blood Potency.
+_SPLAT_TO_TYPE: dict[str, tuple[str, str | None]] = {
+    "vampire":    ("kindred", None),
+    "thin-blood": ("kindred", "thin-blood"),
+    "thinblood":  ("kindred", "thin-blood"),
+    "ghoul":      ("ghoul",   None),
+    "mortal":     ("mortal",  None),
+}
+
+
+def create_bot_character(conn, *, discord_id: str, name: str, splat: str,
+                         clan: str | None = None) -> dict:
+    """Inconnu-style lightweight creation from the bot: name + splat, sane seeded
+    vitals, no full sheet, no approval. Traits are added later via the bot. The
+    character enters the roster unapproved (is_approved=0) — staff may flesh it
+    out / approve it on the web later, but the bot operates on it regardless."""
+    splat_key = (splat or "vampire").strip().lower()
+    ctype, forced_clan = _SPLAT_TO_TYPE.get(splat_key, ("kindred", None))
+    seed: dict = {"humanity": 7}
+    if ctype == "kindred":
+        seed["hunger"] = 1
+        seed["blood_potency"] = 0 if forced_clan == "thin-blood" else 1
+    # clan is NOT NULL; a lightweight character may not have picked one — default
+    # to "caitiff" (the clanless marker). The player can set a real clan later.
+    return create_character(
+        conn, discord_id=discord_id, name=name,
+        clan=(forced_clan or clan or "caitiff"), character_type=ctype, sheet_json=seed,
+    )
+
+
+def apply_sheet_traits(conn, character_id: int, traits: dict[str, int], *,
+                       remove: bool = False) -> dict | None:
+    """Set (or clear, when ``remove``) named traits on a character's sheet_json.
+    Names map to sheet keys via the V5 index; ratings clamp 0-5. Returns
+    ``{"applied": {key: rating}, "unknown": [name, …]}`` or None if gone."""
+    char = get_character(conn, character_id)
+    if not char:
+        return None
+    sheet = dict(char.get("sheet_json") or {})
+    index = _sheet_trait_index()
+    applied: dict[str, int] = {}
+    unknown: list[str] = []
+    for name, rating in (traits or {}).items():
+        key = index.get(str(name).strip().lower())
+        if not key:
+            unknown.append(str(name))
+            continue
+        if remove:
+            sheet.pop(key, None)
+            applied[key] = 0
+        else:
+            val = max(0, min(5, int(rating)))
+            if val == 0:
+                sheet.pop(key, None)
+            else:
+                sheet[key] = val
+            applied[key] = val
+    update_character(conn, character_id, sheet_json=sheet)
+    return {"applied": applied, "unknown": unknown}
+
+
+def set_character_vitals(conn, character_id: int, *,
+                         hunger: int | None = None, humanity: int | None = None,
+                         blood_potency: int | None = None, stains: int | None = None,
+                         willpower_superficial: int | None = None,
+                         willpower_aggravated: int | None = None,
+                         health_superficial: int | None = None,
+                         health_aggravated: int | None = None) -> dict | None:
+    """Absolute-set vitals on sheet_json (None leaves a field untouched). Each is
+    clamped. Hunger/stains/damage drop to no-key at 0 (0 = none); Humanity and
+    Blood Potency keep an explicit 0 (a meaningful rating). Returns resolved
+    vitals, or None if the character is gone."""
+    char = get_character(conn, character_id)
+    if not char:
+        return None
+    sheet = dict(char.get("sheet_json") or {})
+
+    def _set(key: str, val: int | None, lo: int, hi: int, *, keep_zero: bool) -> int:
+        if val is None:
+            return sheet.get(key, 0) or 0
+        v = max(lo, min(hi, int(val)))
+        if v == 0 and not keep_zero:
+            sheet.pop(key, None)
+        else:
+            sheet[key] = v
+        return v
+
+    out = {
+        "hunger":               _set("hunger", hunger, 0, 5, keep_zero=False),
+        "humanity":             _set("humanity", humanity, 0, 10, keep_zero=True),
+        "blood_potency":        _set("blood_potency", blood_potency, 0, 10, keep_zero=True),
+        "stains":               _set("stains", stains, 0, 10, keep_zero=False),
+        "damage_willpower_sup": _set("damage_willpower_sup", willpower_superficial, 0, 15, keep_zero=False),
+        "damage_willpower_agg": _set("damage_willpower_agg", willpower_aggravated, 0, 15, keep_zero=False),
+        "damage_health_sup":    _set("damage_health_sup", health_superficial, 0, 15, keep_zero=False),
+        "damage_health_agg":    _set("damage_health_agg", health_aggravated, 0, 15, keep_zero=False),
+    }
+    update_character(conn, character_id, sheet_json=sheet)
+    return out
+
+
 # ── Dice-roll history + stats (migration 053) ────────────────────────────────
 
 def log_roll(conn, character_id: int, *, kind: str = "roll", pool: int = 0,

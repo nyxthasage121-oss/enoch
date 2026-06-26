@@ -48,6 +48,9 @@ from ..db import (
     upsert_player,
     write_audit,
     apply_character_state_delta,
+    create_bot_character,
+    apply_sheet_traits,
+    set_character_vitals,
     list_character_rolls,
     log_roll,
     update_character,
@@ -497,6 +500,81 @@ async def apply_state_delta(character_id: int, body: DamageDeltaIn):
             after={"deltas": body.model_dump(exclude={"source"}), "source": body.source},
         )
 
+    return {"character_id": character_id, "state": result}
+
+
+# ── Sheet-independent (Inconnu-style) bot editing ────────────────────────────
+
+class QuickCharacterIn(BaseModel):
+    """Lightweight character creation from the bot — name + splat, nothing else."""
+    discord_id: str
+    username: str | None = None
+    name: str = Field(min_length=1, max_length=60)
+    splat: str = "vampire"            # vampire | thin-blood | ghoul | mortal
+    clan: str | None = None
+
+
+@router.post("/characters/quick", dependencies=[Depends(_require_bot)], status_code=201)
+async def create_quick_character_api(body: QuickCharacterIn):
+    """Create a sheet-less character (name + splat + seeded vitals). No web
+    chargen, no approval gate — the bot rolls/tracks on it immediately; traits
+    are added via POST /characters/{id}/traits."""
+    with get_db() as conn:
+        upsert_player(conn, body.discord_id, body.username or body.discord_id)
+        char = create_bot_character(
+            conn, discord_id=body.discord_id, name=body.name,
+            splat=body.splat, clan=body.clan,
+        )
+        write_audit(conn, actor_id="bot", action="create_quick_character",
+                    target_type="character", target_id=char["id"],
+                    after={"name": body.name, "splat": body.splat})
+    log.info("Quick character via bot API: %s (%s, %s)", body.name, body.splat, body.discord_id)
+    return char
+
+
+class TraitsIn(BaseModel):
+    traits: dict[str, int] = Field(default_factory=dict)
+    remove: bool = False
+
+
+@router.post("/characters/{character_id}/traits", dependencies=[Depends(_require_bot)])
+async def set_character_traits_api(character_id: int, body: TraitsIn):
+    """Set or clear named traits (Strength=3, Brawl=2, Dominate=1). Names resolve
+    to the sheet's V5 keys; unknown names come back in ``unknown`` (not fatal)."""
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        result = apply_sheet_traits(conn, character_id, body.traits, remove=body.remove)
+        write_audit(conn, actor_id="bot", action=("clear_traits" if body.remove else "set_traits"),
+                    target_type="character", target_id=character_id,
+                    after={"applied": result["applied"]})
+    return {"character_id": character_id, **result}
+
+
+class VitalsIn(BaseModel):
+    hunger: int | None = None
+    humanity: int | None = None
+    blood_potency: int | None = None
+    stains: int | None = None
+    willpower_superficial: int | None = None
+    willpower_aggravated: int | None = None
+    health_superficial: int | None = None
+    health_aggravated: int | None = None
+
+
+@router.post("/characters/{character_id}/vitals", dependencies=[Depends(_require_bot)])
+async def set_character_vitals_api(character_id: int, body: VitalsIn):
+    """Absolute-set vitals (Hunger, Humanity, Blood Potency, Stains, Willpower/
+    Health damage). A None field is left unchanged. Returns the resolved state."""
+    with get_db() as conn:
+        char = get_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        result = set_character_vitals(conn, character_id, **body.model_dump())
+        write_audit(conn, actor_id="bot", action="set_vitals",
+                    target_type="character", target_id=character_id,
+                    after={"vitals": body.model_dump(exclude_none=True)})
     return {"character_id": character_id, "state": result}
 
 
