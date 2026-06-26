@@ -8,6 +8,7 @@ from discord.ext import commands
 from ..api import (
     get_character, get_player_characters, upsert_player, set_condition, set_bond,
     get_backgrounds, blank_background, recent_rolls,
+    create_quick_character, set_character_traits, set_character_vitals,
 )
 from ..config import settings
 
@@ -28,6 +29,22 @@ _COMMON_CONDITIONS = [
 
 def _web(path: str) -> str:
     return settings.WEB_URL.rstrip("/") + path
+
+
+def _parse_traits(text: str) -> tuple[dict[str, int], list[str]]:
+    """Parse "Strength=3 Brawl=2, dominate=1" into ({name: rating}, [bad tokens]).
+    Accepts commas or spaces between pairs; a token without a numeric rating is
+    returned as 'bad' so the command can flag it."""
+    out: dict[str, int] = {}
+    bad: list[str] = []
+    for tok in (text or "").replace(",", " ").split():
+        name, sep, val = tok.partition("=")
+        v = val.strip()
+        if sep and name.strip() and v.lstrip("-").isdigit():
+            out[name.strip()] = int(v)
+        else:
+            bad.append(tok)
+    return out, bad
 
 
 # ── V5 trait labels for the /character sheet embed ────────────────────────────
@@ -195,6 +212,154 @@ class CharactersCog(commands.Cog):
 
         await interaction.response.send_message(embed=e, view=view, ephemeral=True)
 
+    # ── /character new (Inconnu-style quick create) ───────────────────────────
+
+    @character.command(
+        name="new",
+        description="Quick-create a character — just name + splat, no sheet needed.",
+    )
+    @app_commands.describe(
+        name="Character name",
+        splat="What they are",
+        clan="Clan, if a vampire (optional — defaults to Caitiff)",
+    )
+    @app_commands.choices(splat=[
+        app_commands.Choice(name="Vampire", value="vampire"),
+        app_commands.Choice(name="Thin-Blood", value="thin-blood"),
+        app_commands.Choice(name="Ghoul", value="ghoul"),
+        app_commands.Choice(name="Mortal", value="mortal"),
+    ])
+    async def character_new(self, interaction: discord.Interaction, name: str,
+                            splat: app_commands.Choice[str],
+                            clan: str | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        try:
+            char = await create_quick_character(
+                str(interaction.user.id), str(interaction.user),
+                name, splat.value, clan)
+        except Exception as exc:
+            log.warning("character new failed for %s: %s", interaction.user.id, exc)
+            await interaction.followup.send(
+                "❌ Could not reach the tracker right now. Try again shortly.",
+                ephemeral=True)
+            return
+        e = discord.Embed(
+            title=f"🩸 {char['name']}",
+            description=(
+                f"Created a **{splat.name}** — you can roll and track right now.\n\n"
+                "• Add traits — `/traits set strength=3 brawl=2 dominate=1`\n"
+                "• Set vitals — `/character adjust hunger:2 blood_potency:3`\n"
+                "• Roll — `/roll strength + brawl`"
+            ),
+            color=_GOLD,
+        )
+        e.set_footer(text="Unapproved by design — staff can flesh it out on the web later.")
+        await interaction.followup.send(embed=e, ephemeral=True)
+
+    # ── /character adjust (set vitals) ────────────────────────────────────────
+
+    @character.command(
+        name="adjust",
+        description="Set your character's vitals (Hunger, Humanity, Blood Potency, Stains).",
+    )
+    @app_commands.describe(
+        name="Which character (only if you have more than one)",
+        hunger="Hunger (0-5)",
+        humanity="Humanity (0-10)",
+        blood_potency="Blood Potency (0-10)",
+        stains="Stains (0-10)",
+    )
+    async def character_adjust(self, interaction: discord.Interaction,
+                               name: str | None = None,
+                               hunger: int | None = None,
+                               humanity: int | None = None,
+                               blood_potency: int | None = None,
+                               stains: int | None = None) -> None:
+        await interaction.response.defer(ephemeral=True)
+        if all(v is None for v in (hunger, humanity, blood_potency, stains)):
+            await interaction.followup.send(
+                "Nothing to set — pass at least one of "
+                "`hunger` / `humanity` / `blood_potency` / `stains`.",
+                ephemeral=True)
+            return
+        char = await self._one_character(interaction, name)
+        if not char:
+            await interaction.followup.send(
+                "Which character? Name it, or make one with `/character new`.",
+                ephemeral=True)
+            return
+        try:
+            res = await set_character_vitals(
+                char["id"], hunger=hunger, humanity=humanity,
+                blood_potency=blood_potency, stains=stains)
+        except Exception as exc:
+            log.warning("character adjust failed for %d: %s", char["id"], exc)
+            await interaction.followup.send(
+                "❌ Could not reach the tracker. Try again shortly.", ephemeral=True)
+            return
+        s = res["state"]
+        await interaction.followup.send(
+            f"**{char['name']}** — Hunger {s['hunger']} · Humanity {s['humanity']} · "
+            f"Blood Potency {s['blood_potency']} · Stains {s['stains']}",
+            ephemeral=True)
+
+    # ── /traits (open trait editing — no full sheet needed) ───────────────────
+
+    traits = app_commands.Group(
+        name="traits",
+        description="Set or clear your character's traits, Inconnu-style.")
+
+    @traits.command(name="set", description="Set traits, e.g. strength=3 brawl=2 dominate=1")
+    @app_commands.describe(
+        traits="name=rating pairs, e.g. strength=3 brawl=2 dominate=1",
+        character="Which character (only if you have more than one)")
+    async def traits_set(self, interaction: discord.Interaction, traits: str,
+                         character: str | None = None) -> None:
+        await self._edit_traits(interaction, traits, character, remove=False)
+
+    @traits.command(name="remove", description="Clear traits, e.g. brawl dominate")
+    @app_commands.describe(
+        traits="Trait names to clear, e.g. brawl dominate",
+        character="Which character (only if you have more than one)")
+    async def traits_remove(self, interaction: discord.Interaction, traits: str,
+                            character: str | None = None) -> None:
+        await self._edit_traits(interaction, traits, character, remove=True)
+
+    async def _edit_traits(self, interaction: discord.Interaction, traits_text: str,
+                           name: str | None, *, remove: bool) -> None:
+        await interaction.response.defer(ephemeral=True)
+        char = await self._one_character(interaction, name)
+        if not char:
+            await interaction.followup.send(
+                "Which character? Name it, or make one with `/character new`.",
+                ephemeral=True)
+            return
+        if remove:
+            parsed = {t: 0 for t in (traits_text or "").replace(",", " ").split()}
+            bad: list[str] = []
+        else:
+            parsed, bad = _parse_traits(traits_text)
+        if not parsed:
+            await interaction.followup.send(
+                "Nothing parsed. Use `name=rating`, e.g. `strength=3 brawl=2`.",
+                ephemeral=True)
+            return
+        try:
+            res = await set_character_traits(char["id"], parsed, remove=remove)
+        except Exception as exc:
+            log.warning("traits edit failed for %d: %s", char["id"], exc)
+            await interaction.followup.send(
+                "❌ Could not reach the tracker. Try again shortly.", ephemeral=True)
+            return
+        applied = res.get("applied", {})
+        unknown = list(res.get("unknown", [])) + bad
+        verb = "Cleared" if remove else "Set"
+        msg = f"**{char['name']}** — {verb} {len(applied)} trait(s)."
+        if unknown:
+            shown = ", ".join(f"`{u}`" for u in unknown[:8])
+            msg += f"\n⚠️ Didn't recognize: {shown}"
+        await interaction.followup.send(msg, ephemeral=True)
+
     # ── /character list ───────────────────────────────────────────────────────
 
     @character.command(
@@ -306,10 +471,10 @@ class CharactersCog(commands.Cog):
             )
             return
 
-        active = [c for c in characters if c["is_approved"]]
+        active = [c for c in characters if not c.get("is_draft")]
         if not active:
             await interaction.followup.send(
-                "You have no approved characters. Use `/character submit` to create one.",
+                "You have no characters yet. Use `/character new` (quick) or `/character submit`.",
                 ephemeral=True,
             )
             return
@@ -372,14 +537,16 @@ class CharactersCog(commands.Cog):
 
     async def _one_character(self, interaction: discord.Interaction,
                              name: str | None) -> dict | None:
-        """Resolve the invoking player's approved character by name, or their
-        only one. Returns None when it can't pick."""
+        """Resolve the invoking player's character by name, or their only one
+        (approved or lightweight; half-built web drafts excluded). None when it
+        can't pick."""
         try:
             chars = await get_player_characters(str(interaction.user.id))
         except Exception as exc:
             log.warning("_one_character failed for %s: %s", interaction.user.id, exc)
             return None
-        active = [c for c in chars if c.get("is_approved")]
+        # Any of the player's characters (approved or lightweight), not drafts.
+        active = [c for c in chars if not c.get("is_draft")]
         if name:
             return next((c for c in active
                          if c["name"].lower() == name.strip().lower()), None)

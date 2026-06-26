@@ -56,6 +56,48 @@ async def get_player_characters(discord_id: str) -> list[dict]:
         return r.json()["characters"]
 
 
+# ── Sheet-independent (Inconnu-style) editing ─────────────────────────────────
+
+async def create_quick_character(discord_id: str, username: str, name: str,
+                                 splat: str, clan: str | None = None) -> dict:
+    """Lightweight creation — name + splat, no web chargen, no approval gate."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/characters/quick",
+            json={"discord_id": discord_id, "username": username,
+                  "name": name, "splat": splat, "clan": clan},
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def set_character_traits(character_id: int, traits: dict[str, int],
+                               remove: bool = False) -> dict:
+    """Set or clear named traits on a character. Returns {applied, unknown}."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/characters/{character_id}/traits",
+            json={"traits": traits, "remove": remove},
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def set_character_vitals(character_id: int, **vitals) -> dict:
+    """Absolute-set a character's vitals (None fields are omitted client-side)."""
+    payload = {k: v for k, v in vitals.items() if v is not None}
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{_base()}/api/characters/{character_id}/vitals",
+            json=payload,
+            headers=_headers(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+
 # ── Staff roles ───────────────────────────────────────────────────────────────
 
 async def set_staff_role(actor_discord_id: str, target_discord_id: str,

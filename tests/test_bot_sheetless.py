@@ -110,3 +110,14 @@ def test_bot_editing_endpoints_require_token(_client):
     assert _client.post("/api/characters/1/traits",
                         json={"traits": {"Strength": 2}}).status_code == 401
     assert _client.post("/api/characters/1/vitals", json={"hunger": 1}).status_code == 401
+
+
+# ── bot cog: trait-string parser (the one runtime-testable cog helper) ─────────
+
+def test_parse_traits_cog_helper():
+    from bot.cogs.characters import _parse_traits
+    out, bad = _parse_traits("Strength=3 brawl=2, dominate=1 junk nope=x")
+    assert out == {"Strength": 3, "brawl": 2, "dominate": 1}
+    assert "junk" in bad and "nope=x" in bad
+    assert _parse_traits("") == ({}, [])
+

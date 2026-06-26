@@ -440,14 +440,16 @@ class RollCog(commands.Cog):
                 "❌ Could not reach the tracker right now. Try again in a moment.")
             return
 
-        active = [c for c in characters if c.get("is_approved")]
+        # Operate on any of the player's characters (approved or lightweight/
+        # bot-made), excluding only half-built web-chargen drafts.
+        active = [c for c in characters if not c.get("is_draft")]
         char = None
         if character:
             char = next((c for c in active
                          if c["name"].lower() == character.strip().lower()), None)
             if not char:
                 await interaction.followup.send(
-                    f"No approved character named **{character}** found.")
+                    f"No character named **{character}** found.")
                 return
         elif len(active) == 1:
             char = active[0]
