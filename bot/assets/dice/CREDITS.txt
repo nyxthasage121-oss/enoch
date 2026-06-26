@@ -1,3 +1,8 @@
-V5 dice-face emoji art (ln_* normal, h_* Hunger; bestial/crit/succ/fail).
-From the Inconnu Discord bot — github.com/tiltowait/inconnu — MIT-licensed,
-© 2021 tiltowait. Used with credit. Swap these PNGs to re-skin the dice.
+V5 dice-face emoji (ln_* normal, h_* Hunger; bestial/crit/succ/fail).
+
+The original ankh-dagger art is from the Inconnu Discord bot —
+github.com/tiltowait/inconnu — MIT-licensed, © 2021 tiltowait.
+
+These copies have been RECOLORED to Enoch's palette: normal dice gold (#C8A85B),
+Hunger dice blood-red (#B03030). The silhouettes are unchanged. Swap these PNGs
+(same filenames) and bump _EMOJI_PREFIX in bot/dicemoji.py to re-skin again.

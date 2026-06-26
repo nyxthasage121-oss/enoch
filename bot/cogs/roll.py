@@ -70,10 +70,12 @@ def _fmt_dice(dice: list[int], *, hunger: bool = False) -> str:
 
 def _render_dice(dice: list[int], *, hunger: bool = False,
                  emoji_map: dict[str, str] | None = None) -> str:
-    """Dice as V5 face-emoji when the bot has them, else the text fallback."""
-    if emoji_map:
-        return dicemoji.emojify(dice, hunger, emoji_map)
-    return _fmt_dice(dice, hunger=hunger)
+    """Dice as V5 face-emoji with the numeric values kept on a row underneath;
+    plain numbers only when the bot has no emoji."""
+    text = _fmt_dice(dice, hunger=hunger)
+    if emoji_map and dice:
+        return f"{dicemoji.emojify(dice, hunger, emoji_map)}\n{text}"
+    return text
 
 
 def build_roll_embed(result: RollResult, *, title: str,

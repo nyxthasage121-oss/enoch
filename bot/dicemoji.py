@@ -19,8 +19,10 @@ _ASSET_DIR = Path(__file__).parent / "assets" / "dice"
 DICE_FACES = ["ln_bestial", "ln_crit", "ln_succ", "ln_fail",
               "h_bestial", "h_crit", "h_succ", "h_fail"]
 
-# Application-emoji names are prefixed to avoid colliding with anything else.
-_EMOJI_PREFIX = "enoch_"
+# Application-emoji names are prefixed to avoid collisions; the version suffix
+# forces a fresh upload when the art changes (e.g. 'g' = the gold re-skin), since
+# ensure_dice_emoji only uploads names that don't already exist.
+_EMOJI_PREFIX = "enochg_"
 
 
 def face_key(die: int, hunger: bool) -> str:

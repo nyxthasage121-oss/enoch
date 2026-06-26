@@ -164,3 +164,12 @@ def test_dicemoji_emojify_with_fallback():
     assert emojify([10, 7], False, emap) == "<:c:1> 7"
     assert emojify([10, 3], False, {}) == "10 3"
 
+
+def test_render_dice_keeps_numbers_under_emoji():
+    from bot.cogs.roll import _render_dice
+    emap = {"ln_crit": "<:c:1>", "ln_fail": "<:f:2>"}
+    out = _render_dice([10, 3], emoji_map=emap)
+    assert out.startswith("<:c:1> <:f:2>")          # emoji row on top
+    assert out.split("\n")[1] == "**10** · 3"       # numbers kept on a row below
+    assert _render_dice([10, 3], emoji_map={}) == "**10** · 3"   # no emoji → numbers only
+
