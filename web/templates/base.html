@@ -339,6 +339,28 @@
 
       {% block content %}{% endblock %}
 
+      {# ── Dark Pack attribution — Paradox's community-content licence. The
+         logo hides itself until you drop dark-pack.png into static/images/. #}
+      <footer class="mt-12 pt-5 border-t border-ink-800 text-center">
+        <a href="https://www.worldofdarkness.com/dark-pack" target="_blank" rel="noopener"
+           class="inline-block mb-2">
+          <img src="/static/images/dark-pack.png" alt="Dark Pack" class="h-9 mx-auto opacity-70"
+               onerror="this.closest('a').style.display='none'">
+        </a>
+        <p class="font-garamond text-bone-700 text-[0.68rem] leading-relaxed max-w-2xl mx-auto">
+          <span class="text-bone-600">Enoch</span> is an unofficial, non-commercial fan tool for the
+          New York by Night chronicle. Portions of the materials are the copyrights and trademarks of
+          Paradox Interactive AB, and are used with permission under the
+          <a href="https://www.worldofdarkness.com/dark-pack" target="_blank" rel="noopener"
+             class="text-gold-700 hover:text-gold-500 underline decoration-dotted">Dark Pack</a>.
+          All rights reserved. <em>Vampire: The Masquerade</em> and World of Darkness are trademarks of
+          Paradox Interactive AB. This work is not affiliated with or endorsed by Paradox Interactive.
+          For more information please visit
+          <a href="https://www.worldofdarkness.com" target="_blank" rel="noopener"
+             class="text-gold-700 hover:text-gold-500 underline decoration-dotted">worldofdarkness.com</a>.
+        </p>
+      </footer>
+
     </main>
   </div>
 
