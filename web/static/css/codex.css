@@ -262,6 +262,11 @@ body.error-page   .nyc-horizon { display: none; }
   margin: 0 auto 0.85rem; background: #b08a3e; transform: rotate(45deg); opacity: 0.55;
 }
 
+/* Map canvas — dark base so loading/blocked OSM tiles don't flash light grey.
+   `!important` because leaflet.css (loaded after codex) sets `.leaflet-container
+   { background: #ddd }` at equal specificity. */
+.leaflet-container { background: #0a0708 !important; }
+
 @media (prefers-reduced-motion: reduce) {
   .page-enter { animation: none; }
   .card-lift:hover { transform: none; }

@@ -162,13 +162,15 @@
       <ul class="space-y-3">
         <template x-for="layer in layers" :key="layer.id">
           <li class="gilded-inset p-3 aurora-beam relative overflow-hidden"
-              :style="'border-left: 3px solid ' + (layer.color || '#8B1A1A')">
+              :style="'border-left: 3px solid ' + (layer.color || '#c29b48')">
             <div class="flex items-baseline justify-between gap-2 mb-1">
               <label class="flex items-center gap-2 cursor-pointer min-w-0">
                 <input type="checkbox" :checked="layer.visible"
                        @change="toggleLayer(layer)"
                        class="accent-gold shrink-0">
-                <span class="font-cinzel text-xs text-bone-300 truncate" x-text="layer.name"></span>
+                <span class="font-cinzel text-xs truncate transition-colors"
+                      :class="layer.visible ? 'text-bone-300' : 'text-bone-700 line-through'"
+                      x-text="layer.name"></span>
               </label>
               <span class="font-cinzel text-[0.55rem] text-bone-700 shrink-0"
                     x-text="layer.feature_count + ' feat'"></span>
@@ -529,7 +531,7 @@
                class="w-full text-xs px-2 py-1.5">
       </div>
       <div class="flex items-center gap-2">
-        <input type="color" name="color" :value="layer ? layer.color : '#8B1A1A'"
+        <input type="color" name="color" :value="layer ? layer.color : '#c29b48'"
                class="w-12 h-8 border border-ink-700 bg-ink-900 cursor-pointer">
         <select name="visibility"
                 :value="layer ? layer.visibility : 'public'"
@@ -613,7 +615,7 @@
         if (!local) return;
         local.features = layerData.features || [];
         const group = L.featureGroup();
-        const color = layerData.color || '#8B1A1A';
+        const color = layerData.color || '#c29b48';
         for (const feat of local.features) {
           const lf = this._featureToLeaflet(feat, color);
           if (lf) {

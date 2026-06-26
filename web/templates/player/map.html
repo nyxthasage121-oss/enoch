@@ -44,32 +44,37 @@
   <aside class="bg-ink-900 border-l border-ink-700 p-4 overflow-y-auto"
          style="max-height: calc(100vh - 4.5rem);"
          x-data="mapSidebar()">
-    <div class="mb-4">
+    <div class="mb-3">
       <p class="label-gold mb-1">Chronicle Map</p>
       <p class="font-garamond text-bone-600 text-xs leading-relaxed">
         Click a feature for details. Toggle layers below to hide them.
       </p>
     </div>
+    <div class="divider-gold mb-3"></div>
 
-    <div x-show="!layers.length" x-cloak
-         class="font-garamond text-bone-700 text-xs italic">
+    <div x-show="!layers.length" x-cloak class="font-garamond text-xs empty-state">
       No map layers yet. Staff can import a map from the admin page.
     </div>
 
-    <ul class="space-y-2">
+    <ul class="space-y-1.5">
       <template x-for="layer in layers" :key="layer.id">
-        <li class="border-l-2 pl-3 py-1.5 aurora-beam relative overflow-hidden"
+        <li class="border-l-2 pl-3 pr-1.5 py-1.5 aurora-beam relative overflow-hidden transition-colors hover:bg-ink-800/40"
             :style="'border-color: ' + layer.color">
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" :checked="layer.visible"
                    @change="toggleLayer(layer)"
                    class="accent-gold">
-            <span class="font-cinzel text-xs text-bone-300" x-text="layer.name"></span>
+            {# colour swatch (diamond) echoes the layer's map colour #}
+            <span class="inline-block w-2 h-2 rotate-45 shrink-0"
+                  :style="'background: ' + layer.color" aria-hidden="true"></span>
+            <span class="font-cinzel text-xs transition-colors"
+                  :class="layer.visible ? 'text-bone-300' : 'text-bone-700 line-through'"
+                  x-text="layer.name"></span>
             <span class="font-cinzel text-[0.55rem] text-bone-700 ml-auto"
                   x-text="layer.features.length"></span>
           </label>
           <p x-show="layer.description" x-cloak
-             class="font-garamond text-bone-600 text-[0.7rem] italic mt-0.5"
+             class="font-garamond text-bone-600 text-[0.7rem] italic mt-0.5 pl-6"
              x-text="layer.description"></p>
         </li>
       </template>
@@ -115,7 +120,7 @@
 
       _addLayer(layer) {
         const group = L.featureGroup();
-        const color = layer.color || '#8B1A1A';
+        const color = layer.color || '#c29b48';   // gold default (on-theme; was blood-red)
         for (const feat of (layer.features || [])) {
           const lf = this._featureToLeaflet(feat, color);
           if (lf) {
