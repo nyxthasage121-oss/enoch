@@ -107,10 +107,14 @@ body {
   color: #ece4d6;
 }
 
-/* Film grain overlay */
-body::before {
+/* Film grain overlay — on the .app-shell (a min-h-full element) rather than
+   <body>, because the body's aurora `filter` makes `position:fixed` body-box-
+   relative and the body box is only viewport-tall, so on a long page the grain
+   (and the vignette below) covered just the top screen and left a seam. As an
+   absolute overlay on the full-height shell it conforms to any page size. */
+.app-shell::before {
   content: "";
-  position: fixed; inset: 0;
+  position: absolute; inset: 0;
   pointer-events: none;
   z-index: 9000;
   opacity: 0.055;
@@ -118,10 +122,11 @@ body::before {
   mix-blend-mode: overlay;
 }
 
-/* Vignette — pulls the eye to centre */
-body::after {
+/* Vignette — pulls the eye to centre. On .app-shell (absolute, full page) so it
+   covers the whole document and conforms on resize, not just the top screen. */
+.app-shell::after {
   content: "";
-  position: fixed; inset: 0;
+  position: absolute; inset: 0;
   pointer-events: none;
   z-index: 8999;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.58) 100%);
