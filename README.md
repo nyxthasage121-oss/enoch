@@ -48,3 +48,10 @@ patterns from — a friend's **MCbN XP Tracker**
 for the *Music City by Night* chronicle. Thanks to
 [@jkomg](https://github.com/jkomg) for the groundwork; the specific borrowed
 patterns are credited inline in the code.
+
+The Discord bot's **sheet-independent character model** — lightweight
+one-command creation, open key-value traits, and setting vitals from chat with
+no full sheet and no approval gate — is adapted from **Inconnu**
+([tiltowait/inconnu](https://github.com/tiltowait/inconnu), MIT-licensed, © 2021
+tiltowait). Enoch's implementation is its own (SQL, not Inconnu's MongoDB), but
+the design is theirs; the lifted pieces are credited inline in the code.
