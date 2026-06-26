@@ -54,4 +54,6 @@ one-command creation, open key-value traits, and setting vitals from chat with
 no full sheet and no approval gate — is adapted from **Inconnu**
 ([tiltowait/inconnu](https://github.com/tiltowait/inconnu), MIT-licensed, © 2021
 tiltowait). Enoch's implementation is its own (SQL, not Inconnu's MongoDB), but
-the design is theirs; the lifted pieces are credited inline in the code.
+the design is theirs; the lifted pieces are credited inline in the code. The V5
+dice-face emoji art in `bot/assets/dice/` is also Inconnu's, used under the same
+licence (see `bot/assets/dice/CREDITS.txt`).

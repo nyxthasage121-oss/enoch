@@ -24,6 +24,7 @@ from core.dice import (
     RollResult,
 )
 from .characters import _ATTRIBUTES, _SKILLS_BY_CAT, _DISCIPLINES
+from .. import dicemoji
 
 log = logging.getLogger(__name__)
 
@@ -67,10 +68,19 @@ def _fmt_dice(dice: list[int], *, hunger: bool = False) -> str:
     return " · ".join(out)
 
 
+def _render_dice(dice: list[int], *, hunger: bool = False,
+                 emoji_map: dict[str, str] | None = None) -> str:
+    """Dice as V5 face-emoji when the bot has them, else the text fallback."""
+    if emoji_map:
+        return dicemoji.emojify(dice, hunger, emoji_map)
+    return _fmt_dice(dice, hunger=hunger)
+
+
 def build_roll_embed(result: RollResult, *, title: str,
                      pool_parts: list[tuple[str, int]] | None = None,
                      unknown: list[str] | None = None,
-                     note: str | None = None) -> discord.Embed:
+                     note: str | None = None,
+                     emoji_map: dict[str, str] | None = None) -> discord.Embed:
     """Render a roll result as a Discord embed (offline-testable)."""
     color = _BLOOD if (result.outcome in (MESSY_CRITICAL, BESTIAL_FAILURE)
                        or not result.is_win) else _GOLD
@@ -84,9 +94,11 @@ def build_roll_embed(result: RollResult, *, title: str,
 
     if note:
         e.add_field(name="Blood Surge", value=note, inline=False)
-    e.add_field(name="Dice", value=_fmt_dice(result.normal_dice), inline=False)
+    e.add_field(name="Dice", value=_render_dice(result.normal_dice, emoji_map=emoji_map),
+                inline=False)
     if result.hunger:
-        e.add_field(name="Hunger", value=_fmt_dice(result.hunger_dice, hunger=True),
+        e.add_field(name="Hunger",
+                    value=_render_dice(result.hunger_dice, hunger=True, emoji_map=emoji_map),
                     inline=False)
 
     succ = f"{result.successes} success" + ("" if result.successes == 1 else "es")
@@ -107,7 +119,7 @@ def build_roll_embed(result: RollResult, *, title: str,
     return e
 
 
-def build_posted_roll_embed(p: dict) -> discord.Embed:
+def build_posted_roll_embed(p: dict, *, emoji_map: dict[str, str] | None = None) -> discord.Embed:
     """Render a web-originated roll (from a bot_outbox 'roll_posted' payload) as a
     Discord embed for the chronicle dice channel. Mirrors build_roll_embed but
     reads plain dict fields — the web has no RollResult object to hand over."""
@@ -129,9 +141,10 @@ def build_posted_roll_embed(p: dict) -> discord.Embed:
         e.add_field(name="Blood Surge", value=p["note"], inline=False)
     normal = [int(d) for d in (p.get("normal_dice") or [])]
     hunger = [int(d) for d in (p.get("hunger_dice") or [])]
-    e.add_field(name="Dice", value=_fmt_dice(normal), inline=False)
+    e.add_field(name="Dice", value=_render_dice(normal, emoji_map=emoji_map), inline=False)
     if p.get("hunger"):
-        e.add_field(name="Hunger", value=_fmt_dice(hunger, hunger=True), inline=False)
+        e.add_field(name="Hunger",
+                    value=_render_dice(hunger, hunger=True, emoji_map=emoji_map), inline=False)
 
     succ_n = int(p.get("successes") or 0)
     succ = f"{succ_n} success" + ("" if succ_n == 1 else "es")
@@ -192,7 +205,8 @@ class WillpowerRerollView(discord.ui.View):
             wp_note = " · spend 1 Superficial Willpower"
         embed = build_roll_embed(
             new_result, title=f"{self._title} · Willpower reroll",
-            pool_parts=self._pool_parts, unknown=self._unknown)
+            pool_parts=self._pool_parts, unknown=self._unknown,
+            emoji_map=getattr(interaction.client, "dice_emoji", None))
         note = f"Rerolled {n} {'die' if n == 1 else 'dice'} with Willpower{wp_note}"
         base = embed.footer.text or ""
         embed.set_footer(text=(base + "   " if base else "") + note)
@@ -206,7 +220,8 @@ async def _reply_roll(interaction: discord.Interaction, result: RollResult, *,
     regular failures worth rerolling. ``character_id`` lets the reroll spend the
     Willpower it costs (omitted for bare numeric rolls with no character)."""
     embed = build_roll_embed(result, title=title, pool_parts=pool_parts,
-                             unknown=unknown, note=note)
+                             unknown=unknown, note=note,
+                             emoji_map=getattr(interaction.client, "dice_emoji", None))
     view = None
     if any(d < 6 for d in result.normal_dice):
         view = WillpowerRerollView(result, title=title, pool_parts=pool_parts,

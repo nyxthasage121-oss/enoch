@@ -143,3 +143,24 @@ def test_resolve_pool_specialty_dot_notation():
     assert pool == 3 and "guns?" in unknown                          # no spec → flagged
     assert resolve_pool("strength+melee.swords", sheet, idx)[0] == 6  # mixes fine
 
+
+# ── dice-face emoji (Inconnu-style) ───────────────────────────────────────────
+
+def test_dicemoji_face_key():
+    from bot.dicemoji import face_key
+    assert face_key(1, False) == "ln_bestial"   # a 1 = bestial
+    assert face_key(10, False) == "ln_crit"     # a 10 = crit
+    assert face_key(7, False) == "ln_succ"      # 6-9 = success
+    assert face_key(3, False) == "ln_fail"      # 2-5 = fail
+    assert face_key(1, True) == "h_bestial"     # Hunger dice use the h_ set
+    assert face_key(10, True) == "h_crit"
+
+
+def test_dicemoji_emojify_with_fallback():
+    from bot.dicemoji import emojify
+    emap = {"ln_crit": "<:c:1>", "ln_fail": "<:f:2>"}
+    assert emojify([10, 3], False, emap) == "<:c:1> <:f:2>"
+    # a face missing from the map falls back to the bare number
+    assert emojify([10, 7], False, emap) == "<:c:1> 7"
+    assert emojify([10, 3], False, {}) == "10 3"
+

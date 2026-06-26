@@ -1,0 +1,3 @@
+V5 dice-face emoji art (ln_* normal, h_* Hunger; bestial/crit/succ/fail).
+From the Inconnu Discord bot — github.com/tiltowait/inconnu — MIT-licensed,
+© 2021 tiltowait. Used with credit. Swap these PNGs to re-skin the dice.

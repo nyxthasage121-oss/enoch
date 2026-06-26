@@ -53,6 +53,11 @@ class EnochBot(commands.Bot):
             await self.tree.sync()
             log.info("Slash commands synced globally (propagation may take up to 1 hour)")
 
+        # Ensure the V5 dice-face emoji exist (uploads them to this application
+        # once). Best-effort — rolls fall back to plain numbers if it fails.
+        from .dicemoji import ensure_dice_emoji
+        await ensure_dice_emoji(self)
+
     async def on_ready(self) -> None:
         assert self.user is not None
         log.info("Enoch ready — logged in as %s (id=%d)", self.user, self.user.id)

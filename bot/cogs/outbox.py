@@ -334,7 +334,7 @@ async def _on_roll_posted(bot: commands.Bot, p: dict) -> None:
         log.warning("roll_posted: bot lacks access to dice channel %s", channel_id)
         return
 
-    embed = build_posted_roll_embed(p)
+    embed = build_posted_roll_embed(p, emoji_map=getattr(bot, "dice_emoji", None))
     await channel.send(embed=embed)
 
 
