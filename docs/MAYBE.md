@@ -32,6 +32,8 @@ If an idea can't clear the bar yet, write down *what would make it clear* (its t
 | **reject → private re-draft** (keep editing instead of hard reject) | Web · review loop | A rejection forces a player to rebuild from scratch and it stings | S | ◐ smoother player + staff loop |
 | **Staff-role Discord sync** | Bot + Web | *Only if* NYbN starts maintaining tiered staff roles in Discord — conflicts with the current "roles are manual" design, so likely stays parked | M | ◐ saves manual staff adds |
 | **Loresheet cost label** | Web · spend form | If loresheets ever need their own spend line vs. being treated as Backgrounds | S | ✗ clarity only |
+| **Relationship map** | Web · Directory | *The Directory shipped 2026-06-25 (flat browsable list + profiles).* Build the node/edge graph (sire/childe, coterie-mates, blood bonds + explicit player-declared ties) when the flat list stops conveying who's connected to whom | M | ✗ player immersion |
+| **SPCs in the Directory** (staff-owned NPCs: Prince, Sheriff, …) | Web · Directory + staff | When players keep asking staff "who is NPC X again?" — give recurring NPCs the same browsable profile treatment as PCs, flagged NPC | M | ◐ fewer NPC-lookup pings |
 
 *Effort is rough: **S** = an afternoon, **M** = a focused day or two.*
 *A couple of smaller internal chargen cleanups exist too (step-machine refactor, a JS↔Python preview contract test) — pull them in only if chargen starts fighting you.*
