@@ -203,6 +203,10 @@
              class="nav-link {{ 'active' if request.url.path.startswith('/hunting-sites') else '' }}">
             Hunting Sites
           </a>
+          <a href="/map"
+             class="nav-link {{ 'active' if request.url.path == '/map' else '' }}">
+            Map
+          </a>
         {% endif %}
 
         {% if _in_staff %}
@@ -260,6 +264,10 @@
           <a href="/hunting-sites"
              class="nav-link {{ 'active' if request.url.path.startswith('/hunting-sites') else '' }}">
             Hunting Sites
+          </a>
+          <a href="/staff/map"
+             class="nav-link {{ 'active' if request.url.path.startswith('/staff/map') else '' }}">
+            Map
           </a>
           <a href="/staff/familiars"
              class="nav-link {{ 'active' if request.url.path.startswith('/staff/familiars') else '' }}">
@@ -325,7 +333,12 @@
     </nav>
 
     {# ── Main content ── #}
-    <main class="flex-1 min-w-0 overflow-auto px-5 md:px-8 lg:px-10 py-6 pt-16 md:pt-8 main-bg">
+    <main class="flex-1 min-w-0 overflow-auto px-5 md:px-8 lg:px-10 py-6 pt-16 md:pt-8 main-bg flex flex-col">
+
+      {# Content grows to fill the column so the Dark Pack footer is pushed to
+         the bottom of the viewport on short pages (sticky footer) instead of
+         floating wherever the content happens to end. #}
+      <div class="flex-1">
 
       {# Flash messages (server-side redirect flow) #}
       {% if flash_messages %}
@@ -345,6 +358,8 @@
       {% endif %}
 
       {% block content %}{% endblock %}
+
+      </div>{# /content-grow wrapper — footer below sits at the column's foot #}
 
       {# ── Dark Pack attribution — Paradox's community-content licence. The
          logo hides itself until you drop dark-pack.png into static/images/. #}
