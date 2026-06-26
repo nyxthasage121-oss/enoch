@@ -188,6 +188,10 @@
              class="nav-link {{ 'active' if request.url.path.startswith('/characters') else '' }}">
             My Characters
           </a>
+          <a href="/directory"
+             class="nav-link {{ 'active' if request.url.path.startswith('/directory') else '' }}">
+            Directory
+          </a>
           <a href="/coteries"
              class="nav-link {{ 'active' if request.url.path.startswith('/coteries') else '' }}">
             Coterie

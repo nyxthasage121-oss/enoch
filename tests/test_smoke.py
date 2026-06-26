@@ -228,6 +228,89 @@ def test_send_claim_back_refuses_non_pending(player):
     assert raised, "send_claim_back must refuse a non-pending claim"
 
 
+# ── Directory (chronicle-wide IC who's-who) ──────────────────────────────────
+
+def _seed_dir_char(conn, *, discord, name, clan, approved=True, draft=False, hidden=False):
+    """An approved + visible directory character by default; each flag flips a gate."""
+    from web.db import approve_character, create_character, update_character
+    ch = create_character(conn, discord_id=discord, name=name, clan=clan)
+    if approved:
+        approve_character(conn, ch["id"], reviewer_id=discord)
+    update_character(conn, ch["id"],
+                     is_draft=1 if draft else 0,
+                     directory_hidden=1 if hidden else 0)
+    conn.commit()
+    return ch["id"]
+
+
+def test_directory_lists_visible_approved(player):
+    from web.db import get_db, list_directory_characters
+    with get_db() as conn:
+        cid = _seed_dir_char(conn, discord="dir-vis", name="Visible Vampire", clan="brujah")
+        listed = {c["id"] for c in list_directory_characters(conn)}
+    assert cid in listed
+    r = player.get("/directory")
+    assert r.status_code == 200
+    assert "Visible Vampire" in r.text
+
+
+def test_directory_excludes_hidden(player):
+    from web.db import get_db, get_public_character, list_directory_characters
+    with get_db() as conn:
+        cid = _seed_dir_char(conn, discord="dir-hid", name="Hidden Hunter",
+                             clan="nosferatu", hidden=True)
+        listed = {c["id"] for c in list_directory_characters(conn)}
+        assert get_public_character(conn, cid) is None
+    assert cid not in listed
+    assert player.get(f"/directory/{cid}").status_code == 404   # profile 404s
+
+
+def test_directory_excludes_draft_and_unapproved(player):
+    from web.db import get_db, get_public_character, list_directory_characters
+    with get_db() as conn:
+        draft_id = _seed_dir_char(conn, discord="dir-draft", name="Draft Dummy",
+                                  clan="ventrue", draft=True)
+        unapp_id = _seed_dir_char(conn, discord="dir-unapp", name="Pending Pawn",
+                                  clan="toreador", approved=False)
+        listed = {c["id"] for c in list_directory_characters(conn)}
+        assert get_public_character(conn, draft_id) is None
+        assert get_public_character(conn, unapp_id) is None
+    assert draft_id not in listed
+    assert unapp_id not in listed
+
+
+def test_directory_toggle_persists(player):
+    """The About-panel 'show_in_directory' checkbox round-trips through the save
+    route: absent → hidden, present → visible."""
+    from web.db import approve_character, create_character, get_db
+    with get_db() as conn:
+        ch = create_character(conn, discord_id="111111111111111111",
+                              name="Toggle Subject", clan="malkavian")
+        approve_character(conn, ch["id"], reviewer_id="111111111111111111")
+        conn.commit()
+        cid = ch["id"]
+
+    def _hidden():
+        with get_db() as conn:
+            return conn.execute("SELECT directory_hidden FROM characters WHERE id=?",
+                                (cid,)).fetchone()["directory_hidden"]
+
+    # Unchecked → checkbox absent from POST → directory_hidden flips to 1
+    r = player.post(f"/characters/{cid}/about",
+                    data={"_csrf": "dev-csrf-token", "concept": "tester"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert _hidden() == 1
+
+    # Checked → checkbox present → back to visible
+    r = player.post(f"/characters/{cid}/about",
+                    data={"_csrf": "dev-csrf-token", "concept": "tester",
+                          "show_in_directory": "1"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert _hidden() == 0
+
+
 def test_clan_and_predator_data_renders_in_wizard(player):
     """The wizard should embed the clan + predator data the Alpine state
     reads to render the pickers. The legacy Quick Reference sidebar was

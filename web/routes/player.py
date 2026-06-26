@@ -1242,6 +1242,9 @@ async def character_about_save(
         concept=(form.get("concept") or "").strip() or None,
         sire=(form.get("sire") or "").strip() or None,
         covenant=(form.get("covenant") or "").strip() or None,
+        # Directory visibility is the player's own privacy choice — it stays
+        # editable even when staff has locked the IC profile fields.
+        directory_hidden=0 if form.get("show_in_directory") else 1,
     )
     if not char.get("profile_locked"):
         updates.update(
@@ -1928,6 +1931,38 @@ async def character_submit_for_review(
         "message": f"{char['name']} submitted for staff review. You'll be notified when staff acts on it.",
     }]
     return RedirectResponse(url=f"/characters/{character_id}", status_code=303)
+
+
+@router.get("/directory", response_class=HTMLResponse)
+async def directory_index(request: Request, user: dict = Depends(require_auth)):
+    """Chronicle-wide IC directory — every approved, non-hidden character. The
+    template filters/searches client-side. Public-safe fields only."""
+    from ..db import list_directory_characters
+    with get_db() as conn:
+        characters = list_directory_characters(conn)
+    clans = sorted({c["clan"] for c in characters if c.get("clan")})
+    return templates.TemplateResponse(
+        request, "player/directory.html",
+        _ctx(request, characters=characters, clans=clans),
+    )
+
+
+@router.get("/directory/{character_id}", response_class=HTMLResponse)
+async def directory_profile(
+    request: Request, character_id: int, user: dict = Depends(require_auth),
+):
+    """A character's public IC profile page (the 'wiki' page). Only approved,
+    non-hidden characters; 404 otherwise."""
+    from ..db import get_public_character
+    with get_db() as conn:
+        char = get_public_character(conn, character_id)
+        if not char:
+            raise HTTPException(status_code=404)
+        is_owner = get_character_for_player(conn, character_id, user["id"]) is not None
+    return templates.TemplateResponse(
+        request, "player/directory_profile.html",
+        _ctx(request, char=char, is_owner=is_owner),
+    )
 
 
 @router.get("/characters/{character_id}", response_class=HTMLResponse)

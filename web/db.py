@@ -485,6 +485,40 @@ def list_player_characters(conn, discord_id: str) -> list[dict]:
     return [_enrich_char(r) for r in rows]
 
 
+# Directory of one coterie name per character (subquery avoids JOIN row dups).
+_COTERIE_NAME_SUBQ = (
+    "(SELECT co.name FROM coterie_memberships cm "
+    " JOIN coteries co ON co.id = cm.coterie_id "
+    " WHERE cm.character_id = c.id LIMIT 1)"
+)
+
+
+def list_directory_characters(conn) -> list[dict]:
+    """Approved, non-draft, non-hidden characters for the chronicle IC directory.
+    Public-safe fields only — no sheet, XP, or secrets."""
+    return conn.execute(f"""
+        SELECT c.id, c.name, c.clan, c.concept, c.covenant, c.character_type,
+               c.status, c.profile_image_url, {_COTERIE_NAME_SUBQ} AS coterie_name
+        FROM characters c
+        WHERE c.is_approved = 1 AND c.is_draft = 0
+              AND COALESCE(c.directory_hidden, 0) = 0
+        ORDER BY c.name COLLATE NOCASE ASC
+    """).fetchall()
+
+
+def get_public_character(conn, character_id: int) -> dict | None:
+    """A character's IC-public record for its directory profile page — returned
+    only if approved, non-draft, and not hidden. Public fields only."""
+    return conn.execute(f"""
+        SELECT c.id, c.name, c.clan, c.concept, c.sire, c.covenant,
+               c.character_type, c.status, c.profile_image_url, c.profile_blurb,
+               c.pronouns, {_COTERIE_NAME_SUBQ} AS coterie_name
+        FROM characters c
+        WHERE c.id = ? AND c.is_approved = 1 AND c.is_draft = 0
+              AND COALESCE(c.directory_hidden, 0) = 0
+    """, (character_id,)).fetchone()
+
+
 def list_characters_near_cap(conn, threshold_xp: int = 30) -> list[dict]:
     """Approved + active characters within `threshold_xp` of their cap.
     Sorted closest-first so the dashboard tile + roster filter both
@@ -608,6 +642,8 @@ def update_character(conn, character_id: int, **fields) -> dict:
         # Migration 026 — post-wizard sheet-completion flag (replaces the
         # old `_post_wizard` sentinel that lived inside sheet_json)
         "post_wizard",
+        # Migration 059 — hide a character from the public directory
+        "directory_hidden",
     }
     # JSON-serialize the in-memoriam blob before persistence
     if "in_memoriam" in fields and isinstance(fields["in_memoriam"], (dict, list)):

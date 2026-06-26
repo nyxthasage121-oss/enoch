@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "_macros.html" import clan_icon %}
+{% block title %}Directory — Enoch{% endblock %}
+
+{% block content %}
+<div x-data="{ q: '', clan: '' }">
+
+  <div class="mb-6">
+    <p class="font-cinzel text-[0.6rem] tracking-[0.3em] uppercase text-bone-700 mb-1">Dossier</p>
+    <h1 class="font-cinzel text-3xl text-bone-200 tracking-wide">The Directory</h1>
+    <p class="font-garamond text-bone-500 text-sm mt-1">
+      The Kindred of New York, as they present themselves.
+    </p>
+  </div>
+
+  {# Filter / search (client-side, instant) #}
+  <div class="gilded p-4 mb-5 flex flex-wrap items-end gap-3">
+    <div class="flex-1 min-w-[200px]">
+      <label class="block text-[0.55rem] tracking-widest uppercase text-bone-700 mb-1">Search</label>
+      <input type="text" x-model="q" placeholder="Name or concept…" autocomplete="off" class="w-full text-sm">
+    </div>
+    <div>
+      <label class="block text-[0.55rem] tracking-widest uppercase text-bone-700 mb-1">Clan</label>
+      <select x-model="clan" class="text-sm">
+        <option value="">All clans</option>
+        {% for cl in clans %}<option value="{{ cl }}">{{ cl | replace('-', ' ') | title }}</option>{% endfor %}
+      </select>
+    </div>
+    <p class="font-garamond text-bone-700 text-xs italic ml-auto self-center">{{ characters | length }} listed</p>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for c in characters %}
+    <a href="/directory/{{ c.id }}"
+       data-search="{{ (c.name ~ ' ' ~ (c.concept or '')) | lower }}"
+       data-clan="{{ c.clan or '' }}"
+       x-show="$el.dataset.search.includes(q.toLowerCase().trim()) && (clan === '' || clan === $el.dataset.clan)"
+       class="clan-{{ c.clan }} gilded p-4 block no-underline group hover-border-clan transition-colors">
+      <div class="flex items-center gap-3">
+        {% if c.profile_image_url %}
+        <img src="{{ c.profile_image_url }}" alt="" class="w-10 h-10 rounded object-cover shrink-0 border border-ink-700">
+        {% else %}
+        {{ clan_icon(c.clan, size='w-10 h-10', font_size=14) }}
+        {% endif %}
+        <div class="min-w-0">
+          <h2 class="font-cinzel text-lg text-bone-200 tracking-wide gh-text-clan transition-colors truncate">{{ c.name }}</h2>
+          <p class="label-gold text-[0.6rem] tracking-[0.2em] truncate">
+            {{ (c.clan | replace('-', ' ') | title) if c.clan else (c.character_type | title) }}
+          </p>
+        </div>
+      </div>
+      {% if c.concept %}<p class="font-garamond text-bone-500 text-xs mt-2.5 italic truncate">{{ c.concept }}</p>{% endif %}
+      <div class="flex items-center gap-2 mt-2 flex-wrap">
+        {% if c.coterie_name %}<span class="font-garamond text-bone-700 text-[0.7rem]">{{ c.coterie_name }}</span>{% endif %}
+        {% if c.status and c.status != 'active' %}<span class="chip text-bone-600 border-bone-800 text-[0.5rem]">{{ c.status | title }}</span>{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if not characters %}
+  <p class="font-garamond text-bone-600 italic text-center py-16">No characters are listed in the directory yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

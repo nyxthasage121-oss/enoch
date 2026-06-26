@@ -287,6 +287,14 @@
           </div>
         </div>
 
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" name="show_in_directory" value="1"
+                 {{ 'checked' if not char.directory_hidden }} class="accent-gold mt-0.5">
+          <span class="font-garamond text-bone-400 text-sm">List this character in the
+            <a href="/directory" class="text-gold-600 hover:text-gold-400 underline decoration-dotted">Directory</a>
+            so other players can find them. Uncheck to keep them out of it.</span>
+        </label>
+
         {% if char.profile_locked %}
         <p class="font-garamond text-bone-600 text-xs italic border-l border-ink-700 pl-3">
           Staff locked your IC profile — concept, sire, and covenant stay editable; the rest is frozen.

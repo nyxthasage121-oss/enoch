@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_macros.html" import clan_icon %}
+{% block title %}{{ char.name }} — Directory — Enoch{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <a href="/directory"
+     class="font-cinzel text-[0.6rem] tracking-widest uppercase text-bone-600 hover:text-gold-400">
+    &larr; The Directory
+  </a>
+
+  <div class="clan-{{ char.clan }} gilded p-6 mt-3">
+    <div class="flex items-start gap-5 flex-wrap">
+      {% if char.profile_image_url %}
+      <img src="{{ char.profile_image_url }}" alt="" class="w-28 h-28 rounded object-cover border border-ink-700 shrink-0">
+      {% else %}
+      {{ clan_icon(char.clan, size='w-24 h-24', font_size=28) }}
+      {% endif %}
+      <div class="flex-1 min-w-0">
+        <p class="label-gold text-[0.65rem] tracking-[0.2em]">
+          {{ (char.clan | replace('-', ' ') | title) if char.clan else (char.character_type | title) }}
+        </p>
+        <h1 class="font-cinzel text-3xl text-bone-100 tracking-wide gh-text-clan">{{ char.name }}</h1>
+        {% if char.concept %}<p class="font-garamond text-bone-400 italic mt-1">{{ char.concept }}</p>{% endif %}
+        <div class="flex flex-wrap gap-x-5 gap-y-1 mt-3 text-sm">
+          {% for label, val in [('Covenant', char.covenant), ('Coterie', char.coterie_name),
+                                ('Sire', char.sire), ('Pronouns', char.pronouns)] %}
+            {% if val %}
+            <span class="font-garamond text-bone-400">
+              <span class="text-bone-700 text-[0.7rem] uppercase tracking-widest mr-1">{{ label }}</span>{{ val }}
+            </span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% if char.status and char.status != 'active' %}
+        <span class="chip text-bone-600 border-bone-800 text-[0.55rem] mt-3 inline-block">{{ char.status | title }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="divider-gold my-5"></div>
+    {% if char.profile_blurb %}
+    <p class="font-garamond text-bone-300 leading-relaxed whitespace-pre-line">{{ char.profile_blurb }}</p>
+    {% else %}
+    <p class="font-garamond text-bone-700 italic text-sm">No public bio written yet.</p>
+    {% endif %}
+
+    {% if is_owner %}
+    <div class="mt-6 pt-4 border-t border-ink-800 flex items-center gap-3 flex-wrap">
+      <a href="/characters/{{ char.id }}"
+         class="btn-ghost font-cinzel text-[0.6rem] tracking-widest px-3 py-1.5">Edit your public profile</a>
+      <span class="font-garamond text-bone-700 text-[0.7rem] italic">This is your character — this is how others see it.</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
