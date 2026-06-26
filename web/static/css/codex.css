@@ -237,6 +237,31 @@ body.error-page   .nyc-horizon { display: none; }
    hand-authored rule (codex.css loads after tailwind) avoids a full rebuild. */
 .dark-pack-logo { height: 2.75rem; width: auto; }
 
+/* ── Interactive card hover-lift ─────────────────────────────────────
+   A subtle rise + shadow on clickable cards (directory, character list,
+   coteries). Transition covers border-color too so it composes with the
+   existing `hover-border-clan` utility instead of overriding its easing. */
+.card-lift { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.card-lift:hover { transform: translateY(-2px); box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.6); }
+
+/* Page entrance fade lives further down (`.page-enter` → `fadeUp`); base.html
+   now applies that existing class to the main content wrapper so it fires on
+   every full page load. No new keyframe needed here. */
+
+/* ── Unified empty state — one elegant treatment for "nothing here yet"
+   so empty lists still feel intentional. The gold pip echoes the V5
+   diamond motif. Apply alongside the existing font-garamond text. ───── */
+.empty-state { text-align: center; font-style: italic; color: #7a6f5d; padding: 2.75rem 1rem; }
+.empty-state::before {
+  content: ""; display: block; width: 6px; height: 6px;
+  margin: 0 auto 0.85rem; background: #b08a3e; transform: rotate(45deg); opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
+  .card-lift:hover { transform: none; }
+}
+
 /* Error pages — NYC_Lost SVG sunk back behind the gilded error
    card. Heavier overlay + dimmed brightness so the image is felt
    as atmosphere rather than seen as a foreground photograph. */

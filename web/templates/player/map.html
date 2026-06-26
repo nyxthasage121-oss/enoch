@@ -141,6 +141,7 @@
       },
 
       _featureToLeaflet(feat, color) {
+        color = color || '#c29b48';   // gold fallback — uncoloured layers were Leaflet-blue
         const geom = feat.geometry;
         if (!geom || !geom.type) return null;
         if (geom.type === 'Point') {

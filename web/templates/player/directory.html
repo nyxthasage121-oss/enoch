@@ -35,7 +35,7 @@
        data-search="{{ (c.name ~ ' ' ~ (c.concept or '')) | lower }}"
        data-clan="{{ c.clan or '' }}"
        x-show="$el.dataset.search.includes(q.toLowerCase().trim()) && (clan === '' || clan === $el.dataset.clan)"
-       class="clan-{{ c.clan }} gilded p-4 block no-underline group hover-border-clan transition-colors">
+       class="clan-{{ c.clan }} gilded p-4 block no-underline group hover-border-clan transition-colors card-lift">
       <div class="flex items-center gap-3">
         {% if c.profile_image_url %}
         <img src="{{ c.profile_image_url }}" alt="" class="w-10 h-10 rounded object-cover shrink-0 border border-ink-700">
@@ -59,7 +59,7 @@
   </div>
 
   {% if not characters %}
-  <p class="font-garamond text-bone-600 italic text-center py-16">No characters are listed in the directory yet.</p>
+  <p class="font-garamond empty-state">No characters are listed in the directory yet.</p>
   {% endif %}
 </div>
 {% endblock %}
