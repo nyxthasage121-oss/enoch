@@ -395,6 +395,23 @@ class RollCog(commands.Cog):
                 break
         return out
 
+    async def _solo_hunger(self, discord_id: str, character: str | None) -> int:
+        """Best-effort current Hunger for a raw roll: the named character's, or
+        the player's only one. Any tracker hiccup → 0, so a raw roll never blocks."""
+        try:
+            chars = [c for c in await get_player_characters(discord_id)
+                     if not c.get("is_draft")]
+        except Exception:
+            return 0
+        if character:
+            pick = next((c for c in chars
+                         if c["name"].lower() == character.strip().lower()), None)
+        else:
+            pick = chars[0] if len(chars) == 1 else None
+        if not pick:
+            return 0
+        return max(0, min(5, int(_sheet_of(pick).get("hunger", 0) or 0)))
+
     @app_commands.command(
         name="roll",
         description="Roll a V5 dice pool — a number or traits like 'strength + brawl'.",
@@ -422,22 +439,29 @@ class RollCog(commands.Cog):
     ) -> None:
         await interaction.response.defer()
 
-        # A bare numeric pool with an explicit Hunger needs no character lookup
-        # (unless surging — that needs Blood Potency + the live Hunger).
-        if _looks_numeric(pool) and hunger is not None and not surge:
+        # A bare numeric pool is a raw roll — resolved LOCALLY with no tracker
+        # round-trip (exactly like Inconnu's /vr 5), so it never fails on the
+        # network or a missing character. Hunger: explicit if given, else a
+        # best-effort read of your character's (any hiccup → 0). Surge needs the
+        # character (Blood Potency + live Hunger), so it falls through below.
+        if _looks_numeric(pool) and not surge:
             n = max(0, int(pool) + modifier)
-            await _reply_roll(interaction, roll_pool(n, hunger, difficulty),
+            eff = hunger if hunger is not None else \
+                await self._solo_hunger(str(interaction.user.id), character)
+            await _reply_roll(interaction, roll_pool(n, eff, difficulty),
                               title=f"Roll · {n}d")
             return
 
-        # Otherwise resolve the invoking player's character for traits + Hunger.
+        # A trait pool (strength + brawl …) needs the sheet — resolve the
+        # invoking player's character.
         discord_id = str(interaction.user.id)
         try:
             characters = await get_player_characters(discord_id)
         except Exception as exc:
             log.warning("roll: get_player_characters failed for %s: %s", discord_id, exc)
             await interaction.followup.send(
-                "❌ Could not reach the tracker right now. Try again in a moment.")
+                "❌ Could not reach the tracker right now. For a quick roll, "
+                "use a number like `/roll 5`.")
             return
 
         # Operate on any of the player's characters (approved or lightweight/
@@ -453,17 +477,11 @@ class RollCog(commands.Cog):
                 return
         elif len(active) == 1:
             char = active[0]
-        elif _looks_numeric(pool) and not surge:
-            # Raw numeric roll, no character context needed.
-            n = max(0, int(pool) + modifier)
-            await _reply_roll(interaction, roll_pool(n, hunger or 0, difficulty),
-                              title=f"Roll · {n}d")
-            return
         else:
             names = ", ".join(f"`{c['name']}`" for c in active) or "(none)"
             await interaction.followup.send(
-                "Specify which character with `character:<name>`. "
-                f"Your characters: {names}")
+                "Name a character with `character:<name>`, or roll a raw pool "
+                f"like `/roll 5`. Your characters: {names}")
             return
 
         try:
