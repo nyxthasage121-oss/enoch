@@ -217,7 +217,7 @@ body.landing-page::after {
    both elements rather than cropping to water like a portrait-oriented
    source would. The mask gradient fades the top edge into the body. */
 .nyc-horizon {
-  position: fixed;
+  position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 220px;
   pointer-events: none;
@@ -231,6 +231,11 @@ body.landing-page::after {
 /* Landing and error pages skip the horizon — they use the full backdrop */
 body.landing-page .nyc-horizon,
 body.error-page   .nyc-horizon { display: none; }
+
+/* Dark Pack footer logo — sized here because the h-NN Tailwind utility for
+   this height isn't in the vendored build, and the source PNG is 3000px²; a
+   hand-authored rule (codex.css loads after tailwind) avoids a full rebuild. */
+.dark-pack-logo { height: 2.75rem; width: auto; }
 
 /* Error pages — NYC_Lost SVG sunk back behind the gilded error
    card. Heavier overlay + dimmed brightness so the image is felt

@@ -68,10 +68,6 @@
     </defs>
   </svg>
 
-  {# Faint NYC skyline at the bottom edge of every page (hidden on
-     landing + error pages — they use a full-backdrop treatment). #}
-  <div class="nyc-horizon" aria-hidden="true"></div>
-
   {# ── Mobile nav backdrop ── #}
   <div x-show="navOpen"
        @click="navOpen = false"
@@ -114,7 +110,14 @@
   </div>
 
   {# ── Layout ── #}
-  <div class="flex min-h-full">
+  <div class="flex min-h-full relative">
+
+    {# Faint NYC skyline pinned to the foot of the page content. Lives INSIDE
+       the layout wrapper (not <body>) so it escapes the body filter's
+       containing block: as a child of this min-h-full element it anchors to
+       the bottom of the full page, not stranded one screen down mid-content.
+       Hidden on landing + error pages (they use a full backdrop). #}
+    <div class="nyc-horizon" aria-hidden="true"></div>
 
     {# ── Mobile top bar — wordmark only. At 24px the rays-logo reads
        as a fuzzy halo; users see the full mark via the sidebar drawer. #}
@@ -345,13 +348,13 @@
 
       {# ── Dark Pack attribution — Paradox's community-content licence. The
          logo hides itself until you drop dark-pack.png into static/images/. #}
-      <footer class="mt-12 pt-5 border-t border-ink-800 text-center">
+      <footer class="mt-10 pt-4 border-t border-ink-800 text-center">
         <a href="https://www.worldofdarkness.com/dark-pack" target="_blank" rel="noopener"
-           class="inline-block mb-2">
-          <img src="/static/images/dark-pack.png" alt="Dark Pack" class="h-9 mx-auto opacity-70"
+           class="inline-block mb-1.5">
+          <img src="/static/images/dark-pack.png" alt="Dark Pack" class="dark-pack-logo mx-auto opacity-80"
                onerror="this.closest('a').style.display='none'">
         </a>
-        <p class="font-garamond text-bone-700 text-[0.68rem] leading-relaxed max-w-2xl mx-auto">
+        <p class="font-garamond text-bone-700 text-[0.55rem] leading-relaxed max-w-xl mx-auto">
           <span class="text-bone-600">Enoch</span> is an unofficial, non-commercial fan tool for the
           New York by Night chronicle. Portions of the materials are the copyrights and trademarks of
           Paradox Interactive AB, and are used with permission under the

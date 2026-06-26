@@ -1061,7 +1061,7 @@
     </div>
 
     {# ═══════════════════════════════════════════════════
-       STEP 2 — THE HUNT: Predator + Covenant + Sire
+       STEP 2 — THE HUNT: Predator + Sect
        ═══════════════════════════════════════════════════ #}
     <div x-show="step === 4" x-cloak>
       <div class="mb-6">
@@ -1198,6 +1198,18 @@
               <input type="hidden" name="predator_choices" :value="JSON.stringify(predatorChoices)">
             </div>
           </template>
+        </div>
+
+        {# Sect / Covenant — the character's political faction. Optional, shown
+           for every character type. Binds to `covenant` (the same field the
+           edit + About panels use); the create route persists it on submit. #}
+        <div>
+          <label class="label-gold block mb-2">Sect
+            <span class="text-bone-700 font-sans normal-case text-[0.6rem]">— covenant / faction (optional)</span></label>
+          <select name="covenant" x-model="charName.covenant" class="w-full">
+            <option value="">— Select —</option>
+            {% for cov in covenants %}<option value="{{ cov }}">{{ cov }}</option>{% endfor %}
+          </select>
         </div>
 
         {# Sire is set post-creation in the About My Character panel, not during
