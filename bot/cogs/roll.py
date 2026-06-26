@@ -228,6 +228,31 @@ def _looks_numeric(expr: str) -> bool:
     return expr.strip().isdigit()
 
 
+def _parse_vr_syntax(syntax: str) -> tuple[str, int | None, int, bool]:
+    """Inconnu `/vr` syntax → (pool, hunger|None, difficulty, surge).
+
+    'POOL HUNGER DIFFICULTY' where POOL is a number or a +-joined trait
+    expression (spaces around + are fine), and the trailing bare integers are
+    Hunger then Difficulty. A bare 'surge' token anywhere flags a Blood Surge.
+    Examples: '7 2 1' → ('7', 2, 1, False); 'strength+brawl 2' → ('strength+brawl',
+    2, 0, False); 'brawl surge' → ('brawl', None, 0, True)."""
+    raw = (syntax or "").split()
+    surge = any(t.lower() == "surge" for t in raw)
+    toks = [t for t in raw if t.lower() != "surge" and t != "+"]
+    trailing: list[int] = []
+    while toks and toks[-1].lstrip("-").isdigit():
+        trailing.insert(0, int(toks.pop()))
+    if toks:                          # a trait/macro expression precedes the numbers
+        pool = "+".join(toks)
+        hunger = trailing[0] if len(trailing) >= 1 else None
+        difficulty = trailing[1] if len(trailing) >= 2 else 0
+    else:                             # all bare numbers — first is the pool
+        pool = str(trailing[0]) if trailing else "0"
+        hunger = trailing[1] if len(trailing) >= 2 else None
+        difficulty = trailing[2] if len(trailing) >= 3 else 0
+    return pool, hunger, difficulty, surge
+
+
 def _sheet_of(full: dict) -> dict:
     """Pull a parsed sheet_json dict off a character payload."""
     sheet = full.get("sheet_json") or {}
@@ -412,23 +437,10 @@ class RollCog(commands.Cog):
             return 0
         return max(0, min(5, int(_sheet_of(pick).get("hunger", 0) or 0)))
 
-    @app_commands.command(
-        name="roll",
-        description="Roll a V5 dice pool — a number or traits like 'strength + brawl'.",
-    )
-    @app_commands.describe(
-        pool="Number (5), traits (strength + brawl), or a saved macro name",
-        difficulty="Successes needed (optional)",
-        modifier="Bonus/penalty dice — powers, merits, situational (±)",
-        hunger="Override Hunger dice (defaults to your character's Hunger)",
-        specialty="Add a +1 specialty die (pick one of your character's specialties)",
-        surge="Blood Surge: spend a Rouse Check to add dice (scales with Blood Potency)",
-        character="Which character (only if you have more than one)",
-    )
-    @app_commands.autocomplete(specialty=_specialty_autocomplete)
-    async def roll(
+    async def _do_roll(
         self,
         interaction: discord.Interaction,
+        *,
         pool: str,
         difficulty: int = 0,
         modifier: int = 0,
@@ -437,6 +449,7 @@ class RollCog(commands.Cog):
         surge: bool = False,
         character: str | None = None,
     ) -> None:
+        """Shared V5 roll engine behind /roll, /vr and /vm."""
         await interaction.response.defer()
 
         # A bare numeric pool is a raw roll — resolved LOCALLY with no tracker
@@ -540,6 +553,67 @@ class RollCog(commands.Cog):
         await _reply_roll(interaction, result, title=full["name"],
                           pool_parts=parts, unknown=unknown, note=surge_note,
                           character_id=char["id"])
+
+    # ── /roll — the friendly, separate-fields roller (Enoch's original) ───────
+
+    @app_commands.command(
+        name="roll",
+        description="Roll a V5 dice pool — a number or traits like 'strength + brawl'.",
+    )
+    @app_commands.describe(
+        pool="Number (5), traits (strength + brawl), or a saved macro name",
+        difficulty="Successes needed (optional)",
+        modifier="Bonus/penalty dice — powers, merits, situational (±)",
+        hunger="Override Hunger dice (defaults to your character's Hunger)",
+        specialty="Add a +1 specialty die (pick one of your character's specialties)",
+        surge="Blood Surge: spend a Rouse Check to add dice (scales with Blood Potency)",
+        character="Which character (only if you have more than one)",
+    )
+    @app_commands.autocomplete(specialty=_specialty_autocomplete)
+    async def roll(
+        self,
+        interaction: discord.Interaction,
+        pool: str,
+        difficulty: int = 0,
+        modifier: int = 0,
+        hunger: int | None = None,
+        specialty: str | None = None,
+        surge: bool = False,
+        character: str | None = None,
+    ) -> None:
+        await self._do_roll(
+            interaction, pool=pool, difficulty=difficulty, modifier=modifier,
+            hunger=hunger, specialty=specialty, surge=surge, character=character)
+
+    # ── /vr + /vm — Inconnu single-syntax roll and macro-roll ─────────────────
+
+    @app_commands.command(
+        name="vr",
+        description="Roll, Inconnu-style: POOL HUNGER DIFFICULTY — e.g. 'strength+brawl 2 3' or '7 2 1'.",
+    )
+    @app_commands.describe(
+        syntax="POOL [HUNGER] [DIFFICULTY] — e.g. 'strength+brawl 2 3', '7 2 1'; add 'surge' for a Blood Surge",
+        character="Which character (only if you have more than one)",
+    )
+    async def vr(self, interaction: discord.Interaction, syntax: str,
+                 character: str | None = None) -> None:
+        pool, hunger, difficulty, surge = _parse_vr_syntax(syntax)
+        await self._do_roll(interaction, pool=pool, difficulty=difficulty,
+                            hunger=hunger, surge=surge, character=character)
+
+    @app_commands.command(
+        name="vm",
+        description="Roll a saved macro, Inconnu-style: MACRO HUNGER DIFFICULTY — e.g. 'attack 2 3'.",
+    )
+    @app_commands.describe(
+        syntax="MACRO [HUNGER] [DIFFICULTY] — e.g. 'attack 2 3'",
+        character="Which character (only if you have more than one)",
+    )
+    async def vm(self, interaction: discord.Interaction, syntax: str,
+                 character: str | None = None) -> None:
+        pool, hunger, difficulty, surge = _parse_vr_syntax(syntax)
+        await self._do_roll(interaction, pool=pool, difficulty=difficulty,
+                            hunger=hunger, surge=surge, character=character)
 
     @app_commands.command(
         name="rouse",

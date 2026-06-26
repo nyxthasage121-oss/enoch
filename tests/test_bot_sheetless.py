@@ -121,3 +121,14 @@ def test_parse_traits_cog_helper():
     assert "junk" in bad and "nope=x" in bad
     assert _parse_traits("") == ({}, [])
 
+
+def test_parse_vr_syntax_cog_helper():
+    """Inconnu /vr 'POOL HUNGER DIFFICULTY' parsing."""
+    from bot.cogs.roll import _parse_vr_syntax
+    assert _parse_vr_syntax("7 2 1") == ("7", 2, 1, False)
+    assert _parse_vr_syntax("strength+brawl 2 3") == ("strength+brawl", 2, 3, False)
+    assert _parse_vr_syntax("strength + brawl 2") == ("strength+brawl", 2, 0, False)
+    assert _parse_vr_syntax("brawl surge") == ("brawl", None, 0, True)
+    assert _parse_vr_syntax("5") == ("5", None, 0, False)
+    assert _parse_vr_syntax("") == ("0", None, 0, False)
+
